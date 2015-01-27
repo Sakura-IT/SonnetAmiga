@@ -1,0 +1,1167 @@
+	SUPER
+	NOEXE
+	
+
+	include ppcdefines.i
+	XDEF PPCCode,PPCLen
+
+PPCLen	EQU	PPCEnd-PPCCode
+
+;********************************************************************************************
+	
+	SECTION PPC_EX
+PPCCode
+	b  system_reset				;Branch outside table
+
+	RORG $400-8				;$500	External Interrupt
+Halt1	ori	r0,r0,0		         	;no-op
+	b	Halt1
+	
+	
+;********************************************************************************************
+		
+
+	mtspr	SPRG0,r3			;Redo save state sometime....(stack?)
+	mtspr	SPRG1,r4
+	mtspr	SPRG2,r6
+	mtspr	SPRG3,r7
+	
+	mfspr	r6,srr0
+	mfspr	r7,srr1
+
+	lwz	r4,0(r6)
+	mfmsr	r4
+	ori	r4,r4,(PSL_IR|PSL_DR)
+	mtmsr	r4				;Reenable MMU (can affect srr0/srr1 acc Docs)
+	isync
+	
+	lis	r3,EUMBEPICPROC
+	lwz	r4,$a0(r3)			;Read IACKR to acknowledge it
+	eieio
+	
+	rlwinm	r4,r4,8,0,31
+	cmpwi	r4,$00ff			;Spurious Vector. Should not do EOI acc Docs.
+	beq	NoEOI
+	
+	lis	r3,EUMB
+	lis	r4,$100				;Clear IM0 bit to clear interrupt
+	stw	r4,$100(r3)
+	eieio
+	
+;	bl	ExHandler			;Branch outside table
+	
+;	mfmsr	r4				;Should Enable Exceptions acc Docs
+;	ori	r4,r4,$8000
+;	mtmsr	r4
+;	isync
+	
+	clearreg r4
+	lis	r3,EUMBEPICPROC
+	sync
+	stw	r4,$b0(r3)			;Write 0 to EOI to End Interrupt
+	
+NoEOI	
+	lis	r31,$200
+	lwz	r4,0(r31)			:DEBUG Counter
+	addi	r4,r4,1
+	stw	r4,0(r31)
+	
+	mtspr	srr0,r6
+	mtspr	srr1,r7
+	mfspr	r3,SPRG0
+	mfspr	r4,SPRG1
+	mfspr	r6,SPRG2
+	mfspr	r7,SPRG3
+	sync
+	rfi
+
+
+;********************************************************************************************
+
+	RORG	$800-8				;$900	Decrementer
+Halt2	ori	r0,r0,0         		;no-op
+	b	Halt2
+	
+	
+	ori	r0,r0,0
+	rfi
+
+
+;********************************************************************************************
+
+	RORG	$2F00-8				;$3000 	End of Exception Vectors Table
+Halt3	ori	r0,r0,0         		;no-op
+	b	Halt3
+	
+ExHandler					;Nothing for now
+	blr	
+
+;********************************************************************************************	
+						;Start Exception Handler
+	RORG	$3F00				;$4000	System initialization
+system_reset
+		
+	lis	r22,CMD_BASE
+	lis	r29,VEC_BASE
+	ori	r29,r29,$6000			;For initial communication
+	
+	bl	Reset
+	setpcireg EUMBBAR
+	lis	r25,EUMB
+	bl	ConfigWrite32
+	bl	ConfigMem			;Result = Sonnet Mem Len in r8
+	li	r3,0				;To RAM at $0
+	lis	r4,$fff0			;From "ROM"
+	li	r5,$4000			;Bytes copied + Offset
+	li	r6,$100				;Offset
+	bl	copy_and_flush
+	bl	mmuSetup
+	bl	Epic
+	bl	Caches
+	
+
+	lis	r27,$8000			;Upper boundary PCI Memory Mediator
+	mr	r26,r8				;Oops, hardcoded
+
+	li	r28,17
+	mtctr	r28	
+	li	r28,1
+	li	r25,29
+	
+Loop1	slw.	r26,r26,r28
+	blt	Fndbit
+	addi	r25,r25,-1
+	bdnz	Loop1
+	b	agentBoot
+	
+Fndbit	slw.	r26,r26,r28
+	beq	SetLen
+	addi	r25,r25,1
+
+SetLen	mr	r30,r28
+	slw	r30,r30,r25
+	slw	r30,r30,r28
+	subf	r27,r30,r27
+	lis	r26,EUMB
+	ori	r26,r26,ITWR	
+	stwbrx	r25,0,r26			;debug = $19 (=48MB, Development system)
+	sync
+
+	setpcireg LMBAR
+	mr	r25,r27
+	ori	r25,r25,8			;debug = $7c000008
+	bl	ConfigWrite32
+
+	stw	r27,8(r29)			;MemStart
+	stw	r8,12(r29)			;MemLen
+	
+	lis	r3,$9				;Usercode hardcoded at $90000
+						;This should become the idle task
+	loadreg	r1,$7fffc			;Userstack in unused mem (See BootPPC.s)
+	lis	r15,0
+	stw	r15,0(r1)
+	li	r2,$e000			;SDA ($6000-$16000)
+	loadreg	r13,$1e000			;SDA2 ($16000-$26000)
+	bl	End
+	
+Start	li	r25,0
+	lwz	r28,0(r25)
+	stw	r28,4(r29)			;Code word		
+agentBoot:
+	ori	r0,r0,0
+	ori	r0,r0,0
+	ori	r0,r0,0         		;no-op
+	ori	r0,r0,0         		;no-op
+	b	agentBoot
+
+End	mflr	r4
+	
+	addi	r5,r4,End-Start
+	subf	r5,r4,r5
+	li	r6,0
+	bl	copy_and_flush			;Put program in Sonnet Mem instead if PCI Mem
+	
+	mfmsr	r14
+	ori	r14,r14,$0000b900		;Enable External Exceptions (b900)
+	mtmsr	r14
+	isync
+	
+	mtspr	srr0,r3
+	isync
+	mtspr	srr1,r14	
+	isync
+	sync	
+	rfi					;To user code
+
+;********************************************************************************************
+
+						;Clear MSR to diable interrupts and checks
+Reset	mflr	r15
+	mfmsr	r1
+	andi.	r1,r1,$40
+	sync
+	mtmsr	r1				;Clear MSR, keep Interrupt Prefix for now 
+	isync
+						;Zero-out registers  
+	andi.   r0, r0, 0
+	mtspr   SPRG0, r0
+	mtspr   SPRG1, r0
+	mtspr   SPRG2, r0
+	mtspr   SPRG3, r0
+						;Set HID0 to known state 
+	lis	r3, High(HID0_NHR)
+	ori	r3, r3, Low(HID0_NHR)
+	mfspr	r4, HID0
+	and	r3, r4, r3			;Clear other bits 
+	mtspr	HID0, r3
+	sync
+						;Set MPU/MSR to a known state. Turn on FP 
+ 	lis	r3,High(PPC_MSR_FP)
+	ori	r3,r3,Low(PPC_MSR_FP)
+	sync
+	mtmsr 	r3
+	isync
+						;Init the floating point control/status register 
+ 	mtfsfi  7,0
+	mtfsfi  6,0
+	mtfsfi  5,0
+	mtfsfi  4,0
+	mtfsfi  3,0
+	mtfsfi  2,0
+	mtfsfi  1,0
+	mtfsfi  0,0
+	isync
+
+						;Initialize floating point data regs to known state 
+	bl	ifpdr_value
+	dc.l	$3f800000			;Value of 1.0
+ifpdr_value:
+	mflr	r3
+	lfs	f0,0(r3)
+	lfs	f1,0(r3)
+	lfs	f2,0(r3)
+	lfs	f3,0(r3)
+	lfs	f4,0(r3)
+	lfs	f5,0(r3)
+	lfs	f6,0(r3)
+	lfs	f7,0(r3)
+	lfs	f8,0(r3)
+	lfs	f9,0(r3)
+	lfs	f10,0(r3)
+	lfs	f11,0(r3)	
+	lfs	f12,0(r3)
+	lfs	f13,0(r3)
+	lfs	f14,0(r3)
+	lfs	f15,0(r3)
+	lfs	f16,0(r3)
+	lfs	f17,0(r3)
+	lfs	f18,0(r3)
+	lfs	f19,0(r3)
+	lfs	f20,0(r3)
+	lfs	f21,0(r3)	
+	lfs	f22,0(r3)
+	lfs	f23,0(r3)
+	lfs	f24,0(r3)
+	lfs	f25,0(r3)
+	lfs	f26,0(r3)
+	lfs	f27,0(r3)
+	lfs	f28,0(r3)
+	lfs	f29,0(r3)
+	lfs	f30,0(r3)
+	lfs	f31,0(r3)
+	sync
+						;Clear BAT and Segment mapping registers 
+	andi.	r1,r1,0
+	mtspr	ibat0u,r1
+	mtspr	ibat1u,r1
+	mtspr	ibat2u,r1
+	mtspr	ibat3u,r1	
+	mtspr	dbat0u,r1
+	mtspr	dbat1u,r1
+	mtspr	dbat2u,r1
+	mtspr	dbat3u,r1
+	
+	isync
+	sync
+	sync
+	lis	r1,$8000
+	isync
+	mtsr	0,r1
+	mtsr	1,r1
+	mtsr	2,r1
+	mtsr	3,r1
+	mtsr	4,r1
+	mtsr	5,r1
+	mtsr	6,r1
+	mtsr	7,r1
+	mtsr	8,r1
+	mtsr	9,r1
+	mtsr	10,r1
+	mtsr	11,r1
+	mtsr	12,r1
+	mtsr	13,r1
+	mtsr	14,r1
+	mtsr	15,r1
+	isync
+	sync
+	sync
+						;Turn off caches and invalidate them 
+
+	mfl2cr3	r3				;**UNRECOGNIZED - SEE PPCDEFINES.I
+	rlwinm  r3,r3,0,1,31	  	   	;turn off the L2 enable bit 
+	mtl2cr3	r3				;**When supported remove trailing number mnemonic
+	isync
+
+	oris	r3,r3,High(L2CR_L2I)
+	mtl2cr3	r3				;**
+	sync
+Wait1:
+	mfl2cr3	r3				;**
+	andi.	r3,r3,Low(L2CR_L2IP)
+	cmpwi	r3,Low(L2CR_L2IP)
+	beq	Wait1				;Wait for invalidate done 
+
+						;Invalidate L1 Cache 
+	mfspr   r3,HID0
+	isync
+	rlwinm  r4,r3,0,18,15			;Clear d16 and d17 to disable L1 cache 
+	sync
+	isync
+	mtspr   HID0,r4 			;turn off caches 
+	isync
+
+	lis	r3,0
+	ori	r3,r3,Low(HID0_ICFI)		;Invalidates instruction caches 
+	or	r4,r4,r3
+	sync
+	isync
+	mtspr	HID0,r4
+	andc	r4,r4,r3
+	isync
+
+	lis	r3,0
+	ori	r3,r3,Low(HID0_DCFI)		;Invalidates data caches 
+	or	r4,r4,r3
+	sync
+	isync
+	mtspr	HID0,r4
+	andc	r4,r4,r3
+	isync
+
+	li	r11,$2000			;No harm 
+	mtctr	r11
+Delay1:
+	bdnz	Delay1
+
+	isync
+	mfspr	r4,HID0
+	isync
+	ori	r4,r4,(HID0_ICE|HID0_ICFI)
+	isync
+	mtspr	HID0,r4				;turn on i-cache for speed 
+	rlwinm	r4,r4,0,21,19			;clear the ICFI bit 
+	isync
+	mtspr	HID0,r4
+
+						;Get CPU type 
+	mfspr	r28,PVR
+	stw	r28,16(r29)			
+	
+	mtlr	r15
+	blr
+
+;********************************************************************************************
+
+
+Epic	lis	r26,EUMB
+	loadreg	r27,EPIC_GCR
+	add	r27,r26,r27
+	li	r28,$a0				
+	stw	r28,0(r27)			;Reset EPIC
+	
+ResLoop	lwz	r28,0(r27)
+	andi.	r28,r28,$80
+	bne	ResLoop				;Wait for reset
+
+	li	r28,$20
+	stw	r28,0(r27)			;Set Mixed Mode
+	
+	loadreg	r28,$80050042
+	loadreg	r27,EPIC_IIVPR3
+	add	r27,r26,r27
+	stwbrx	r28,0,r27			;Set MU interrupt, Pri = 5, Vector = $42
+	sync
+	
+	loadreg	r27,EPIC_EICR
+	add	r27,r26,r27
+	lwz	r28,0(r27)
+	rlwinm	r28,r28,0,21,19			;Doc says Set SIE = 0
+	stw	r28,0(r27)	
+	sync
+
+	loadreg	r27,EPIC_IIVPR3
+	add 	r27,r26,r27
+	lwz	r28,0(r27)
+	rlwinm	r28,r28,0,25,23			;Doc says Mask M bit now. Can maybe already at
+	stw	r28,0(r27)			;while setting the interrupt above?
+	sync
+	
+	loadreg	r27,EPIC_PCTPR
+	add	r27,r26,r27
+	lis	r28,0
+	stw	r28,0(r27)			;Doc says Set Pri (Task) = 0
+	
+	loadreg	r27,EPIC_FRR
+	add	r27,r26,r27
+	
+	lwbrx	r28,0,r27
+	rlwinm	r28,r28,16,21,31		;Get FRR[NIRQ]
+
+	mtctr	r28				;Doc says clear all possible ints
+	lis	r26,EUMBEPICPROC
+
+ClearInts
+	lwz	r27,$a0(r26)			;IACKR
+	eieio
+	clearreg r27
+	sync
+	stw	r27,$b0(r26)			;EOI
+	bdnz	ClearInts
+	
+	blr
+	
+;********************************************************************************************	
+
+						;Enable L1 data cache 
+Caches	mfspr	r4,HID0	
+	ori	r4,r4,Low(HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE)
+	isync
+	mtspr	HID0,r4				;Enable D-cache
+	isync
+	
+						; Set up on chip L2 cache controller.
+
+	lis	r4,High(L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST)
+	ori	r4,r4,0
+	
+	mtl2cr4	r4				;**
+	sync
+	mfl2cr5	r5				;**
+	oris	r5,r5,High(L2CR_L2I)
+	mtl2cr5	r5				;**
+	sync
+	
+Wait2:
+	mfl2cr3	r3				;**
+	andi.	r3,r3,Low(L2CR_L2IP)
+	cmpwi	r3,Low(L2CR_L2IP)
+	beq	Wait2				;Wait for invalidate done 
+
+	oris	r4,r4,High(L2CR_L2E)
+	mtl2cr4	r4				;Enable L2 cache 
+	sync
+	isync
+	blr
+
+
+;********************************************************************************************
+	
+mmuSetup:					;Could be simpler
+
+	lis r4,High(IBAT0L_VAL)
+	ori r4,r4,Low(IBAT0L_VAL)
+	lis r3,High(IBAT0U_VAL)
+	ori r3,r3,Low(IBAT0U_VAL)
+	mtspr ibat0l,r4
+	mtspr ibat0u,r3
+	isync
+
+	lis r4,High(DBAT0L_VAL)
+	ori r4,r4,Low(DBAT0L_VAL)
+	lis r3,High(DBAT0U_VAL)
+	ori r3,r3,Low(DBAT0U_VAL)
+	mtspr dbat0l,r4
+	mtspr dbat0u,r3
+	isync
+
+	lis r4,High(IBAT1L_VAL)
+	ori r4,r4,Low(IBAT1L_VAL)
+	lis r3,High(IBAT1U_VAL)
+	ori r3,r3,Low(IBAT1U_VAL)
+	mtspr ibat1l,r4
+	mtspr ibat1u,r3
+	isync
+
+	lis r4,High(DBAT1L_VAL)
+	ori r4,r4,Low(DBAT1L_VAL)
+	lis r3,High(DBAT1U_VAL)
+	ori r3,r3,Low(DBAT1U_VAL)
+	mtspr dbat1l,r4
+	mtspr dbat1u,r3
+	isync
+
+	lis r4,High(IBAT2L_VAL)
+	ori r4,r4,Low(IBAT2L_VAL)
+	lis r3,High(IBAT2U_VAL)
+	ori r3,r3,Low(IBAT2U_VAL)
+	mtspr ibat2l,r4
+	mtspr ibat2u,r3
+	isync
+
+	lis r4,High(DBAT2L_VAL)
+	ori r4,r4,Low(DBAT2L_VAL)
+	lis r3,High(DBAT2U_VAL)
+	ori r3,r3,Low(DBAT2U_VAL)
+	mtspr dbat2l,r4
+	mtspr dbat2u,r3
+	isync
+
+	lis r4,High(IBAT3L_VAL)
+	ori r4,r4,Low(IBAT3L_VAL)
+	lis r3,High(IBAT3U_VAL)
+	ori r3,r3,Low(IBAT3U_VAL)
+	mtspr ibat3l,r4
+	mtspr ibat3u,r3
+	isync
+
+	
+	lis r4,High(DBAT3L_VAL)
+	ori r4,r4,Low(DBAT3L_VAL)
+	lis r3,High(DBAT3U_VAL)
+	ori r3,r3,Low(DBAT3U_VAL)
+	mtspr dbat3l,r4
+	mtspr dbat3u,r3
+	isync
+						;BATs are now set up, now invalidate tlb entries
+
+	lis r3,0	
+	
+	IFD MPC603e
+	lis r5,$2				;set up high bound of $00020000  for 603e
+	ENDC
+	
+	IFD MPC750
+	lis r5,$4				;750/MAX have 2x as many tlbs as 603e
+	ENDC
+	isync
+
+;Recall that in order to invalidate TLB entries, the value issued to
+;tlbie must increase the value in bits 14:19 (750, MAX) or 15:19(603e)
+;by one each iteration.
+
+
+tlblp:
+	tlbie r3
+	sync
+	addi r3,r3,$1000
+	cmp 0,0,r3,r5				;check if all TLBs invalidated yet
+	blt tlblp
+	
+	mfmsr	r4
+	ori	r4,r4,$00000030			;Translation enable 
+	andi.	r4,r4,$ffbf			;Exception prefix from $fff00000 to $0
+	mtmsr	r4
+	isync
+
+	blr
+;********************************************************************************************		
+	
+ConfigWrite32:
+	lis	r20,CONFIG_ADDR
+	lis 	r21,CONFIG_DAT
+	stwbrx	r23,0,r20
+	sync
+	stwbrx	r25,0,r21
+	sync
+	blr
+		
+ConfigWrite8:
+	lis	r20,CONFIG_ADDR
+	stwbrx	r23,0,r20
+	sync
+	andi.	r19,r23,3
+	oris	r21,r19,CONFIG_DAT
+	stb	r25,0(r21)
+	sync
+	blr
+
+;********************************************************************************************
+	
+ConfigMem:					;Code lifted from the Sonnet Driver
+	mflr	r15				;by Mastatabs from A1k fame
+
+	setpcireg MCCR4		
+	lis	r25,$0010	
+	mr	r25,r25			;nop ?
+	bl	ConfigWrite32		;set MCCR4 to $100000 BUFTYPE[1] = 
+
+	setpcireg MCCR3	
+	lis	r25,$2
+	ori	r25,r25,$a29c		;$2A29C  0101 010 001 010 011 100,
+					;RP1  RAS Precharge = 4 3b100
+					;(4 clocks are 110 per pdf, seems docu is wrong)
+					;RCD2 RAS to CAS delay = 3
+					;CAS3 CAS assertion = 2
+					;CP4  CAS precharge = 1
+					;CAS5 CAS assertion = 2																	
+					;CBR  RAS assertion = 5
+					;CAS write timing modifier DRAM = 0	
+					;31-19 = 0
+	bl	ConfigWrite32		;set MCCR3 to $2A29C
+	
+	setpcireg MCCR2	
+	lis	r25,$e000
+	ori	r25,r25,$1040
+	bl	ConfigWrite32		;set MCCR2 to $E0001040
+					;MCCR2 Memory Control Config Reg   = $e0001040
+					;    Read Modify Write parity      = $0 Disabled
+					;    RSV_PG Reserve one open page  = $0 Four open page mode
+					;    Refresh Interval              = $0208 = 520 decimal
+					;    EDO Enable                    = $0 standard DRAM
+					;    ECC enable                    = $0 Disabled
+					;    Inline Read Parity enable     = $0 Disabled
+					;    Inline Report Parity enable   = $0 Disabled
+					;    Inline Parity not ECC         = $0 Disabled
+					;    ASFALL timing                 = $0 clocks
+					;    ASRISE timing for Port X      = $0 clocks
+					;    TS Wait Timer                 = $7 8 clocks min disable time
+
+	setpcireg MCCR1
+	lis	r25,$ffe2
+	mr	r25,r25
+	bl	ConfigWrite32		;Set MCCR1 to FFE20000	RAM_TYPE = 1 -> DRAM/EDO, 
+					;SREN = 0 disable selfref, MEMGO = 0, 
+					;BURST = 0, all banks 9 row bits
+
+	setpcireg MSAR1
+	clearreg r25
+	bl	ConfigWrite32		;clear MSAR1
+
+	setpcireg MESAR1
+	clearreg r25
+	bl	ConfigWrite32		;clear EMASR1
+
+	setpcireg MSAR2
+	clearreg r25
+	bl	ConfigWrite32		;clear MASR2
+
+	setpcireg MESAR2
+	clearreg r25
+	bl	ConfigWrite32		;clear EMASR2
+
+	setpcireg MEAR1
+	loadreg r25,$7F7F7F7F
+	bl	ConfigWrite32		;set MEAR1 to 7f7f7f7f
+
+	setpcireg MEEAR1
+	clearreg r25
+	bl	ConfigWrite32		;clear EMEAR1
+
+	setpcireg MEAR2
+	loadreg r25,$7F7F7F7F
+	bl	ConfigWrite32		;set MEAR2 to 7f7f7f7f
+
+	setpcireg MEEAR2
+	clearreg r25
+	bl	ConfigWrite32		;clear EMEAR2
+
+	setpcireg MCCR1
+	lis	r25,$ffea
+	mr	r25,r25
+	bl	ConfigWrite32		;set MCCR1 to ffea0000  set MEMGO!
+
+	li	r3,0
+	loadreg r4,"Boon"		;$426F6F6E -> "Boon"
+	li	r5,1
+	li	r8,0
+	li	r9,0
+	li	r10,0
+	li	r11,0
+	li	r12,0
+	lis	r13,$ffea		;ffea0000
+	li	r14,0
+	li	r16,0
+	li	r17,0
+	li	r18,0
+	li	r19,0
+
+loc_3BD8:
+	setpcireg MBEN			;Memory Bank Enable Register
+	mr	r25, r5
+	bl	ConfigWrite8		;enable Bank 0
+
+	stw	r4, 0(r3)		;try to store "Boon" at address $0
+	eieio
+	
+	stw	r3, 4(r3)		;try to store $0 at $4
+	eieio
+	lwz	r7, 0(r3)		;read from $0
+	cmplw	r4, r7			;is it "Boon", long compare
+	bne	loc_4184
+	
+	or	r14, r14, r5		;continue if found
+	
+	setpcireg MCCR1			;$800000f0
+	loadreg r25,$ffeaffff		;-22,65535
+	bl	ConfigWrite32		;set all banks to 12 or 13 row bits
+
+	lis	r6, $40
+	stw	r3, 0(r6)		;set $400000 to $0
+	lis	r6, $80
+	stw	r3, 0(r6)		;set $800000 to $0
+	lis	r6, $100
+	stw	r3, 0(r6)		;set $1000000 to $0
+	lis	r6, $200
+	stw	r3, 0(r6)		;set $2000000 to $0
+	lis	r6, $400
+	stw	r3, 0(r6)		;set $4000000 to $0
+	lis	r6, $800
+	stw	r3, 0(r6)		;set $8000000 to $0
+	eieio
+	stw	r4, 0(r3)		;set $0 to "Boon"
+	eieio
+	lis	r6, $40
+	lwz	r7, 0(r6)		;read from $400000
+	cmplw	r4, r7			;is it "Boon"
+	beq	loc_3CBC		;if yes goto loc_3CBC
+	lis	r6, $80
+	lwz	r7, 0(r6)		;read form $800000
+	cmplw	r4, r7			;is it "Boon"
+	beq	loc_3E24		;if yes goto loc_3E24
+	lis	r6, $100
+	lwz	r7, 0(r6)		;read from $1000000
+	cmplw	r4, r7			;is it "Boon"
+	beq	loc_3E24		;if yes goto loc_3E24
+	lis	r6, $200
+	lwz	r7, 0(r6)		;read from $2000000
+	cmplw	r4, r7
+	beq	loc_3E24		;if its "Boon" goto loc_3E24
+	lis	r6, $400
+	lwz	r7, 0(r6)		;read from $4000000
+	cmplw	r4, r7
+	beq	loc_3E24		;if its "Boon" goto loc_3E24
+	lis	r6, $800
+	lwz	r7, 0(r6)		;read from $8000000
+	cmplw	r4, r7
+	beq	loc_3E24		;if its "Boon" goto loc_3E24
+	b	loc_4184		;goto loc_4184
+
+;********************************************************************************************
+loc_3CBC:				;CODE XREF: findSetMem+1D0
+	loadreg r25,$FFEAAAAA		;set row bits to 11 row bits
+	bl	ConfigWrite32
+	lis	r6, $20			;continue tests
+	stw	r3, 0(r6)
+	lis	r6, $40
+	stw	r3, 0(r6)
+	lis	r6, $80
+	stw	r3, 0(r6)
+	lis	r6, $100
+	stw	r3, 0(r6)
+	lis	r6, $200
+	stw	r3, 0(r6)
+	eieio
+	stw	r4, 0(r3)
+	eieio
+	lis	r6, $20
+	lwz	r7, 0(r6)
+	cmplw	r4, r7
+	beq	loc_3D50
+	lis	r6, $40
+	lwz	r7, 0(r6)
+	cmplw	r4, r7
+	beq	loc_3E24
+	lis	r6, $80
+	lwz	r7, 0(r6)
+	cmplw	r4, r7
+	beq	loc_3E24
+	lis	r6, $100
+	lwz	r7, 0(r6)
+	cmplw	r4, r7
+	beq	loc_3E24
+	lis	r6, $200
+	lwz	r7, 0(r6)
+	cmplw	r4, r7
+	beq	loc_3E24
+	b	loc_4184
+
+;********************************************************************************************
+loc_3D50:				;CODE XREF: findSetMem+274
+	loadreg r25,$FFEA5555		;set row bits to 10 row bits
+	bl	ConfigWrite32
+	lis	r6, $10			;continue tests
+	stw	r3, 0(r6)
+	lis	r6, $20
+	stw	r3, 0(r6)
+	lis	r6, $40
+	stw	r3, 0(r6)
+	lis	r6, $80
+	stw	r3, 0(r6)
+	eieio
+	stw	r4, 0(r3)
+	eieio
+	lis	r6, $10
+	lwz	r7, 0(r6)
+	cmplw	r4, r7
+	beq	loc_3DCC
+	lis	r6, $20
+	lwz	r7, 0(r6)
+	cmplw	r4, r7
+	beq	loc_3E24
+	lis	r6, $40
+	lwz	r7, 0(r6)
+	cmplw	r4, r7
+	beq	loc_3E24
+	lis	r6, $80
+	lwz	r7, 0(r6)
+	cmplw	r4, r7
+	beq	loc_3E24
+	b	loc_4184
+
+;********************************************************************************************
+loc_3DCC:				;CODE XREF: findSetMem+300
+	lis	r6, 8
+	stw	r3, 0(r6)
+	lis	r6, $10
+	stw	r3, 0(r6)
+	lis	r6, $20
+	stw	r3, 0(r6)
+	eieio
+	stw	r4, 0(r3)
+	eieio
+	lis	r6, 8
+	lwz	r7, 0(r6)
+	cmplw	r4, r7
+	beq	loc_4184
+	lis	r6, $10
+	lwz	r7, 0(r6)
+	cmplw	r4, r7
+	beq	loc_3E24
+	lis	r6, $20
+	lwz	r7, 0(r6)
+	cmplw	r4, r7
+	beq	loc_3E24
+	b	loc_4184
+
+;********************************************************************************************
+loc_3E24:				;CODE XREF: findSetMem+1E0
+					;findSetMem+1F0 ...
+	cmplwi	r5, 1
+	bne	loc_3E84
+	mr	r7, r8
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	or	r9, r9, r7
+	mr	r7, r8
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	or	r16, r16, r7
+	add	r8, r8, r6
+	mr	r7, r8
+	addi	r7, r7, $FF
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	or	r11, r11, r7
+	mr	r7, r8
+	addi	r7, r7, $FF
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	or	r18, r18, r7
+	andi.	r2, r2, 3
+	or	r13, r13, r2
+	b	loc_4184
+
+;********************************************************************************************
+loc_3E84:				;CODE XREF: findSetMem+394
+	cmplwi	r5, 2
+	bne	loc_3EF4
+	mr	r7, r8
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	slwi	r7, r7, 8
+	or	r9, r9, r7
+	mr	r7, r8
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	slwi	r7, r7, 8
+	or	r16, r16, r7
+	add	r8, r8, r6
+	mr	r7, r8
+	addi	r7, r7, -1
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	slwi	r7, r7, 8
+	or	r11, r11, r7
+	mr	r7, r8
+	addi	r7, r7, -1
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	slwi	r7, r7, 8
+	or	r18, r18, r7
+	andi.	r2, r2, $C
+	or	r13, r13, r2
+	b	loc_4184
+
+;********************************************************************************************
+loc_3EF4:				;CODE XREF: findSetMem+3F4
+	cmplwi	r5, 4
+	bne	loc_3F64
+	mr	r7, r8
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	slwi	r7, r7, 16
+	or	r9, r9, r7
+	mr	r7, r8
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	slwi	r7, r7, 16
+	or	r16, r16, r7
+	add	r8, r8, r6
+	mr	r7, r8
+	addi	r7, r7, -1
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	slwi	r7, r7, 16
+	or	r11, r11, r7
+	mr	r7, r8
+	addi	r7, r7, -1
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	slwi	r7, r7, 16
+	or	r18, r18, r7
+	andi.	r2, r2, $30
+	or	r13, r13, r2
+	b	loc_4184
+
+;********************************************************************************************
+loc_3F64:				;CODE XREF: findSetMem+464
+	cmplwi	r5, 8
+	bne	loc_3FD4
+	mr	r7, r8
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	slwi	r7, r7, 24
+	or	r9, r9, r7
+	mr	r7, r8
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	slwi	r7, r7, 24
+	or	r16, r16, r7
+	add	r8, r8, r6
+	mr	r7, r8
+	addi	r7, r7, -1
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	slwi	r7, r7, 24
+	or	r11, r11, r7
+	mr	r7, r8
+	addi	r7, r7, -1
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	slwi	r7, r7, 24
+	or	r18, r18, r7
+	andi.	r2, r2, $C0
+	or	r13, r13, r2
+	b	loc_4184
+
+;********************************************************************************************
+loc_3FD4:				;CODE XREF: findSetMem+4D4
+	cmplwi	r5, $10
+	bne	loc_4034
+	mr	r7, r8
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	or	r10, r10, r7
+	mr	r7, r8
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	or	r17, r17, r7
+	add	r8, r8, r6
+
+loc_4000:
+	mr	r7, r8
+	addi	r7, r7, -1
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	or	r12, r12, r7
+	mr	r7, r8
+	addi	r7, r7, -1
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	or	r19, r19, r7
+	andi.	r2, r2, $300
+	or	r13, r13, r2
+	b	loc_4184
+
+;********************************************************************************************
+loc_4034:
+	cmplwi	r5, $20
+
+	bne	loc_40A4
+	mr	r7, r8
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	slwi	r7, r7, 8
+	or	r10, r10, r7
+	mr	r7, r8
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	slwi	r7, r7, 8
+	or	r17, r17, r7
+	add	r8, r8, r6
+	mr	r7, r8
+	addi	r7, r7, -1
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	slwi	r7, r7, 8
+	or	r12, r12, r7
+	mr	r7, r8
+	addi	r7, r7, -1
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	slwi	r7, r7, 8
+	or	r19, r19, r7
+	andi.	r2, r2, $C00
+	or	r13, r13, r2
+	b	loc_4184
+
+;********************************************************************************************
+loc_40A4:
+	cmplwi	r5, $40
+	bne	loc_4114
+	mr	r7, r8
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	slwi	r7, r7, 16
+	or	r10, r10, r7
+	mr	r7, r8
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	slwi	r7, r7, 16
+	or	r17, r17, r7
+	add	r8, r8, r6
+	mr	r7, r8
+	addi	r7, r7, -1
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	slwi	r7, r7, 16
+	or	r12, r12, r7
+	mr	r7, r8
+	addi	r7, r7, -1
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	slwi	r7, r7, 16
+	or	r19, r19, r7
+	andi.	r2, r2, $3000
+	or	r13, r13, r2
+	b	loc_4184
+
+;********************************************************************************************
+loc_4114:
+	cmplwi	r5, $80
+	bne	loc_4184
+	mr	r7, r8
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	slwi	r7, r7, 24
+	or	r10, r10, r7
+	mr	r7, r8
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	slwi	r7, r7, 24
+	or	r17, r17, r7
+	add	r8, r8, r6
+	mr	r7, r8
+	addi	r7, r7, -1
+	srwi	r7, r7, 20
+	andi.	r7, r7, $FF
+	slwi	r7, r7, 24
+	or	r12, r12, r7
+	mr	r7, r8
+	addi	r7, r7, -1
+	srwi	r7, r7, 28
+	andi.	r7, r7, 3
+	slwi	r7, r7, 24
+	or	r19, r19, r7
+	andi.	r2, r2, $c000
+	or	r13, r13, r2
+	b	loc_4184
+
+loc_4184:
+	slwi	r5, r5, 1
+	cmplwi	r5, $100
+	bne	loc_3BD8
+
+	setpcireg MSAR1			;80
+	mr	r25, r9
+	bl	ConfigWrite32		;store found values to registers
+
+	setpcireg MSAR2			;84
+	mr	r25, r10
+	bl	ConfigWrite32
+
+	setpcireg MEAR1			;90
+	mr	r25, r11
+	bl	ConfigWrite32
+
+	setpcireg MEAR2			;94
+	mr	r25, r12
+	bl	ConfigWrite32
+
+	setpcireg MCCR1			;F0
+	mr	r25, r13
+	bl	ConfigWrite32
+
+	setpcireg MBEN			;A0
+	mr	r25, r14
+	bl	ConfigWrite8
+
+	setpcireg MESAR1		;88
+	mr	r25, r16
+	bl	ConfigWrite32
+
+	setpcireg MESAR2		;8c
+	mr	r25, r17
+	bl	ConfigWrite32
+
+	setpcireg MEEAR1		;98
+	mr	r25, r18
+	bl	ConfigWrite32
+
+	setpcireg MEEAR2		;9C
+	mr	r25, r19
+	bl	ConfigWrite32
+
+	addi	r16, r7, 4
+	
+	mtlr	r15
+	blr
+	
+;********************************************************************************************
+;Copy routine used to copy the kernel to start at physical address 0
+;and flush and invalidate the caches as needed.
+;r3 = dest addr, r4 = source addr, r5 = copy limit, r6 = start offset
+;on exit, r3, r4, r5 are unchanged, r6 is updated to be >= r5.
+
+copy_and_flush:
+	addi	r5,r5,-4
+	addi	r6,r6,-4
+cachel:	li	r0,L1_CACHE_LINE_SIZE/4
+	mtctr	r0
+cachel1:	addi	r6,r6,4			;copy a cache line 
+	lwzx	r0,r6,r4
+	stwx	r0,r6,r3
+	bdnz	cachel1
+	dcbst	r6,r3				;write it to memory
+	sync
+	icbi	r6,r3				;flush the icache line
+	cmplw	0,r6,r5
+	blt	cachel
+	sync					;additional sync needed on g4
+	isync
+	addi	r5,r5,4
+	addi	r6,r6,4
+	blr
+;********************************************************************************************
+PPCEnd
+

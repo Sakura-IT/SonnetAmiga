@@ -1,0 +1,5 @@
+	cd dh2:.Development/PCI/WarpHW
+	GenAm WarpHW.s
+	PowerAsm ConfirmInterrupt.p TO ConfirmInterrupt.o
+	Echo "Linking....."
+	vlink -s WarpHW.o ConfirmInterrupt.o -o WarpHW.library
