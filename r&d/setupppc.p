@@ -61,10 +61,10 @@ Halt1	ori	r0,r0,0		         	;no-op
 	stw	r4,$b0(r3)			;Write 0 to EOI to End Interrupt
 	
 NoEOI	
-	lis	r31,$200
-	lwz	r4,0(r31)			:DEBUG Counter
+	lis	r3,$200
+	lwz	r4,0(r3)			:DEBUG Counter
 	addi	r4,r4,1
-	stw	r4,0(r31)
+	stw	r4,0(r3)
 	
 	mtspr	srr0,r6
 	mtspr	srr1,r7
@@ -182,7 +182,7 @@ End	mflr	r4
 	bl	copy_and_flush			;Put program in Sonnet Mem instead if PCI Mem
 	
 	mfmsr	r14
-	ori	r14,r14,$0000b900		;Enable External Exceptions (b900)
+	ori	r14,r14,$8000			;Enable External Exceptions
 	mtmsr	r14
 	isync
 	

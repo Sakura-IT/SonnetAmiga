@@ -1,6 +1,5 @@
 	OPT	P=68060/68851
 	OPT	NOLINE
-;	OPT	AMIGA
 	OPT	ALINK
 
 COMMAND		EQU $4				
@@ -256,7 +255,6 @@ FunkyMMU					;make address on 68k appear same as on Sonnet
 	move.l d5,d0				;Size
 	sub.l a1,d0
 	move.l d0,d5
-;	move.l #$2000000,d0			;Size = 32MB
 	lea MMUTags(pc),a2
 	jsr _LVOSetPropertiesA(a6)
 	tst.l d0
