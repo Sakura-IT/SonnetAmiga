@@ -1,6 +1,4 @@
-	OPT	P=68060/68851
-	OPT	NOLINE
-	OPT	ALINK
+
 
 COMMAND		EQU $4				
 PCSRBAR		EQU $14				
@@ -13,7 +11,7 @@ mh_Upper	EQU 24
 MMU		EQU 1		
 
 	incdir	include:
-	include system/system.gs
+	include	lvo/exec_lib.i
 	include	exec/memory.i
 	include pci.i
 	include mmu/mmutags.i
@@ -85,7 +83,9 @@ Sonnet	move.l d7,a0
 	
 	move.l a2,d4
 EndDrty	lea PPCCode(pc),a2
-	move.l #PPCLen-1,d6
+	move.l #PPCLen,d6
+	lsr.l #2,d6
+	subq.l #1,d6	
 
 loop2	move.l (a2)+,(a4)+
 	dbf d6,loop2

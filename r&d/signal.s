@@ -1,11 +1,8 @@
-	OPT	P=68060/68851
-	OPT	NOLINE
-	OPT	AMIGA
 
 IMR0		EQU $50
 
 	incdir	include:
-	include system/system.gs
+	include	lvo/exec_lib.i
 	include	exec/memory.i
 	include pci.i
 

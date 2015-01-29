@@ -1,214 +1,188 @@
-clearreg	macro
-		lis \1, 0
-		mr \1,\1
-		endm
-
-loadreg 	macro
-		IFEQ High(\2)
-		li      \1, \2
-    		ELSEIF
-        	lis     \1, High(\2)
-        	ori     \1, \1, Low(\2)
-    		ENDC
-		endm
-
-setpcireg	macro
-		ori r23,r22,\1
-		endm
-		
-mfl2cr3		macro				
-		dc.l $7c79faa6		;r3	Let's do this different when we've the time...
-		endm
-		
-mtl2cr3		macro
-		dc.l $7c79fba6		;r3
-		endm				
 
 
-mfl2cr4		macro
-		dc.l $7c99faa6		;r4
-		endm
-		
-mtl2cr4		macro
-		dc.l $7c99fba6		;r4
-		endm				
+.set HID0,1008
+.set HID0_NHR,0x00010000
+.set HID0_ICFI,0x00000800
+.set HID0_DCFI,0x00000400
+.set HID0_ICE,0x00008000
+.set HID0_DCE,0x00004000
+.set HID0_SGE,0x00000080
+.set HID0_BTIC,0x00000020
+.set HID0_BHTE,0x00000004
+
+.set PPC_MSR_FP,0x00002000
+.set IMIMR,0x104
+.set PCI_COMMAND,0x4
+.set OMBAR,0x2300
+.set OTWR,0x2308
+.set ITWR,0x2310
+.set LMBAR,0x10
+.set MSAR1,0x80
+.set MSAR2,0x84
+.set MESAR1,0x88
+.set MESAR2,0x8C
+.set MEAR1,0x90
+.set MEAR2,0x94
+.set MEEAR1,0x98
+.set MEEAR2,0x9C
+.set MBEN,0xA0
+
+.set MCCR1,0xF0
+.set MCCR2,0xF4
+.set MCCR3,0xF8
+.set MCCR4,0xFC
+.set PVR,287
 
 
-mfl2cr5		macro
-		dc.l $7cb9faa6		;r5
-		endm
-		
-mtl2cr5		macro
-		dc.l $7cb9fba6		;r5
-		endm				
+.set srr1,27
+.set srr0,26
+.set ibat0u,528
+.set ibat0l,529
+.set ibat1u,530
+.set ibat1l,531
+.set ibat2u,532
+.set ibat2l,533
+.set ibat3u,534
+.set ibat3l,535
+.set dbat0u,536
+.set dbat0l,537
+.set dbat1u,538
+.set dbat1l,539
+.set dbat2u,540
+.set dbat2l,541
+.set dbat3u,542
+.set dbat3l,543
+.set l2cr,1017
 
+.set EPIC_GCR,0x41020
+.set EPIC_PCTPR,0x60080
+.set EPIC_FRR,0x41000
+.set EPIC_EICR,0x41030
+.set EPIC_IVPR0,0x50200
+.set EPIC_IVPR3,0x50260
+.set EPIC_IVPR4,0x50280
+.set EPIC_IIVPR3,0x510c0
 
+.set SPRG0,272
+.set SPRG1,273
+.set SPRG2,274
+.set SPRG3,275
 
-HID0		EQU	1008
-HID0_NHR	EQU	$00010000
-HID0_ICFI	EQU	$00000800
-HID0_DCFI	EQU	$00000400
-HID0_ICE	EQU	$00008000
-HID0_DCE	EQU	$00004000
-HID0_SGE	EQU	$00000080
-HID0_BTIC	EQU	$00000020
-HID0_BHTE	EQU	$00000004
+.set CONFIG_ADDR,0xFEC0
+.set CONFIG_DAT,0xFEE0
+.set CMD_BASE,0x8000
+.set VEC_BASE,0xFFF0
+.set EUMBBAR,0x78			#At 0x80000000 (Sonnet side)
+.set EUMB,0x8000
+.set EUMBEPICPROC,0x8006
 
-PPC_MSR_FP	EQU	$00002000
-L2CR		EQU	1017
-PVR		EQU	287
-CTR		EQU	9
+.set	PSL_VEC,	0x02000000	#/* ..6. AltiVec vector unit available */
+.set	PSL_SPV,	0x02000000	#/* B... (e500) SPE enable */
+.set	PSL_UCLE,	0x00400000	#/* B... user-mode cache lock enable */
+.set	PSL_POW,	0x00040000	#/* ..6. power management */
+.set	PSL_WE,		PSL_POW		#/* B4.. wait state enable */
+.set	PSL_TGPR,	0x00020000	#/* ..6. temp. gpr remapping (mpc603e) */
+.set	PSL_CE,		PSL_TGPR	#/* B4.. critical interrupt enable */
+.set	PSL_ILE,	0x00010000	#/* ..6. interrupt endian mode (1 == le) */
+.set	PSL_EE,		0x00008000	#/* B468 external interrupt enable */
+.set	PSL_PR,		0x00004000	#/* B468 privilege mode (1 == user) */
+.set	PSL_FP,		0x00002000	#/* B.6. floating point enable */
+.set	PSL_ME,		0x00001000	#/* B468 machine check enable */
+.set	PSL_FE0,	0x00000800	#/* B.6. floating point mode 0 */
+.set	PSL_SE,		0x00000400	#/* ..6. single-step trace enable */
+.set	PSL_DWE,	PSL_SE		#/* .4.. debug wait enable */
+.set	PSL_UBLE,	PSL_SE		#/* B... user BTB lock enable */
+.set	PSL_BE,		0x00000200	#/* ..6. branch trace enable */
+.set	PSL_DE,		PSL_BE		#/* B4.. debug interrupt enable */
+.set	PSL_FE1,	0x00000100	#/* B.6. floating point mode 1 */
+.set	PSL_IP,		0x00000040	#/* ..6. interrupt prefix */
+.set	PSL_IR,		0x00000020	#/* .468 instruction address relocation */
+.set	PSL_IS,		PSL_IR		#/* B... instruction address space */
+.set	PSL_DR,		0x00000010	#/* .468 data address relocation */
+.set	PSL_DS,		PSL_DR		#/* B... data address space */
+.set	PSL_PM,		0x00000008	#/* ..6. Performance monitor */
+.set	PSL_PMM,	PSL_PM		#/* B... Performance monitor */
+.set	PSL_RI,		0x00000002	#/* ..6. recoverable interrupt */
+.set	PSL_LE,		0x00000001	#/* ..6. endian mode (1 == le) */
 
+# general BAT defines for bit settings to compose BAT regs
+# represent all the different block lengths
+# The BL field	 is part of the Upper Bat Register
 
-srr0		EQU	26
-srr1		EQU	27
-SPRG0		EQU	272
-SPRG1		EQU	273
-SPRG2		EQU	274
-SPRG3		EQU	275
-PSL_IR		EQU	32
-PSL_DR		EQU	16
-CONFIG_ADDR	EQU	$FEC0
-CONFIG_DAT	EQU	$FEE0
-CMD_BASE	EQU	$8000
-VEC_BASE	EQU	$FFF0
-EUMBBAR		EQU	$78		;At 0x80000000 (Sonnet side)
-EUMB		EQU	$8000
-EUMBEPICPROC	EQU	$8006
-EUMBEPICCONF	EQU	$8004
-EUMBEPICINT	EQU	$8005
-EUMBF		EQU	$800F
-EPIC_GCR	EQU	$41020
-EPIC_PCTPR	EQU	$60080
-EPIC_FRR	EQU	$41000
-EPIC_EICR	EQU	$41030
-EPIC_IVPR0	EQU	$50200
-EPIC_IVPR3	EQU	$50260
-EPIC_IVPR4	EQU	$50280
-EPIC_IIVPR3	EQU	$510c0
-IMIMR		EQU	$104
-PCI_COMMAND	EQU	$4
-OMBAR		EQU	$2300
-OTWR		EQU	$2308
-ITWR		EQU	$2310
-LMBAR		EQU	$10
-MSAR1		EQU	$80
-MSAR2		EQU	$84
-MESAR1		EQU	$88
-MESAR2		EQU	$8C
-MEAR1		EQU	$90
-MEAR2		EQU	$94
-MEEAR1		EQU	$98
-MEEAR2		EQU	$9C
-MBEN		EQU	$A0
+.set BAT_BL_128K,0x00000000
+.set BAT_BL_256K,0x00000004
+.set BAT_BL_512K,0x0000000C
+.set BAT_BL_1M,0x0000001C
+.set BAT_BL_2M,0x0000003C
+.set BAT_BL_4M,0x0000007C
+.set BAT_BL_8M,0x000000FC
+.set BAT_BL_16M,0x000001FC
+.set BAT_BL_32M,0x000003FC
+.set BAT_BL_64M,0x000007FC
+.set BAT_BL_128M,0x00000FFC
+.set BAT_BL_256M,0x00001FFC
 
-MCCR1		EQU	$F0
-MCCR2		EQU	$F4
-MCCR3		EQU	$F8
-MCCR4		EQU	$FC
+# supervisor/user valid mode definitions  - Upper BAT
+.set BAT_VALID_SUPERVISOR,0x00000002
+.set BAT_VALID_USER,0x00000001
+.set BAT_INVALID,0x00000000
 
+# WIMG bit settings  - Lower BAT
+.set BAT_WRITE_THROUGH,0x00000040
+.set BAT_CACHE_INHIBITED,0x00000020
+.set BAT_COHERENT,0x00000010
+.set BAT_GUARDED,0x00000008
 
-ibat0u		EQU	528
-ibat0l		EQU	529
-ibat1u		EQU	530
-ibat1l		EQU	531
-ibat2u		EQU	532
-ibat2l		EQU	533
-ibat3u		EQU	534
-ibat3l		EQU	535
+# Protection bits - Lower BAT
+.set BAT_NO_ACCESS,0x00000000
+.set BAT_READ_ONLY,0x00000001
+.set BAT_READ_WRITE,0x00000002
 
-dbat0u		EQU	536
-dbat0l		EQU	537
-dbat1u		EQU	538
-dbat1l		EQU	539
-dbat2u		EQU	540
-dbat2l		EQU	541
-dbat3u		EQU	542
-dbat3l		EQU	543
+# Bit defines for the L2CR register
+.set L2CR_L2E,0x80000000 		# bit 0 - enable
+.set L2CR_L2PE,0x40000000 		# bit 1 - data parity
+.set L2CR_L2SIZ_2M,0x00000000 	# bits 2-3 2 MB; MPC7400 ONLY!
+.set L2CR_L2SIZ_1M,0x30000000 	# bits 2-3 1MB
+.set L2CR_L2SIZ_HM,0x20000000 	# bits 2-3 512K
+.set L2CR_L2SIZ_QM,0x10000000 	# bits 2-3 256K; MPC750 ONLY
+.set L2CR_L2CLK_1,0x02000000 	# bits 4-6 Clock Ratio div 1
+.set L2CR_L2CLK_1_5,0x04000000 	# bits 4-6 Clock Ratio div 1.5
+.set L2CR_L2CLK_2,0x08000000 	# bits 4-6 Clock Ratio div 2
+.set L2CR_L2CLK_2_5,0x0a000000 	# bits 4-6 Clock Ratio div 2.5
+.set L2CR_L2CLK_3,0x0c000000 	# bits 4-6 Clock Ratio div 3
+.set L2CR_L2RAM_BURST,0x01000000 # bits 7-8 burst SRAM
+.set L2CR_DO,0x00400000 		# bit 9 Enable caching of instr. in L2
+.set L2CR_L2I,0x00200000 		# bit 10 Global invalidate bit
+.set L2CR_TS,0x00040000 		# bit 13 Test support on 
+.set L2CR_TS_OFF,~L2CR_TS   	# bit 13 Test support off
+.set L2CR_L2OH_5,0x00000000 	# bits 14-15 Output Hold time = 0.5ns*/
+.set L2CR_L2OH_1,0x00010000 	# bits 14-15 Output Hold time = 1.0ns*/
+.set L2CR_L2OH_INV,0x00020000 	# bits 14-15 Output Hold time = 1.0ns*/
+.set L2CR_L2IP,0x00000001
 
-; general BAT defines for bit settings to compose BAT regs
-; represent all the different block lengths
-; The BL field	 is part of the Upper Bat Register
+# first, set address ranges for the devices I’m mapping with the BATs. 
+# The memory model for my board has ROM at fff000000 and RAM at 0x00000000. 
 
-BAT_BL_128K 	EQU	$00000000
-BAT_BL_256K 	EQU 	$00000004
-BAT_BL_512K 	EQU	$0000000C
-BAT_BL_1M 	EQU 	$0000001C
-BAT_BL_2M 	EQU 	$0000003C
-BAT_BL_4M 	EQU 	$0000007C
-BAT_BL_8M 	EQU 	$000000FC
-BAT_BL_16M 	EQU 	$000001FC
-BAT_BL_32M 	EQU 	$000003FC
-BAT_BL_64M 	EQU 	$000007FC
-BAT_BL_128M 	EQU 	$00000FFC
-BAT_BL_256M 	EQU 	$00001FFC
+.set PROM_BASE,0xfc000000	# IOSPACE and 'ROM'
+.set PRAM_BASE,0x00000000
+.set VROM_BASE,PROM_BASE
+.set VRAM_BASE,PRAM_BASE
+.set PCI_BASE,0x80000000
+.set IBAT0L_VAL,(PROM_BASE | BAT_CACHE_INHIBITED | BAT_READ_WRITE)
+.set IBAT0U_VAL,(VROM_BASE|BAT_VALID_SUPERVISOR|BAT_VALID_USER|BAT_BL_64M)
+.set DBAT0L_VAL,IBAT0L_VAL
+.set DBAT0U_VAL,IBAT0U_VAL
+.set IBAT1L_VAL,(PRAM_BASE | BAT_READ_WRITE)
+.set IBAT1U_VAL,(VRAM_BASE | BAT_BL_256M | BAT_VALID_SUPERVISOR | BAT_VALID_USER)
+.set DBAT1L_VAL,IBAT1L_VAL
+.set DBAT1U_VAL,IBAT1U_VAL
+.set IBAT2L_VAL,(PRAM_BASE+0x10000000 | BAT_READ_WRITE)
+.set IBAT2U_VAL,(VRAM_BASE+0x10000000 | BAT_BL_128M | BAT_VALID_SUPERVISOR | BAT_VALID_USER)
+.set DBAT2L_VAL,IBAT2L_VAL
+.set DBAT2U_VAL,IBAT2U_VAL
+.set IBAT3L_VAL,(PCI_BASE | BAT_CACHE_INHIBITED | BAT_READ_WRITE)
+.set IBAT3U_VAL,(PCI_BASE | BAT_BL_256M | BAT_VALID_SUPERVISOR | BAT_VALID_USER)
+.set DBAT3L_VAL,(PCI_BASE | BAT_CACHE_INHIBITED | BAT_READ_WRITE)
+.set DBAT3U_VAL,(PCI_BASE | BAT_BL_256M | BAT_VALID_SUPERVISOR | BAT_VALID_USER)
 
-; supervisor/user valid mode definitions  - Upper BAT
-BAT_VALID_SUPERVISOR 	EQU 	$00000002
-BAT_VALID_USER 		EQU 	$00000001
-BAT_INVALID 		EQU 	$00000000
-
-; WIMG bit settings  - Lower BAT
-BAT_WRITE_THROUGH 	EQU 	$00000040
-BAT_CACHE_INHIBITED 	EQU 	$00000020
-BAT_COHERENT 		EQU 	$00000010
-BAT_GUARDED 		EQU 	$00000008
-
-; Protection bits - Lower BAT
-BAT_NO_ACCESS	EQU 	$00000000
-BAT_READ_ONLY 	EQU 	$00000001
-BAT_READ_WRITE	EQU 	$00000002
-
-; Bit defines for the L2CR register
-L2CR_L2E 	EQU 	$80000000 		; bit 0 - enable
-L2CR_L2PE 	EQU 	$40000000 		; bit 1 - data parity
-L2CR_L2SIZ_2M 	EQU 	$00000000 		; bits 2-3 2 MB; MPC7400 ONLY!
-L2CR_L2SIZ_1M 	EQU 	$30000000 		; bits 2-3 1MB
-L2CR_L2SIZ_HM 	EQU 	$20000000 		; bits 2-3 512K
-L2CR_L2SIZ_QM 	EQU 	$10000000 		; bits 2-3 256K; MPC750 ONLY
-L2CR_L2CLK_1 	EQU 	$02000000 		; bits 4-6 Clock Ratio div 1
-L2CR_L2CLK_1_5 	EQU 	$04000000 		; bits 4-6 Clock Ratio div 1.5
-L2CR_L2CLK_2 	EQU 	$08000000 		; bits 4-6 Clock Ratio div 2
-L2CR_L2CLK_2_5 	EQU 	$0a000000 		; bits 4-6 Clock Ratio div 2.5
-L2CR_L2CLK_3 	EQU 	$0c000000 		; bits 4-6 Clock Ratio div 3
-L2CR_L2RAM_BURST EQU 	$01000000 		; bits 7-8 burst SRAM
-L2CR_DO 	EQU 	$00400000 		; bit 9 Enable caching of instr. in L2
-L2CR_L2I 	EQU 	$00200000 		; bit 10 Global invalidate bit
-L2CR_TS 	EQU 	$00040000 		; bit 13 Test support on 
-L2CR_TS_OFF 	EQU 	~L2CR_TS   		; bit 13 Test support off
-L2CR_L2OH_5 	EQU 	$00000000 		; bits 14-15 Output Hold time = 0.5ns*/
-L2CR_L2OH_1 	EQU 	$00010000 		; bits 14-15 Output Hold time = 1.0ns*/
-L2CR_L2OH_INV 	EQU 	$00020000 		; bits 14-15 Output Hold time = 1.0ns*/
-L2CR_L2IP	EQU	$00000001
-
-; first, set address ranges for the devices I'm mapping with the BATs. 
-; The memory model for my board has ROM at fff000000 and RAM at $00000000. 
-
-PROM_BASE 	EQU 	$fc000000		; IOSPACE and 'ROM'
-PRAM_BASE 	EQU 	$00000000
-VROM_BASE 	EQU 	PROM_BASE
-VRAM_BASE 	EQU 	PRAM_BASE
-PCI_BASE 	EQU 	$80000000
-
-IBAT0L_VAL EQU (PROM_BASE|BAT_CACHE_INHIBITED|BAT_READ_WRITE)
-IBAT0U_VAL EQU (VROM_BASE|BAT_VALID_SUPERVISOR|BAT_VALID_USER|BAT_BL_64M)
-DBAT0L_VAL EQU IBAT0L_VAL
-DBAT0U_VAL EQU IBAT0U_VAL
-IBAT1L_VAL EQU (PRAM_BASE|BAT_READ_WRITE)
-IBAT1U_VAL EQU (VRAM_BASE|BAT_BL_256M|BAT_VALID_SUPERVISOR|BAT_VALID_USER)
-DBAT1L_VAL EQU IBAT1L_VAL
-DBAT1U_VAL EQU IBAT1U_VAL
-IBAT2L_VAL EQU (PRAM_BASE+$10000000|BAT_READ_WRITE)
-IBAT2U_VAL EQU (VRAM_BASE+$10000000|BAT_BL_128M|BAT_VALID_SUPERVISOR|BAT_VALID_USER)
-DBAT2L_VAL EQU IBAT2L_VAL
-DBAT2U_VAL EQU IBAT2U_VAL
-IBAT3L_VAL EQU (PCI_BASE|BAT_CACHE_INHIBITED|BAT_GUARDED|BAT_READ_WRITE)
-IBAT3U_VAL EQU (PCI_BASE|BAT_BL_256M|BAT_VALID_SUPERVISOR|BAT_VALID_USER)
-DBAT3L_VAL EQU (PCI_BASE|BAT_CACHE_INHIBITED|BAT_GUARDED|BAT_READ_WRITE)
-DBAT3U_VAL EQU (PCI_BASE|BAT_BL_256M|BAT_VALID_SUPERVISOR|BAT_VALID_USER)
-
-
-
-MPC750 		EQU 	$1
-
-L1_CACHE_LINE_SIZE	EQU	32
+.set L1_CACHE_LINE_SIZE,32
