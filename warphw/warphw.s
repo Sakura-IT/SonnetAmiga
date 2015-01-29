@@ -1,10 +1,10 @@
 ; IRA V2.08 (26.12.14) (c)1993-95 Tim Ruehsen, (c)2009-2014 Frank Wille
 
-	OPT	P=68060/68851
-	OPT	NOLINE
-;	OPT	AMIGA
-	OPT	ALINK
-
+	
+IMR0		EQU $50
+PCI_SPACE0	EQU $10
+PCSRBAR		EQU $14
+	
 	XREF	ConfirmInterrupt
 
 ;********************************************************************************************
@@ -205,25 +205,59 @@ LAB_001C:
 GetDriverID:
 	MOVE.L	#LAB_0025,D0
 	RTS
+
 SupportedProtocol:
 	MOVEQ	#1,D0
 	RTS
+
 InitBootArea:
-	move.l	#$7c000000,d0				;Dirty; Make Clean
-	RTS
+	movem.l d0-a6,-(a7)
+	bsr.s FindSonnet
+	addq.l #1,d1
+	beq.s Error
+	move.l PCI_SPACE0(a4),d0
+	bra.s Error
+	
 BootPowerPC:
 	RTS
+	
 CauseInterrupt:
-	move.l	#$60003000,a0				;Dirty; Make Clean
-	move.l	#$deadc0de,$50(a3)			;IMR0
-	BSR.W	LAB_0026
-	RTS
+	movem.l d0-a6,-(a7)
+	bsr.s FindSonnet
+	addq.l #1,d1
+	beq.s Error
+	move.l PCSRBAR(a4),d0
+	rol.w #8,d0
+	swap d0
+	rol.w #8,d0
+	move.l d0,a0
+	move.l #$deadc0de,IMR0(a0)
+Error	nop	
+	movem.l (a7)+,d0-a6
+	rts
+
+FindSonnet:
+	moveq.l #0,d2
+	moveq.l #$3f,d1				;Now follow some nasty absolute values
+	move.l #$40000000,a0			;Start Mediator config
+	move.b #$60,(a0)			;Start PCI Mem ($60000000)
+CpLoop	move.l #$40800000,a4
+	move.l d2,d0
+	lsl.l #3,d0
+	lsl.l #8,d0
+	add.l d0,a4
+	move.l (a4),d4
+	cmp.l #$FFFFFFFF,d4
+	beq Error
+	cmp.l #$57100400,d4
+	beq.s Sonnet
+	addq.l #1,d2	
+	dbf d1,CpLoop
+Sonnet	rts
+
 LAB_0025:
 	DC.B	"WarpUp hardware driver for Sonnet Crescendo 7200 PCI",0
 	cnop	0,2
-LAB_0026:
-	NOP
-	RTS
 
 	SECTION S_1,DATA
 
@@ -263,6 +297,6 @@ FUNCTABLE:
 WARPHWLIBNAME:
 	DC.B	"warpHW.library",0,0
 IDSTRING:
-	DC.B	"$VER: warpHW.library 1.0 (27-Jan-15)",0
+	DC.B	"$VER: warpHW.library 1.0 (30-Jan-15)",0
 	cnop	0,2
 	END
