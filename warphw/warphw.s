@@ -2,7 +2,7 @@
 
 	
 IMR0		EQU $50
-PCI_SPACE0	EQU $10
+LMBAR		EQU $10
 PCSRBAR		EQU $14
 	
 	XREF	ConfirmInterrupt
@@ -203,26 +203,30 @@ LAB_001C:
 	DC.W	$0003
 
 GetDriverID:
-	MOVE.L	#LAB_0025,D0
-	RTS
+	move.l #DriverID,d0
+	rts
 
 SupportedProtocol:
-	MOVEQ	#1,D0
-	RTS
+	moveq.l #1,d0
+	rts
 
 InitBootArea:
-	movem.l d0-a6,-(a7)
+	movem.l d1-a6,-(a7)
 	bsr.s FindSonnet
 	addq.l #1,d1
 	beq.s Error
-	move.l PCI_SPACE0(a4),d0
+	move.l LMBAR(a4),d0
+	rol.w #8,d0
+	swap d0
+	rol.w #8,d0
+	and.b #$f7,d0
 	bra.s Error
-	
+
 BootPowerPC:
-	RTS
+	rts
 	
 CauseInterrupt:
-	movem.l d0-a6,-(a7)
+	movem.l d1-a6,-(a7)
 	bsr.s FindSonnet
 	addq.l #1,d1
 	beq.s Error
@@ -233,14 +237,12 @@ CauseInterrupt:
 	move.l d0,a0
 	move.l #$deadc0de,IMR0(a0)
 Error	nop	
-	movem.l (a7)+,d0-a6
+	movem.l (a7)+,d1-a6
 	rts
 
 FindSonnet:
 	moveq.l #0,d2
 	moveq.l #$3f,d1				;Now follow some nasty absolute values
-	move.l #$40000000,a0			;Start Mediator config
-	move.b #$60,(a0)			;Start PCI Mem ($60000000)
 CpLoop	move.l #$40800000,a4
 	move.l d2,d0
 	lsl.l #3,d0
@@ -248,15 +250,17 @@ CpLoop	move.l #$40800000,a4
 	add.l d0,a4
 	move.l (a4),d4
 	cmp.l #$FFFFFFFF,d4
-	beq Error
+	beq Error2
 	cmp.l #$57100400,d4
 	beq.s Sonnet
 	addq.l #1,d2	
 	dbf d1,CpLoop
+Error2	move.l d4,d1	
 Sonnet	rts
 
-LAB_0025:
-	DC.B	"WarpUp hardware driver for Sonnet Crescendo 7200 PCI",0
+
+DriverID
+	dc.b "WarpUp hardware driver for Sonnet Crescendo 7200 PCI",0
 	cnop	0,2
 
 	SECTION S_1,DATA
@@ -297,6 +301,6 @@ FUNCTABLE:
 WARPHWLIBNAME:
 	DC.B	"warpHW.library",0,0
 IDSTRING:
-	DC.B	"$VER: warpHW.library 1.0 (30-Jan-15)",0
+	DC.B	"$VER: warpHW.library 1.0 (31-Jan-15)",0
 	cnop	0,2
 	END
