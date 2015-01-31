@@ -7,7 +7,7 @@ OTWR		EQU $308
 WP_CONTROL	EQU $F48		
 WP_TRIG01	EQU $c0000000
 mh_Upper	EQU 24
-
+MEMF_PPC	EQU $1000
 MMU		EQU 1		
 
 	incdir	include:
@@ -91,7 +91,7 @@ loop2	move.l (a2)+,(a4)+
 	dbf d6,loop2
 	jsr _LVOCacheClearU(a6)
 	
-Shark	move.l #$abcdabcd,$6004(a1)		;Code Word
+	move.l #$abcdabcd,$6004(a1)		;Code Word
 	move.l #$abcdabcd,$6008(a1)		;Sonnet Mem Start (Translated to PCI)
 	move.l #$abcdabcd,$600c(a1)		;Sonnet Mem Len
 	
@@ -113,9 +113,9 @@ Wait	move.l $6004(a1),d5
 	tst.l d0
 	beq.s NoReloc
 	move.l #$1000000,d5
+	move.l d0,d7
 	move.l d0,d6
 	bra.s Reloc
-	
 	ENDC
 	
 NoReloc	move.l #$80000,d7			;Set stack
@@ -123,9 +123,8 @@ NoReloc	move.l #$80000,d7			;Set stack
 	add.l d7,d5
 	move.l $600c(a1),d6
 	sub.l d7,d6
-	move.l d6,d7
-	
-	
+	add.l d6,d7
+		
 Reloc	moveq.l #16,d0
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_REVERSE,d1
 	jsr _LVOAllocVec(a6)
@@ -142,7 +141,7 @@ Reloc	moveq.l #16,d0
 	move.l d5,a0
 	move.w #$0a01,8(a0)
 	move.l a1,10(a0)
-	move.w #$0005,14(a0)
+	move.w #MEMF_PUBLIC|MEMF_FAST|MEMF_PPC,14(a0)
 	lea 32(a0),a1
 	move.l a1,16(a0)
 	clr.l (a1)
@@ -159,12 +158,20 @@ Reloc	moveq.l #16,d0
 	lea 322(a6),a0
 	tst.l d4
 	beq.s NoPCILb
+	
+	IFD MMU
+	move.l #$1000000,d6
+	lea MMUTags(pc),a2
+	move.l 4(a2),d5
+	sub.l d6,d5
+	add.l d6,d7
+	ENDC
+	
 	move.l d4,a2
 	move.l d5,PCI_SPACE0(a2)
-	subq.l #1,d7
-	moveq.l #-1,d5
-	sub.l d7,d5
-	move.l d5,PCI_SPACELEN0(a2)
+	moveq.l #1,d6
+	sub.l d7,d6		
+	move.l d6,PCI_SPACELEN0(a2)
 NoPCILb	jsr _LVOEnqueue(a6)
 	jsr _LVOPermit(a6)
 	
@@ -183,22 +190,21 @@ CpLoop	move.l #$40800000,a4			;Start PCI config
 	lsl.l #3,d0
 	lsl.l #8,d0
 	add.l d0,a4
-	move.l (a4),d4
-	cmp.l #$FFFFFFFF,d4
+	move.l (a4),d6
+	cmp.l #$FFFFFFFF,d6
 	beq Exit
-	rol.w #8,d4
-	swap d4
-	rol.w #8,d4
-	cmp.l #$00041057,d4
-	beq.s SharkPPC
-	cmp.l #$0005121a,d4
+	rol.w #8,d6
+	swap d6
+	rol.w #8,d6
+	cmp.l #$00041057,d6
+	beq.s MPC107
+	cmp.l #$0005121a,d6
 	beq VooDoo3
 VooDone	addq.l #1,d2	
 	dbf d1,CpLoop
 	bra Exit
 
-SharkPPC
-	move.l #$62B00000,a5
+MPC107	move.l #$62B00000,a5
 	move.l a5,a1
 	lea $100(a5),a5
 	
