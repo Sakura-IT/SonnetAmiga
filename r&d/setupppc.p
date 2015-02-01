@@ -123,9 +123,20 @@ system_reset:
 	ori	r29,r29,0x6000			#For initial communication
 
 	bl	Reset
+	
+	setpcireg PICR1
+	loadreg r25,VAL_PICR1
+	bl	ConfigWrite32
+	setpcireg PICR2
+	loadreg r25,VAL_PICR2
+	bl	ConfigWrite32
+	setpcireg PMCR1
+	loadreg r25,VAL_PMCR1
+	bl	ConfigWrite16
 	setpcireg EUMBBAR
 	lis	r25,EUMB
 	bl	ConfigWrite32
+	
 	bl	ConfigMem			#Result = Sonnet Mem Len in r8
 	li	r3,0				#To RAM at 0x0
 	lis	r4,0xfff0			#From "ROM"
@@ -581,6 +592,15 @@ ConfigWrite32:
 	stwbrx	r23,0,r20
 	sync
 	stwbrx	r25,0,r21
+	sync
+	blr
+
+ConfigWrite16:
+	lis	r20,CONFIG_ADDR
+	lis 	r21,CONFIG_DAT
+	stwbrx	r23,0,r20
+	sync
+	sthbrx	r25,0,r21
 	sync
 	blr
 		

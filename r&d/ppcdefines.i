@@ -1,16 +1,47 @@
 
 
 .set HID0,1008
-.set HID0_NHR,0x00010000
-.set HID0_ICFI,0x00000800
-.set HID0_DCFI,0x00000400
-.set HID0_ICE,0x00008000
-.set HID0_DCE,0x00004000
-.set HID0_SGE,0x00000080
-.set HID0_BTIC,0x00000020
-.set HID0_BHTE,0x00000004
+.set HID0_NHR,			0x00010000
+.set HID0_ICFI,			0x00000800
+.set HID0_DCFI,			0x00000400
+.set HID0_ICE,			0x00008000
+.set HID0_DCE,			0x00004000
+.set HID0_SGE,			0x00000080
+.set HID0_BTIC,			0x00000020
+.set HID0_BHTE,			0x00000004
 
-.set PPC_MSR_FP,0x00002000
+.set PICR1,0xA8
+.set PICR1_CF_MP_MULTI,		0x00000003
+.set PICR1_SPEC_PCI,		0x00000004
+.set PICR1_CF_APARK,		0x00000008
+.set PICR1_CF_LOOP_SNOOP,	0x00000010
+.set PICR1_CF_LE_MODE,		0x00000020
+.set PICR1_ST_GATH_EN,		0x00000040
+.set PICR1_NO_BUS_WIDTH_CHECK,	0x00000080
+.set PICR1_TEA_EN,		0x00000400
+.set PICR1_MCP_EN,		0x00000800
+.set PICR1_FLASH_WR_EN,		0x00001000
+.set PICR1_CF_LBA_EN,		0x00002000
+.set PICR1_PROC_TYPE_7XX,	0x00040000
+.set VAL_PICR1,			PICR1_SPEC_PCI|PICR1_CF_APARK|PICR1_CF_LOOP_SNOOP|PICR1_ST_GATH_EN|PICR1_TEA_EN|PICR1_MCP_EN|PICR1_FLASH_WR_EN|PICR1_PROC_TYPE_7XX
+
+.set PICR2,0xAC
+.set PICR2_CF_LBCLAIM_WS,	0x00000600
+.set VAL_PICR2,			PICR2_CF_LBCLAIM_WS
+
+.set PMCR1,0x70
+.set PMCR1_SLEEP,		0x0008
+.set PMCR1_NAP,			0x0010
+.set PMCR1_DOZE,		0x0020
+.set PMCR1_BR1_WAKE,		0x0040
+.set PMCR1_PM,			0x0080
+.set PMCR1_LP_REF_EN,		0x1000
+.set PMCR1_NO_SLEEP_MSG,	0x4000
+.set PMCR1_NO_NAP_MSG,		0x8000
+.set PMCR1_NO_MSG,		0xC000
+.set VAL_PMCR1,			PMCR1_DOZE|PMCR1_BR1_WAKE|PMCR1_LP_REF_EN|PMCR1_NO_MSG
+
+.set PPC_MSR_FP,		0x00002000
 .set IMIMR,0x104
 .set PCI_COMMAND,0x4
 .set OMBAR,0x2300
@@ -109,56 +140,56 @@
 # represent all the different block lengths
 # The BL field	 is part of the Upper Bat Register
 
-.set BAT_BL_128K,0x00000000
-.set BAT_BL_256K,0x00000004
-.set BAT_BL_512K,0x0000000C
-.set BAT_BL_1M,0x0000001C
-.set BAT_BL_2M,0x0000003C
-.set BAT_BL_4M,0x0000007C
-.set BAT_BL_8M,0x000000FC
-.set BAT_BL_16M,0x000001FC
-.set BAT_BL_32M,0x000003FC
-.set BAT_BL_64M,0x000007FC
-.set BAT_BL_128M,0x00000FFC
-.set BAT_BL_256M,0x00001FFC
+.set BAT_BL_128K,		0x00000000
+.set BAT_BL_256K,		0x00000004
+.set BAT_BL_512K,		0x0000000C
+.set BAT_BL_1M,			0x0000001C
+.set BAT_BL_2M,			0x0000003C
+.set BAT_BL_4M,			0x0000007C
+.set BAT_BL_8M,			0x000000FC
+.set BAT_BL_16M,		0x000001FC
+.set BAT_BL_32M,		0x000003FC
+.set BAT_BL_64M,		0x000007FC
+.set BAT_BL_128M,		0x00000FFC
+.set BAT_BL_256M,		0x00001FFC
 
 # supervisor/user valid mode definitions  - Upper BAT
-.set BAT_VALID_SUPERVISOR,0x00000002
-.set BAT_VALID_USER,0x00000001
-.set BAT_INVALID,0x00000000
+.set BAT_VALID_SUPERVISOR,	0x00000002
+.set BAT_VALID_USER,		0x00000001
+.set BAT_INVALID,		0x00000000
 
 # WIMG bit settings  - Lower BAT
-.set BAT_WRITE_THROUGH,0x00000040
-.set BAT_CACHE_INHIBITED,0x00000020
-.set BAT_COHERENT,0x00000010
-.set BAT_GUARDED,0x00000008
+.set BAT_WRITE_THROUGH,		0x00000040
+.set BAT_CACHE_INHIBITED,	0x00000020
+.set BAT_COHERENT,		0x00000010
+.set BAT_GUARDED,		0x00000008
 
 # Protection bits - Lower BAT
-.set BAT_NO_ACCESS,0x00000000
-.set BAT_READ_ONLY,0x00000001
-.set BAT_READ_WRITE,0x00000002
+.set BAT_NO_ACCESS,		0x00000000
+.set BAT_READ_ONLY,		0x00000001
+.set BAT_READ_WRITE,		0x00000002
 
 # Bit defines for the L2CR register
-.set L2CR_L2E,0x80000000 		# bit 0 - enable
-.set L2CR_L2PE,0x40000000 		# bit 1 - data parity
-.set L2CR_L2SIZ_2M,0x00000000 	# bits 2-3 2 MB; MPC7400 ONLY!
-.set L2CR_L2SIZ_1M,0x30000000 	# bits 2-3 1MB
-.set L2CR_L2SIZ_HM,0x20000000 	# bits 2-3 512K
-.set L2CR_L2SIZ_QM,0x10000000 	# bits 2-3 256K; MPC750 ONLY
-.set L2CR_L2CLK_1,0x02000000 	# bits 4-6 Clock Ratio div 1
-.set L2CR_L2CLK_1_5,0x04000000 	# bits 4-6 Clock Ratio div 1.5
-.set L2CR_L2CLK_2,0x08000000 	# bits 4-6 Clock Ratio div 2
-.set L2CR_L2CLK_2_5,0x0a000000 	# bits 4-6 Clock Ratio div 2.5
-.set L2CR_L2CLK_3,0x0c000000 	# bits 4-6 Clock Ratio div 3
-.set L2CR_L2RAM_BURST,0x01000000 # bits 7-8 burst SRAM
-.set L2CR_DO,0x00400000 		# bit 9 Enable caching of instr. in L2
-.set L2CR_L2I,0x00200000 		# bit 10 Global invalidate bit
-.set L2CR_TS,0x00040000 		# bit 13 Test support on 
-.set L2CR_TS_OFF,~L2CR_TS   	# bit 13 Test support off
-.set L2CR_L2OH_5,0x00000000 	# bits 14-15 Output Hold time = 0.5ns*/
-.set L2CR_L2OH_1,0x00010000 	# bits 14-15 Output Hold time = 1.0ns*/
-.set L2CR_L2OH_INV,0x00020000 	# bits 14-15 Output Hold time = 1.0ns*/
-.set L2CR_L2IP,0x00000001
+.set L2CR_L2E,			0x80000000 		# bit 0 - enable
+.set L2CR_L2PE,			0x40000000 		# bit 1 - data parity
+.set L2CR_L2SIZ_2M,		0x00000000	 	# bits 2-3 2 MB; MPC7400 ONLY!
+.set L2CR_L2SIZ_1M,		0x30000000 		# bits 2-3 1MB
+.set L2CR_L2SIZ_HM,		0x20000000 		# bits 2-3 512K
+.set L2CR_L2SIZ_QM,		0x10000000 		# bits 2-3 256K; MPC750 ONLY
+.set L2CR_L2CLK_1,		0x02000000 		# bits 4-6 Clock Ratio div 1
+.set L2CR_L2CLK_1_5,		0x04000000 		# bits 4-6 Clock Ratio div 1.5
+.set L2CR_L2CLK_2,		0x08000000 		# bits 4-6 Clock Ratio div 2
+.set L2CR_L2CLK_2_5,		0x0a000000 		# bits 4-6 Clock Ratio div 2.5
+.set L2CR_L2CLK_3,		0x0c000000 		# bits 4-6 Clock Ratio div 3
+.set L2CR_L2RAM_BURST,		0x01000000 		# bits 7-8 burst SRAM
+.set L2CR_DO,			0x00400000 		# bit 9 Enable caching of instr. in L2
+.set L2CR_L2I,			0x00200000 		# bit 10 Global invalidate bit
+.set L2CR_TS,			0x00040000 		# bit 13 Test support on 
+.set L2CR_TS_OFF,		~L2CR_TS   		# bit 13 Test support off
+.set L2CR_L2OH_5,		0x00000000 		# bits 14-15 Output Hold time = 0.5ns*/
+.set L2CR_L2OH_1,		0x00010000 		# bits 14-15 Output Hold time = 1.0ns*/
+.set L2CR_L2OH_INV,		0x00020000 		# bits 14-15 Output Hold time = 1.0ns*/
+.set L2CR_L2IP,			0x00000001
 
 # first, set address ranges for the devices I’m mapping with the BATs. 
 # The memory model for my board has ROM at fff000000 and RAM at 0x00000000. 
