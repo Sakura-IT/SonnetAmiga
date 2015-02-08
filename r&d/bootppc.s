@@ -8,15 +8,11 @@ WP_CONTROL	EQU $F48
 WP_TRIG01	EQU $c0000000
 mh_Upper	EQU 24
 MEMF_PPC	EQU $1000
-MMU		EQU 1		
 
 	incdir	include:
 	include	lvo/exec_lib.i
 	include	exec/memory.i
 	include pci.i
-	include mmu/mmutags.i
-	include mmu/context.i
-	include	lvo/mmu_lvo.i
 
 	XREF PPCCode,PPCLen
 
@@ -108,16 +104,6 @@ Wait	move.l $6004(a1),d5
 	cmp.l #"Boon",d5
 	bne.s Wait
 	
-	IFD MMU
-	bsr FunkyMMU
-	tst.l d0
-	beq.s NoReloc
-	move.l #$1000000,d5
-	move.l d0,d7
-	move.l d0,d6
-	bra.s Reloc
-	ENDC
-	
 NoReloc	move.l #$80000,d7			;Set stack
 	move.l $6008(a1),d5
 	add.l d7,d5
@@ -139,7 +125,7 @@ Reloc	moveq.l #16,d0
 		
 	move.l a0,a1
 	move.l d5,a0
-	move.w #$0a01,8(a0)
+	move.w #$0a30,8(a0)			;DEBUG $0a01
 	move.l a1,10(a0)
 	move.w #MEMF_PUBLIC|MEMF_FAST|MEMF_PPC,14(a0)
 	lea 32(a0),a1
@@ -153,28 +139,28 @@ Reloc	moveq.l #16,d0
 	move.l d6,24(a0)
 	move.l d1,28(a0)
 	move.l a0,a1	
+	move.l a0,a4
 	
-	jsr _LVOForbid(a6)	
+	jsr _LVODisable(a6)	
 	lea 322(a6),a0
 	tst.l d4
 	beq.s NoPCILb
-	
-	IFD MMU
-	move.l #$1000000,d6
-	lea MMUTags(pc),a2
-	move.l 4(a2),d5
-	sub.l d6,d5
-	add.l d6,d7
-	ENDC
 	
 	move.l d4,a2
 	move.l d5,PCI_SPACE0(a2)
 	moveq.l #1,d6
 	sub.l d7,d6		
 	move.l d6,PCI_SPACELEN0(a2)
-NoPCILb	jsr _LVOEnqueue(a6)
-	jsr _LVOPermit(a6)
-	
+NoPCILb	jsr _LVOEnqueue(a6)	
+	moveq.l #0,d0
+	lea Warp(pc),a1
+	jsr _LVOOpenLibrary(a6)	
+	move.l a4,a1
+	jsr _LVORemove(a6)
+	move.w #$0a01,8(a4)
+	move.l a4,a1
+	jsr _LVOEnqueue(a6)
+	jsr _LVOEnable(a6)		
 	tst.l d4
 	beq Exit	
 	bra Exit2
@@ -235,67 +221,15 @@ VooDoo3	movem.l d0-a6,-(a7)
 	bra VooDone
 ;********************************************************************************************
 
-	IFD MMU
-
-FunkyMMU					;make address on 68k appear same as on Sonnet
-	movem.l d1-a6,-(a7)			;can't use first 16MB though...
-	lea MMUTags(pc),a2
-	move.l #$1000000,d7
-	move.l $6008(a1),d6
-	add.l d7,d6
-	move.l d6,4(a2)
-	move.l $600c(a1),d5
-	moveq.l #0,d0
-	lea mmulib(pc),a1
-	jsr _LVOOpenLibrary(a6)
-	move.l d0,d7
-	beq.s NoMMU
-	move.l d0,a6
-	jsr _LVODefaultContext(a6)
-	move.l d0,d6
-	beq.s NoMMU2
-	move.l d0,a0				;Context
-	move.l #MAPP_REMAPPED|MAPP_COPYBACK,d1	;flags
-	moveq.l #-1,d2				;Mask
-	move.l #$1000000,a1			;Logical
-	move.l d5,d0				;Size
-	sub.l a1,d0
-	move.l d0,d5
-	lea MMUTags(pc),a2
-	jsr _LVOSetPropertiesA(a6)
-	tst.l d0
-	beq.s NoMMU2
-	move.l d6,a0
-	jsr _LVORebuildTree(a6)
-	move.l d7,a1
-	move.l 4.w,a6
-	jsr _LVOCloseLibrary(a6)
-	move.l d5,d0
-	movem.l (a7)+,d1-a6
-	rts	
-	
-NoMMU2	move.l d7,a1
-	move.l 4.w,a6
-	jsr _LVOCloseLibrary(a6)
-NoMMU	movem.l (a7)+,d1-a6
-	moveq.l #0,d0
-	rts	
-
-;********************************************************************************************
-
-MMUTags	dc.l MAPTAG_DESTINATION,$7d000000,TAG_DONE,0
-
-mmulib	dc.b "mmu.library",0
-	cnop	0,2
-	
-	ENDC
 	
 pcilib	dc.b "pci.library",0
 	cnop	0,2
 MemName	dc.b "Sonnet memory",0
 	cnop	0,2
-PCIMem	dc.b "pcidma memory",0	
-	cnop	0,4
+PCIMem	dc.b "pcidma memory",0
+	cnop	0,2
+Warp	dc.b "sonnet.library",0
+	cnop 0,2	
 	
 ;********************************************************************************************	
 

@@ -44,7 +44,7 @@ EInt:	mtspr	SPRG0,r3			#Redo save state sometime....(stack?)
 	
 	mfspr	r6,srr0
 	mfspr	r7,srr1
-
+	
 	lwz	r4,0(r6)
 	mfmsr	r4
 	ori	r4,r4,(PSL_IR|PSL_DR)
@@ -60,16 +60,9 @@ EInt:	mtspr	SPRG0,r3			#Redo save state sometime....(stack?)
 	beq	NoEOI
 	
 	lis	r3,EUMB
-	lis	r4,0x100				#Clear IM0 bit to clear interrupt
+	lis	r4,0x100			#Clear IM0 bit to clear interrupt
 	stw	r4,0x100(r3)
 	eieio
-	
-#	bl	ExHandler			#Branch outside table
-	
-#	mfmsr	r4				#Should Enable Exceptions acc Docs
-#	ori	r4,r4,0x8000
-#	mtmsr	r4
-#	isync
 	
 	clearreg r4
 	lis	r3,EUMBEPICPROC
@@ -81,6 +74,10 @@ NoEOI:
 	lwz	r4,0(r3)			#DEBUG Counter
 	addi	r4,r4,1
 	stw	r4,0(r3)
+	lis	r3,0x7e00
+	lwz	r4,0(r3)
+	addi	r4,r4,1
+	stw 	r4,4(r3)
 	
 	mtspr	srr0,r6
 	mtspr	srr1,r7
@@ -98,15 +95,15 @@ EIntEnd:
 	.space 0x400 - (EIntEnd-EInt+8)		#0x900	Decrementer
 Halt2:	ori	r0,r0,0         		#no-op
 	b	Halt2
-	
+DecSt:	
 	ori	r0,r0,0
 	rfi
-
+DecEnd:
 
 #********************************************************************************************
 
 	
-	.space	0x3000-0x910			#0x3000 	End of Exception Vectors Table
+	.space	0x2700 - (DecEnd-DecSt+8)	#0x3000 	End of Exception Vectors Table
 Halt3:	ori	r0,r0,0         		#no-op
 	b	Halt3
 						#Start Exception Handler
@@ -141,13 +138,9 @@ system_reset:
 	li	r3,0				#To RAM at 0x0
 	lis	r4,0xfff0			#From "ROM"
 	li	r5,0x4000			#Bytes copied + Offset
-	li	r6,0x100				#Offset
+	li	r6,0x100			#Offset
 	bl	copy_and_flush
-	bl	mmuSetup
-	bl	Epic
-	bl	Caches
 	
-
 	lis	r27,0x8000			#Upper boundary PCI Memory Mediator
 	mr	r26,r8				#Oops, hardcoded
 
@@ -183,6 +176,10 @@ SetLen:	mr	r30,r28
 	stw	r27,8(r29)			#MemStart
 	stw	r8,12(r29)			#MemLen
 	
+	bl	mmuSetup
+	bl	Epic
+	bl	Caches
+
 	lis	r3,0x9				#Usercode hardcoded at 0x90000
 						#This should become the idle task
 	loadreg	r1,0x7fffc			#Userstack in unused mem (See BootPPC.s)
@@ -209,6 +206,14 @@ End:	mflr	r4
 	li	r6,0
 	bl	copy_and_flush			#Put program in Sonnet Mem instead if PCI Mem
 	
+
+	mtdec	r3
+	isync
+	lis	r14,0
+	mtspr	285,r14
+	mtspr	284,r14				#Time Base Lower	
+
+	
 	mfmsr	r14
 	ori	r14,r14,0x8000			#Enable External Exceptions
 	mtmsr	r14
@@ -216,7 +221,7 @@ End:	mflr	r4
 	
 	mtspr	srr0,r3
 	isync
-	mtspr	srr1,r14	
+	mtspr	srr1,r14
 	isync
 	sync	
 	rfi					#To user code
@@ -243,9 +248,11 @@ Reset:	mflr	r15
 	and	r3,r4, r3			#Clear other bits 
 	mtspr	HID0,r3
 	sync
+
 						#Set MPU/MSR to a known state. Turn on FP 
  	lis	r3,PPC_MSR_FP@h
 	ori	r3,r3,PPC_MSR_FP@l
+	or	r3,r1,r3
 	sync
 	mtmsr 	r3
 	isync
@@ -420,6 +427,17 @@ ResLoop:
 	stwbrx	r28,0,r27			#Set MU interrupt, Pri = 5, Vector = 0x42
 	sync
 	
+	loadreg r28,0x10000			#Set Slice/Quantum
+	loadreg r27,EPIC_GTBCR0
+	add	r27,r26,r27
+	stwbrx	r28,0,r27
+	sync	
+	loadreg r28,0x80040043
+	loadreg r27,EPIC_GTVPR0
+	add	r27,r26,r27
+	stwbrx	r28,0,r27
+	sync	
+	
 	loadreg	r27,EPIC_EICR
 	add	r27,r26,r27
 	lwz	r28,0(r27)
@@ -433,6 +451,13 @@ ResLoop:
 	rlwinm	r28,r28,0,25,23			#Doc says Mask M bit now. Can maybe already at
 	stw	r28,0(r27)			#while setting the interrupt above?
 	sync
+	
+	loadreg	r27,EPIC_GTVPR0
+	add 	r27,r26,r27
+	lwz	r28,0(r27)
+	rlwinm	r28,r28,0,25,23			#Doc says Mask M bit now. Can maybe already at
+	stw	r28,0(r27)			#while setting the interrupt above?
+	sync	
 	
 	loadreg	r27,EPIC_PCTPR
 	add	r27,r26,r27
@@ -532,6 +557,9 @@ mmuSetup:					#Could be simpler
 	ori r4,r4,IBAT2L_VAL@l
 	lis r3,IBAT2U_VAL@h
 	ori r3,r3,IBAT2U_VAL@l
+	
+	or r3,r3,r27
+	
 	mtspr ibat2l,r4
 	mtspr ibat2u,r3
 	isync
@@ -540,6 +568,9 @@ mmuSetup:					#Could be simpler
 	ori r4,r4,DBAT2L_VAL@l
 	lis r3,DBAT2U_VAL@h
 	ori r3,r3,DBAT2U_VAL@l
+	
+	or r3,r3,r27
+	
 	mtspr dbat2l,r4
 	mtspr dbat2u,r3
 	isync
