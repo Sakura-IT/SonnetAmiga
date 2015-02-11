@@ -1,0 +1,40 @@
+The TO-DO list:
+
+*)	Get code execution on the Sonnet		*DONE
+*)	Initialize Memory on the Sonnet			*DONE
+*)	Make Sonnet Memory avaiable to the Amiga	*DONE
+*)	Initialize BATs, L2, EPIC etc.			*DONE
+*)	Implement external interrupt			*DONE
+*)	Implement timer interrupt			*DONE
+*)	Implement a PPC<->68k message system
+	*)	WaitFor68k
+	*)	WaitForPPC
+	*)	PutXMsg
+	*)	FindPortPPC
+	*)	WaitPortPPC
+	*)	GetMsgPPC
+	*)	ReplyMsgPPC
+	*)	AllocMsgPPC
+	*)	FreeMsgPPC
+	*)	AllocXMsg
+	*)	FreeXMsg
+*)	Implement basic library functionality
+	*)	RunPPC(XL)
+	*)	AllocVecPPC
+	*)	FreeVecPPC
+	*)	CreateTaskPPC
+	*)	DeleteTaskPPC
+	*)	Run68K(XL)
+	*)	NewListPPC
+	*)	InsertPPC
+	*)	EnqueuePPC
+	*)	AddHeadPPC
+	*)	RemovePPC
+	*)	RemHeadPPC
+*)	Add a preemptive scheduler
+	*)	Ready/Wait/added list
+*)	Implement basic auxilary functionality for demo program
+	*)	GetInfo
+	*)	GetCPU
+*)	Implement rest of exceptions plus error messaging
+*)	Implemented remaining functions
