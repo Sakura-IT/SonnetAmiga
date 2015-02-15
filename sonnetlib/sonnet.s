@@ -25,6 +25,7 @@ StackSize	EQU $80000
 	
 	XREF	SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
+	XREF	AddTimePPC,SubTimePPC,CmpTimePPC
 
 	XREF 	PPCCode,PPCLen
 	XDEF	PowerPCBase
@@ -519,9 +520,9 @@ AllocXMsgPPC			rts
 FreeXMsgPPC			rts
 PutXMsgPPC			rts
 GetSysTimePPC			rts
-AddTimePPC			rts
-SubTimePPC			rts
-CmpTimePPC			rts
+;;;;;;AddTimePPC		rts
+;;;;;;SubTimePPC		rts
+;;;;;;CmpTimePPC		rts
 SetReplyPortPPC			rts
 SnoopTask			rts
 EndSnoopTask			rts

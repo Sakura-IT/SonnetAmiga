@@ -7,6 +7,7 @@
 
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
+.global	AddTimePPC,SubTimePPC,CmpTimePPC
 
 		.text
 
@@ -199,7 +200,7 @@ Link1:		stw	r5,4(r4)
 
 #********************************************************************************************
 #
-#	node FindNamePPC(list, name) // r3=r4,r5
+#	node = FindNamePPC(list, name) // r3=r4,r5
 #
 #********************************************************************************************
 
@@ -251,3 +252,77 @@ NewListPPC:
 		stw	r4,-4(r4)
 		blr	
 
+#********************************************************************************************
+#
+#	void AddTimePPC(Dest, Source)	// r4,r5
+#
+#********************************************************************************************
+
+AddTimePPC:
+		lwz	r6,4(r4)
+		lwz	r7,4(r5)
+		add	r6,r6,r7
+		lis	r0,15
+		ori	r0,r0,16960
+		li	r3,0
+		cmplw	r6,r0
+		blt-	Link2
+		sub	r6,r6,r0
+		li	r3,1
+Link2:		lwz	r8,0(r4)
+		lwz	r9,0(r5)
+		add	r8,r8,r9
+		add	r8,r8,r3
+		stw	r6,4(r4)
+		stw	r8,0(r4)
+		blr	
+
+#********************************************************************************************
+#
+#	void SubTimePPC(Dest, Source)	// r4,r5
+#
+#********************************************************************************************
+
+SubTimePPC:
+		lwz	r6,4(r4)
+		lwz	r7,4(r5)
+		sub	r6,r6,r7
+		li	r3,0
+		mr.	r6,r6
+		bge-	Link3
+		lis	r0,15
+		ori	r0,r0,16960
+		add	r6,r6,r0
+		li	r3,1
+Link3:		lwz	r8,0(r4)
+		lwz	r9,0(r5)
+		sub	r8,r8,r9
+		sub	r8,r8,r3
+		stw	r6,4(r4)
+		stw	r8,0(r4)
+		blr	
+
+
+#********************************************************************************************
+#
+#	Result = CmpTimePPC(Dest, Source)	// r3=r4,r5
+#
+#********************************************************************************************
+
+CmpTimePPC:
+		lwz	r6,0(r4)
+		lwz	r7,0(r5)
+		cmplw	r6,r7
+		blt-	Link5
+		bgt-	Link4
+		lwz	r8,4(r4)
+		lwz	r9,4(r5)
+		cmplw	r8,r9
+		blt-	Link5
+		bgt-	Link4
+		li	r3,0
+		b	E5
+Link4:		li	r3,-1
+		b	E5
+Link5:		li	r3,1
+E5:		blr
