@@ -21,9 +21,10 @@ StackSize	EQU $80000
 	include	lvo/expansion_lib.i
 	include	libraries/configvars.i
 	include	exec/execbase.i
-
 	
-	XREF	ConfirmInterrupt
+	XREF	SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
+	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC
+
 	XREF 	PPCCode,PPCLen
 	XDEF	PowerPCBase
 
@@ -48,6 +49,9 @@ ROMTAG:
 	dc.l	LibName
 	dc.l	IDString
 	dc.l	INIT
+
+ENDSKIP:
+	ds.w	1
 
 INIT	movem.l d1-a6,-(a7)
 	move.l 4.w,a6
@@ -238,6 +242,13 @@ RLoc	add.l d2,(a2)+
 	jsr _LVOMakeLibrary(a6)	
 	tst.l d0
 	beq.s NoLib
+	
+	move.l a4,a1
+	sub.l #StackSize,a1
+	move.l d0,4(a1)					;PowerPCBase at $4
+	move.l a4,8(a1)					;Memheader at $8
+	move.l a1,(a1)					;Sonnet relocated mem at $0
+
 	move.l d0,a1
 	jsr _LVOAddLibrary(a6)
 	lea PowerPCBase(pc),a1
@@ -441,14 +452,14 @@ ObtainSemaphorePPC		rts
 AttemptSemaphorePPC		rts
 ReleaseSemaphorePPC		rts
 FindSemaphorePPC		rts
-InsertPPC			rts
-AddHeadPPC			rts
-AddTailPPC			rts
-RemovePPC			rts
-RemHeadPPC			rts
-RemTailPPC			rts
-EnqueuePPC			rts
-FindNamePPC			rts
+;;;;;;InsertPPC			rts
+;;;;;;AddHeadPPC		rts
+;;;;;;AddTailPPC		rts
+;;;;;;RemovePPC			rts
+;;;;;;RemHeadPPC		rts
+;;;;;;RemTailPPC		rts
+;;;;;;EnqueuePPC		rts
+;;;;;;FindNamePPC		rts
 FindTagItemPPC			rts
 GetTagDataPPC			rts
 NextTagItemPPC			rts
@@ -470,8 +481,8 @@ WaitTime			rts
 ChangeStack			rts
 LockTaskList			rts
 UnLockTaskList			rts
-SetExcMMU			rts
-ClearExcMMU			rts
+;;;;;;SetExcMMU			rts
+;;;;;;ClearExcMMU		rts	
 ChangeMMU			rts
 GetInfo				rts
 CreateMsgPortPPC		rts
@@ -539,9 +550,6 @@ X1	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITLONG	LIB_IDSTRING,IDString
 X2	ds.l	1
 	
-ENDSKIP:
-	ds.w	1
-
 FUNCTABLE:
 	dc.l	Open
 	dc.l	Close
