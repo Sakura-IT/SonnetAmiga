@@ -26,11 +26,11 @@ The TO-DO list:
 	*)	DeleteTaskPPC
 	*)	Run68K(XL)
 	*)	NewListPPC
-	*)	InsertPPC
-	*)	EnqueuePPC
-	*)	AddHeadPPC
-	*)	RemovePPC
-	*)	RemHeadPPC
+	*)	InsertPPC				*DONE
+	*)	EnqueuePPC				*DONE
+	*)	AddHeadPPC				*DONE
+	*)	RemovePPC				*DONE
+	*)	RemHeadPPC				*DONE
 *)	Add a preemptive scheduler
 	*)	Ready/Wait/added list
 *)	Implement basic auxilary functionality for demo program
