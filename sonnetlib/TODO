@@ -25,7 +25,7 @@ The TO-DO list:
 	*)	CreateTaskPPC
 	*)	DeleteTaskPPC
 	*)	Run68K(XL)
-	*)	NewListPPC
+	*)	NewListPPC				*DONE
 	*)	InsertPPC				*DONE
 	*)	EnqueuePPC				*DONE
 	*)	AddHeadPPC				*DONE
@@ -35,6 +35,6 @@ The TO-DO list:
 	*)	Ready/Wait/added list
 *)	Implement basic auxilary functionality for demo program
 	*)	GetInfo
-	*)	GetCPU
+	*)	GetCPU					*DONE
 *)	Implement rest of exceptions plus error messaging
 *)	Implemented remaining functions

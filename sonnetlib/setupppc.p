@@ -180,6 +180,10 @@ SetLen:	mr	r30,r28
 	bl	Epic
 	bl	Caches
 
+	mfspr	r3,PVR				#Get CPU Type
+	li	r1,0
+	stw	r3,12(r1)			#Store at SonnetBase+12	
+
 	lis	r3,0x9				#Usercode hardcoded at 0x90000
 						#This should become the idle task
 	loadreg	r1,0x7fffc			#Userstack in unused mem (See BootPPC.s)
@@ -397,10 +401,6 @@ Delay1:
 	isync
 	mtspr	HID0,r4
 
-						#Get CPU type 
-	mfspr	r28,PVR
-	stw	r28,16(r29)			
-	
 	mtlr	r15
 	blr
 

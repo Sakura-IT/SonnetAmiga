@@ -6,7 +6,7 @@
 .endm
 
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
-.global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC
+.global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 
 		.text
 
@@ -229,6 +229,25 @@ E4:		blr
 
 #********************************************************************************************
 #
-#
+#	void ResetPPC(void)	// Dummy (as in powerpc.library
 #
 #********************************************************************************************
+
+ResetPPC:
+		blr
+		
+
+#********************************************************************************************
+#
+#	void NewListPPC(List)	// r4
+#
+#********************************************************************************************
+
+NewListPPC:		
+		stw	r4,8(r4)
+		lis	r0,0
+		nop	
+		stwu	r0,4(r4)
+		stw	r4,-4(r4)
+		blr	
+

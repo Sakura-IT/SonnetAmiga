@@ -21,9 +21,10 @@ StackSize	EQU $80000
 	include	lvo/expansion_lib.i
 	include	libraries/configvars.i
 	include	exec/execbase.i
+	include powerpc/powerpc.i
 	
 	XREF	SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
-	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC
+	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 
 	XREF 	PPCCode,PPCLen
 	XDEF	PowerPCBase
@@ -161,14 +162,16 @@ Wait	move.l $6004(a1),d5
 	cmp.l #"Boon",d5
 	bne.s Wait
 	
-NoReloc	move.l #StackSize,d7			;Set stack
+	move.l #StackSize,d7			;Set stack
 	move.l $6008(a1),d5
+	lea SonnetBase(pc),a0
+	move.l d5,(a0)
 	add.l d7,d5
 	move.l $600c(a1),d6
 	sub.l d7,d6
 	add.l d6,d7
 		
-Reloc	moveq.l #16,d0
+	moveq.l #16,d0
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_REVERSE,d1
 	jsr _LVOAllocVec(a6)
 	tst.l d0
@@ -182,7 +185,7 @@ Reloc	moveq.l #16,d0
 		
 	move.l a0,a1
 	move.l d5,a0
-	move.w #$0a32,LN_TYPE(a0)			;DEBUG $0a32
+	move.w #$0a32,LN_TYPE(a0)
 	move.l a1,LN_NAME(a0)
 	move.w #MEMF_PUBLIC|MEMF_FAST|MEMF_PPC,14(a0)
 	lea MH_SIZE(a0),a1
@@ -243,16 +246,15 @@ RLoc	add.l d2,(a2)+
 	tst.l d0
 	beq.s NoLib
 	
-	move.l a4,a1
-	sub.l #StackSize,a1
+	move.l SonnetBase(pc),a1
 	move.l d0,4(a1)					;PowerPCBase at $4
 	move.l a4,8(a1)					;Memheader at $8
 	move.l a1,(a1)					;Sonnet relocated mem at $0
+	lea PowerPCBase(pc),a1
+	move.l d0,(a1)
 
 	move.l d0,a1
 	jsr _LVOAddLibrary(a6)
-	lea PowerPCBase(pc),a1
-	move.l d0,(a1)
 	
 NoLib	move.l a4,a1
 	jsr _LVORemove(a6)
@@ -420,9 +422,26 @@ CpxLoop	move.l MediatorBase(pc),a4
 Error2	move.l d4,d1	
 xSonnet	rts
 
+GetCPU	movem.l d1-a6,-(a7)
+	move.l SonnetBase(pc),a1
+	move.l 12(a1),d0
+	and.w #$0,d0
+	swap d0
+	subq.l #8,d0
+	beq.s G3
+	subq.l #4,d0
+	beq.s G4
+	move.l #0,d0
+	bra.s ExCPU
+G3	move.l #CPUF_G3,d0
+	bra.s ExCPU
+G4	move.l #CPUF_G4,d0
+ExCPU	movem.l (a7)+,d1-a6
+	rts
+
 RunPPC				rts
 WaitForPPC			rts
-GetCPU				rts
+;;;;;;GetCPU			rts
 PowerDebugMode			rts
 AllocVec32			rts
 FreeVec32			rts
@@ -513,8 +532,8 @@ SetNiceValue			rts
 TrySemaphorePPC			rts
 AllocPrivateMem			rts
 FreePrivateMem			rts
-ResetPPC			rts
-NewListPPC			rts
+;;;;;;ResetPPC			rts
+;;;;;;NewListPPC		rts
 SetExceptPPC			rts
 ObtainSemaphoreSharedPPC	rts
 AttemptSemaphoreSharedPPC	rts
@@ -539,6 +558,7 @@ DriverID
 
 Buffer		ds.l	1
 PowerPCBase	ds.l	1
+SonnetBase	ds.l	1
 MediatorBase	ds.l	1
 
 DATATABLE:
