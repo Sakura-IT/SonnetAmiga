@@ -20,7 +20,7 @@ The TO-DO list:
 	*)	FreeXMsg
 *)	Implement basic library functionality
 	*)	RunPPC(XL)
-	*)	AllocVecPPC
+	*)	AllocVecPPC				*DONE
 	*)	FreeVecPPC
 	*)	CreateTaskPPC
 	*)	DeleteTaskPPC
