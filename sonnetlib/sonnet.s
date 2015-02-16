@@ -23,9 +23,11 @@ StackSize	EQU $80000
 	include	exec/execbase.i
 	include powerpc/powerpc.i
 	
+	XREF	FunctionsLen
+	
 	XREF	SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
-	XREF	AddTimePPC,SubTimePPC,CmpTimePPC
+	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC
 
 	XREF 	PPCCode,PPCLen
 	XDEF	PowerPCBase
@@ -215,13 +217,15 @@ Wait	move.l $6004(a1),d5
 	move.l d6,PCI_SPACELEN0(a2)
 NoPCILb	jsr _LVOEnqueue(a6)
 
-	move.l #(EndCp-Open),d0
+	move.l #(EndCP-Open)+FunctionsLen,d0
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1
 	jsr _LVOAllocVec(a6)
 	tst.l d0
 	beq Exit2
 	move.l d0,a1
-	move.l #(EndCp-Open)/4-1,d1
+	move.l #(EndCP-Open)+FunctionsLen,d1
+	lsr.l #2,d1
+	subq.l #1,d1
 	lea Open(pc),a0
 MoveSon	move.l (a0)+,(a1)+
 	dbf d1,MoveSon
@@ -459,7 +463,7 @@ Run68K				rts
 WaitFor68K			rts
 SPrintF				rts
 Run68KLowLevel			rts
-AllocVecPPC			rts
+;;;;;;AllocVecPPC		rts
 FreeVecPPC			rts
 CreateTaskPPC			rts
 DeleteTaskPPC			rts
@@ -727,6 +731,5 @@ LibName
 IDString
 	DC.B	"$VER: sonnet.library 1.0 (11-Feb-15)",0
 	cnop	0,4
-EndCp	nop
-	end
+EndCP	end
 	
