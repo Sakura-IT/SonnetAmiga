@@ -1,15 +1,17 @@
 .include ppcdefines.i
+.set MH_FIRST,16
+.set MH_FREE,28
+.set MC_BYTES,4
+.set MC_NEXT,0
+.set FunctionsLen,(EndFunctions-SetExcMMU)
 
-.macro clearreg # reg
-		lis \1, 0
-		mr \1,\1
-.endm
+.global FunctionsLen
 
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
-.global	AddTimePPC,SubTimePPC,CmpTimePPC
+.global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC
 
-		.text
+.section "S_0","acrx"
 
 #********************************************************************************************
 #
@@ -326,3 +328,100 @@ Link4:		li	r3,-1
 		b	E5
 Link5:		li	r3,1
 E5:		blr
+
+#********************************************************************************************
+#
+#	MemBlock = AllocVecPPC(Length)	// r3=r4 (r5 and r6 are ignored) 4 byte alligned
+#
+#********************************************************************************************
+
+AllocVecPPC:
+		stwu	r31,-4(r1)
+		stwu	r30,-4(r1)
+		stwu	r29,-4(r1)
+		stwu	r28,-4(r1)
+		stwu	r23,-4(r1)
+		stwu	r22,-4(r1)
+		stwu	r21,-4(r1)
+		stwu	r20,-4(r1)
+
+		andi.	r3,r0,0
+		addi	r29,r0,12
+		addco.	r4,r4,r29
+		loadreg r20,0xfffffffc
+		and	r4,r4,r20
+		li	r20,0
+		lwz	r20,8(r20)
+		lwz	r5,MH_FREE(r20)
+		subfco	r31,r5,r4
+		cmp	0,0,r5,r4
+		bge	.R_AAAAAAAIC
+		b	error
+.R_AAAAAAAIC:
+		lwz	r21,MH_FIRST(r20)
+		addi	r23,r20,MH_FIRST
+MemLoop:	lwz	r5,MC_BYTES(r21)
+		subfco	r31,r5,r4
+		cmp	0,0,r5,r4
+		blt	.R_AAAAAAAIH
+		b	FoundMem
+.R_AAAAAAAIH:
+		lwz	r30,MC_NEXT(r21)
+		cmpi	0,0,r30,0
+		bne	.R_AAAAAAAIJ
+		b	error
+.R_AAAAAAAIJ:
+		mr	r23,r21
+		lwz	r21,MC_NEXT(r21)
+		b	MemLoop
+		
+FoundMem:	mr	r22,r21
+		addco.	r22,r22,r4
+		mr	r3,r21
+		addi	r29,r0,8
+		addco.	r3,r3,r29
+		lwz	r29,MC_NEXT(r21)
+		stw	r29,0(r22)
+		lwz	r29,MC_BYTES(r21)
+		stw	r29,4(r22)
+		lwz	r30,MC_BYTES(r22)
+		subfco	r28,r30,r4
+		subf.	r30,r4,r30
+		stw	r30,MC_BYTES(r22)
+		lwz	r30,MH_FREE(r20)
+		subfco	r28,r30,r4
+		subf.	r30,r4,r30
+		stw	r30,MH_FREE(r20)
+		stw	r22,MC_NEXT(r23)
+		rlwinm	r30,r3,0,24,31
+		andi.	r30,r30,0xfc
+		rlwimi	r3,r30,0,24,31
+		stw	r4,MC_NEXT(r21)
+		addi	r29,r0,5
+		subfco	r28,r4,r29
+		subf.	r4,r29,r4
+		addi	r29,r0,4
+		addco.	r21,r21,r29
+ClrMem:		andi.	r30,r30,0
+		stb	r30,0(r21)
+		addi	r21,r21,1
+		extsh	r29,r4
+		cmpi	2,0,r29,0
+		beq	cr2,.P_AAAAAAAJM
+		subi	r29,r29,1
+		rlwimi	r4,r29,0,16,31
+		b	ClrMem
+.P_AAAAAAAJM:
+		subi	r29,r29,1
+		rlwimi	r4,r29,0,16,31
+error:		lwz	r20,0(r1)
+		lwzu	r21,4(r1)
+		lwzu	r22,4(r1)
+		lwzu	r23,4(r1)
+		lwzu	r28,4(r1)
+		lwzu	r29,4(r1)
+		lwzu	r30,4(r1)
+		lwzu	r31,4(r1)
+		addi	r1,r1,4
+		blr
+EndFunctions:		
