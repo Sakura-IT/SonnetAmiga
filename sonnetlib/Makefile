@@ -6,7 +6,7 @@ ASM68KPARAM=-m68020up -Fhunk
 ASMPPCPARAM=-many -mppc32 -Fhunk
 
 OBJECTS68K=sonnet.o
-OBJECTSPPC=setupppc.o ppcfunctions.o
+OBJECTSPPC=ppcfunctions.o setupppc.o
 INCLUDES=ppcdefines.i pci.i
 
 RMRF=rm -rf
@@ -25,4 +25,3 @@ $(EXECUTABLE) : $(OBJECTS68K) $(OBJECTSPPC)
 
 clean :
 	$(RMRF) $(OBJECTS) $(EXECUTABLE)
-
