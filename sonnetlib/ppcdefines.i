@@ -1,3 +1,20 @@
+.macro clearreg # reg
+		lis \1, 0
+		mr \1,\1
+.endm
+
+.macro loadreg # reg, value
+	.if (\2 >= -0x8000) && (\2 <= 0x7fff)
+        li      \1, \2
+    .else
+        lis     \1, \2@h
+        ori     \1, \1, \2@l
+    .endif
+.endm
+
+.macro setpcireg # value
+		ori r23,r22,\1
+.endm
 
 
 .set HID0,1008
