@@ -78,27 +78,27 @@ ConfirmInterrupt:
 
 InsertPPC:	
 		mr.	r6,r6
-		beq-	NoPred
+		beq-	.NoPred
 		lwz	r3,0(r6)
 		mr.	r3,r3
-		beq-	Just1
+		beq-	.Just1
 		stw	r3,0(r5)
 		stw	r6,4(r5)
 		stw	r5,4(r3)
 		stw	r5,0(r6)
-		b	E1
-Just1:		stw	r6,0(r5)
+		b	.E1
+.Just1:		stw	r6,0(r5)
 		lwz	r3,4(r6)
 		stw	r3,4(r5)
 		stw	r5,4(r6)
 		stw	r5,0(r3)
-		b	E1
-NoPred:		lwz	r3,0(r4)			#Same as AddHeadPPC
+		b	.E1
+.NoPred:	lwz	r3,0(r4)			#Same as AddHeadPPC
 		stw	r5,0(r4)
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-E1:		blr	
+.E1:		blr	
 
 #********************************************************************************************
 #
@@ -153,11 +153,11 @@ RemHeadPPC:
 		lwz	r5,0(r4)
 		lwz	r3,0(r5)
 		mr.	r3,r3
-		beq-	E2
+		beq-	.E2
 		stw	r3,0(r4)
 		stw	r4,4(r3)
 		mr	r3,r5
-E2:		blr	
+.E2:		blr	
 
 #********************************************************************************************
 #
@@ -169,11 +169,11 @@ RemTailPPC:
 		lwz	r3,8(r4)
 		lwz	r5,4(r3)
 		mr.	r5,r5
-		beq-	E3
+		beq-	.E3
 		stw	r5,8(r4)
 		addi	r4,r4,4
 		stw	r4,0(r5)
-E3:		blr	
+.E3:		blr	
 
 #********************************************************************************************
 #
@@ -185,16 +185,16 @@ EnqueuePPC:
 		lbz	r3,9(r5)
 		extsb	r3,r3
 		lwz	r6,0(r4)
-Loop1:		mr	r4,r6
+.Loop1:		mr	r4,r6
 		lwz	r6,0(r4)
 		mr.	r6,r6
-		beq-	Link1
+		beq-	.Link1
 		lbz	r7,9(r4)
 		extsb	r7,r7
 		cmpw	r3,r7
-		ble+	Loop1
+		ble+	.Loop1
 		lwz	r3,4(r4)
-Link1:		stw	r5,4(r4)
+.Link1:		stw	r5,4(r4)
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
@@ -211,24 +211,24 @@ FindNamePPC:
 
 		lwz	r3,0(r4)
 		mr.	r3,r3
-		beq-	E4
+		beq-	.E4
 		subi	r8,r5,1
-Loop2:		mr	r6,r3
+.Loop2:		mr	r6,r3
 		lwz	r3,0(r6)
 		mr.	r3,r3
-		beq-	E4
+		beq-	.E4
 		lwz	r4,10(r6)
 		mr	r5,r8
 		subi	r4,r4,1
-Loop3:		lbzu	r0,1(r4)
+.Loop3:		lbzu	r0,1(r4)
 		lbzu	r7,1(r5)
 		cmplw	r0,r7
-		bne+	Loop2
+		bne+	.Loop2
 		lbz	r0,0(r4)
 		mr.	r0,r0
-		bne+	Loop3
+		bne+	.Loop3
 		mr	r3,r6
-E4:		blr	
+.E4:		blr	
 
 #********************************************************************************************
 #
@@ -268,10 +268,10 @@ AddTimePPC:
 		ori	r0,r0,16960
 		li	r3,0
 		cmplw	r6,r0
-		blt-	Link2
+		blt-	.Link2
 		sub	r6,r6,r0
 		li	r3,1
-Link2:		lwz	r8,0(r4)
+.Link2:		lwz	r8,0(r4)
 		lwz	r9,0(r5)
 		add	r8,r8,r9
 		add	r8,r8,r3
@@ -291,12 +291,12 @@ SubTimePPC:
 		sub	r6,r6,r7
 		li	r3,0
 		mr.	r6,r6
-		bge-	Link3
+		bge-	.Link3
 		lis	r0,15
 		ori	r0,r0,16960
 		add	r6,r6,r0
 		li	r3,1
-Link3:		lwz	r8,0(r4)
+.Link3:		lwz	r8,0(r4)
 		lwz	r9,0(r5)
 		sub	r8,r8,r9
 		sub	r8,r8,r3
@@ -315,23 +315,23 @@ CmpTimePPC:
 		lwz	r6,0(r4)
 		lwz	r7,0(r5)
 		cmplw	r6,r7
-		blt-	Link5
-		bgt-	Link4
+		blt-	.Link5
+		bgt-	.Link4
 		lwz	r8,4(r4)
 		lwz	r9,4(r5)
 		cmplw	r8,r9
-		blt-	Link5
-		bgt-	Link4
+		blt-	.Link5
+		bgt-	.Link4
 		li	r3,0
-		b	E5
-Link4:		li	r3,-1
-		b	E5
-Link5:		li	r3,1
-E5:		blr
+		b	.E5
+.Link4:		li	r3,-1
+		b	.E5
+.Link5:		li	r3,1
+.E5:		blr
 
 #********************************************************************************************
 #
-#	MemBlock = AllocVecPPC(Length)	// r3=r4 (r5 and r6 are ignored) 4 byte alligned
+#	MemBlock = AllocVecPPC(Length)	// r3=r4 (r5 and r6 are ignored) Should be 4 byte aligned
 #
 #********************************************************************************************
 
@@ -346,41 +346,48 @@ AllocVecPPC:
 		stwu	r20,-4(r1)
 
 		andi.	r3,r0,0
-		addi	r29,r0,12
+		addi	r29,r0,4
 		addco.	r4,r4,r29
-		loadreg r20,0xfffffffc
-		and	r4,r4,r20
-		li	r20,0
+		li 	r20,0
 		lwz	r20,8(r20)
 		lwz	r5,MH_FREE(r20)
 		subfco	r31,r5,r4
 		cmp	0,0,r5,r4
-		bge	.R_AAAAAAAIC
-		b	error
-.R_AAAAAAAIC:
+		bge	.Link6
+		b	.error
+.Link6:
 		lwz	r21,MH_FIRST(r20)
 		addi	r23,r20,MH_FIRST
-MemLoop:	lwz	r5,MC_BYTES(r21)
+.MemLoop:	lwz	r5,MC_BYTES(r21)
 		subfco	r31,r5,r4
 		cmp	0,0,r5,r4
-		blt	.R_AAAAAAAIH
-		b	FoundMem
-.R_AAAAAAAIH:
+		blt	.Link7
+		b	.FoundMem
+.Link7:
 		lwz	r30,MC_NEXT(r21)
 		cmpi	0,0,r30,0
-		bne	.R_AAAAAAAIJ
-		b	error
-.R_AAAAAAAIJ:
+		bne	.Link8
+		b	.error
+.Link8:
 		mr	r23,r21
 		lwz	r21,MC_NEXT(r21)
-		b	MemLoop
+		b	.MemLoop
 		
-FoundMem:	mr	r22,r21
+.FoundMem:	mr	r22,r21
 		addco.	r22,r22,r4
 		mr	r3,r21
-		addi	r29,r0,8
+		addi	r29,r0,4
 		addco.	r3,r3,r29
-		lwz	r29,MC_NEXT(r21)
+		lwz	r5,MC_BYTES(r21)
+		subfco	r31,r5,r4
+		cmp	0,0,r5,r4
+		beq	.Link9
+		b	.NotPerfect
+.Link9:
+		lwz	r22,MC_NEXT(r21)
+		b	.JmpPerfect
+		
+.NotPerfect:	lwz	r29,MC_NEXT(r21)
 		stw	r29,0(r22)
 		lwz	r29,MC_BYTES(r21)
 		stw	r29,4(r22)
@@ -388,33 +395,31 @@ FoundMem:	mr	r22,r21
 		subfco	r28,r30,r4
 		subf.	r30,r4,r30
 		stw	r30,MC_BYTES(r22)
-		lwz	r30,MH_FREE(r20)
+.JmpPerfect:	lwz	r30,MH_FREE(r20)
 		subfco	r28,r30,r4
 		subf.	r30,r4,r30
 		stw	r30,MH_FREE(r20)
 		stw	r22,MC_NEXT(r23)
-		rlwinm	r30,r3,0,24,31
-		andi.	r30,r30,0xfc
-		rlwimi	r3,r30,0,24,31
 		stw	r4,MC_NEXT(r21)
 		addi	r29,r0,5
 		subfco	r28,r4,r29
 		subf.	r4,r29,r4
 		addi	r29,r0,4
 		addco.	r21,r21,r29
-ClrMem:		andi.	r30,r30,0
+.ClrMem:	andi.	r30,r30,0
 		stb	r30,0(r21)
 		addi	r21,r21,1
 		extsh	r29,r4
 		cmpi	2,0,r29,0
-		beq	cr2,.P_AAAAAAAJM
+		beq	cr2,.Link10
 		subi	r29,r29,1
 		rlwimi	r4,r29,0,16,31
-		b	ClrMem
-.P_AAAAAAAJM:
+		b	.ClrMem
+.Link10:
 		subi	r29,r29,1
 		rlwimi	r4,r29,0,16,31
-error:		lwz	r20,0(r1)
+
+.error:		lwz	r20,0(r1)
 		lwzu	r21,4(r1)
 		lwzu	r22,4(r1)
 		lwzu	r23,4(r1)
@@ -423,5 +428,6 @@ error:		lwz	r20,0(r1)
 		lwzu	r30,4(r1)
 		lwzu	r31,4(r1)
 		addi	r1,r1,4
+		sync
 		blr
 EndFunctions:		
