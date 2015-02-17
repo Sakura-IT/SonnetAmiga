@@ -3,6 +3,7 @@
 .global PPCCode,PPCLen
 
 .set	PPCLen,(PPCEnd-PPCCode)
+.set	_LVOAllocVecPPC,-324
 
 #********************************************************************************************
 	
@@ -38,8 +39,12 @@ EInt:	mtspr	SPRG0,r3			#Redo save state sometime....(stack?)
 	rlwinm	r4,r4,8,0,31
 	cmpwi	r4,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
 	beq	NoEOI
+	cmpwi	r4,0x0042
+	bne	NoHEAR
+
+	b	TestRoutine
 	
-	lis	r3,EUMB
+NoHEAR:	lis	r3,EUMB
 	lis	r4,0x100			#Clear IM0 bit to clear interrupt
 	stw	r4,0x100(r3)
 	eieio
@@ -49,17 +54,7 @@ EInt:	mtspr	SPRG0,r3			#Redo save state sometime....(stack?)
 	sync
 	stw	r4,0xb0(r3)			#Write 0 to EOI to End Interrupt
 	
-NoEOI:	
-	lis	r3,0x200
-	lwz	r4,0(r3)			#DEBUG Counter
-	addi	r4,r4,1
-	stw	r4,0(r3)
-	lis	r3,0x7e00
-	lwz	r4,0(r3)
-	addi	r4,r4,1
-	stw 	r4,4(r3)
-	
-	mtspr	srr0,r6
+NoEOI:	mtspr	srr0,r6
 	mtspr	srr1,r7
 	mfspr	r3,SPRG0
 	mfspr	r4,SPRG1
@@ -67,6 +62,15 @@ NoEOI:
 	mfspr	r7,SPRG3
 	sync
 	rfi
+	
+TestRoutine:	
+	li	r3,0
+	lwz	r3,4(r3)
+	li	r4,1000
+	lwz	r0,_LVOAllocVecPPC+2(r3)
+	mtlr	r0
+	blrl	
+	b	NoHEAR
 EIntEnd:
 
 
