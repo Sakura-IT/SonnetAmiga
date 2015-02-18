@@ -9,7 +9,7 @@
 
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
-.global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC
+.global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC
 
 .section "S_0","acrx"
 
@@ -344,16 +344,23 @@ AllocVecPPC:
 		stwu	r22,-4(r1)
 		stwu	r21,-4(r1)
 		stwu	r20,-4(r1)
+		stwu	r7,-4(r1)
+		stwu	r6,-4(r1)
 
 		andi.	r3,r0,0
 		addi	r29,r0,4
 		addco.	r4,r4,r29
-		li 	r20,0
+.Align:		andi.	r29,r4,3
+		beq+	.Aligned
+		addi	r4,r4,1
+		b	.Align
+		
+.Aligned:	li 	r20,0
 		lwz	r20,8(r20)
 		lwz	r5,MH_FREE(r20)
 		subfco	r31,r5,r4
 		cmp	0,0,r5,r4
-		bge	.Link6
+		bge+	.Link6
 		b	.error
 .Link6:
 		lwz	r21,MH_FIRST(r20)
@@ -366,7 +373,7 @@ AllocVecPPC:
 .Link7:
 		lwz	r30,MC_NEXT(r21)
 		cmpi	0,0,r30,0
-		bne	.Link8
+		bne+	.Link8
 		b	.error
 .Link8:
 		mr	r23,r21
@@ -381,13 +388,30 @@ AllocVecPPC:
 		lwz	r5,MC_BYTES(r21)
 		subfco	r31,r5,r4
 		cmp	0,0,r5,r4
-		beq	.Link9
-		b	.NotPerfect
-.Link9:
-		lwz	r22,MC_NEXT(r21)
-		b	.JmpPerfect
+		beq-	.Yep
+		b	.MaybePerfect
 		
-.NotPerfect:	lwz	r29,MC_NEXT(r21)
+.Yep:		lwz	r22,MC_NEXT(r21)
+		b	.JmpPerfect
+
+.MaybePerfect:	addi	r29,r0,4
+		addco.	r4,r4,r29
+		subfco	r31,r5,r4
+		cmp	0,0,r5,r4
+		bne	.Link9
+		b	.Yep
+.Link9:
+		addi	r29,r0,4
+		addco.	r4,r4,r29
+		subfco	r31,r5,r4
+		cmp	0,0,r5,r4
+		bne	.Link10
+		b	.Yep
+.Link10:
+		addi	r29,r0,8
+		subfco	r28,r4,r29
+		subf.	r4,r29,r4
+		lwz	r29,MC_NEXT(r21)
 		stw	r29,0(r22)
 		lwz	r29,MC_BYTES(r21)
 		stw	r29,4(r22)
@@ -411,15 +435,17 @@ AllocVecPPC:
 		addi	r21,r21,1
 		extsh	r29,r4
 		cmpi	2,0,r29,0
-		beq	cr2,.Link10
+		beq-	cr2,.Link11
 		subi	r29,r29,1
 		rlwimi	r4,r29,0,16,31
 		b	.ClrMem
-.Link10:
+.Link11:
 		subi	r29,r29,1
 		rlwimi	r4,r29,0,16,31
 
-.error:		lwz	r20,0(r1)
+.error:		lwz	r6,0(r1)
+		lwzu	r7,4(r1)
+		lwzu	r20,4(r1)
 		lwzu	r21,4(r1)
 		lwzu	r22,4(r1)
 		lwzu	r23,4(r1)
@@ -430,4 +456,98 @@ AllocVecPPC:
 		addi	r1,r1,4
 		sync
 		blr
-EndFunctions:		
+		
+#********************************************************************************************
+#
+#	Result = FreeVecPPC(MemBlock)	// r3=r4 r3 should be MEMERR_SUCCESS on success
+#
+#********************************************************************************************		
+		
+FreeVecPPC:		
+		stwu	r31,-4(r1)
+		stwu	r30,-4(r1)
+		stwu	r29,-4(r1)
+		stwu	r28,-4(r1)
+		stwu	r23,-4(r1)
+		stwu	r22,-4(r1)
+		stwu	r21,-4(r1)
+		stwu	r20,-4(r1)
+		stwu	r7,-4(r1)
+		stwu	r6,-4(r1)
+		
+		addi	r3,r0,1
+		li	r20,0
+		lwz	r20,8(r20)
+		addi	r23,r20,MH_FIRST
+		lwz	r5,0(r23)
+		cmpi	0,0,r5,0
+		bne+	.Link12
+		b	.error2
+.Link12:
+		mr	r21,r5
+.MHLoop:	subfco	r31,r5,r4
+		cmp	0,0,r5,r4
+		ble	.Link13
+		b	.FoundMH
+.Link13:
+		lwz	r5,MC_NEXT(r21)
+		cmpi	0,0,r5,0
+		bne+	.Link14
+		b	.error2
+.Link14:
+		addi	r23,r21,MC_NEXT
+		b	.MHLoop
+
+.FoundMH:	mr	r21,r4
+		lwz	r6,-4(r21)
+		cmpi	0,0,r6,0
+		bne+	.Link15
+		b	.error2
+.Link15:
+		mr	r7,r6
+		addi	r29,r0,4
+		subfco	r28,r4,r29
+		subf.	r4,r29,r4
+		addco.	r6,r6,r4
+		subfco	r31,r6,r5
+		cmp	0,0,r6,r5
+		bne	.Link16
+		b	.OnlyChunk
+.Link16:
+		stw	r5,-4(r21)
+		stw	r7,0(r21)
+		b	.MoreChunks
+
+.OnlyChunk:	mr	r22,r5
+		lwz	r29,MC_NEXT(r22)
+		stw	r29,-4(r21)
+		lwz	r29,MC_BYTES(r22)
+		stw	r29,0(r21)
+		lwz	r30,0(r21)
+		addco.	r30,r30,r7
+		stw	r30,0(r7)
+
+.MoreChunks:	stw	r4,0(r23)
+		lwz	r30,MH_FREE(r20)
+		addco.	r30,r30,r7
+		stw	r30,MH_FREE(r20)
+		addi	r29,r0,1
+		subfco	r28,r3,r29
+		subf.	r3,r29,r3
+
+.error2:	lwz	r6,0(r1)
+		lwzu	r7,4(r1)
+		lwzu	r20,4(r1)
+		lwzu	r21,4(r1)
+		lwzu	r22,4(r1)
+		lwzu	r23,4(r1)
+		lwzu	r28,4(r1)
+		lwzu	r29,4(r1)
+		lwzu	r30,4(r1)
+		lwzu	r31,4(r1)
+		addi	r1,r1,4
+		sync
+		blr	
+		
+#********************************************************************************************			
+EndFunctions:
