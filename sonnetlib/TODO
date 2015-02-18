@@ -21,7 +21,7 @@ The TO-DO list:
 *)	Implement basic library functionality
 	*)	RunPPC(XL)
 	*)	AllocVecPPC				*DONE
-	*)	FreeVecPPC
+	*)	FreeVecPPC				*DONE
 	*)	CreateTaskPPC
 	*)	DeleteTaskPPC
 	*)	Run68K(XL)
