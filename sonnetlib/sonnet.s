@@ -30,7 +30,7 @@ blr		MACRO
 	
 	XREF	SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
-	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC
+	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC
 
 	XREF 	PPCCode,PPCLen
 	XDEF	PowerPCBase
@@ -465,7 +465,7 @@ WaitFor68K			blr
 SPrintF				blr
 Run68KLowLevel			blr
 ;;;;;;AllocVecPPC		blr
-FreeVecPPC			blr
+;;;;;;FreeVecPPC		blr
 CreateTaskPPC			blr
 DeleteTaskPPC			blr
 FindTaskPPC			blr
