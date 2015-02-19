@@ -4,101 +4,13 @@
 
 .set	PPCLen,(PPCEnd-PPCCode)
 .set	_LVOAllocVecPPC,-324
+.set	_LVOGetInfo,-594
 
 #********************************************************************************************
 	
-	.text
-PPCCode:
-	b  system_reset				#Branch outside table
+.section "PPCFunctions","acrx"
 
-	.space 0x400-12				#$500	External Interrupt
-Halt1:	ori	r0,r0,0		         	#no-op
-	b	Halt1
-	
-#********************************************************************************************
-		
-
-EInt:	mtspr	SPRG0,r3			#Redo save state sometime....(stack?)
-	mtspr	SPRG1,r4
-	mtspr	SPRG2,r6
-	mtspr	SPRG3,r7
-	
-	mfspr	r6,srr0
-	mfspr	r7,srr1
-	
-	lwz	r4,0(r6)
-	mfmsr	r4
-	ori	r4,r4,(PSL_IR|PSL_DR)
-	mtmsr	r4				#Reenable MMU (can affect srr0/srr1 acc Docs)
-	isync
-	
-	lis	r3,EUMBEPICPROC
-	lwz	r4,0xa0(r3)			#Read IACKR to acknowledge it
-	eieio
-	
-	rlwinm	r4,r4,8,0,31
-	cmpwi	r4,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
-	beq	NoEOI
-	cmpwi	r4,0x0042
-	bne	NoHEAR
-
-	b	TestRoutine
-	
-NoHEAR:	lis	r3,EUMB
-	lis	r4,0x100			#Clear IM0 bit to clear interrupt
-	stw	r4,0x100(r3)
-	eieio
-	
-	clearreg r4
-	lis	r3,EUMBEPICPROC
-	sync
-	stw	r4,0xb0(r3)			#Write 0 to EOI to End Interrupt
-	
-NoEOI:	mtspr	srr0,r6
-	mtspr	srr1,r7
-	mfspr	r3,SPRG0
-	mfspr	r4,SPRG1
-	mfspr	r6,SPRG2
-	mfspr	r7,SPRG3
-	sync
-	rfi
-	
-TestRoutine:	
-	li	r3,0
-	lwz	r3,4(r3)
-	li	r4,1000
-	lwz	r0,_LVOAllocVecPPC+2(r3)
-	mtlr	r0
-	blrl	
-	b	NoHEAR
-EIntEnd:
-
-
-#********************************************************************************************
-
-	.space 0x400 - (EIntEnd-EInt+8)		#0x900	Decrementer
-Halt2:	ori	r0,r0,0         		#no-op
-	b	Halt2
-DecSt:	
-	ori	r0,r0,0
-	rfi
-DecEnd:
-
-#********************************************************************************************
-
-	
-	.space	0x2700 - (DecEnd-DecSt+8)	#0x3000 	End of Exception Vectors Table
-Halt3:	ori	r0,r0,0         		#no-op
-	b	Halt3
-						#Start Exception Handler
-ExHandler:					#Nothing for now
-	blr	
-ExHandlerEnd:
-#********************************************************************************************	
-	
-	.space 0x1000 - (ExHandlerEnd-ExHandler)	#0x4000	System initialization
-system_reset:
-		
+PPCCode:					#0x4000	System initialization
 	lis	r22,CMD_BASE
 	lis	r29,VEC_BASE
 	ori	r29,r29,0x6000			#For initial communication
@@ -119,11 +31,7 @@ system_reset:
 	bl	ConfigWrite32
 	
 	bl	ConfigMem			#Result = Sonnet Mem Len in r8
-	li	r3,0				#To RAM at 0x0
-	lis	r4,0xfff0			#From "ROM"
-	li	r5,0x4000			#Bytes copied + Offset
-	li	r6,0x100			#Offset
-	bl	copy_and_flush
+	bl	InstallExceptions		#Put exceptions in place
 	
 	lis	r27,0x8000			#Upper boundary PCI Memory Mediator
 	mr	r26,r8				#Oops, hardcoded
@@ -166,11 +74,11 @@ SetLen:	mr	r30,r28
 
 	mfspr	r3,PVR				#Get CPU Type
 	li	r1,0
-	stw	r3,12(r1)			#Store at SonnetBase+12	
+	stw	r3,CPUInfo(r1)			#Store at SonnetBase+12
 
 	lis	r3,0x9				#Usercode hardcoded at 0x90000
 						#This should become the idle task
-	loadreg	r1,0x7fffc			#Userstack in unused mem (See BootPPC.s)
+	loadreg	r1,0x7fefc			#Userstack in unused mem (See BootPPC.s)
 	lis	r15,0
 	stw	r15,0(r1)
 	li	r2,-8192			#SDA (0x6000-0x16000)
@@ -194,17 +102,16 @@ End:	mflr	r4
 	li	r6,0
 	bl	copy_and_flush			#Put program in Sonnet Mem instead if PCI Mem
 	
-
-	mtdec	r3
-	isync
-	lis	r14,0
-	mtspr	285,r14
+#	mtdec	r3				#Activate Decrementer Exception
+#	sync					#
+	
+	lis	r14,0				#Reset
+	mtspr	285,r14				#Time Base Upper and
 	mtspr	284,r14				#Time Base Lower	
 
-	
 	mfmsr	r14
-	ori	r14,r14,0x8000			#Enable External Exceptions
-	mtmsr	r14
+	ori	r14,r14,0x8000			#Enable External Exceptions (and Decrementer
+	mtmsr	r14				#Exception when activated)
 	isync
 	
 	mtspr	srr0,r3
@@ -1207,5 +1114,101 @@ cachel1:	addi	r6,r6,4			#copy a cache line
 	addi	r6,r6,4
 	blr
 #********************************************************************************************
-PPCEnd:
 
+InstallExceptions:
+	mflr	r15
+	bl	GtCode
+Halt:	ori	r0,r0,0		         	#no-op
+	b	Halt
+GtCode:	mflr	r16
+	li	r17,0
+	li	r18,20
+	mtctr	r18
+FillEm:	addi	r17,r17,0x100
+	lwz	r19,0(r16)
+	stw	r19,0(r17)
+	lwz	r19,4(r16)
+	stw	r19,4(r17)
+	bdnz	FillEm
+	bl	EIntEnd
+
+EInt:	mtspr	SPRG0,r3			#Redo save state sometime....(stack?)
+	mtspr	SPRG1,r4
+	mtspr	SPRG2,r6
+	mtspr	SPRG3,r7
+	
+	mfspr	r6,srr0
+	mfspr	r7,srr1
+	
+	lwz	r4,0(r6)
+	mfmsr	r4
+	ori	r4,r4,(PSL_IR|PSL_DR)
+	mtmsr	r4				#Reenable MMU (can affect srr0/srr1 acc Docs)
+	isync
+	
+	lis	r3,EUMBEPICPROC
+	lwz	r4,0xa0(r3)			#Read IACKR to acknowledge it
+	eieio
+	
+	rlwinm	r4,r4,8,0,31
+	cmpwi	r4,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
+	beq	NoEOI
+	cmpwi	r4,0x0042
+	bne	NoHEAR
+
+	b	TestRoutine
+	
+NoHEAR:	lis	r3,EUMB
+	lis	r4,0x100			#Clear IM0 bit to clear interrupt
+	stw	r4,0x100(r3)
+	eieio
+	clearreg r4
+	lis	r3,EUMBEPICPROC
+	sync
+	stw	r4,0xb0(r3)			#Write 0 to EOI to End Interrupt
+	
+NoEOI:	mtspr	srr0,r6
+	mtspr	srr1,r7
+	mfspr	r3,SPRG0
+	mfspr	r4,SPRG1
+	mfspr	r6,SPRG2
+	mfspr	r7,SPRG3
+	sync
+	rfi
+	
+TestRoutine:	
+	li	r3,SonnetBase
+	lwz	r3,PowerPCBase(r3)
+	bl	TagEnd
+.long		0x80102006,0,0x80102007,0,0x80102000,0,0x80102001,0,0x80102004,0,0x80102005,0,0
+TagEnd:	mflr	r4
+	li	r0,0
+	stw	r4,20(r0)
+	lwz	r0,_LVOGetInfo+2(r3)
+	mtlr	r0
+	blrl	
+	b	NoHEAR
+	
+EIntEnd:
+	mflr	r4
+	li	r3,0x500
+	li	r5,EIntEnd-EInt
+	li	r6,0
+	bl	copy_and_flush
+	bl	DcIntEnd
+	
+DcInt:	loadreg	r3,"test"			#Decrementer Exception. Not activated (see above)
+	li	r4,0
+	stw	r3,32(r4)
+	rfi	
+
+DcIntEnd:
+	mflr	r4
+	li	r3,0x900
+	li	r5,DcIntEnd-DcInt
+	li	r6,0
+	bl	copy_and_flush
+		
+	mtlr	r15
+	blr	
+PPCEnd:
