@@ -30,14 +30,14 @@ blr		MACRO
 	
 	XREF	SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
-	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC
+	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC.GetInfo
 
 	XREF 	PPCCode,PPCLen
 	XDEF	PowerPCBase
 
 ;********************************************************************************************
 
-	SECTION S_0,CODE
+	SECTION LibBody,CODE
 
 ;********************************************************************************************
 
@@ -142,7 +142,9 @@ Sonnet	move.l d7,a0
 	move.l #$0000F0FF,OMBAR(a3)		;Processor outbound mem at $FFF00000
 	
 	move.l a2,d4
-EndDrty	lea PPCCode(pc),a2
+EndDrty	move.l #$48003f00,(a4)
+	lea $3f00(a4),a4
+	lea PPCCode(pc),a2
 	move.l #PPCLen,d6
 	lsr.l #2,d6
 	subq.l #1,d6	
@@ -509,7 +511,7 @@ UnLockTaskList			blr
 ;;;;;;SetExcMMU			blr
 ;;;;;;ClearExcMMU		blr	
 ChangeMMU			blr
-GetInfo				blr
+;;;;;;GetInfo			blr
 CreateMsgPortPPC		blr
 DeleteMsgPortPPC		blr
 AddPortPPC			blr
@@ -730,7 +732,7 @@ EndFlag	dc.l	$ffffffff
 LibName
 	dc.b	"sonnet.library",0,0
 IDString
-	DC.B	"$VER: sonnet.library 1.0 (11-Feb-15)",0
+	DC.B	"$VER: sonnet.library 1.0 (19-Feb-15)",0
 	cnop	0,4
 EndCP	end
 	

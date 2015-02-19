@@ -9,9 +9,9 @@
 
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
-.global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC
+.global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo
 
-.section "S_0","acrx"
+.section "LibBody","acrx"
 
 #********************************************************************************************
 #
@@ -355,8 +355,8 @@ AllocVecPPC:
 		addi	r4,r4,1
 		b	.Align
 		
-.Aligned:	li 	r20,0
-		lwz	r20,8(r20)
+.Aligned:	li 	r20,SonnetBase
+		lwz	r20,PPCMemHeader(r20)
 		lwz	r5,MH_FREE(r20)
 		subfco	r31,r5,r4
 		cmp	0,0,r5,r4
@@ -476,8 +476,8 @@ FreeVecPPC:
 		stwu	r6,-4(r1)
 		
 		addi	r3,r0,1
-		li	r20,0
-		lwz	r20,8(r20)
+		li	r20,SonnetBase
+		lwz	r20,PPCMemHeader(r20)
 		addi	r23,r20,MH_FIRST
 		lwz	r5,0(r23)
 		cmpi	0,0,r5,0
@@ -548,6 +548,139 @@ FreeVecPPC:
 		addi	r1,r1,4
 		sync
 		blr	
+
+#********************************************************************************************
+#
+#	void  GetInfo(PPCInfoTagList)	// r4 (Must be in supervisor mode - to be fixed)
+#
+#********************************************************************************************		
+
+GetInfo:
+		stwu	r8,-4(r1)
+		stwu	r7,-4(r1)
+		stwu	r6,-4(r1)
+		stwu	r5,-4(r1)
+		stwu	r4,-4(r1)
+		li	r6,1
+.NextTag:	lwz	r5,0(r4)
+		mr.	r5,r5
+		beq	.EndTag
+		subf.	r7,r6,r5
+		beq-	.IgnoreTag
+		subf.	r7,r6,r7
+		beq-	.ChainTag
+		subf.	r7,r6,r7
+		beq-	.SkipTags
+		rlwinm	r7,r5,0,0,19
+		loadreg	r8,0x80102000
+		cmpw	r7,r8		
+		beq+	.UserTag				
+.EndTag:	lwz	r4,0(r1)
+		lwzu	r5,4(r1)
+		lwzu	r6,4(r1)
+		lwzu	r7,4(r1)
+		lwzu	r8,4(r1)
+		sync
+		blr		
+
+.IgnoreTag:	addi	r4,r4,8
+		b	.NextTag		
+.ChainTag:	lwz	r4,4(r4)
+		b	.NextTag
+.SkipTags:	lwz	r7,4(r4)
+		li	r8,3
+		slw	r7,r7,r8
+		add 	r4,r4,r7
+		b	.NextTag
+
+.UserTag:	rlwinm.	r7,r5,0,27,31
+		beq	.INFO_CPU		
+		subf.	r7,r6,r7
+		beq	.INFO_PVR
+		subf.	r7,r6,r7
+		beq	.INFO_ICACHE
+		subf.	r7,r6,r7
+		beq	.INFO_DCACHE
+		subf.	r7,r6,r7
+		beq	.INFO_PAGETABLE
+		subf.	r7,r6,r7
+		beq	.INFO_TABLESIZE
+		subf.	r7,r6,r7
+		beq	.INFO_BUSCLOCK
+		subf.	r7,r6,r7
+		beq	.INFO_CPUCLOCK
+		b	.IgnoreTag
 		
+
+.INFO_CPU:	li	r7,SonnetBase
+		lwz	r7,CPUInfo(r7)
+		rlwinm	r7,r7,16,28,31
+		andi.	r7,r7,4
+		beq+	.G3
+		loadreg r7,CPUF_G4
+		b	.GotCPU		
+.G3:		loadreg	r7,CPUF_G3
+		b	.GotCPU
+		
+.INFO_PVR:	li	r7,SonnetBase
+		lwz	r7,CPUInfo(r7)
+.GotCPU:	stw	r7,4(r4)
+		b	.IgnoreTag
+		
+.INFO_ICACHE:	mfspr	r8,HID0
+		rlwinm	r8,r8,19,29,31
+.ReUse:		andi.	r8,r8,5
+		li	r7,0
+		cmpwi	r8,4
+		beq	.StoreTag
+		addi	r7,r7,1
+		cmpwi	r8,5
+		beq	.StoreTag
+		addi	r7,r7,1
+		cmpwi	r8,0
+		beq	.StoreTag
+		addi	r7,r7,1
+		b	.StoreTag
+
+.INFO_DCACHE:	mfspr	r8,HID0
+		rlwinm	r8,r8,20,29,31
+		b	.ReUse
+		
+.INFO_PAGETABLE:	
+		mfspr	r7,SDR1
+		rlwinm	r7,r7,0,0,15
+		b 	.StoreTag
+		
+.INFO_TABLESIZE:
+		mfspr	r8,SDR1
+		li	r7,0
+		rlwinm.	r8,r8,0,23,31
+		beq	.NoShift
+.CntShift:	add	r7,r7,r6
+		srw.	r8,r8,r6
+		bne	.CntShift
+.NoShift:	addi	r7,r7,6
+		mr	r8,r7
+		li	r7,1
+		rlwnm	r7,r7,r8,0,31		
+		b	.StoreTag
+		
+.INFO_BUSCLOCK:	loadreg	r7,66666666
+.StoreTag:	stw	r7,4(r4)
+		b	.IgnoreTag
+		
+.INFO_CPUCLOCK:	mfspr	r7,HID1
+		rlwinm	r7,r7,4,28,31
+		cmpwi	r7,1
+		beq	.MHz500
+		cmpwi	r7,13
+		beq	.MHz400
+		li	r7,0
+		b 	.StoreTag
+.MHz500:	loadreg	r7,500000000
+		b	.StoreTag
+.MHz400:	loadreg r7,400000000
+		b	.StoreTag		
+
 #********************************************************************************************			
 EndFunctions:
