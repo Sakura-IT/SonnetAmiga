@@ -34,7 +34,9 @@ The TO-DO list:
 *)	Add a preemptive scheduler
 	*)	Ready/Wait/added list
 *)	Implement basic auxilary functionality for demo program
-	*)	GetInfo
+	*)	Super
+	*)	User
+	*)	GetInfo					*DONE
 	*)	GetCPU					*DONE
 *)	Implement rest of exceptions plus error messaging
 *)	Implemented remaining functions
