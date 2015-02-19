@@ -17,6 +17,20 @@
 .endm
 
 
+#Sonnet Base:
+.set SonnetBase,0
+.set PowerPCBase,4
+.set PPCMemHeader,8
+.set CPUInfo,12
+.set RunningTask,16
+.set ReadyTasks,20
+.set WaitingTasks,24
+
+.set SDR1,25
+
+.set CPUF_G3,			0x00200000
+.set CPUF_G4,			0x00400000
+
 .set HID0,1008
 .set HID0_NHR,			0x00010000
 .set HID0_ICFI,			0x00000800
@@ -26,7 +40,7 @@
 .set HID0_SGE,			0x00000080
 .set HID0_BTIC,			0x00000020
 .set HID0_BHTE,			0x00000004
-
+.set HID1,1009
 
 .set PICR1,0xA8
 .set PICR1_CF_MP_MULTI,		0x00000003
