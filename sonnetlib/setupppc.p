@@ -1141,7 +1141,6 @@ EInt:	mtspr	SPRG0,r3			#Redo save state sometime....(stack?)
 	mfspr	r6,srr0
 	mfspr	r7,srr1
 	
-	lwz	r4,0(r6)
 	mfmsr	r4
 	ori	r4,r4,(PSL_IR|PSL_DR)
 	mtmsr	r4				#Reenable MMU (can affect srr0/srr1 acc Docs)
@@ -1187,7 +1186,6 @@ TestRoutine:
 	lwz	r3,PowerPCBase(r3)
 	bl	TagEnd
 .long		0,0	
-#.long		0x80102006,0,0x80102007,0,0x80102000,0,0x80102001,0,0x80102004,0,0x80102005,0,0
 TagEnd:	mflr	r4
 	li	r0,SonnetBase
 	stw	r4,Debug(r0)

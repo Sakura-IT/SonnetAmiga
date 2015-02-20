@@ -1,4 +1,5 @@
 .include ppcdefines.i
+.include sonnet_libppc.i
 .set MH_FIRST,16
 .set MH_FREE,28
 .set MC_BYTES,4
@@ -10,6 +11,7 @@
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 .global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
+.global NextTagItemPPC,GetTagDataPPC,FindTagItemPPC
 
 .section "LibBody","acrx"
 
@@ -551,7 +553,7 @@ FreeVecPPC:
 
 #********************************************************************************************
 #
-#	void  GetInfo(PPCInfoTagList)	// r4 (Must be in supervisor mode - to be fixed)
+#	void  GetInfo(PPCInfoTagList)	// r4
 #
 #********************************************************************************************		
 
@@ -562,38 +564,32 @@ GetInfo:
 		stwu	r5,-4(r1)
 		stwu	r4,-4(r1)
 		li	r6,1
-.NextTag:	lwz	r5,0(r4)
-		mr.	r5,r5
-		beq	.EndTag
-		subf.	r7,r6,r5
-		beq-	.IgnoreTag
-		subf.	r7,r6,r7
-		beq-	.ChainTag
-		subf.	r7,r6,r7
-		beq-	.SkipTags
-		rlwinm	r7,r5,0,0,19
+		
+.TagLoop:	mflr	r5
+		li	r3,SonnetBase
+		lwz	r3,PowerPCBase(r3)
+		lwz	r0,_LVONextTagItemPPC+2(r3)
+		mtlr	r0
+		blrl
+		mtlr	r5
+		mr.	r3,r3
+		beq	.NoTags		
+		rlwinm	r7,r3,0,0,19
 		loadreg	r8,0x80102000
 		cmpw	r7,r8		
-		beq+	.UserTag				
-.EndTag:	lwz	r4,0(r1)
+		beq+	.UserTag
+.NextInList:	addi	r4,r4,8
+		b	.TagLoop
+		
+.NoTags:	lwz	r4,0(r1)
 		lwzu	r5,4(r1)
 		lwzu	r6,4(r1)
 		lwzu	r7,4(r1)
 		lwzu	r8,4(r1)
 		sync
-		blr		
+		blr
 
-.IgnoreTag:	addi	r4,r4,8
-		b	.NextTag		
-.ChainTag:	lwz	r4,4(r4)
-		b	.NextTag
-.SkipTags:	lwz	r7,4(r4)
-		li	r8,3
-		slw	r7,r7,r8
-		add 	r4,r4,r7
-		b	.NextTag
-
-.UserTag:	rlwinm.	r7,r5,0,27,31
+.UserTag:	rlwinm.	r7,r3,0,27,31
 		beq	.INFO_CPU		
 		subf.	r7,r6,r7
 		beq	.INFO_PVR
@@ -609,7 +605,7 @@ GetInfo:
 		beq	.INFO_BUSCLOCK
 		subf.	r7,r6,r7
 		beq	.INFO_CPUCLOCK
-		b	.IgnoreTag
+		b	.NextInList
 		
 
 .INFO_CPU:	li	r7,SonnetBase
@@ -625,7 +621,7 @@ GetInfo:
 .INFO_PVR:	li	r7,SonnetBase
 		lwz	r7,CPUInfo(r7)
 .GotCPU:	stw	r7,4(r4)
-		b	.IgnoreTag
+		b	.NextInList
 		
 .INFO_ICACHE:	li	r8,SonnetBase
 		lwz	r8,CPUHID0(r8)
@@ -671,7 +667,7 @@ GetInfo:
 		
 .INFO_BUSCLOCK:	loadreg	r7,SonnetBusClock
 .StoreTag:	stw	r7,4(r4)
-		b	.IgnoreTag
+		b	.NextInList
 		
 .INFO_CPUCLOCK:	li	r7,SonnetBase
 		lwz	r7,CPUHID1(r7)
@@ -694,75 +690,187 @@ GetInfo:
 #********************************************************************************************
 
 GetSysTimePPC:	
-			stw	r2,20(r1)
-			mflr	r0
-			stw	r0,8(r1)
-			mfcr	r0
-			stw	r0,4(r1)
-			stw	r13,-4(r1)
-			subi	r13,r1,4
-			stwu	r7,-4(r13)
-			stwu	r6,-4(r13)
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r7,-4(r13)
+		stwu	r6,-4(r13)
 
-			mr	r6,r4
-			loadreg	r5,SonnetBusClock
-			rlwinm	r5,r5,30,2,31
-.Loop5:			mftbu	r3
-			mftbl	r4
-			mftbu	r7
-			cmplw	r7,r3
-			bne+	.Loop5
-			bl	.Link17
-			stw	r3,0(r6)
-			mullw	r7,r5,r3
-			sub	r7,r4,r7
-			lis	r0,15
-			ori	r0,r0,16960
-			mullw	r4,r0,r7
-			mulhw	r3,r0,r7
-			bl	.Link17
-			stw	r3,4(r6)
-			lwz	r6,0(r13)
-			lwzu	r7,4(r13)
-			lwz	r13,-4(r1)
-			lwz	r0,8(r1)
-			mtlr	r0
-			lwz	r0,4(r1)
-			mtcr	r0
-			lwz	r2,20(r1)
-			blr
+		mr	r6,r4
+		loadreg	r5,SonnetBusClock
+		rlwinm	r5,r5,30,2,31
+.Loop5:		mftbu	r3
+		mftbl	r4
+		mftbu	r7
+		cmplw	r7,r3
+		bne+	.Loop5
+		bl	.Link17
+		stw	r3,0(r6)
+		mullw	r7,r5,r3
+		sub	r7,r4,r7
+		lis	r0,15
+		ori	r0,r0,16960
+		mullw	r4,r0,r7
+		mulhw	r3,r0,r7
+		bl	.Link17
+		stw	r3,4(r6)
+		lwz	r6,0(r13)
+		lwzu	r7,4(r13)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr
 
-.Link17:		mfctr	r0
-			stwu	r0,-4(r13)
-			stwu	r6,-4(r13)
-			stwu	r5,-4(r13)
-			stwu	r4,-4(r13)
-			li	r0,32
-			mtctr	r0
-			li	r6,0
-.Loop4:			mr.	r3,r3
-			bge-	.Link18
-			addc	r4,r4,r4
-			adde	r3,r3,r3
-			add	r6,r6,r6
-			b	.Link19
-.Link18:		addc	r4,r4,r4
-			adde	r3,r3,r3
-			add	r6,r6,r6
-			cmplw	r5,r3
-			bgt-	.Link20
-.Link19:		sub.	r3,r3,r5
-			addi	r6,r6,1
-.Link20:		bdnz+	.Loop4
-			mr	r3,r6
-			lwz	r4,0(r13)
-			lwz	r5,4(r13)
-			lwz	r6,8(r13)
-			addi	r13,r13,12
-			lwz	r0,0(r13)
-			addi	r13,r13,4
-			mtctr	r0
-			blr
+.Link17:	mfctr	r0
+		stwu	r0,-4(r13)
+		stwu	r6,-4(r13)
+		stwu	r5,-4(r13)
+		stwu	r4,-4(r13)
+		li	r0,32
+		mtctr	r0
+		li	r6,0
+.Loop4:		mr.	r3,r3
+		bge-	.Link18
+		addc	r4,r4,r4
+		adde	r3,r3,r3
+		add	r6,r6,r6
+		b	.Link19
+.Link18:	addc	r4,r4,r4
+		adde	r3,r3,r3
+		add	r6,r6,r6
+		cmplw	r5,r3
+		bgt-	.Link20
+.Link19:	sub.	r3,r3,r5
+		addi	r6,r6,1
+.Link20:	bdnz+	.Loop4
+		mr	r3,r6
+		lwz	r4,0(r13)
+		lwz	r5,4(r13)
+		lwz	r6,8(r13)
+		addi	r13,r13,12
+		lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtctr	r0
+		blr
+
+#********************************************************************************************
+#
+#	tag = NextTagItemPPC(tagItemPtr) // r3=r4
+#
+#********************************************************************************************
+
+NextTagItemPPC:
+		stwu	r8,-4(r1)
+		stwu	r7,-4(r1)
+		stwu	r6,-4(r1)
+		stwu	r5,-4(r1)		
+		li	r6,1
+.NextTag:	lwz	r5,0(r4)
+		mr.	r5,r5
+		beq	.EndTag
+		subf.	r7,r6,r5
+		beq-	.IgnoreTag
+		subf.	r7,r6,r7
+		beq-	.ChainTag
+		subf.	r7,r6,r7
+		beq-	.SkipTags
+.EndTag:	mr	r3,r5
+		lwz	r5,0(r1)
+		lwzu	r6,4(r1)
+		lwzu	r7,4(r1)
+		lwzu	r8,4(r1)
+		addi	r1,r1,4
+		sync
+		blr
+
+.IgnoreTag:	addi	r4,r4,8
+		b	.NextTag		
+.ChainTag:	lwz	r4,4(r4)
+		b	.NextTag
+.SkipTags:	lwz	r7,4(r4)
+		li	r8,3
+		slw	r7,r7,r8
+		add 	r4,r4,r7
+		b	.NextTag
 			
+#********************************************************************************************
+#
+#	value = GetTagDataPPC(tagValue, defaultVal, taglist) // r3=r4,r5,r6
+#
+#********************************************************************************************		
+		
+GetTagDataPPC:	
+		stwu	r8,-4(r1)
+		stwu	r7,-4(r1)
+		stwu	r6,-4(r1)
+		stwu	r5,-4(r1)
+		stwu	r4,-4(r1)
+		mr	r8,r5
+		mr	r5,r6
+		li	r6,1
+		
+		mflr	r7
+		li	r3,SonnetBase
+		lwz	r3,PowerPCBase(r3)
+		lwz	r0,_LVOFindTagItemPPC+2(r3)
+		mtlr	r0
+		blrl
+		mtlr	r7
+		mr.	r3,r3
+		bne	.Done
+		mr	r3,r8
+		b	.Done2
+		
+.Done:		lwz	r3,4(r3)		
+.Done2:		lwz	r4,0(r1)
+		lwzu	r5,4(r1)
+		lwzu	r6,4(r1)
+		lwzu	r7,4(r1)
+		lwzu	r8,4(r1)
+		addi	r1,r1,4
+		sync
+		blr
+
+#********************************************************************************************
+#
+#	value = FindTagItemPPC(tagValue, taglist) // r3=r4,r5
+#
+#********************************************************************************************		
+
+FindTagItemPPC:	
+		stwu	r8,-4(r1)
+		stwu	r7,-4(r1)
+		stwu	r6,-4(r1)
+		stwu	r5,-4(r1)
+		stwu	r4,-4(r1)
+		mr	r8,r4
+		mr	r4,r5
+		li	r6,1
+		
+.TagLoop2:	mflr	r7
+		li	r3,SonnetBase
+		lwz	r3,PowerPCBase(r3)
+		lwz	r0,_LVONextTagItemPPC+2(r3)
+		mtlr	r0
+		blrl
+		mtlr	r7
+		mr.	r3,r3
+		beq	.Done2
+		
+		cmpw	r8,r3
+		beq	.Done3
+		addi	r4,r4,8
+		b	.TagLoop2
+		
+.Done3:		mr	r3,r4
+		b	.Done2
+		
 #********************************************************************************************			
 EndFunctions:
