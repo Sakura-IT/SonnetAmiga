@@ -22,9 +22,16 @@
 .set PowerPCBase,4
 .set PPCMemHeader,8
 .set CPUInfo,12
-.set RunningTask,16
-.set ReadyTasks,20
-.set WaitingTasks,24
+.set CPUHID0,16
+.set CPUHID1,20
+.set CPUSDR1,24
+.set RunningTask,28
+.set ReadyTasks,32
+.set WaitingTasks,36
+
+.set Debug,48
+
+.set SonnetBusClock,66666666			#66.6 MHz
 
 .set SDR1,25
 
