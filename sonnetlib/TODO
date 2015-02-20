@@ -19,7 +19,7 @@ The TO-DO list:
 	*)	AllocXMsg
 	*)	FreeXMsg
 *)	Implement basic library functionality
-	*)	RunPPC(XL)
+	*)	RunPPC(XL)				*DONE
 	*)	AllocVecPPC				*DONE
 	*)	FreeVecPPC				*DONE
 	*)	CreateTaskPPC
@@ -34,8 +34,6 @@ The TO-DO list:
 *)	Add a preemptive scheduler
 	*)	Ready/Wait/added list
 *)	Implement basic auxilary functionality for demo program
-	*)	Super
-	*)	User
 	*)	GetInfo					*DONE
 	*)	GetCPU					*DONE
 *)	Implement rest of exceptions plus error messaging
