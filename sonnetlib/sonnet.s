@@ -25,12 +25,16 @@ blr		MACRO
 	include	libraries/configvars.i
 	include	exec/execbase.i
 	include powerpc/powerpc.i
+	include	dos/dostags.i
+	include lvo/dos_lib.i
+	include exec/ports.i
+	include dos/dosextens.i
 	
 	XREF	FunctionsLen
 	
 	XREF	SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
-	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC.GetInfo,GetSysTimePPC
+	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
 	XREF	NextTagItemPPC,GetTagDataPPC,FindTagItemPPC
 	
 	XREF 	PPCCode,PPCLen
@@ -90,6 +94,14 @@ FndMem	move.l d0,d7
 	tst.l d0
 	beq.s Exit
 	move.l d0,a5
+	
+	lea DosLib(pc),a1
+	moveq.l #37,d0
+	jsr _LVOOpenLibrary(a6)
+	tst.l d0
+	beq Exit2				;Open dos.library
+	lea DosBase(pc),a1
+	move.l d0,(a1)
 	
 	lea ExpLib(pc),a1
 	moveq.l #27,d0
@@ -223,23 +235,26 @@ Wait	move.l $6004(a1),d5
 	move.l d6,PCI_SPACELEN0(a2)
 NoPCILb	jsr _LVOEnqueue(a6)
 
-	move.l #(EndCP-Open)+FunctionsLen,d0
+	move.l #(EndCP-MasterControl)+FunctionsLen,d0
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1
 	jsr _LVOAllocVec(a6)
 	tst.l d0
 	beq Exit2
 	move.l d0,a1
-	move.l #(EndCP-Open)+FunctionsLen,d1
+	lea PrcName-MasterControl(a1),a2
+	lea MasterControl(pc),a0
+	move.l a2,PrcTags+12-MasterControl(a0)
+	move.l a1,PrcTags+4-MasterControl(a0)
+	move.l #(EndCP-MasterControl)+FunctionsLen,d1
 	lsr.l #2,d1
 	subq.l #1,d1
-	lea Open(pc),a0
 MoveSon	move.l (a0)+,(a1)+
 	dbf d1,MoveSon
 	
 	sub.l a0,a1
 	move.l a1,d2
 	move.l d0,a1
-	add.l #DATATABLE-Open,a1
+	add.l #DATATABLE-MasterControl,a1
 	move.l a1,a0
 	add.l #FUNCTABLE-DATATABLE,a0
 	move.l a0,a2
@@ -266,6 +281,11 @@ RLoc	add.l d2,(a2)+
 
 	move.l d0,a1
 	jsr _LVOAddLibrary(a6)
+	lea PrcTags(pc),a1
+	move.l a1,d1
+	move.l DosBase(pc),a6
+	jsr _LVOCreateNewProc(a6)
+	move.l 4.w,a6
 	
 NoLib	move.l a4,a1
 	jsr _LVORemove(a6)
@@ -335,7 +355,8 @@ VooDoo3	movem.l d0-a6,-(a7)
 	movem.l (a7)+,d0-a6
 	bra VooDone
 
-
+DosLib	dc.b "dos.library",0
+	cnop 	0,2
 ExpLib	dc.b "expansion.library",0
 	cnop	0,2
 pcilib	dc.b "pci.library",0
@@ -347,6 +368,56 @@ PCIMem	dc.b "pcidma memory",0
 	
 ;********************************************************************************************
 
+MasterControl
+	movem.l d0-a6,-(a7)
+	move.l 4.w,a6
+	moveq.l #17,d0					;Start 68k
+	jsr _LVOAllocSignal(a6)
+	tst.l d0
+	bmi.s SigErr
+	moveq.l #18,d0					;Start PPC
+	jsr _LVOAllocSignal(a6)
+	tst.l d0
+	bmi.s SigErr
+	moveq.l #19,d0					;End 68k
+	jsr _LVOAllocSignal(a6)
+	tst.l d0
+	bmi.s SigErr
+	moveq.l #20,d0					;End PPC
+	jsr _LVOAllocSignal(a6)
+	tst.l d0
+	bmi.s SigErr
+	
+NextMsg	move.l #$60000,d0
+	jsr _LVOWait(a6)
+	btst #17,d0
+	bne.s Msg68k
+Don68k	btst #18,d0
+	bne.s MsgPPC	
+	bra.s NextMsg
+	
+SigErr	movem.l (a7)+,d0-a6
+	rts
+
+Msg68k	move.l #$7c000000,a1
+	move.l #"68k!",64(a1)
+	bra.s Don68k
+
+MsgPPC	move.l ThisTask(a6),a0
+	lea pr_MsgPort(a0),a0
+	jsr _LVOGetMsg(a6)
+	tst.l d0
+	beq.s NextMsg
+	move.l d0,a1					;MOVE THIS TO TASKLIST PPC
+	jsr _LVOReplyMsg(a6)				;THEN CREATE PPC TASK WITH THESE VALUES
+	move.l #$7c000000,a1				;EXIT CODE OF PPC TASK SIGNALS THIS
+	move.l #"PPC!",64(a1)				;TASK WITH END PPC SIGNAL
+	bra.s NextMsg
+
+	cnop 0,4
+	
+PrcTags	dc.l NP_Entry,0,NP_Name,0,NP_Priority,125,0,0
+PrcName	dc.b "MasterControl",0,0,0
 
 Open	move.l	a6,d0
 	tst.l	d0
@@ -448,7 +519,56 @@ G4	move.l #CPUF_G4,d0
 ExCPU	movem.l (a7)+,d1-a6
 	rts
 
-RunPPC				rts
+RunPPC	movem.l d1-a6,-(a7)
+	lea PStruct(pc),a1
+	move.l a0,(a1)
+	move.l 4.w,a6
+	jsr _LVOCreateMsgPort(a6)
+	tst.l d0
+	beq.s Cannot
+	lea Port(pc),a1
+	move.l d0,(a1)
+	move.l #MN_SIZE+PP_SIZE,d0
+	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1
+	jsr _LVOAllocVec(a6)
+	tst.l d0
+	beq.s Cannot
+	lea Msg(pc),a1
+	move.l d0,(a1)
+	move.l Port(pc),d1
+	move.l d0,a1
+	move.w #MN_SIZE+PP_SIZE,MN_LENGTH(a1)
+	move.l d1,MN_REPLYPORT(a1)
+	lea MN_LENGTH+2(a1),a2
+	move.l #PP_SIZE/4-1,d0
+	move.l PStruct(pc),a0
+CpMsg	move.l (a0)+,(a2)+
+	dbf d0,CpMsg
+	move.b #NT_MESSAGE,LN_TYPE(a1)
+	lea PrcName(pc),a1	
+	jsr _LVOFindTask(a6)
+	move.l d0,d7
+	beq.s Cannot
+	move.l d0,a0
+	lea pr_MsgPort(a0),a0
+	move.l Msg(pc),a1
+	jsr _LVOPutMsg(a6)
+	move.l d7,a1
+	move.l #$40000,d0
+	jsr _LVOSignal(a6)	
+	move.l Port(pc),a0
+	jsr _LVOWaitPort(a6)
+	moveq.l #0,d0
+	bra.s Success
+	
+Cannot	subq.l #1,d0
+Success	movem.l (a7)+,d1-a6
+	rts
+
+Port	ds.l 1
+Msg	ds.l 1
+PStruct	ds.l 1
+
 WaitForPPC			rts
 ;;;;;;GetCPU			rts
 PowerDebugMode			rts
@@ -569,6 +689,7 @@ Buffer		ds.l	1
 PowerPCBase	ds.l	1
 SonnetBase	ds.l	1
 MediatorBase	ds.l	1
+DosBase		ds.l	1
 
 DATATABLE:
 	INITBYTE	LN_TYPE,NT_LIBRARY
