@@ -30,7 +30,7 @@ blr		MACRO
 	
 	XREF	SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
-	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC.GetInfo
+	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC.GetInfo,GetSysTimePPC
 
 	XREF 	PPCCode,PPCLen
 	XDEF	PowerPCBase
@@ -526,7 +526,7 @@ CopyMemPPC			blr
 AllocXMsgPPC			blr
 FreeXMsgPPC			blr
 PutXMsgPPC			blr
-GetSysTimePPC			blr
+;;;;GetSysTimePPC		blr
 ;;;;;;AddTimePPC		blr
 ;;;;;;SubTimePPC		blr
 ;;;;;;CmpTimePPC		blr

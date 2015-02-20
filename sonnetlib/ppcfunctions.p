@@ -9,7 +9,7 @@
 
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
-.global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo
+.global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
 
 .section "LibBody","acrx"
 
@@ -627,7 +627,8 @@ GetInfo:
 .GotCPU:	stw	r7,4(r4)
 		b	.IgnoreTag
 		
-.INFO_ICACHE:	mfspr	r8,HID0
+.INFO_ICACHE:	li	r8,SonnetBase
+		lwz	r8,CPUHID0(r8)
 		rlwinm	r8,r8,19,29,31
 .ReUse:		andi.	r8,r8,5
 		li	r7,0
@@ -642,17 +643,20 @@ GetInfo:
 		addi	r7,r7,1
 		b	.StoreTag
 
-.INFO_DCACHE:	mfspr	r8,HID0
+.INFO_DCACHE:	li	r8,SonnetBase
+		lwz	r8,CPUHID0(r8)
 		rlwinm	r8,r8,20,29,31
 		b	.ReUse
 		
 .INFO_PAGETABLE:	
-		mfspr	r7,SDR1
+		li	r7,SonnetBase
+		lwz	r7,CPUSDR1(r7)
 		rlwinm	r7,r7,0,0,15
 		b 	.StoreTag
 		
 .INFO_TABLESIZE:
-		mfspr	r8,SDR1
+		li	r8,SonnetBase
+		lwz	r8,CPUSDR1(r8)
 		li	r7,0
 		rlwinm.	r8,r8,0,23,31
 		beq	.NoShift
@@ -665,11 +669,12 @@ GetInfo:
 		rlwnm	r7,r7,r8,0,31		
 		b	.StoreTag
 		
-.INFO_BUSCLOCK:	loadreg	r7,66666666
+.INFO_BUSCLOCK:	loadreg	r7,SonnetBusClock
 .StoreTag:	stw	r7,4(r4)
 		b	.IgnoreTag
 		
-.INFO_CPUCLOCK:	mfspr	r7,HID1
+.INFO_CPUCLOCK:	li	r7,SonnetBase
+		lwz	r7,CPUHID1(r7)
 		rlwinm	r7,r7,4,28,31
 		cmpwi	r7,1
 		beq	.MHz500
@@ -682,5 +687,82 @@ GetInfo:
 .MHz400:	loadreg r7,400000000
 		b	.StoreTag		
 
+#********************************************************************************************
+#
+#	void  GetSysTimePPC(TimeVal)	// r4
+#
+#********************************************************************************************
+
+GetSysTimePPC:	
+			stw	r2,20(r1)
+			mflr	r0
+			stw	r0,8(r1)
+			mfcr	r0
+			stw	r0,4(r1)
+			stw	r13,-4(r1)
+			subi	r13,r1,4
+			stwu	r7,-4(r13)
+			stwu	r6,-4(r13)
+
+			mr	r6,r4
+			loadreg	r5,SonnetBusClock
+			rlwinm	r5,r5,30,2,31
+.Loop5:			mftbu	r3
+			mftbl	r4
+			mftbu	r7
+			cmplw	r7,r3
+			bne+	.Loop5
+			bl	.Link17
+			stw	r3,0(r6)
+			mullw	r7,r5,r3
+			sub	r7,r4,r7
+			lis	r0,15
+			ori	r0,r0,16960
+			mullw	r4,r0,r7
+			mulhw	r3,r0,r7
+			bl	.Link17
+			stw	r3,4(r6)
+			lwz	r6,0(r13)
+			lwzu	r7,4(r13)
+			lwz	r13,-4(r1)
+			lwz	r0,8(r1)
+			mtlr	r0
+			lwz	r0,4(r1)
+			mtcr	r0
+			lwz	r2,20(r1)
+			blr
+
+.Link17:		mfctr	r0
+			stwu	r0,-4(r13)
+			stwu	r6,-4(r13)
+			stwu	r5,-4(r13)
+			stwu	r4,-4(r13)
+			li	r0,32
+			mtctr	r0
+			li	r6,0
+.Loop4:			mr.	r3,r3
+			bge-	.Link18
+			addc	r4,r4,r4
+			adde	r3,r3,r3
+			add	r6,r6,r6
+			b	.Link19
+.Link18:		addc	r4,r4,r4
+			adde	r3,r3,r3
+			add	r6,r6,r6
+			cmplw	r5,r3
+			bgt-	.Link20
+.Link19:		sub.	r3,r3,r5
+			addi	r6,r6,1
+.Link20:		bdnz+	.Loop4
+			mr	r3,r6
+			lwz	r4,0(r13)
+			lwz	r5,4(r13)
+			lwz	r6,8(r13)
+			addi	r13,r13,12
+			lwz	r0,0(r13)
+			addi	r13,r13,4
+			mtctr	r0
+			blr
+			
 #********************************************************************************************			
 EndFunctions:

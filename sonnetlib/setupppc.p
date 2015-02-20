@@ -1,10 +1,9 @@
 .include ppcdefines.i
+.include sonnet_libppc.i
 
 .global PPCCode,PPCLen
 
 .set	PPCLen,(PPCEnd-PPCCode)
-.set	_LVOAllocVecPPC,-324
-.set	_LVOGetInfo,-594
 
 #********************************************************************************************
 	
@@ -73,8 +72,10 @@ SetLen:	mr	r30,r28
 	bl	Caches
 
 	mfspr	r3,PVR				#Get CPU Type
-	li	r1,0
-	stw	r3,CPUInfo(r1)			#Store at SonnetBase+12
+	li	r1,SonnetBase
+	stw	r3,CPUInfo(r1)
+	mfspr	r3,HID1				#Get CPU Multiplier
+	stw	r3,CPUHID1(r1)			
 
 	lis	r3,0x9				#Usercode hardcoded at 0x90000
 						#This should become the idle task
@@ -1158,7 +1159,12 @@ EInt:	mtspr	SPRG0,r3			#Redo save state sometime....(stack?)
 
 	b	TestRoutine
 	
-NoHEAR:	lis	r3,EUMB
+NoHEAR:	li	r3,SonnetBase
+	mfspr	r4,HID0
+	stw	r4,CPUHID0(r3)
+	mfspr	r4,SDR1
+	stw	r4,CPUSDR1(r3)
+	lis	r3,EUMB
 	lis	r4,0x100			#Clear IM0 bit to clear interrupt
 	stw	r4,0x100(r3)
 	eieio
@@ -1180,11 +1186,12 @@ TestRoutine:
 	li	r3,SonnetBase
 	lwz	r3,PowerPCBase(r3)
 	bl	TagEnd
-.long		0x80102006,0,0x80102007,0,0x80102000,0,0x80102001,0,0x80102004,0,0x80102005,0,0
+.long		0,0	
+#.long		0x80102006,0,0x80102007,0,0x80102000,0,0x80102001,0,0x80102004,0,0x80102005,0,0
 TagEnd:	mflr	r4
-	li	r0,0
-	stw	r4,20(r0)
-	lwz	r0,_LVOGetInfo+2(r3)
+	li	r0,SonnetBase
+	stw	r4,Debug(r0)
+	lwz	r0,_LVOGetSysTimePPC+2(r3)
 	mtlr	r0
 	blrl	
 	b	NoHEAR
