@@ -67,6 +67,7 @@ ENDSKIP:
 
 INIT	movem.l d1-a6,-(a7)
 	move.l 4.w,a6
+	lea Buffer(pc),a4
 	
 	lea MemList(a6),a0
 	lea MemName(pc),a1
@@ -79,13 +80,22 @@ INIT	movem.l d1-a6,-(a7)
 	tst.l d0
 	bne.s FndMem
 	bra Dirty				;No initialized VGA found
-
+	
+Clean	move.l PCIBase(pc),d0
+	beq.s NoPCI
+	bsr.s ClsLib
+NoPCI	move.l DosBase(pc),d0
+	beq.s NoDos
+	bsr.s ClsLib
+NoDos	move.l ExpBase(pc),d0
+	beq.s Exit	
+	bsr.s ClsLib
 Exit	move.l PowerPCBase(pc),d0
 	movem.l (a7)+,d1-a6
 	rts
-Exit2	move.l a5,a1
-	jsr _LVOCloseLibrary(a6)	
-	bra.s Exit
+	
+ClsLib  move.l d0,a1
+	jmp _LVOCloseLibrary(a6)	
 	
 FndMem	move.l d0,d7
 	moveq.l #0,d0
@@ -93,22 +103,22 @@ FndMem	move.l d0,d7
 	jsr _LVOOpenLibrary(a6)
 	tst.l d0
 	beq.s Exit
-	move.l d0,a5
+	move.l d0,PCIBase-Buffer(a4)
 	
 	lea DosLib(pc),a1
 	moveq.l #37,d0
 	jsr _LVOOpenLibrary(a6)
 	tst.l d0
-	beq Exit2				;Open dos.library
-	lea DosBase(pc),a1
-	move.l d0,(a1)
+	beq.s Clean				;Open dos.library
+	move.l d0,DosBase-Buffer(a4)
 	
 	lea ExpLib(pc),a1
-	moveq.l #27,d0
+	moveq.l #37,d0
 	jsr _LVOOpenLibrary(a6)			;Open expansion.library
 	tst.l d0
-	beq Exit2
-
+	beq.s Clean
+	move.l d0,ExpBase-Buffer(a4)
+	
 	move.l d0,a6
 	sub.l a0,a0
 	move.l #$89e,d0				;ELBOX
@@ -116,16 +126,16 @@ FndMem	move.l d0,d7
 	jsr _LVOFindConfigDev(a6)		;Find A3000/A4000 mediator (for now)
 	move.l 4.w,a6
 	tst.l d0
-	beq Exit2
+	beq.s Clean
 
 	move.l d0,a1
 	move.l cd_BoardAddr(a1),d0		;Start address Configspace Mediator
-	lea MediatorBase(pc),a2
-	move.l d0,(a2)
+	move.l d0,MediatorBase-Buffer(a4)
 	
-	move.l PCI_List(a5),a2
+	move.l PCIBase(pc),a2
+	move.l PCI_List(a2),a2
 Loop1	move.l LN_SUCC(a2),d6
-	beq.s Exit2
+	beq Clean
 	move.l PCI_VENDORID(a2),d1
 	cmp.l #$10570004,d1
 	beq.s Sonnet
@@ -138,13 +148,13 @@ Sonnet	move.l d7,a0
 	and.w #0,d1
 	move.l d1,a1
 	move.l #$10000,d0
-	jsr _LVOAllocAbs(a6)
+	jsr _LVOAllocAbs(a6)			;Allocate fake ROM in VGA Mem
 	tst.l d0
-	beq Exit2
+	beq Clean
 
-	move.l d0,a4
-	move.l a4,a1
-	lea $100(a4),a4
+	move.l d0,a5
+	move.l a5,a1
+	lea $100(a5),a5
 	
 	move.l PCI_SPACE1(a2),a3		;PCSRBAR Sonnet
 	or.b #15,d0				;64kb
@@ -155,14 +165,14 @@ Sonnet	move.l d7,a0
 	move.l #$0000F0FF,OMBAR(a3)		;Processor outbound mem at $FFF00000
 	
 	move.l a2,d4
-EndDrty	move.l #$48003f00,(a4)
-	lea $3f00(a4),a4
+EndDrty	move.l #$48003f00,(a5)
+	lea $3f00(a5),a5
 	lea PPCCode(pc),a2
 	move.l #PPCLen,d6
 	lsr.l #2,d6
 	subq.l #1,d6	
 
-loop2	move.l (a2)+,(a4)+
+loop2	move.l (a2)+,(a5)+
 	dbf d6,loop2
 	jsr _LVOCacheClearU(a6)
 	
@@ -172,10 +182,10 @@ loop2	move.l (a2)+,(a4)+
 	
 	tst.l d4
 	bne.s NoCmm
-	move.l d5,a4
-	move.l COMMAND(A4),d5
+	move.l d5,a5
+	move.l COMMAND(a5),d5
 	bset #26,d5				;Set Bus Master bit
-	move.l d5,COMMAND(a4)
+	move.l d5,COMMAND(a5)
 
 NoCmm	move.l #WP_TRIG01,WP_CONTROL(a3)	;Negate HRESET
 
@@ -185,8 +195,7 @@ Wait	move.l $6004(a1),d5
 	
 	move.l #StackSize,d7			;Set stack
 	move.l $6008(a1),d5
-	lea SonnetBase(pc),a0
-	move.l d5,(a0)
+	move.l d5,SonnetBase-Buffer(a4)
 	add.l d7,d5
 	move.l $600c(a1),d6
 	sub.l d7,d6
@@ -196,7 +205,7 @@ Wait	move.l $6004(a1),d5
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_REVERSE,d1
 	jsr _LVOAllocVec(a6)
 	tst.l d0
-	beq Exit2
+	beq Clean
 	move.l d0,a0
 	lea MemName(pc),a1
 	move.l (a1),(a0)
@@ -220,7 +229,7 @@ Wait	move.l $6004(a1),d5
 	move.l d6,MH_UPPER(a0)
 	move.l d1,MH_FREE(a0)
 	move.l a0,a1	
-	move.l a0,a4
+	move.l a0,a5
 	
 	jsr _LVODisable(a6)	
 	lea MemList(a6),a0
@@ -239,7 +248,7 @@ NoPCILb	jsr _LVOEnqueue(a6)
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1
 	jsr _LVOAllocVec(a6)
 	tst.l d0
-	beq Exit2
+	beq Clean
 	move.l d0,a1
 	lea PrcName-MasterControl(a1),a2
 	lea MasterControl(pc),a0
@@ -274,10 +283,9 @@ RLoc	add.l d2,(a2)+
 	
 	move.l SonnetBase(pc),a1
 	move.l d0,4(a1)					;PowerPCBase at $4
-	move.l a4,8(a1)					;Memheader at $8
+	move.l a5,8(a1)					;Memheader at $8
 	move.l a1,(a1)					;Sonnet relocated mem at $0
-	lea PowerPCBase(pc),a1
-	move.l d0,(a1)
+	move.l d0,PowerPCBase-Buffer(a4)
 
 	move.l d0,a1
 	jsr _LVOAddLibrary(a6)
@@ -287,17 +295,15 @@ RLoc	add.l d2,(a2)+
 	jsr _LVOCreateNewProc(a6)
 	move.l 4.w,a6
 	
-NoLib	move.l a4,a1
+NoLib	move.l a5,a1
 	jsr _LVORemove(a6)
-	move.w #$0a01,8(a4)
-	move.l a4,a1
+	move.w #$0a01,8(a5)
+	move.l a5,a1
 	lea MemList(a6),a0
 	jsr _LVOEnqueue(a6)
 	jsr _LVOEnable(a6)		
 
-	tst.l d4
-	beq Exit	
-	bra Exit2
+	bra Clean
 
 ;********************************************************************************************
 
@@ -305,15 +311,15 @@ Dirty	move.l MediatorBase(pc),a0
 	moveq.l #0,d2
 	moveq.l #$3f,d1
 	move.b #$60,(a0)			;Start address PCI Mem ($60000000)
-CpLoop	move.l a0,a4
-	add.l #$800000,a4			;Start address PCI config
+CpLoop	move.l a0,a5
+	add.l #$800000,a5			;Start address PCI config
 	move.l d2,d0
 	lsl.l #3,d0
 	lsl.l #8,d0
-	add.l d0,a4
-	move.l (a4),d6
+	add.l d0,a5
+	move.l (a5),d6
 	cmp.l #$FFFFFFFF,d6
-	beq Exit
+	beq Clean
 	rol.w #8,d6
 	swap d6
 	rol.w #8,d6
@@ -323,17 +329,17 @@ CpLoop	move.l a0,a4
 	beq VooDoo3
 VooDone	addq.l #1,d2	
 	dbf d1,CpLoop
-	bra Exit
+	bra Clean
 
 MPC107	move.l #$62B00000,a5
 	move.l a5,a1
 	lea $100(a5),a5
 	
 	move.l #$00300064,d5			;EUMB at $64003000
-	move.l d5,PCSRBAR(a4)
-	move.l COMMAND(a4),d5
+	move.l d5,PCSRBAR(a5)
+	move.l COMMAND(a5),d5
 	bset #25,d5				;Set PCI Memory bit
-	move.l d5,COMMAND(a4)
+	move.l d5,COMMAND(a5)
 	
 	move.l #$64003000,a3			;EUMB at $64003000
 	move.l #$0F00B062,OTWR(a3)		;Host outbound PCI mem at $62B00000, 64kb (Code in GFXMem?)
@@ -341,17 +347,17 @@ MPC107	move.l #$62B00000,a5
 
 	move.l OTWR(a3),d5
 	moveq.l #0,d4
-	move.l a4,d5
-	lea $100(a1),a4
+	move.l a5,d5
+	lea $100(a1),a5
 	bra EndDrty
 
 
 VooDoo3	movem.l d0-a6,-(a7)
 	move.l	#$62,d5				;Set BAR Voodoo at $62000000
-	move.l d5,$14(a4)
-	move.l COMMAND(a4),d5
+	move.l d5,$14(a5)
+	move.l COMMAND(a5),d5
 	bset #25,d5				;Set PCI Memory bit (Voodoo3)
-	move.l d5,COMMAND(a4)
+	move.l d5,COMMAND(a5)
 	movem.l (a7)+,d0-a6
 	bra VooDone
 
@@ -370,6 +376,7 @@ PCIMem	dc.b "pcidma memory",0
 
 MasterControl
 	movem.l d0-a6,-(a7)
+	lea Buffer(pc),a4
 	move.l 4.w,a6
 	moveq.l #17,d0					;Start 68k
 	jsr _LVOAllocSignal(a6)
@@ -454,7 +461,7 @@ InitBootArea:
 	bsr.s FindSonnet
 	addq.l #1,d1
 	beq.s Error
-	move.l LMBAR(a4),d0
+	move.l LMBAR(a5),d0
 	rol.w #8,d0	
 	swap d0
 	rol.w #8,d0
@@ -472,7 +479,7 @@ CauseInterruptHW:
 StrtPPC	bsr.s FindSonnet
 	addq.l #1,d1
 	beq.s Error
-	move.l PCSRBAR(a4),d0
+	move.l PCSRBAR(a5),d0
 	rol.w #8,d0
 	swap d0
 	rol.w #8,d0
@@ -486,13 +493,13 @@ Error	nop
 FindSonnet:
 	moveq.l #0,d2
 	moveq.l #$3f,d1
-CpxLoop	move.l MediatorBase(pc),a4
-	add.l #$800000,a4
+CpxLoop	move.l MediatorBase(pc),a5
+	add.l #$800000,a5
 	move.l d2,d0
 	lsl.l #3,d0
 	lsl.l #8,d0
-	add.l d0,a4
-	move.l (a4),d4
+	add.l d0,a5
+	move.l (a5),d4
 	cmp.l #$FFFFFFFF,d4
 	beq Error2
 	cmp.l #$57100400,d4
@@ -520,21 +527,19 @@ ExCPU	movem.l (a7)+,d1-a6
 	rts
 
 RunPPC	movem.l d1-a6,-(a7)
-	lea PStruct(pc),a1
-	move.l a0,(a1)
+	lea Buffer(pc),a4
+	move.l a0,PStruct-Buffer(a4)
 	move.l 4.w,a6
 	jsr _LVOCreateMsgPort(a6)
 	tst.l d0
 	beq.s Cannot
-	lea Port(pc),a1
-	move.l d0,(a1)
+	move.l d0,Port-Buffer(a4)
 	move.l #MN_SIZE+PP_SIZE,d0
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1
 	jsr _LVOAllocVec(a6)
 	tst.l d0
 	beq.s Cannot
-	lea Msg(pc),a1
-	move.l d0,(a1)
+	move.l d0,Msg-Buffer(a4)
 	move.l Port(pc),d1
 	move.l d0,a1
 	move.w #MN_SIZE+PP_SIZE,MN_LENGTH(a1)
@@ -558,16 +563,25 @@ CpMsg	move.l (a0)+,(a2)+
 	jsr _LVOSignal(a6)	
 	move.l Port(pc),a0
 	jsr _LVOWaitPort(a6)
-	moveq.l #0,d0
-	bra.s Success
 	
-Cannot	subq.l #1,d0
-Success	movem.l (a7)+,d1-a6
-	rts
+							;Copy Msg back to ppstruct	
+	moveq.l #0,d7
+	bra.s Success
 
-Port	ds.l 1
-Msg	ds.l 1
-PStruct	ds.l 1
+Cannot	moveq.l #-1,d7	
+Success	move.l Msg(pc),d0
+	beq.s NoMsg
+	bsr.s FreeIt
+NoMsg	move.l Port(pc),d0
+	beq.s EndIt
+	bsr.s FreeIt
+EndIt	move.l d7,d0
+	movem.l (a7)+,d1-a6
+	rts
+	
+FreeIt	move.l d0,a1
+	jmp _LVOFreeVec(a6)
+
 
 WaitForPPC			rts
 ;;;;;;GetCPU			rts
@@ -690,6 +704,11 @@ PowerPCBase	ds.l	1
 SonnetBase	ds.l	1
 MediatorBase	ds.l	1
 DosBase		ds.l	1
+ExpBase		ds.l	1
+PCIBase		ds.l	1
+Port		ds.l 	1
+Msg		ds.l 	1
+PStruct		ds.l 	1
 
 DATATABLE:
 	INITBYTE	LN_TYPE,NT_LIBRARY
