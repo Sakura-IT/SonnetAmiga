@@ -1,7 +1,7 @@
 .include ppcdefines.i
 .include sonnet_libppc.i
 
-.global PPCCode,PPCLen,RunningTask
+.global PPCCode,PPCLen,RunningTask,WaitingTasks
 
 .set	PPCLen,(PPCEnd-PPCCode)
 

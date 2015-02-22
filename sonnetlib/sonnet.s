@@ -29,6 +29,7 @@ blr		MACRO
 	include lvo/dos_lib.i
 	include exec/ports.i
 	include dos/dosextens.i
+	include lvo/sonnet_lib.i
 	
 	XREF	FunctionsLen
 	
@@ -37,7 +38,7 @@ blr		MACRO
 	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
 	XREF	NextTagItemPPC,GetTagDataPPC,FindTagItemPPC
 	
-	XREF 	PPCCode,PPCLen,RunningTask
+	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks
 	XDEF	PowerPCBase
 
 ;********************************************************************************************
@@ -300,7 +301,6 @@ RLoc	add.l d2,(a2)+
 	move.l a1,d1
 	move.l DosBase(pc),a6
 	jsr _LVOCreateNewProc(a6)
-	move.l d0,ComProc-Buffer(a4)
 	move.l 4.w,a6
 	
 NoLib	move.l a5,a1
@@ -427,17 +427,26 @@ MsgPPC	move.l ThisTask(a6),a0
 	jsr _LVOReplyMsg(a6)				;THEN CREATE PPC TASK WITH THESE VALUES
 	move.l #$7c000000,a1				;EXIT CODE OF PPC TASK SIGNALS THIS
 	move.l #"PPC!",64(a1)				;TASK WITH END PPC SIGNAL
+	move.l PowerPCBase(pc),a6
+	move.l a6,68(a1)
+	jsr _LVOCauseInterruptHW(a6)			;Force reschedule. Is this faster than
+	move.l 4.w,a6					;just wait for normal reschedule?
 	bra.s NextMsg
 
 	cnop 0,4
-	
+
 PrcTags	dc.l NP_Entry,0,NP_Name,0,NP_Priority,125,0,0
 PrcName	dc.b "MasterControl",0,0,0
+
 
 Open	move.l	a6,d0
 	tst.l	d0
 	beq.s	NoA6
 	move.l	d0,a6
+	move.l a1,-(a7)
+	lea PowerPCBase(pc),a1
+	move.l a6,(a1)
+	move.l (a7)+,a1
 	addq.w	#1,LIB_OPENCNT(a6)
 	bclr	#3,Buffer
 NoA6	rts
@@ -484,8 +493,15 @@ BootPowerPC:
 CauseInterruptHW:
 	movem.l d1-a6,-(a7)
 	move.l #"HEAR",d5
-StrtPPC	bsr.s FindSonnet
-	addq.l #1,d1
+StrtPPC	lea Buffer(pc),a4
+	move.l SonAddr(pc),d0
+	beq.s First
+	move.l d0,a5	
+	bra.s NoFirst
+	
+First	bsr.s FindSonnet
+	move.l a5,SonAddr-Buffer(a4)
+NoFirst	addq.l #1,d1
 	beq.s Error
 	move.l PCSRBAR(a5),d0
 	rol.w #8,d0
@@ -495,7 +511,6 @@ StrtPPC	bsr.s FindSonnet
 	move.l d5,IMR0(a0)
 Error	nop
 	movem.l (a7)+,d1-a6
-	nop
 	rts
 
 FindSonnet:
@@ -564,8 +579,13 @@ CpMsg	move.l (a0)+,(a2)+
 CpName	move.l (a1)+,(a2)+
 	dbf d0,CpName
 	move.l ComProc(pc),d7
+	bne.s Fast
+	lea PrcName(pc),a1
+	jsr _LVOFindTask(a6)
+	move.l d0,d7
 	beq.s Cannot
-	move.l d7,a0
+	move.l d7,ComProc-Buffer(a4)
+Fast	move.l d7,a0
 	lea pr_MsgPort(a0),a0
 	move.l Msg(pc),a1
 	jsr _LVOPutMsg(a6)
@@ -608,11 +628,14 @@ FreePrt	move.l d0,a0
 GetPPCState
 	move.l a0,-(a7)
 	move.l d1,-(a7)
-	moveq.l #PPCSTATEF_APPACTIVE,d0
+	moveq.l #PPCSTATEF_POWERSAVE,d0			;If no waiting then POWERSAVE
 	move.l SonnetBase(pc),a0
-	move.l RunningTask(a0),d1
+	move.l WaitingTasks(a0),d1
+	beq.s NoWait
+	moveq.l #PPCSTATEF_APPACTIVE,d0
+NoWait	move.l RunningTask(a0),d1
 	beq.s NoRun
-	addq.l #2,d0					;PPCSTATEF_APPRUNNING
+	moveq.l #PPCSTATEF_APPRUNNING,d0
 NoRun	move.l (a7)+,d1
 	move.l (a7)+,a0
 	rts
@@ -747,6 +770,7 @@ Msg		ds.l 	1
 PStruct		ds.l 	1
 ROMMem		ds.l	1
 ComProc		ds.l	1
+SonAddr		ds.l	1
 
 DATATABLE:
 	INITBYTE	LN_TYPE,NT_LIBRARY
