@@ -29,5 +29,5 @@ clean :
 	$(RMRF) $(OBJECTS) $(EXECUTABLE)
 
 distribution : $(EXECUTABLE)
-	lha a $(DISTRNAME) $(EXECUTABLE)
+	$(LHA) a $(DISTRNAME) $(EXECUTABLE)
 
