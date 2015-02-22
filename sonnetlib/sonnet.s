@@ -37,7 +37,7 @@ blr		MACRO
 	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
 	XREF	NextTagItemPPC,GetTagDataPPC,FindTagItemPPC
 	
-	XREF 	PPCCode,PPCLen
+	XREF 	PPCCode,PPCLen,RunningTask
 	XDEF	PowerPCBase
 
 ;********************************************************************************************
@@ -300,6 +300,7 @@ RLoc	add.l d2,(a2)+
 	move.l a1,d1
 	move.l DosBase(pc),a6
 	jsr _LVOCreateNewProc(a6)
+	move.l d0,ComProc-Buffer(a4)
 	move.l 4.w,a6
 	
 NoLib	move.l a5,a1
@@ -561,19 +562,23 @@ CpMsg	move.l (a0)+,(a2)+
 	moveq.l #15,d0
 	move.l LN_NAME(a1),a1
 CpName	move.l (a1)+,(a2)+
-	dbf d0,CpName	
-	lea PrcName(pc),a1	
-	jsr _LVOFindTask(a6)
-	move.l d0,d7
+	dbf d0,CpName
+	move.l ComProc(pc),d7
 	beq.s Cannot
-	move.l d0,a0
+	move.l d7,a0
 	lea pr_MsgPort(a0),a0
 	move.l Msg(pc),a1
 	jsr _LVOPutMsg(a6)
 	move.l d7,a1
 	move.l #$40000,d0				;Bit 18
 	jsr _LVOSignal(a6)	
-	move.l Port(pc),a0
+	bra.s Stacker
+
+WaitForPPC
+	lea Buffer(pc),a4
+	move.l a0,PStruct-Buffer(a4)
+	movem.l d1-a6,-(a7)
+Stacker	move.l Port(pc),a0
 	jsr _LVOWaitPort(a6)
 	move.l PStruct(pc),a1
 	move.l Msg(pc),a0
@@ -599,9 +604,22 @@ FreeIt	move.l d0,a1
 	jmp _LVOFreeVec(a6)
 FreePrt	move.l d0,a0
 	jmp _LVODeleteMsgPort(a6)
+	
+GetPPCState
+	move.l a0,-(a7)
+	move.l d1,-(a7)
+	moveq.l #PPCSTATEF_APPACTIVE,d0
+	move.l SonnetBase(pc),a0
+	move.l RunningTask(a0),d1
+	beq.s NoRun
+	addq.l #2,d0					;PPCSTATEF_APPRUNNING
+NoRun	move.l (a7)+,d1
+	move.l (a7)+,a0
+	rts
+	
 
-
-WaitForPPC			rts
+;;;;;;RunPPC			rts
+;;;;;;WaitForPPC		rts
 ;;;;;;GetCPU			rts
 PowerDebugMode			rts
 AllocVec32			rts
@@ -610,7 +628,7 @@ SPrintF68K			rts
 AllocXMsg			rts
 FreeXMsg			rts
 PutXMsg				rts
-GetPPCState			rts
+;;;;;;GetPPCState		rts
 SetCache68K			rts
 CreatePPCTask			rts
 CausePPCInterrupt		rts
@@ -728,6 +746,7 @@ Port		ds.l 	1
 Msg		ds.l 	1
 PStruct		ds.l 	1
 ROMMem		ds.l	1
+ComProc		ds.l	1
 
 DATATABLE:
 	INITBYTE	LN_TYPE,NT_LIBRARY

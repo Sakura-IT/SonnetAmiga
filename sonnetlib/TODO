@@ -8,7 +8,7 @@ The TO-DO list:
 *)	Implement timer interrupt			*DONE
 *)	Implement a PPC<->68k message system
 	*)	WaitFor68k
-	*)	WaitForPPC
+	*)	WaitForPPC				*DONE
 	*)	PutXMsg
 	*)	FindPortPPC
 	*)	WaitPortPPC
