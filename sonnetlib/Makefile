@@ -1,6 +1,8 @@
 ASM68K=vasmm68k_mot
 ASMPPC=vasmppc_std
 LD=vlink
+TAR=tar
+RMRF=rm -rf
 
 ASM68KPARAM=-I$(INCLUDE_I) -m68020up -Fhunk
 ASMPPCPARAM=-many -mppc32 -Fhunk
@@ -9,8 +11,8 @@ OBJECTS68K=sonnet.o
 OBJECTSPPC=ppcfunctions.o setupppc.o
 INCLUDES=ppcdefines.i pci.i
 
-RMRF=rm -rf
 EXECUTABLE=sonnet.library
+DISTRNAME=sonnet.tar.gz
 
 all: $(EXECUTABLE) 
 
@@ -25,3 +27,7 @@ $(EXECUTABLE) : $(OBJECTS68K) $(OBJECTSPPC)
 
 clean :
 	$(RMRF) $(OBJECTS) $(EXECUTABLE)
+
+distribution : $(EXECUTABLE)
+	tar -zcvf $(DISTRNAME) $(EXECUTABLE)
+
