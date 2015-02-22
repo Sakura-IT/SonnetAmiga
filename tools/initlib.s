@@ -1,6 +1,6 @@
-	incdir include:
-	include lvo/exec_lib.i
-	include	lvo/sonnet_lib.i
+
+	include exec/exec_lib.i
+	include	sonnet_lib.i
 
 
 	movem.l d0-a6,-(a7)

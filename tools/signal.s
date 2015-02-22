@@ -1,8 +1,7 @@
 
 IMR0		EQU $50
 
-	incdir	include:
-	include	lvo/exec_lib.i
+	include	exec/exec_lib.i
 	include	exec/memory.i
 	include pci.i
 
