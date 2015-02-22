@@ -319,7 +319,7 @@ ResLoop:
 	stwbrx	r28,0,r27			#Set MU interrupt, Pri = 5, Vector = 0x42
 	sync
 	
-	loadreg r28,0x10000			#Set Slice/Quantum
+	loadreg r28,Quantum			#Set Slice/Quantum
 	loadreg r27,EPIC_GTBCR0
 	add	r27,r26,r27
 	stwbrx	r28,0,r27
@@ -501,7 +501,7 @@ tlblp:
 	blt tlblp
 	
 	mfmsr	r4
-	ori	r4,r4,0x00000030			#Translation enable 
+	ori	r4,r4,0x00000030		#Translation enable 
 	andi.	r4,r4,0xffbf			#Exception prefix from 0xfff00000 to 0x0
 	mtmsr	r4
 	isync

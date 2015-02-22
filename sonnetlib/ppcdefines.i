@@ -32,6 +32,9 @@
 .set Debug,48
 
 .set SonnetBusClock,66666666			#66.6 MHz
+.set SonnetTimerFreq,(SonnetBusClock/8)		#Default when EICR=0x4 at bits 30-28
+.set SwitchFreq,50				#50Hz
+.set Quantum,(SonnetTimerFreq/SwitchFreq)	#1/50s
 
 .set SDR1,25
 

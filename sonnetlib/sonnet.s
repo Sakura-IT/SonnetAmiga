@@ -81,7 +81,10 @@ INIT	movem.l d1-a6,-(a7)
 	bne.s FndMem
 	bra Dirty				;No initialized VGA found
 	
-Clean	move.l PCIBase(pc),d0
+Clean	move.l ROMMem(pc),d0
+	beq.s NoROM
+	bsr.s FreeROM
+NoROM	move.l PCIBase(pc),d0
 	beq.s NoPCI
 	bsr.s ClsLib
 NoPCI	move.l DosBase(pc),d0
@@ -95,7 +98,10 @@ Exit	move.l PowerPCBase(pc),d0
 	rts
 	
 ClsLib  move.l d0,a1
-	jmp _LVOCloseLibrary(a6)	
+	jmp _LVOCloseLibrary(a6)
+FreeROM	move.l d0,a1
+	move.l #$10000,d0
+	jmp _LVOFreeMem(a6)
 	
 FndMem	move.l d0,d7
 	moveq.l #0,d0
@@ -126,7 +132,7 @@ FndMem	move.l d0,d7
 	jsr _LVOFindConfigDev(a6)		;Find A3000/A4000 mediator (for now)
 	move.l 4.w,a6
 	tst.l d0
-	beq.s Clean
+	beq Clean
 
 	move.l d0,a1
 	move.l cd_BoardAddr(a1),d0		;Start address Configspace Mediator
@@ -152,6 +158,7 @@ Sonnet	move.l d7,a0
 	tst.l d0
 	beq Clean
 
+	move.l d0,ROMMem-Buffer(a4)
 	move.l d0,a5
 	move.l a5,a1
 	lea $100(a5),a5
@@ -532,17 +539,17 @@ RunPPC	movem.l d1-a6,-(a7)
 	move.l 4.w,a6
 	jsr _LVOCreateMsgPort(a6)
 	tst.l d0
-	beq.s Cannot
+	beq Cannot
 	move.l d0,Port-Buffer(a4)
-	move.l #MN_SIZE+PP_SIZE,d0
+	move.l #MN_SIZE+PP_SIZE+64,d0
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1
 	jsr _LVOAllocVec(a6)
 	tst.l d0
-	beq.s Cannot
+	beq Cannot
 	move.l d0,Msg-Buffer(a4)
 	move.l Port(pc),d1
 	move.l d0,a1
-	move.w #MN_SIZE+PP_SIZE,MN_LENGTH(a1)
+	move.w #MN_SIZE+PP_SIZE+64,MN_LENGTH(a1)
 	move.l d1,MN_REPLYPORT(a1)
 	lea MN_LENGTH+2(a1),a2
 	move.l #PP_SIZE/4-1,d0
@@ -550,6 +557,11 @@ RunPPC	movem.l d1-a6,-(a7)
 CpMsg	move.l (a0)+,(a2)+
 	dbf d0,CpMsg
 	move.b #NT_MESSAGE,LN_TYPE(a1)
+	move.l ThisTask(a6),a1
+	moveq.l #15,d0
+	move.l LN_NAME(a1),a1
+CpName	move.l (a1)+,(a2)+
+	dbf d0,CpName	
 	lea PrcName(pc),a1	
 	jsr _LVOFindTask(a6)
 	move.l d0,d7
@@ -559,12 +571,16 @@ CpMsg	move.l (a0)+,(a2)+
 	move.l Msg(pc),a1
 	jsr _LVOPutMsg(a6)
 	move.l d7,a1
-	move.l #$40000,d0
+	move.l #$40000,d0				;Bit 18
 	jsr _LVOSignal(a6)	
 	move.l Port(pc),a0
 	jsr _LVOWaitPort(a6)
-	
-							;Copy Msg back to ppstruct	
+	move.l PStruct(pc),a1
+	move.l Msg(pc),a0
+	lea MN_LENGTH+2(a0),a0
+	move.l #PP_SIZE/4-1,d0
+CpBck	move.l (a0)+,(a1)+
+	dbf d0,CpBck
 	moveq.l #0,d7
 	bra.s Success
 
@@ -574,13 +590,15 @@ Success	move.l Msg(pc),d0
 	bsr.s FreeIt
 NoMsg	move.l Port(pc),d0
 	beq.s EndIt
-	bsr.s FreeIt
+	bsr.s FreePrt
 EndIt	move.l d7,d0
 	movem.l (a7)+,d1-a6
 	rts
 	
 FreeIt	move.l d0,a1
 	jmp _LVOFreeVec(a6)
+FreePrt	move.l d0,a0
+	jmp _LVODeleteMsgPort(a6)
 
 
 WaitForPPC			rts
@@ -709,6 +727,7 @@ PCIBase		ds.l	1
 Port		ds.l 	1
 Msg		ds.l 	1
 PStruct		ds.l 	1
+ROMMem		ds.l	1
 
 DATATABLE:
 	INITBYTE	LN_TYPE,NT_LIBRARY
