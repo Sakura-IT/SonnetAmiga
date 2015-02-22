@@ -2,7 +2,7 @@ ASM68K=vasmm68k_mot
 ASMPPC=vasmppc_std
 LD=vlink
 
-ASM68KPARAM=-m68020up -Fhunk
+ASM68KPARAM=-Iinclude_i: -m68020up -Fhunk
 ASMPPCPARAM=-many -mppc32 -Fhunk
 
 OBJECTS68K=sonnet.o

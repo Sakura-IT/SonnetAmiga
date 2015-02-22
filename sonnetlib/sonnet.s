@@ -12,24 +12,29 @@ StackSize	EQU $80000
 blr		MACRO
 		dc.l $4E800020
 		ENDM
-	
-	incdir	include:
-	include	lvo/exec_lib.i
+
+FUNC_CNT	 EQU	-30		* Skip 4 standard vectors	
+FUNCDEF		 MACRO
+_LVO\1		 EQU	FUNC_CNT
+FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
+		 ENDM
+		
+	include	exec/exec_lib.i
 	include exec/initializers.i
 	include	exec/nodes.i
 	include exec/libraries.i
 	include exec/resident.i
 	include	exec/memory.i
 	include pci.i
-	include	lvo/expansion_lib.i
+	include	libraries/expansion_lib.i
 	include	libraries/configvars.i
 	include	exec/execbase.i
 	include powerpc/powerpc.i
 	include	dos/dostags.i
-	include lvo/dos_lib.i
+	include dos/dos_lib.i
 	include exec/ports.i
 	include dos/dosextens.i
-	include lvo/sonnet_lib.i
+	include sonnet_lib.i
 	
 	XREF	FunctionsLen
 	
