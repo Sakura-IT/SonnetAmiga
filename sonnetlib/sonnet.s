@@ -9,6 +9,8 @@ WP_CONTROL	EQU $F48
 WP_TRIG01	EQU $c0000000
 MEMF_PPC	EQU $1000
 StackSize	EQU $80000
+MN_IDENTIFIER	EQU MN_LENGTH+2
+MN_PPSTRUCT	EQU MN_IDENTIFIER+4
 blr		MACRO
 		dc.l $4E800020
 		ENDM
@@ -388,60 +390,63 @@ PCIMem	dc.b "pcidma memory",0
 ;********************************************************************************************
 
 MasterControl
-	movem.l d0-a6,-(a7)
 	lea Buffer(pc),a4
 	move.l 4.w,a6
-	moveq.l #17,d0					;Start 68k
-	jsr _LVOAllocSignal(a6)
-	tst.l d0
-	bmi.s SigErr
-	moveq.l #18,d0					;Start PPC
-	jsr _LVOAllocSignal(a6)
-	tst.l d0
-	bmi.s SigErr
-	moveq.l #19,d0					;End 68k
-	jsr _LVOAllocSignal(a6)
-	tst.l d0
-	bmi.s SigErr
-	moveq.l #20,d0					;End PPC
-	jsr _LVOAllocSignal(a6)
-	tst.l d0
-	bmi.s SigErr
 	
-NextMsg	move.l #$60000,d0
-	jsr _LVOWait(a6)
-	btst #17,d0
-	bne.s Msg68k
-Don68k	btst #18,d0
-	bne.s MsgPPC	
-	bra.s NextMsg
-	
-SigErr	movem.l (a7)+,d0-a6
-	rts
-
-Msg68k	move.l #$7c000000,a1
-	move.l #"68k!",64(a1)
-	bra.s Don68k
-
-MsgPPC	move.l ThisTask(a6),a0
+NextMsg	move.l ThisTask(a6),a0
 	lea pr_MsgPort(a0),a0
+	move.l a0,d6
+	jsr _LVOWaitPort(a6)
+GetLoop	move.l d6,a0
 	jsr _LVOGetMsg(a6)
-	tst.l d0
+	move.l d0,d7
 	beq.s NextMsg
-	move.l d0,a1					;MOVE THIS TO TASKLIST PPC
-	jsr _LVOReplyMsg(a6)				;THEN CREATE PPC TASK WITH THESE VALUES
-	move.l #$7c000000,a1				;EXIT CODE OF PPC TASK SIGNALS THIS
-	move.l #"PPC!",64(a1)				;TASK WITH END PPC SIGNAL
-	move.l PowerPCBase(pc),a6
-	move.l a6,68(a1)
-	jsr _LVOCauseInterruptHW(a6)			;Force reschedule. Is this faster than
-	move.l 4.w,a6					;just wait for normal reschedule?
+	move.l d0,a1
+	move.l MN_IDENTIFIER(a1),d0
+	cmp.l #"TPPC",d0
+	beq.s MsgTPPC
+	cmp.l #"T68k",d0
+	beq.s MsgT68k
+	cmp.l #"FPPC",d0
+	beq.s MsgFPPC
+	cmp.l #"F68k",d0
+	beq.s MsgF68k
+	bra.s GetLoop
+
+MsgT68k	move.l #$7c000000,a1
+	move.l #"T68k",64(a1)
+	move.l d7,a1
+	jsr _LVOReplyMsg(a6)
 	bra.s NextMsg
+
+MsgTPPC	move.l #$7c000000,a1				;MOVE THIS TO TASKLIST PPC
+	move.l #"TPPC",64(a1)				;THEN CREATE PPC TASK WITH THESE VALUES
+	move.l PowerPCBase(pc),a6			;EXIT CODE OF PPC TASK SIGNALS THIS
+	move.l a6,68(a1)				;TASK WITH END PPC SIGNAL
+	jsr _LVOCauseInterruptHW(a6)			;Force reschedule. Is this faster than
+	move.l 4.w,a6
+	move.l d7,a1
+	jsr _LVOReplyMsg(a6)				;just wait for normal reschedule?
+	bra NextMsg
+
+MsgF68k	move.l #$7c000000,a1
+	move.l #"F68k",64(a1)
+	move.l d7,a1
+	jsr _LVOReplyMsg(a6)
+	bra NextMsg
+
+MsgFPPC	move.l #$7c000000,a1
+	move.l #"FPPC",64(a1)
+	move.l d7,a1
+	jsr _LVOReplyMsg(a6)
+	bra NextMsg	
 
 	cnop 0,4
 
 PrcTags	dc.l NP_Entry,0,NP_Name,0,NP_Priority,125,0,0
-PrcName	dc.b "MasterControl",0,0,0
+PrcName	dc.b "MasterControl",0
+
+	cnop 0,4
 
 
 Open	move.l	a6,d0
@@ -557,12 +562,20 @@ ExCPU	movem.l (a7)+,d1-a6
 RunPPC	movem.l d1-a6,-(a7)
 	lea Buffer(pc),a4
 	move.l a0,PStruct-Buffer(a4)
+	
 	move.l 4.w,a6
-	jsr _LVOCreateMsgPort(a6)
+	move.l ThisTask(a6),a1
+	cmp.b #NT_PROCESS,LN_TYPE(a1)
+	bne.s xTask
+	lea pr_MsgPort(a1),a1
+	move.l a1,d0
+	bra.s xProces
+	
+xTask	jsr _LVOCreateMsgPort(a6)			;Not done yet. How to find this Port?
 	tst.l d0
 	beq Cannot
-	move.l d0,Port-Buffer(a4)
-	move.l #MN_SIZE+PP_SIZE+64,d0
+xProces	move.l d0,Port-Buffer(a4)
+	move.l #MN_SIZE+PP_SIZE+68,d0
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1
 	jsr _LVOAllocVec(a6)
 	tst.l d0
@@ -570,9 +583,9 @@ RunPPC	movem.l d1-a6,-(a7)
 	move.l d0,Msg-Buffer(a4)
 	move.l Port(pc),d1
 	move.l d0,a1
-	move.w #MN_SIZE+PP_SIZE+64,MN_LENGTH(a1)
+	move.w #MN_SIZE+PP_SIZE+68,MN_LENGTH(a1)
 	move.l d1,MN_REPLYPORT(a1)
-	lea MN_LENGTH+2(a1),a2
+	lea MN_PPSTRUCT(a1),a2
 	move.l #PP_SIZE/4-1,d0
 	move.l PStruct(pc),a0
 CpMsg	move.l (a0)+,(a2)+
@@ -593,21 +606,31 @@ CpName	move.l (a1)+,(a2)+
 Fast	move.l d7,a0
 	lea pr_MsgPort(a0),a0
 	move.l Msg(pc),a1
+	move.l #"TPPC",MN_IDENTIFIER(a1)
 	jsr _LVOPutMsg(a6)
-	move.l d7,a1
-	move.l #$40000,d0				;Bit 18
-	jsr _LVOSignal(a6)	
 	bra.s Stacker
 
 WaitForPPC
+	movem.l d1-a6,-(a7)
 	lea Buffer(pc),a4
 	move.l a0,PStruct-Buffer(a4)
-	movem.l d1-a6,-(a7)
+
 Stacker	move.l Port(pc),a0
 	jsr _LVOWaitPort(a6)
-	move.l PStruct(pc),a1
-	move.l Msg(pc),a0
-	lea MN_LENGTH+2(a0),a0
+GtLoop	move.l Port(pc),a0
+	jsr _LVOGetMsg(a6)
+	tst.l d0
+	beq.s Stacker
+	move.l d0,a0
+	move.l MN_IDENTIFIER(a0),d0
+	cmp.l #"TPPC",d0
+	beq.s DizDone
+	cmp.l #"T68k",d0
+	beq.s Runk86
+	bra.s GtLoop
+	
+DizDone	move.l PStruct(pc),a1
+	lea MN_PPSTRUCT(a0),a0
 	move.l #PP_SIZE/4-1,d0
 CpBck	move.l (a0)+,(a1)+
 	dbf d0,CpBck
@@ -618,7 +641,10 @@ Cannot	moveq.l #-1,d7
 Success	move.l Msg(pc),d0
 	beq.s NoMsg
 	bsr.s FreeIt
-NoMsg	move.l Port(pc),d0
+NoMsg	move.l ThisTask(a6),a1
+	cmp.b #NT_PROCESS,LN_TYPE(a1)
+	beq.s EndIt
+	move.l Port(pc),d0
 	beq.s EndIt
 	bsr.s FreePrt
 EndIt	move.l d7,d0
@@ -629,6 +655,9 @@ FreeIt	move.l d0,a1
 	jmp _LVOFreeVec(a6)
 FreePrt	move.l d0,a0
 	jmp _LVODeleteMsgPort(a6)
+
+Runk86	nop						;68k routines called from PPC
+	bra GtLoop
 	
 GetPPCState
 	move.l a0,-(a7)

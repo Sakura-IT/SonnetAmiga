@@ -103,16 +103,15 @@ End:	mflr	r4
 	li	r6,0
 	bl	copy_and_flush			#Put program in Sonnet Mem instead if PCI Mem
 	
-#	mtdec	r3				#Activate Decrementer Exception
-#	sync					#
-	
 	lis	r14,0				#Reset
+	mtdec	r14				#Decrementer,
 	mtspr	285,r14				#Time Base Upper and
-	mtspr	284,r14				#Time Base Lower	
+	mtspr	284,r14				#Time Base Lower.
+	sync
 
 	mfmsr	r14
-	ori	r14,r14,0x8000			#Enable External Exceptions (and Decrementer
-	mtmsr	r14				#Exception when activated)
+	ori	r14,r14,0x8000			#Enable External Exceptions and Decrementer
+	mtmsr	r14				#Exception
 	isync
 	
 	mtspr	srr0,r3
@@ -1202,9 +1201,7 @@ EIntEnd:
 	bl	copy_and_flush
 	bl	DcIntEnd
 	
-DcInt:	loadreg	r3,"test"			#Decrementer Exception. Not activated (see above)
-	li	r4,0
-	stw	r3,32(r4)
+DcInt:	nop					#Decrementer Exception
 	rfi	
 
 DcIntEnd:
