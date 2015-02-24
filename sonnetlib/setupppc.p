@@ -1196,6 +1196,9 @@ TagEnd:	mflr	r4
 EIntEnd:
 	mflr	r4
 	li	r3,0x500
+	loadreg	r5,0x48002b00
+	stw	r5,0(r3)
+	li	r3,0x3000			#Jump from Exception (0x500) immediatly to 0x3000
 	li	r5,EIntEnd-EInt
 	li	r6,0
 	bl	copy_and_flush

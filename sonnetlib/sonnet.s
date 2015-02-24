@@ -9,8 +9,6 @@ WP_CONTROL	EQU $F48
 WP_TRIG01	EQU $c0000000
 MEMF_PPC	EQU $1000
 StackSize	EQU $80000
-MN_IDENTIFIER	EQU MN_LENGTH+2
-MN_PPSTRUCT	EQU MN_IDENTIFIER+4
 blr		MACRO
 		dc.l $4E800020
 		ENDM
@@ -542,6 +540,7 @@ CpxLoop	move.l MediatorBase(pc),a5
 Error2	move.l d4,d1	
 xSonnet	rts
 
+
 GetCPU	movem.l d1-a6,-(a7)
 	move.l SonnetBase(pc),a1
 	move.l 12(a1),d0
@@ -559,10 +558,30 @@ G4	move.l #CPUF_G4,d0
 ExCPU	movem.l (a7)+,d1-a6
 	rts
 
-RunPPC	movem.l d1-a6,-(a7)
-	lea Buffer(pc),a4
-	move.l a0,PStruct-Buffer(a4)
+
+;********************************************************************************************
+;
+;	status = RunPPC(PPStruct) // d0=a0
+;
+;********************************************************************************************
 	
+MN_MIRROR	EQU MN_LENGTH+2
+MN_IDENTIFIER	EQU MN_MIRROR+4
+MN_PPSTRUCT	EQU MN_IDENTIFIER+4
+
+
+PStruct	EQU -12
+Msg	EQU -8
+Port	EQU -4
+
+
+RunPPC	link a5,#-12
+	movem.l d1-a6,-(a7)
+	moveq.l #0,d0
+	move.l d0,Msg(a5)
+	move.l d0,Port(a5)
+	move.l a0,PStruct(a5)	
+	lea Buffer(pc),a4	
 	move.l 4.w,a6
 	move.l ThisTask(a6),a1
 	cmp.b #NT_PROCESS,LN_TYPE(a1)
@@ -574,20 +593,21 @@ RunPPC	movem.l d1-a6,-(a7)
 xTask	jsr _LVOCreateMsgPort(a6)			;Not done yet. How to find this Port?
 	tst.l d0
 	beq Cannot
-xProces	move.l d0,Port-Buffer(a4)
-	move.l #MN_SIZE+PP_SIZE+68,d0
+xProces	move.l d0,Port(a5)
+	move.l #MN_SIZE+PP_SIZE+76,d0
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1
 	jsr _LVOAllocVec(a6)
 	tst.l d0
 	beq Cannot
-	move.l d0,Msg-Buffer(a4)
-	move.l Port(pc),d1
+	move.l d0,Msg(a5)
+	move.l Port(a5),d1	
 	move.l d0,a1
-	move.w #MN_SIZE+PP_SIZE+68,MN_LENGTH(a1)
+	move.w #MN_SIZE+PP_SIZE+76,MN_LENGTH(a1)
 	move.l d1,MN_REPLYPORT(a1)
+	move.l d1,MN_MIRROR(a1)
 	lea MN_PPSTRUCT(a1),a2
 	move.l #PP_SIZE/4-1,d0
-	move.l PStruct(pc),a0
+	move.l PStruct(a5),a0
 CpMsg	move.l (a0)+,(a2)+
 	dbf d0,CpMsg
 	move.b #NT_MESSAGE,LN_TYPE(a1)
@@ -601,23 +621,39 @@ CpName	move.l (a1)+,(a2)+
 	lea PrcName(pc),a1
 	jsr _LVOFindTask(a6)
 	move.l d0,d7
-	beq.s Cannot
+	beq Cannot
 	move.l d7,ComProc-Buffer(a4)
 Fast	move.l d7,a0
 	lea pr_MsgPort(a0),a0
-	move.l Msg(pc),a1
+	move.l Msg(a5),a1
 	move.l #"TPPC",MN_IDENTIFIER(a1)
 	jsr _LVOPutMsg(a6)
 	bra.s Stacker
+	
+;********************************************************************************************
+;
+;	status = WaitForPPC(PPStruct) // d0=a0
+;
+;********************************************************************************************
 
 WaitForPPC
+	link a5,#-12
 	movem.l d1-a6,-(a7)
 	lea Buffer(pc),a4
-	move.l a0,PStruct-Buffer(a4)
+	move.l a0,PStruct(a5)
+	move.l 4.w,a6
+	move.l ThisTask(a6),a1
+	cmp.b #NT_PROCESS,LN_TYPE(a1)
+	beq.s yProces
+	
+	ILLEGAL						;Not done yet. How to create this port?
+	
+yProces	lea pr_MsgPort(a1),a1
+	move.l a1,Port(a5)	
 
-Stacker	move.l Port(pc),a0
+Stacker	move.l Port(a5),a0
 	jsr _LVOWaitPort(a6)
-GtLoop	move.l Port(pc),a0
+GtLoop	move.l Port(a5),a0
 	jsr _LVOGetMsg(a6)
 	tst.l d0
 	beq.s Stacker
@@ -629,7 +665,7 @@ GtLoop	move.l Port(pc),a0
 	beq.s Runk86
 	bra.s GtLoop
 	
-DizDone	move.l PStruct(pc),a1
+DizDone	move.l PStruct(a5),a1
 	lea MN_PPSTRUCT(a0),a0
 	move.l #PP_SIZE/4-1,d0
 CpBck	move.l (a0)+,(a1)+
@@ -638,17 +674,18 @@ CpBck	move.l (a0)+,(a1)+
 	bra.s Success
 
 Cannot	moveq.l #-1,d7	
-Success	move.l Msg(pc),d0
+Success	move.l Msg(a5),d0
 	beq.s NoMsg
 	bsr.s FreeIt
 NoMsg	move.l ThisTask(a6),a1
 	cmp.b #NT_PROCESS,LN_TYPE(a1)
 	beq.s EndIt
-	move.l Port(pc),d0
+	move.l Port(a5),d0
 	beq.s EndIt
 	bsr.s FreePrt
 EndIt	move.l d7,d0
 	movem.l (a7)+,d1-a6
+	unlk a5
 	rts
 	
 FreeIt	move.l d0,a1
@@ -656,9 +693,30 @@ FreeIt	move.l d0,a1
 FreePrt	move.l d0,a0
 	jmp _LVODeleteMsgPort(a6)
 
-Runk86	nop						;68k routines called from PPC
-	bra GtLoop
+Runk86	movem.l d0-a6,-(a7)				;68k routines called from PPC
+	move.l a0,-(a7)
+	lea MN_PPSTRUCT(a0),a1
+	pea xBack(pc)
+	move.l PP_CODE(a1),a0
+	add.l PP_OFFSET(a1),a0
+	move.l a0,-(a7)
+	lea PP_REGS(a1),a6				;PP_STACKSIZE & PP_STACKPTR to be done
+	movem.l (a6)+,d0-a6				;Is this possible? Correct sequence?
+	rts
 	
+xBack	move.l (a7)+,a6
+	movem.l (a7)+,d0-a5				;Correct Sequence?
+	move.l a6,a1
+	move.l (a7)+,a6
+	jsr _LVOReplyMsg(a6)	
+	bra GtLoop
+
+;********************************************************************************************
+;
+;	PPCState = GetPCState(void) // d0
+;
+;********************************************************************************************	
+
 GetPPCState
 	move.l a0,-(a7)
 	move.l d1,-(a7)
@@ -674,6 +732,7 @@ NoRun	move.l (a7)+,d1
 	move.l (a7)+,a0
 	rts
 	
+;********************************************************************************************
 
 ;;;;;;RunPPC			rts
 ;;;;;;WaitForPPC		rts
@@ -799,9 +858,6 @@ MediatorBase	ds.l	1
 DosBase		ds.l	1
 ExpBase		ds.l	1
 PCIBase		ds.l	1
-Port		ds.l 	1
-Msg		ds.l 	1
-PStruct		ds.l 	1
 ROMMem		ds.l	1
 ComProc		ds.l	1
 SonAddr		ds.l	1
