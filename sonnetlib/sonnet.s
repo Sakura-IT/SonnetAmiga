@@ -701,7 +701,8 @@ Runk86	movem.l d0-a6,-(a7)				;68k routines called from PPC
 	add.l PP_OFFSET(a1),a0
 	move.l a0,-(a7)
 	lea PP_REGS(a1),a6				;PP_STACKSIZE & PP_STACKPTR to be done
-	movem.l (a6)+,d0-a6				;Is this possible? Correct sequence?
+	movem.l (a6)+,d0-a5				;Correct sequence?
+	move.l (a6),a6
 	rts
 	
 xBack	move.l (a7)+,a6
@@ -731,6 +732,26 @@ NoWait	move.l RunningTask(a0),d1
 NoRun	move.l (a7)+,d1
 	move.l (a7)+,a0
 	rts
+
+;********************************************************************************************
+;
+;	TaskPPC = CreatePPCTask(TagItems) // d0 = a0
+;
+;********************************************************************************************
+
+CreatePPCTask	
+	movem.l d1-a6,-(a7)
+	lea -PP_SIZE(a7),a7
+	movem.l d0-a6,PP_REGS(a7)
+	move.l a7,a0
+	move.l PowerPCBase(pc),a6
+	move.l a6,PP_CODE(a7)
+	move.l #_LVOCreateTaskPPC+2,PP_OFFSET(a7)
+	jsr _LVORunPPC(a6)
+	movem.l PP_REGS(a7),d0-a6
+	lea PP_SIZE(a7),a7
+	movem.l (a7)+,d1-a6
+	rts
 	
 ;********************************************************************************************
 
@@ -746,7 +767,7 @@ FreeXMsg			rts
 PutXMsg				rts
 ;;;;;;GetPPCState		rts
 SetCache68K			rts
-CreatePPCTask			rts
+C;;;;;;reatePPCTask		rts
 CausePPCInterrupt		rts
 
 Run68K				blr
