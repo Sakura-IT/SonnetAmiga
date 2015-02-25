@@ -1,7 +1,7 @@
 .include ppcdefines.i
 .include sonnet_libppc.i
 
-.global PPCCode,PPCLen,RunningTask,WaitingTasks
+.global PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks
 
 .set	PPCLen,(PPCEnd-PPCCode)
 
@@ -44,7 +44,7 @@ Loop1:	slw.	r26,r26,r28
 	blt	Fndbit
 	addi	r25,r25,-1
 	bdnz	Loop1
-	b	agentBoot
+	b	ExitCode
 	
 Fndbit:	slw.	r26,r26,r28
 	beq	SetLen
@@ -89,12 +89,18 @@ SetLen:	mr	r30,r28
 Start:	li	r25,0
 	lwz	r28,0(r25)
 	stw	r28,4(r29)			#Code word		
-agentBoot:
-	ori	r0,r0,0
-	ori	r0,r0,0
+ExitCode:
+	li	r30,SonnetBase
+	li	r29,1
+	stw	r29,ReadyTasks(r30)
+	stw 	r4,0x70(r30)
+	lwz	r29,0x80(r30)
+	addi	r29,r29,1
+	stw	r29,0x80(r30)
+Pause:	ori	r0,r0,0
 	ori	r0,r0,0         		#no-op
 	ori	r0,r0,0         		#no-op
-	b	agentBoot
+	b	Pause
 
 End:	mflr	r4
 	
@@ -1133,54 +1139,75 @@ FillEm:	addi	r17,r17,0x100
 	bl	EIntEnd
 
 EInt:	mtspr	SPRG0,r3			#Redo save state sometime....(stack?)
-	mtspr	SPRG1,r4
+	mtspr	SPRG1,r5
 	mtspr	SPRG2,r6
 	mtspr	SPRG3,r7
 	
 	mfspr	r6,srr0
 	mfspr	r7,srr1
 	
-	mfmsr	r4
-	ori	r4,r4,(PSL_IR|PSL_DR)
-	mtmsr	r4				#Reenable MMU (can affect srr0/srr1 acc Docs)
+	mfmsr	r5
+	ori	r5,r5,(PSL_IR|PSL_DR)
+	mtmsr	r5				#Reenable MMU (can affect srr0/srr1 acc Docs)
 	isync
 	
 	lis	r3,EUMBEPICPROC
-	lwz	r4,0xa0(r3)			#Read IACKR to acknowledge it
+	lwz	r5,0xa0(r3)			#Read IACKR to acknowledge it
 	eieio
 	
-	rlwinm	r4,r4,8,0,31
-	cmpwi	r4,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
+	rlwinm	r5,r5,8,0,31
+	cmpwi	r5,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
 	beq	NoEOI
-	cmpwi	r4,0x0042
+	cmpwi	r5,0x0042
 	bne	NoHEAR
 
 	b	TestRoutine
 	
 NoHEAR:	li	r3,SonnetBase
-	mfspr	r4,HID0
-	stw	r4,CPUHID0(r3)
-	mfspr	r4,SDR1
-	stw	r4,CPUSDR1(r3)
+	mfspr	r5,HID0
+	stw	r5,CPUHID0(r3)
+	mfspr	r5,SDR1
+	stw	r5,CPUSDR1(r3)
+	
+	lwz	r5,RunningTask(r3)
+	cmpwi	r5,0				#HACK!
+	beq	NoRunning
+	bl	Hack
+		
+.long		PPCINFO_CPU,0,PPCINFO_PVR,0,PPCINFO_CPUCLOCK,0,PPCINFO_BUSCLOCK,0
+.long		PPCINFO_ICACHE,0,PPCINFO_DCACHE,0,PPCINFO_PAGETABLE,0,PPCINFO_TABLESIZE,0
+.long		0,0
+
+Hack:	mflr 	r4
+	lis	r6,0x9
+	mtlr	r6
+	li	r5,0
+	lwz	r6,RunningTask(r3)
+	lwz	r6,0(r6)
+	stw	r5,RunningTask(r3)	
+	sync	
+
+NoRunning:	
 	lis	r3,EUMB
-	lis	r4,0x100			#Clear IM0 bit to clear interrupt
-	stw	r4,0x100(r3)
+	lis	r5,0x100			#Clear IM0 bit to clear interrupt
+	stw	r5,0x100(r3)
 	eieio
-	clearreg r4
+	clearreg r5
 	lis	r3,EUMBEPICPROC
 	sync
-	stw	r4,0xb0(r3)			#Write 0 to EOI to End Interrupt
+	stw	r5,0xb0(r3)			#Write 0 to EOI to End Interrupt
 	
 NoEOI:	mtspr	srr0,r6
 	mtspr	srr1,r7
 	mfspr	r3,SPRG0
-	mfspr	r4,SPRG1
+	mfspr	r5,SPRG1
 	mfspr	r6,SPRG2
 	mfspr	r7,SPRG3
 	sync
 	rfi
 	
-TestRoutine:	
+TestRoutine:
+	b	NoHEAR	
 	li	r3,SonnetBase
 	lwz	r3,PowerPCBase(r3)
 	bl	TagEnd

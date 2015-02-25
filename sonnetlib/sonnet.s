@@ -43,7 +43,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
 	XREF	NextTagItemPPC,GetTagDataPPC,FindTagItemPPC
 	
-	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks
+	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks
 	XDEF	PowerPCBase
 
 ;********************************************************************************************
@@ -299,6 +299,9 @@ RLoc	add.l d2,(a2)+
 	move.l a5,8(a1)					;Memheader at $8
 	move.l a1,(a1)					;Sonnet relocated mem at $0
 	move.l d0,PowerPCBase-Buffer(a4)
+	moveq.l #0,d1
+	move.l d1,ReadyTasks(a1)
+	move.l d1,RunningTask(a1)
 
 	move.l d0,a1
 	jsr _LVOAddLibrary(a6)
@@ -411,31 +414,34 @@ GetLoop	move.l d6,a0
 	beq.s MsgF68k
 	bra.s GetLoop
 
-MsgT68k	move.l #$7c000000,a1
-	move.l #"T68k",64(a1)
-	move.l d7,a1
+MsgT68k	move.l d7,a1
 	jsr _LVOReplyMsg(a6)
 	bra.s NextMsg
 
-MsgTPPC	move.l #$7c000000,a1				;MOVE THIS TO TASKLIST PPC
-	move.l #"TPPC",64(a1)				;THEN CREATE PPC TASK WITH THESE VALUES
-	move.l PowerPCBase(pc),a6			;EXIT CODE OF PPC TASK SIGNALS THIS
-	move.l a6,68(a1)				;TASK WITH END PPC SIGNAL
+MsgTPPC	move.l SonnetBase(pc),a0
+	lea MN_PPSTRUCT(a1),a2
+	move.l PP_CODE(a2),a3
+	add.l PP_OFFSET(a2),a3
+	move.l a3,RunningTask(a0)
+	move.l #"TPPC",64(a0)
+	move.l PowerPCBase(pc),a6
+	
 	jsr _LVOCauseInterruptHW(a6)			;Force reschedule. Is this faster than
-	move.l 4.w,a6
+	move.l 4.w,a6					;just wait for normal reschedule?
+	move.l SonnetBase(pc),a0
 	move.l d7,a1
-	jsr _LVOReplyMsg(a6)				;just wait for normal reschedule?
+	moveq.l #0,d1
+PPCWait	tst.l ReadyTasks(a0)				:QUICK HACK
+	beq.s PPCWait
+	move.l d1,ReadyTasks(a0)
+	jsr _LVOReplyMsg(a6)				
 	bra NextMsg
 
-MsgF68k	move.l #$7c000000,a1
-	move.l #"F68k",64(a1)
-	move.l d7,a1
+MsgF68k	move.l d7,a1
 	jsr _LVOReplyMsg(a6)
 	bra NextMsg
 
-MsgFPPC	move.l #$7c000000,a1
-	move.l #"FPPC",64(a1)
-	move.l d7,a1
+MsgFPPC	move.l d7,a1
 	jsr _LVOReplyMsg(a6)
 	bra NextMsg	
 
@@ -767,7 +773,7 @@ FreeXMsg			rts
 PutXMsg				rts
 ;;;;;;GetPPCState		rts
 SetCache68K			rts
-C;;;;;;reatePPCTask		rts
+;;;;;;CreatePPCTask		rts
 CausePPCInterrupt		rts
 
 Run68K				blr

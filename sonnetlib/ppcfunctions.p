@@ -629,8 +629,8 @@ GetInfo:
 .ReUse:		andi.	r8,r8,5
 		li	r7,0
 		cmpwi	r8,4
-		beq	.StoreTag
-		addi	r7,r7,1
+		beq	.StoreTag			#BITDEF means bits (1,2,4,8 and not
+		addi	r7,r7,1				#values (0,1,2,3)?
 		cmpwi	r8,5
 		beq	.StoreTag
 		addi	r7,r7,1
