@@ -36,6 +36,17 @@
 .set SwitchFreq,50				#50Hz
 .set Quantum,(SonnetTimerFreq/SwitchFreq)	#1/50s
 
+.set PPCINFO_CPU,		0x80102000		#CPU type (see below)
+.set PPCINFO_PVR,             	0x80102001		#PVR value
+.set PPCINFO_ICACHE,          	0x80102002		#Instruction cache state
+.set PPCINFO_DCACHE,          	0x80102003		#Data cache state
+.set PPCINFO_PAGETABLE,       	0x80102004		#Page table location
+.set PPCINFO_TABLESIZE,       	0x80102005		#Page table size
+.set PPCINFO_BUSCLOCK,        	0x80102006		#PPC bus clock
+.set PPCINFO_CPUCLOCK,        	0x80102007		#PPC CPU clock
+.set PPCINFO_CPULOAD,         	0x80102008		#Total CPU usage *100 [%]
+.set PPCINFO_SYSTEMLOAD,      	0x80102009		#Total system load *100 [%]
+
 .set SDR1,25
 
 .set CPUF_G3,			0x00200000
