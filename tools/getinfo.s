@@ -5,8 +5,11 @@
 		include exec/exec_lib.i
 		include dos/dos_lib.i
 		
+;************************************************************************************************
+
 		section code
-		
+
+;************************************************************************************************		
 		
 		movem.l d0-a6,-(a7)
 		lea infotext,a4
@@ -22,20 +25,14 @@
 		jsr _LVOOpenLibrary(a6)
 		tst.l d0
 		beq NoLib
-		move.l d0,PowerPCBase-infotext(a4)
+		move.l d0,_PowerPCBase-infotext(a4)
 		move.l d0,a6
+		lea Tags-infotext(a4),a1
+		move.l a1,d1
 		
-		lea -PP_SIZE(a7),a7
-		movem.l d0-a6,PP_REGS(a7)
-		move.l a7,a0
-		move.l a6,PP_CODE(a7)
-		move.l #_LVOGetInfo+2,PP_OFFSET(a7)
-		jsr _LVORunPPC(a6)				;No parameter parsing (HACK)
-		movem.l PP_REGS(a7),d0-a6
-		lea PP_SIZE(a7),a7		
+		RUNPOWERPC	_PowerPCBase,GetInfo
 		
-		move.l	#$7c000000,a2				;HACK
-		add.l $70(a2),a2
+		lea Tags-infotext(a4),a2
 		
 		move.l DosBase-infotext(a4),a6
 		move.l a4,d1
@@ -124,9 +121,12 @@ Done		move.l 52(a2),d2
 NoLib		movem.l (a7)+,d0-a6
 		rts
 
+;************************************************************************************************
 
+		section data			;MUST be in Sonnet memory!
+		
+;************************************************************************************************		
 
-		section data
 infotext        dc.b    "CPU:                   %s   (PVR = %08lx)",10
 		dc.b    "CPU clock:             %ld.%06ld MHz",10
 		dc.b    "Bus clock:             %ld.%06ld MHz",10
@@ -155,32 +155,15 @@ CACHE_OFF_L     dc.b    "OFF and LOCKED",0
 		cnop    0,4
 Args		dc.l	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0		
 DosBase		dc.l	0
-PowerPCBase	dc.l	0
+_PowerPCBase	dc.l	0
 
 DosLib		dc.b 	"dos.library",0
 		cnop	0,2
 PowerPCLib	dc.b	"sonnet.library",0
 		cnop	0,4		
-		
-PPCInfo_Tags
-		dc.l    PPCINFO_CPU
-Tag_CPU         dc.l    0
-		dc.l    PPCINFO_PVR
-Tag_PVR         dc.l    0
-		dc.l    PPCINFO_ICACHE
-Tag_ICACHE      dc.l    0
-		dc.l    PPCINFO_DCACHE
-Tag_DCACHE      dc.l    0
-		dc.l    PPCINFO_PAGETABLE
-Tag_PAGETABLE   dc.l    0
-		dc.l    PPCINFO_TABLESIZE
-Tag_TABLESIZE   dc.l    0
-		dc.l    PPCINFO_BUSCLOCK
-Tag_BUSCLOCK    dc.l    0
-		dc.l    PPCINFO_CPUCLOCK
-Tag_CPUCLOCK    dc.l    0
-		dc.l    PPCINFO_CPULOAD
-Tag_CPULOAD     dc.l    0
-		dc.l    PPCINFO_SYSTEMLOAD
-Tag_SYSTEMLOAD  dc.l    0
-		dc.l    0
+	
+Tags		dc.l	PPCINFO_CPU,0,PPCINFO_PVR,0,PPCINFO_CPUCLOCK,0,PPCINFO_BUSCLOCK,0
+		dc.l	PPCINFO_ICACHE,0,PPCINFO_DCACHE,0,PPCINFO_PAGETABLE,0,PPCINFO_TABLESIZE,0
+		dc.l	0,0
+	
+;************************************************************************************************
