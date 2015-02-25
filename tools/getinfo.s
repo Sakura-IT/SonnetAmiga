@@ -31,6 +31,11 @@
 		move.l a1,d1
 		
 		RUNPOWERPC	_PowerPCBase,GetInfo
+
+		lea Time-infotext(a4),a1
+		move.l a1,d1
+		
+		RUNPOWERPC	_PowerPCBase,GetSysTimePPC
 		
 		lea Tags-infotext(a4),a2
 		
@@ -134,7 +139,7 @@ infotext        dc.b    "CPU:                   %s   (PVR = %08lx)",10
 		dc.b    "Data Cache:            %s",10
 		dc.b    "Page table location:   %08lx",10
 		dc.b    "Page table size:       %ld KBytes",10
-		dc.b    "Time base content:     %08lx %08lx",10
+		dc.b    "PPC Uptime:            %06ld s %06ld µs",10
 		dc.b    "CPU load:              %ld.%02ld%%",10
 		dc.b    "System load:           %ld.%02ld%%",10
 		dc.b    0
@@ -153,14 +158,17 @@ CACHE_ON_L      dc.b    "ON and LOCKED",0
 CACHE_OFF_L     dc.b    "OFF and LOCKED",0
 
 		cnop    0,4
-Args		dc.l	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0		
+Args		dc.l	0,0,0,0,0,0,0,0,0,0
+Time		dc.l	0,0
+		dc.l	0,0,0,0,0,0
+		
 DosBase		dc.l	0
 _PowerPCBase	dc.l	0
 
 DosLib		dc.b 	"dos.library",0
 		cnop	0,2
 PowerPCLib	dc.b	"sonnet.library",0
-		cnop	0,4		
+		cnop	0,4
 	
 Tags		dc.l	PPCINFO_CPU,0,PPCINFO_PVR,0,PPCINFO_CPUCLOCK,0,PPCINFO_BUSCLOCK,0
 		dc.l	PPCINFO_ICACHE,0,PPCINFO_DCACHE,0,PPCINFO_PAGETABLE,0,PPCINFO_TABLESIZE,0
