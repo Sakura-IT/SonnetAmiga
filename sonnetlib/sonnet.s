@@ -420,9 +420,8 @@ MsgT68k	move.l d7,a1
 
 MsgTPPC	move.l SonnetBase(pc),a0
 	lea MN_PPSTRUCT(a1),a2
-	move.l PP_CODE(a2),a3
-	add.l PP_OFFSET(a2),a3
-	move.l a3,RunningTask(a0)
+	move.l a2,RunningTask(a0)
+
 	move.l #"TPPC",64(a0)
 	move.l PowerPCBase(pc),a6
 	

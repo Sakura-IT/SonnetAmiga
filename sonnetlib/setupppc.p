@@ -4,6 +4,9 @@
 .global PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks
 
 .set	PPCLen,(PPCEnd-PPCCode)
+.set	PP_CODE,0
+.set	PP_OFFSET,4
+.set	PP_REGS,20
 
 #********************************************************************************************
 	
@@ -77,18 +80,21 @@ SetLen:	mr	r30,r28
 	mfspr	r3,HID1				#Get CPU Multiplier
 	stw	r3,CPUHID1(r1)			
 
-	lis	r3,0x9				#Usercode hardcoded at 0x90000
+	loadreg	r3,0x8000			#Start hardcoded at 0x8000
 						#This should become the idle task
 	loadreg	r1,0x7fefc			#Userstack in unused mem (See BootPPC.s)
 	lis	r15,0
 	stw	r15,0(r1)
-	li	r2,-8192			#SDA (0x6000-0x16000)
-	loadreg	r13,0x1e000			#SDA2 (0x16000-0x26000)
+	loadreg	r2,0x18000			#SDA (0x10000-0x20000)
+	loadreg	r13,0x28000			#SDA2 (0x20000-0x30000)
 	bl	End
 	
 Start:	li	r25,0
 	lwz	r28,0(r25)
-	stw	r28,4(r29)			#Code word		
+	stw	r28,4(r29)			#Code word
+Rest:	nop
+	b	Rest
+	
 ExitCode:
 	li	r30,SonnetBase
 	li	r29,1
@@ -97,9 +103,8 @@ ExitCode:
 	lwz	r29,0x80(r30)
 	addi	r29,r29,1
 	stw	r29,0x80(r30)
-Pause:	ori	r0,r0,0
-	ori	r0,r0,0         		#no-op
-	ori	r0,r0,0         		#no-op
+Pause:	nop
+	nop
 	b	Pause
 
 End:	mflr	r4
@@ -1172,18 +1177,16 @@ NoHEAR:	li	r3,SonnetBase
 	lwz	r5,RunningTask(r3)
 	cmpwi	r5,0				#HACK!
 	beq	NoRunning
-	bl	Hack
 		
-.long		PPCINFO_CPU,0,PPCINFO_PVR,0,PPCINFO_CPUCLOCK,0,PPCINFO_BUSCLOCK,0
-.long		PPCINFO_ICACHE,0,PPCINFO_DCACHE,0,PPCINFO_PAGETABLE,0,PPCINFO_TABLESIZE,0
-.long		0,0
-
-Hack:	mflr 	r4
-	lis	r6,0x9
+	loadreg	r6,0x8000
+	addi	r6,r6,ExitCode-Start
 	mtlr	r6
-	li	r5,0
 	lwz	r6,RunningTask(r3)
-	lwz	r6,0(r6)
+	lwz	r4,PP_REGS+4(r6)
+	lwz	r5,PP_OFFSET(r6)
+	lwz	r6,PP_CODE(r6)
+	add	r6,r6,r5
+	li	r5,0
 	stw	r5,RunningTask(r3)	
 	sync	
 

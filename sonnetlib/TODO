@@ -1,5 +1,10 @@
 The TO-DO list:
 
+MAIN PROBLEM:	How to load PPC Code/Data to memory with attributes $1005
+		This is slow memory for the 68k. You want to keep the 68k
+		out of this memory for the most part.
+		Refer to GetInfo_Data1005 for hunk adjustments.
+
 *)	Get code execution on the Sonnet		*DONE
 *)	Initialize Memory on the Sonnet			*DONE
 *)	Make Sonnet Memory avaiable to the Amiga	*DONE
@@ -38,4 +43,3 @@ The TO-DO list:
 	*)	GetCPU					*DONE
 *)	Implement rest of exceptions plus error messaging
 *)	Implemented remaining functions
-
