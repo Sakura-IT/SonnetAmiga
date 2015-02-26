@@ -21,6 +21,7 @@ SupportedProtocol()()
 InitBootArea()()
 BootPowerPC()()
 CauseInterruptHW()()
+FlushL1DCache()()
 ##abi PPC
 ConfirmInterrupt()()
 ##bias 300
