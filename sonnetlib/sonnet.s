@@ -818,7 +818,7 @@ NoAl32	movem.l (a7)+,d2-d3
 
 ;********************************************************************************************
 ;
-;	void = FreeXMsg(message) // a0
+;	void FreeXMsg(message) // a0
 ;
 ;********************************************************************************************
 
@@ -826,6 +826,85 @@ FreeXMsg
 	move.l a0,a1
 	jsr _LVOFreeVec32(a6)
 	rts
+
+;********************************************************************************************
+;
+;	void SetCache68k(cacheflags, start, length) // d0,a0,d1
+;
+;********************************************************************************************
+
+SetCache68K
+	movem.l d2-d4/a2/a6,-(a7)
+	move.l d0,d2
+	move.l a0,a2
+	move.l d1,d3
+	cmp.l #CACHE_DCACHEOFF,d2
+	beq.s DCOff
+	cmp.l #CACHE_DCACHEON,d2
+	beq.s DCOn
+	cmp.l #CACHE_ICACHEOFF,d2
+	beq.s ICOff
+	cmp.l #CACHE_ICACHEON,d2
+	beq.s ICOn
+	cmp.l #CACHE_DCACHEFLUSH,d2
+	beq.s DCFlush
+	cmp.l #CACHE_ICACHEINV,d2
+	beq.s ICInv
+	cmp.l #CACHE_DCACHEINV,d2	
+	beq.s DCFlush
+	bra CacheIt
+	
+DCOff	moveq.l #0,d0
+	move.l #CACRF_EnableD,d1
+	move.l 4.w,a6
+	jsr _LVOCacheControl(a6)
+	bra.s CacheIt
+
+DCOn	move.l #CACRF_EnableD,d0
+	move.l d0,d1
+	move.l 4.w,a6
+	jsr _LVOCacheControl(a6)
+	bra.s CacheIt
+
+ICOff	moveq.l #0,d0
+	move.l #CACRF_EnableI,d1
+	move.l 4.w,a6
+	jsr _LVOCacheControl(a6)
+	bra.s CacheIt
+	
+ICOn	move.l #CACRF_EnableI,d0
+	move.l d0,d1
+	move.l 4.w,a6	
+	bra.s CacheIt
+
+DCFlush	tst.l a2
+	beq.s NoStrtA
+	tst.l d3
+	beq.s NoStrtA
+	move.l a2,a0
+	move.l d3,d0
+	move.l #CACRF_ClearD,d1
+	move.l 4.w,a6
+	jsr _LVOCacheClearE(a6)
+	bra.s CacheIt
+
+ICInv	tst.l a2
+	beq.s NoStrtA
+	tst.l d3
+	beq.s NoStrtA
+	move.l a2,a0
+	move.l d3,d0
+	move.l #CACRF_ClearI,d1
+	move.l 4.w,a6
+	jsr _LVOCacheClearE(a6)	
+	bra.s CacheIt
+	
+NoStrtA	move.l 4.w,a6
+	jsr _LVOCacheClearU(a6)
+	
+CacheIt	movem.l (a7)+,d2-d4/a2/a6
+	rts	
+	
 	
 ;********************************************************************************************
 
@@ -840,7 +919,7 @@ SPrintF68K			rts			;debug feature
 ;;;;;;FreeXMsg			rts
 PutXMsg				rts
 ;;;;;;GetPPCState		rts
-SetCache68K			rts
+;;;;;;SetCache68K		rts
 ;;;;;;CreatePPCTask		rts
 CausePPCInterrupt		rts
 
