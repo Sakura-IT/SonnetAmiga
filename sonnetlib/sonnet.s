@@ -42,6 +42,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
 	XREF	NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache
+	XREF	AllocXMsgPPC,FreeXMsgPPC
 	
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init
 	XDEF	PowerPCBase
@@ -839,8 +840,8 @@ GetMsgPPC			blr
 ReplyMsgPPC			blr
 FreeAllMem			blr
 CopyMemPPC			blr
-AllocXMsgPPC			blr
-FreeXMsgPPC			blr
+;;;;;;AllocXMsgPPC		blr
+;;;;;;FreeXMsgPPC		blr
 PutXMsgPPC			blr
 ;;;;;;GetSysTimePPC		blr
 ;;;;;;AddTimePPC		blr
@@ -1055,7 +1056,7 @@ EndFlag	dc.l	$ffffffff
 LibName
 	dc.b	"sonnet.library",0,0
 IDString
-	DC.B	"$VER: sonnet.library 1.0 (19-Feb-15)",0
+	DC.B	"$VER: sonnet.library 1.0 (26-Feb-15)",0
 	cnop	0,4
 EndCP	end
 	

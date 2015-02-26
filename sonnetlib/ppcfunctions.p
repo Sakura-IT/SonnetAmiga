@@ -12,6 +12,7 @@
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 .global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
 .global NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache
+.global	AllocXMsgPPC,FreeXMsgPPC
 
 .section "LibBody","acrx"
 
@@ -897,6 +898,84 @@ Fl2:		dcbf	r0,r4
 		bdnz	Fl2		
 
 		blr
+
+#********************************************************************************************
+#
+#	message = AllocXMsgPPC(bodysize, replyport) // r3=r4,r5
+#
+#********************************************************************************************
+
+
+AllocXMsgPPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+
+		li	r3,SonnetBase
+		lwz	r3,PowerPCBase(r3)
+		addi	r31,r4,20
+		mr	r30,r5
+		mr	r4,r31
+		
+		lwz	r0,_LVOAllocVecPPC+2(r3)
+		mtlr	r0
+		blrl
+		
+		mr.	r3,r3
+		beq-	NoMaam
+		stw	r30,14(r3)
+		sth	r31,18(r3)
+		
+NoMaam:		lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr		
+		
+#********************************************************************************************
+#
+#	void FreeXMsgPPC(message) // r4
+#
+#********************************************************************************************		
+
+FreeXMsgPPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		
+		li	r3,SonnetBase
+		lwz	r3,PowerPCBase(r3)
+		
+		lwz	r0,_LVOFreeVecPPC+2(r3)
+		mtlr	r0
+		blrl	
+		
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr		
 		
 #********************************************************************************************			
 EndFunctions:
