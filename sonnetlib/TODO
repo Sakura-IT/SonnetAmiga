@@ -21,8 +21,8 @@ MAIN PROBLEM:	How to load PPC Code/Data to memory with attributes $1005
 	*)	ReplyMsgPPC
 	*)	AllocMsgPPC
 	*)	FreeMsgPPC
-	*)	AllocXMsg
-	*)	FreeXMsg
+	*)	AllocXMsg				*DONE
+	*)	FreeXMsg				*DONE
 	*)	AllocXMsgPPC				*DONE
 	*)	FreeXMsgPPC				*DONE
 	*)	PutXMsgPPC

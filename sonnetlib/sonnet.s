@@ -761,18 +761,83 @@ CreatePPCTask
 	lea PP_SIZE(a7),a7
 	movem.l (a7)+,d1-a6
 	rts
+
+;********************************************************************************************
+;
+;	memblock = AllocVec32(memsize) // d0 = d0 (d1 is ignored)
+;
+;********************************************************************************************
+	
+AllocVec32
+	move.l a6,-(a7)
+	add.l #$38,d0
+	move.l 4.w,a6
+	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1	;attributes are FIXED to Sonnet mem
+	jsr _LVOAllocVec(a6)
+	move.l d0,d1
+	add.l #$27,d0
+	and.l #$ffffffe0,d0
+	move.l d0,a0
+	move.l d1,-4(a0)
+	move.l (A7)+,a6
+	rts	
+
+;********************************************************************************************
+;
+;	void FreeVec32(memblock) // a1
+;
+;********************************************************************************************
+	
+FreeVec32
+	move.l a6,-(a7)
+	move.l a1,d0
+	move.l -4(a1),a1
+	jsr _LVOFreeVec(a6)
+	move.l (a7)+,a6
+	rts
+
+;********************************************************************************************
+;
+;	message = AllocXMsg(bodysize, replyport) // d0=d0,a0
+;
+;********************************************************************************************
+
+AllocXMsg
+	movem.l d2-d3,-(a7)
+	move.l a0,d2
+	add.l #$14,d0
+	move.l d0,d3
+	jsr _LVOAllocVec32(a6)
+	tst.l d0
+	beq.s NoAl32
+	move.l d0,a0
+	move.l d2,MN_REPLYPORT(a0)
+	move.w d3,MN_LENGTH(a0)
+NoAl32	movem.l (a7)+,d2-d3
+	rts	
+
+;********************************************************************************************
+;
+;	void = FreeXMsg(message) // a0
+;
+;********************************************************************************************
+
+FreeXMsg
+	move.l a0,a1
+	jsr _LVOFreeVec32(a6)
+	rts
 	
 ;********************************************************************************************
 
 ;;;;;;RunPPC			rts
 ;;;;;;WaitForPPC		rts
 ;;;;;;GetCPU			rts
-PowerDebugMode			rts
-AllocVec32			rts
-FreeVec32			rts
-SPrintF68K			rts
-AllocXMsg			rts
-FreeXMsg			rts
+PowerDebugMode			rts			;debug feature
+;;;;;;AllocVec32		rts
+;;;;;;FreeVec32			rts
+SPrintF68K			rts			;debug feature
+;;;;;;AllocXMsg			rts
+;;;;;;FreeXMsg			rts
 PutXMsg				rts
 ;;;;;;GetPPCState		rts
 SetCache68K			rts
