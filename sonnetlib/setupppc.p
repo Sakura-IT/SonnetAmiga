@@ -1124,6 +1124,7 @@ cachel1:	addi	r6,r6,4			#copy a cache line
 	addi	r5,r5,4
 	addi	r6,r6,4
 	blr
+	
 #********************************************************************************************
 
 InstallExceptions:
@@ -1143,11 +1144,16 @@ FillEm:	addi	r17,r17,0x100
 	bdnz	FillEm
 	bl	EIntEnd
 
-EInt:	mtspr	SPRG0,r3			#Redo save state sometime....(stack?)
-	mtspr	SPRG1,r5
-	mtspr	SPRG2,r6
-	mtspr	SPRG3,r7
-	
+EInt:	stw	r13,-4(r1)			#Create local stack
+	subi	r13,r1,4
+	stwu	r1,-4096(r1)
+		
+	stwu	r3,-4(r13)
+#	stwu	r4,-4(r13)
+	stwu 	r5,-4(r13)		
+	stwu	r6,-4(r13)
+	stwu	r7,-4(r13)
+		
 	mfspr	r6,srr0
 	mfspr	r7,srr1
 	
@@ -1202,11 +1208,19 @@ NoRunning:
 	
 NoEOI:	mtspr	srr0,r6
 	mtspr	srr1,r7
-	mfspr	r3,SPRG0
-	mfspr	r5,SPRG1
-	mfspr	r6,SPRG2
-	mfspr	r7,SPRG3
+	
 	sync
+	
+	lwz	r7,0(r13)
+	lwzu	r6,4(r13)
+	lwzu	r5,4(r13)
+#	lwzu	r4,4(r13)
+	lwzu	r3,4(r13)
+	addi	r13,r13,4
+	
+	lwz	r1,0(r1)
+	lwz	r13,-4(r1)			#Destroy local stack
+	
 	rfi
 	
 TestRoutine:
