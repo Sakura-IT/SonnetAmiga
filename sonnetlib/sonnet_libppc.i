@@ -30,6 +30,10 @@
 .set _LVOCauseInterruptHW	,	-138
 .set _LVOConfirmInterrupt	,	-144
 
+####  Custom offsets
+
+.set _LVOFlushL1DCache		,	-150
+
 ####  PPC Library offsets
 
 .set _LVORun68K              ,       -300

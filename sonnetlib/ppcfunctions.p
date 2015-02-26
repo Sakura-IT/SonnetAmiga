@@ -11,7 +11,7 @@
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 .global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
-.global NextTagItemPPC,GetTagDataPPC,FindTagItemPPC
+.global NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache
 
 .section "LibBody","acrx"
 
@@ -871,6 +871,32 @@ FindTagItemPPC:
 		
 .Done3:		mr	r3,r4
 		b	.Done2
+
+#********************************************************************************************
+#
+#	Support: void Flush_L1_DCache(void)
+#
+#********************************************************************************************
+
+FlushL1DCache:			
+		li	r4,0x7000
+
+		li	r6,0x400
+		mr	r5,r6
+		mtctr	r6
+	
+Fl1:		lwz	r6,0(r4)
+		addi	r4,r4,L1_CACHE_LINE_SIZE
+		bdnz	Fl1
+	
+		li	r4,0x7000
+		mtctr	r5
+		
+Fl2:		dcbf	r0,r4
+		addi	r4,r4,L1_CACHE_LINE_SIZE
+		bdnz	Fl2		
+
+		blr
 		
 #********************************************************************************************			
 EndFunctions:

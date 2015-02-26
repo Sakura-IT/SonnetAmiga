@@ -41,7 +41,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
-	XREF	NextTagItemPPC,GetTagDataPPC,FindTagItemPPC
+	XREF	NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache
 	
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks
 	XDEF	PowerPCBase
@@ -924,7 +924,8 @@ FUNCTABLE:
 	dc.l	CauseInterruptHW
 	dc.l	ConfirmInterrupt
 	
-	dc.l	Reserved
+	dc.l	FlushL1DCache
+	
 	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved

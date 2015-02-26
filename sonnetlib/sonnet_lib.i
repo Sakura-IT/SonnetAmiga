@@ -30,6 +30,10 @@ _LVOBootPowerPC		=	-132
 _LVOCauseInterruptHW	=	-138
 _LVOConfirmInterrupt	=	-144
 
+****  Custom offsets
+
+_LVOFlushL1DCache	=	-150
+
 ****  PPC Library offsets
 
 _LVORun68K              =       -300
