@@ -338,16 +338,16 @@ CmpTimePPC:
 #********************************************************************************************
 
 AllocVecPPC:
-		stwu	r31,-4(r1)
-		stwu	r30,-4(r1)
-		stwu	r29,-4(r1)
-		stwu	r28,-4(r1)
-		stwu	r23,-4(r1)
-		stwu	r22,-4(r1)
-		stwu	r21,-4(r1)
-		stwu	r20,-4(r1)
-		stwu	r7,-4(r1)
-		stwu	r6,-4(r1)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r23,-4(r13)
+		stwu	r22,-4(r13)
+		stwu	r21,-4(r13)
+		stwu	r20,-4(r13)
+		stwu	r7,-4(r13)
+		stwu	r6,-4(r13)
 
 		andi.	r3,r0,0
 		addi	r29,r0,4
@@ -445,17 +445,17 @@ AllocVecPPC:
 		subi	r29,r29,1
 		rlwimi	r4,r29,0,16,31
 
-.error:		lwz	r6,0(r1)
-		lwzu	r7,4(r1)
-		lwzu	r20,4(r1)
-		lwzu	r21,4(r1)
-		lwzu	r22,4(r1)
-		lwzu	r23,4(r1)
-		lwzu	r28,4(r1)
-		lwzu	r29,4(r1)
-		lwzu	r30,4(r1)
-		lwzu	r31,4(r1)
-		addi	r1,r1,4
+.error:		lwz	r6,0(r13)
+		lwzu	r7,4(r13)
+		lwzu	r20,4(r13)
+		lwzu	r21,4(r13)
+		lwzu	r22,4(r13)
+		lwzu	r23,4(r13)
+		lwzu	r28,4(r13)
+		lwzu	r29,4(r13)
+		lwzu	r30,4(r13)
+		lwzu	r31,4(r13)
+		addi	r13,r13,4
 		sync
 		blr
 		
@@ -466,16 +466,16 @@ AllocVecPPC:
 #********************************************************************************************		
 		
 FreeVecPPC:		
-		stwu	r31,-4(r1)
-		stwu	r30,-4(r1)
-		stwu	r29,-4(r1)
-		stwu	r28,-4(r1)
-		stwu	r23,-4(r1)
-		stwu	r22,-4(r1)
-		stwu	r21,-4(r1)
-		stwu	r20,-4(r1)
-		stwu	r7,-4(r1)
-		stwu	r6,-4(r1)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r23,-4(r13)
+		stwu	r22,-4(r13)
+		stwu	r21,-4(r13)
+		stwu	r20,-4(r13)
+		stwu	r7,-4(r13)
+		stwu	r6,-4(r13)
 		
 		addi	r3,r0,1
 		li	r20,SonnetBase
@@ -537,17 +537,17 @@ FreeVecPPC:
 		subfco	r28,r3,r29
 		subf.	r3,r29,r3
 
-.error2:	lwz	r6,0(r1)
-		lwzu	r7,4(r1)
-		lwzu	r20,4(r1)
-		lwzu	r21,4(r1)
-		lwzu	r22,4(r1)
-		lwzu	r23,4(r1)
-		lwzu	r28,4(r1)
-		lwzu	r29,4(r1)
-		lwzu	r30,4(r1)
-		lwzu	r31,4(r1)
-		addi	r1,r1,4
+.error2:	lwz	r6,0(r13)
+		lwzu	r7,4(r13)
+		lwzu	r20,4(r13)
+		lwzu	r21,4(r13)
+		lwzu	r22,4(r13)
+		lwzu	r23,4(r13)
+		lwzu	r28,4(r13)
+		lwzu	r29,4(r13)
+		lwzu	r30,4(r13)
+		lwzu	r31,4(r13)
+		addi	r13,r13,4
 		sync
 		blr	
 
@@ -558,11 +558,11 @@ FreeVecPPC:
 #********************************************************************************************		
 
 GetInfo:
-		stwu	r8,-4(r1)
-		stwu	r7,-4(r1)
-		stwu	r6,-4(r1)
-		stwu	r5,-4(r1)
-		stwu	r4,-4(r1)
+		stwu	r8,-4(r13)
+		stwu	r7,-4(r13)
+		stwu	r6,-4(r13)
+		stwu	r5,-4(r13)
+		stwu	r4,-4(r13)
 		li	r6,1
 		
 .TagLoop:	mflr	r5
@@ -581,11 +581,11 @@ GetInfo:
 .NextInList:	addi	r4,r4,8
 		b	.TagLoop
 		
-.NoTags:	lwz	r4,0(r1)
-		lwzu	r5,4(r1)
-		lwzu	r6,4(r1)
-		lwzu	r7,4(r1)
-		lwzu	r8,4(r1)
+.NoTags:	lwz	r4,0(r13)
+		lwzu	r5,4(r13)
+		lwzu	r6,4(r13)
+		lwzu	r7,4(r13)
+		lwzu	r8,4(r13)
 		sync
 		blr
 
@@ -767,10 +767,10 @@ GetSysTimePPC:
 #********************************************************************************************
 
 NextTagItemPPC:
-		stwu	r8,-4(r1)
-		stwu	r7,-4(r1)
-		stwu	r6,-4(r1)
-		stwu	r5,-4(r1)		
+		stwu	r8,-4(r13)
+		stwu	r7,-4(r13)
+		stwu	r6,-4(r13)
+		stwu	r5,-4(r13)		
 		li	r6,1
 .NextTag:	lwz	r5,0(r4)
 		mr.	r5,r5
@@ -782,11 +782,11 @@ NextTagItemPPC:
 		subf.	r7,r6,r7
 		beq-	.SkipTags
 .EndTag:	mr	r3,r5
-		lwz	r5,0(r1)
-		lwzu	r6,4(r1)
-		lwzu	r7,4(r1)
-		lwzu	r8,4(r1)
-		addi	r1,r1,4
+		lwz	r5,0(r13)
+		lwzu	r6,4(r13)
+		lwzu	r7,4(r13)
+		lwzu	r8,4(r13)
+		addi	r13,r13,4
 		sync
 		blr
 
@@ -807,11 +807,11 @@ NextTagItemPPC:
 #********************************************************************************************		
 		
 GetTagDataPPC:	
-		stwu	r8,-4(r1)
-		stwu	r7,-4(r1)
-		stwu	r6,-4(r1)
-		stwu	r5,-4(r1)
-		stwu	r4,-4(r1)
+		stwu	r8,-4(r13)
+		stwu	r7,-4(r13)
+		stwu	r6,-4(r13)
+		stwu	r5,-4(r13)
+		stwu	r4,-4(r13)
 		mr	r8,r5
 		mr	r5,r6
 		li	r6,1
@@ -829,12 +829,12 @@ GetTagDataPPC:
 		b	.Done2
 		
 .Done:		lwz	r3,4(r3)		
-.Done2:		lwz	r4,0(r1)
-		lwzu	r5,4(r1)
-		lwzu	r6,4(r1)
-		lwzu	r7,4(r1)
-		lwzu	r8,4(r1)
-		addi	r1,r1,4
+.Done2:		lwz	r4,0(r13)
+		lwzu	r5,4(r13)
+		lwzu	r6,4(r13)
+		lwzu	r7,4(r13)
+		lwzu	r8,4(r13)
+		addi	r13,r13,4
 		sync
 		blr
 
@@ -845,11 +845,11 @@ GetTagDataPPC:
 #********************************************************************************************		
 
 FindTagItemPPC:	
-		stwu	r8,-4(r1)
-		stwu	r7,-4(r1)
-		stwu	r6,-4(r1)
-		stwu	r5,-4(r1)
-		stwu	r4,-4(r1)
+		stwu	r8,-4(r13)
+		stwu	r7,-4(r13)
+		stwu	r6,-4(r13)
+		stwu	r5,-4(r13)
+		stwu	r4,-4(r13)
 		mr	r8,r4
 		mr	r4,r5
 		li	r6,1

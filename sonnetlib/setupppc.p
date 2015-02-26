@@ -1,7 +1,7 @@
 .include ppcdefines.i
 .include sonnet_libppc.i
 
-.global PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks
+.global PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init
 
 .set	PPCLen,(PPCEnd-PPCCode)
 .set	PP_CODE,0
@@ -89,14 +89,11 @@ SetLen:	mr	r30,r28
 	loadreg	r13,0x28000			#SDA2 (0x20000-0x30000)
 	bl	End
 	
-Start:	li	r25,0
-	lwz	r28,0(r25)
-	stw	r28,4(r29)			#Code word
-Rest:	nop
-	b	Rest
+Start:		nop				#Dummy entry at absolute 0x8000
+	b	Start
 	
 ExitCode:
-	li	r30,SonnetBase
+	li	r30,SonnetBase			#Exit code of processes (in development)
 	li	r29,1
 	stw	r29,ReadyTasks(r30)
 	stw 	r4,0x70(r30)
@@ -119,6 +116,16 @@ End:	mflr	r4
 	mtspr	285,r14				#Time Base Upper and
 	mtspr	284,r14				#Time Base Lower.
 	sync
+
+	lwz	r28,0(r14)
+	stw	r28,0x7c(r14)
+	stw	r29,0x84(r14)
+	stw	r28,4(r29)			#Signal 68k that PPC is initialized
+
+	loadreg r6,"INIT"
+WInit:	lwz	r28,Init(r14)
+	cmplw	r28,r6
+	bne	WInit				#Wait for 68k to set up library
 
 	mfmsr	r14
 	ori	r14,r14,0x8000			#Enable External Exceptions and Decrementer
@@ -174,7 +181,7 @@ Reset:	mflr	r15
 	isync
 						#Initialize floating point data regs to known state 
 	bl	ifpdr_value
-.word	0x3f80,0x0000				#Value of 1.0
+.long		0x3f800000			#Value of 1.0
 ifpdr_value:
 	mflr	r3
 	lfs	f0,0(r3)

@@ -43,7 +43,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
 	XREF	NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache
 	
-	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks
+	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init
 	XDEF	PowerPCBase
 
 ;********************************************************************************************
@@ -391,6 +391,9 @@ PCIMem	dc.b "pcidma memory",0
 ;********************************************************************************************
 
 MasterControl
+	move.l #"INIT",d6
+	move.l SonnetBase(pc),a4
+	move.l d6,Init(a4)
 	lea Buffer(pc),a4
 	move.l 4.w,a6
 	

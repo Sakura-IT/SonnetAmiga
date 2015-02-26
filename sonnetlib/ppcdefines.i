@@ -28,6 +28,7 @@
 .set RunningTask,28
 .set ReadyTasks,32
 .set WaitingTasks,36
+.set Init,40
 
 .set Debug,48
 
