@@ -45,7 +45,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	AllocXMsgPPC,FreeXMsgPPC
 	
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init
-	XDEF	PowerPCBase
+	XDEF	_PowerPCBase
 
 ;********************************************************************************************
 
@@ -100,7 +100,7 @@ NoPCI	move.l DosBase(pc),d0
 NoDos	move.l ExpBase(pc),d0
 	beq.s Exit	
 	bsr.s ClsLib
-Exit	move.l PowerPCBase(pc),d0
+Exit	move.l _PowerPCBase(pc),d0
 	movem.l (a7)+,d1-a6
 	rts
 	
@@ -299,7 +299,7 @@ RLoc	add.l d2,(a2)+
 	move.l d0,4(a1)					;PowerPCBase at $4
 	move.l a5,8(a1)					;Memheader at $8
 	move.l a1,(a1)					;Sonnet relocated mem at $0
-	move.l d0,PowerPCBase-Buffer(a4)
+	move.l d0,_PowerPCBase-Buffer(a4)
 	moveq.l #0,d1
 	move.l d1,ReadyTasks(a1)
 	move.l d1,RunningTask(a1)
@@ -427,7 +427,7 @@ MsgTPPC	move.l SonnetBase(pc),a0
 	move.l a2,RunningTask(a0)
 
 	move.l #"TPPC",64(a0)
-	move.l PowerPCBase(pc),a6
+	move.l _PowerPCBase(pc),a6
 	
 	jsr _LVOCauseInterruptHW(a6)			;Force reschedule. Is this faster than
 	move.l 4.w,a6					;just wait for normal reschedule?
@@ -461,7 +461,7 @@ Open	move.l	a6,d0
 	beq.s	NoA6
 	move.l	d0,a6
 	move.l a1,-(a7)
-	lea PowerPCBase(pc),a1
+	lea _PowerPCBase(pc),a1
 	move.l a6,(a1)
 	move.l (a7)+,a1
 	addq.w	#1,LIB_OPENCNT(a6)
@@ -750,15 +750,9 @@ NoRun	move.l (a7)+,d1
 
 CreatePPCTask	
 	movem.l d1-a6,-(a7)
-	lea -PP_SIZE(a7),a7
-	movem.l d0-a6,PP_REGS(a7)
-	move.l a7,a0
-	move.l PowerPCBase(pc),a6
-	move.l a6,PP_CODE(a7)
-	move.l #_LVOCreateTaskPPC+2,PP_OFFSET(a7)
-	jsr _LVORunPPC(a6)
-	movem.l PP_REGS(a7),d0-a6
-	lea PP_SIZE(a7),a7
+	
+	RUNPOWERPC	_PowerPCBase,CreateTaskPPC
+	
 	movem.l (a7)+,d1-a6
 	rts
 
@@ -1026,7 +1020,7 @@ DriverID
 	cnop	0,2
 
 Buffer		ds.l	1
-PowerPCBase	ds.l	1
+_PowerPCBase	ds.l	1
 SonnetBase	ds.l	1
 MediatorBase	ds.l	1
 DosBase		ds.l	1

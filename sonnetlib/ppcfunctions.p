@@ -11,7 +11,7 @@
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 .global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
-.global NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache
+.global NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache,FindNamePPC
 .global	AllocXMsgPPC,FreeXMsgPPC
 
 .section "LibBody","acrx"
@@ -339,6 +339,16 @@ CmpTimePPC:
 #********************************************************************************************
 
 AllocVecPPC:
+
+		stw	r2,20(r1)			#Should be 32 aligned instead of 4?
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
@@ -457,7 +467,15 @@ AllocVecPPC:
 		lwzu	r30,4(r13)
 		lwzu	r31,4(r13)
 		addi	r13,r13,4
-		sync
+		
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		
 		blr
 		
 #********************************************************************************************
@@ -466,7 +484,15 @@ AllocVecPPC:
 #
 #********************************************************************************************		
 		
-FreeVecPPC:		
+FreeVecPPC:	stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
@@ -549,7 +575,15 @@ FreeVecPPC:
 		lwzu	r30,4(r13)
 		lwzu	r31,4(r13)
 		addi	r13,r13,4
-		sync
+		
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		
 		blr	
 
 #********************************************************************************************
@@ -558,7 +592,15 @@ FreeVecPPC:
 #
 #********************************************************************************************		
 
-GetInfo:
+GetInfo:	stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+
 		stwu	r8,-4(r13)
 		stwu	r7,-4(r13)
 		stwu	r6,-4(r13)
@@ -587,7 +629,16 @@ GetInfo:
 		lwzu	r6,4(r13)
 		lwzu	r7,4(r13)
 		lwzu	r8,4(r13)
-		sync
+		addi	r13,r13,4
+		
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		
 		blr
 
 .UserTag:	rlwinm.	r7,r3,0,27,31
@@ -628,16 +679,16 @@ GetInfo:
 		lwz	r8,CPUHID0(r8)
 		rlwinm	r8,r8,19,29,31
 .ReUse:		andi.	r8,r8,5
-		li	r7,0
+		li	r7,1
 		cmpwi	r8,4
-		beq	.StoreTag			#BITDEF means bits (1,2,4,8 and not
-		addi	r7,r7,1				#values (0,1,2,3)?
+		beq	.StoreTag
+		addi	r7,r7,1
 		cmpwi	r8,5
 		beq	.StoreTag
-		addi	r7,r7,1
+		addi	r7,r7,2
 		cmpwi	r8,0
 		beq	.StoreTag
-		addi	r7,r7,1
+		addi	r7,r7,4
 		b	.StoreTag
 
 .INFO_DCACHE:	li	r8,SonnetBase
@@ -698,6 +749,7 @@ GetSysTimePPC:
 		stw	r0,4(r1)
 		stw	r13,-4(r1)
 		subi	r13,r1,4
+		stwu	r1,-284(r1)
 		stwu	r7,-4(r13)
 		stwu	r6,-4(r13)
 
@@ -721,6 +773,7 @@ GetSysTimePPC:
 		stw	r3,4(r6)
 		lwz	r6,0(r13)
 		lwzu	r7,4(r13)
+		lwz	r1,0(r1)
 		lwz	r13,-4(r1)
 		lwz	r0,8(r1)
 		mtlr	r0
@@ -758,7 +811,7 @@ GetSysTimePPC:
 		addi	r13,r13,12
 		lwz	r0,0(r13)
 		addi	r13,r13,4
-		mtctr	r0
+		mtctr	r0		
 		blr
 
 #********************************************************************************************
@@ -788,7 +841,7 @@ NextTagItemPPC:
 		lwzu	r7,4(r13)
 		lwzu	r8,4(r13)
 		addi	r13,r13,4
-		sync
+
 		blr
 
 .IgnoreTag:	addi	r4,r4,8
@@ -836,7 +889,7 @@ GetTagDataPPC:
 		lwzu	r7,4(r13)
 		lwzu	r8,4(r13)
 		addi	r13,r13,4
-		sync
+
 		blr
 
 #********************************************************************************************
@@ -976,6 +1029,6 @@ FreeXMsgPPC:
 		mtcr	r0
 		lwz	r2,20(r1)
 		blr		
-		
+
 #********************************************************************************************			
 EndFunctions:
