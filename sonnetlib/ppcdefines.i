@@ -16,6 +16,13 @@
 		ori r23,r22,\1
 .endm
 
+.macro LIBCALLPOWERPC # function
+	li	r3,SonnetBase
+	lwz	r3,PowerPCBase(r3)
+	lwz     r0,_LVO\1+2(r3)
+	mtlr    r0
+	blrl
+.endm
 
 #Sonnet Base:
 .set SonnetBase,0

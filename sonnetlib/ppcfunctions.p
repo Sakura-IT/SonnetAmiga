@@ -1,9 +1,14 @@
 .include ppcdefines.i
 .include sonnet_libppc.i
+
 .set MH_FIRST,16
 .set MH_FREE,28
 .set MC_BYTES,4
 .set MC_NEXT,0
+.set TASKPPC_TASKPTR,88
+.set TC_SIGALLOC,18
+.set TC_SIGWAIT,22
+.set TC_SIGRECVD,26
 .set FunctionsLen,(EndFunctions-SetExcMMU)
 
 .global FunctionsLen
@@ -11,8 +16,8 @@
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 .global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
-.global NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache,FindNamePPC
-.global	AllocXMsgPPC,FreeXMsgPPC
+.global NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache,FreeSignalPPC
+.global	AllocXMsgPPC,FreeXMsgPPC,CreateMsgPortPPC,DeleteMsgPortPPC,AllocSignalPPC
 
 .section "LibBody","acrx"
 
@@ -609,11 +614,9 @@ GetInfo:	stw	r2,20(r1)
 		li	r6,1
 		
 .TagLoop:	mflr	r5
-		li	r3,SonnetBase
-		lwz	r3,PowerPCBase(r3)
-		lwz	r0,_LVONextTagItemPPC+2(r3)
-		mtlr	r0
-		blrl
+		
+		LIBCALLPOWERPC NextTagItemPPC
+
 		mtlr	r5
 		mr.	r3,r3
 		beq	.NoTags		
@@ -871,11 +874,9 @@ GetTagDataPPC:
 		li	r6,1
 		
 		mflr	r7
-		li	r3,SonnetBase
-		lwz	r3,PowerPCBase(r3)
-		lwz	r0,_LVOFindTagItemPPC+2(r3)
-		mtlr	r0
-		blrl
+		
+		LIBCALLPOWERPC FindTagItemPPC
+
 		mtlr	r7
 		mr.	r3,r3
 		bne	.Done
@@ -909,11 +910,9 @@ FindTagItemPPC:
 		li	r6,1
 		
 .TagLoop2:	mflr	r7
-		li	r3,SonnetBase
-		lwz	r3,PowerPCBase(r3)
-		lwz	r0,_LVONextTagItemPPC+2(r3)
-		mtlr	r0
-		blrl
+
+		LIBCALLPOWERPC NextTagItemPPC
+
 		mtlr	r7
 		mr.	r3,r3
 		beq	.Done2
@@ -971,15 +970,11 @@ AllocXMsgPPC:
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 
-		li	r3,SonnetBase
-		lwz	r3,PowerPCBase(r3)
 		addi	r31,r4,20
 		mr	r30,r5
 		mr	r4,r31
 		
-		lwz	r0,_LVOAllocVecPPC+2(r3)
-		mtlr	r0
-		blrl
+		LIBCALLPOWERPC AllocVecPPC
 		
 		mr.	r3,r3
 		beq-	NoMaam
@@ -1014,12 +1009,7 @@ FreeXMsgPPC:
 		subi	r13,r1,4
 		stwu	r1,-284(r1)
 		
-		li	r3,SonnetBase
-		lwz	r3,PowerPCBase(r3)
-		
-		lwz	r0,_LVOFreeVecPPC+2(r3)
-		mtlr	r0
-		blrl	
+		LIBCALLPOWERPC FreeVecPPC
 		
 		lwz	r1,0(r1)
 		lwz	r13,-4(r1)
@@ -1029,6 +1019,229 @@ FreeXMsgPPC:
 		mtcr	r0
 		lwz	r2,20(r1)
 		blr		
+
+#********************************************************************************************
+#
+#	MsgPortPPC = CreateMsgPortPPC(void) // r3
+#
+#********************************************************************************************
+
+CreateMsgPortPPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+
+		li	r4,100
+		lis	r5,1
+		ori	r5,r5,1
+		li	r6,32
+		
+		LIBCALLPOWERPC AllocVecPPC
+	
+		mr.	r3,r3
+		beq-	NoMsgMem
+		mr	r30,r3
+		addi	r4,r30,34
+		stw	r4,8(r4)
+		li	r0,0
+		stwu	r0,4(r4)
+		stwu	r4,-4(r4)
+		addi	r4,r30,20
+		stw	r4,8(r4)
+		li	r0,0
+		stwu	r0,4(r4)
+		stwu	r4,-4(r4)
+		li	r4,-1
+		
+		LIBCALLPOWERPC AllocSignalPPC
+	
+		cmpwi	r3,-1
+		beq-	NoSigFree
+		stb	r3,15(r30)
+		addi	r4,r30,48
+		
+		LIBCALLPOWERPC InitSemaphorePPC
+
+		cmpwi	r3,-1
+		bne-	NoSemMem
+		lwz	r3,88(r31)
+		stw	r3,16(r30)
+		li	r0,0
+		stb	r0,14(r30)
+		li	r0,101
+		stb	r0,8(r30)
+		mr	r4,r30
+		b	HaveAll
+
+NoSemMem:	lbz	r4,15(r30)
+
+		LIBCALLPOWERPC FreeSignalPPC
+
+NoSigFree:	mr	r4,r30
+
+		LIBCALLPOWERPC FreeVecPPC
+	
+NoMsgMem:  	li	r4,0
+HaveAll:	mr	r3,r4
+		lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr
+		
+#********************************************************************************************
+#
+#	void  DeleteMsgPortPPC(MsgPortPPC) // r4
+#
+#********************************************************************************************
+
+DeleteMsgPortPPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		stwu	r31,-4(r13)
+		mr.	r31,r4
+		beq-	NoPortDef
+
+		addi	r4,r31,48
+
+		LIBCALLPOWERPC FreeSemaphorePPC
+
+		lbz	r4,15(r31)
+		
+		LIBCALLPOWERPC FreeSignalPPC
+
+		mr	r4,r31
+		
+		LIBCALLPOWERPC FreeVecPPC
+
+NoPortDef:	lwz	r31,0(r13)
+		addi	r13,r13,4
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr
+
+#********************************************************************************************
+#
+#	void  FreeSignalPPC(signalNum) // r4
+#
+#********************************************************************************************
+
+FreeSignalPPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+
+		extsb	r4,r4
+		cmpwi	r4,-1
+		beq-	NoSigDef
+
+		li	r5,SonnetBase
+		lwz	r5,RunningTask(r5)		
+
+		lwz	r5,TASKPPC_TASKPTR(r5)		#Task structure not in place yet!!!
+		lwz	r3,TC_SIGALLOC(r5)
+		li	r6,1
+		slw	r6,r6,r4
+		andc	r3,r3,r6
+		stw	r3,TC_SIGALLOC(r5)
+
+NoSigDef:	lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr
+
+#********************************************************************************************
+#
+#	signalnum = AllocSignalPPC(signalNum) // r4
+#
+#********************************************************************************************
+
+AllocSignalPPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		extsb	r4,r4
+
+		lwz	r5,TASKPPC_TASKPTR(r5)
+		lwz	r3,TC_SIGALLOC(r5)
+		cmpwi	r4,-1
+		beq-	RandomSig
+
+		li	r6,1
+		slw	r6,r6,r4
+		and.	r0,r6,r3
+		bne-	NoSigHere
+		b	GetSig
+
+RandomSig:	lis	r6,-32768
+		li	r4,31
+NxtSig:		and.	r7,r3,r6
+		beq-	GetSig
+		subi	r4,r4,1
+		rlwinm.	r6,r6,31,1,31
+		bne+	NxtSig
+
+NoSigHere:	li	r3,-1
+		b	EndSig
+
+GetSig:		or	r3,r3,r6
+		stw	r3,TC_SIGALLOC(r5)		#Task structure not in place yet
+
+		lwz	r7,TC_SIGRECVD(r5)		#Original routine had disable/enable
+		andc	r7,r7,r6
+		stw	r7,TC_SIGRECVD(r5)
+		lwz	r7,TC_SIGWAIT(r5)
+		andc	r7,r7,r6
+		stw	r7,TC_SIGWAIT(r5)
+
+EndSig:		mr	r4,r3
+		mr	r3,r4
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr	
 
 #********************************************************************************************			
 EndFunctions:

@@ -41,8 +41,8 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
-	XREF	NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache
-	XREF	AllocXMsgPPC,FreeXMsgPPC
+	XREF	NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache,FreeSignalPPC
+	XREF	AllocXMsgPPC,FreeXMsgPPC,CreateMsgPortPPC,DeleteMsgPortPPC,AllocSignalPPC
 	
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init
 	XDEF	_PowerPCBase
@@ -945,8 +945,8 @@ FindSemaphorePPC		blr
 ;;;;;;FindTagItemPPC		blr
 ;;;;;;GetTagDataPPC		blr
 ;;;;;;NextTagItemPPC		blr
-AllocSignalPPC			blr
-FreeSignalPPC			blr
+;;;;;;AllocSignalPPC		blr
+;;;;;;FreeSignalPPC		blr
 SetSignalPPC			blr
 SignalPPC			blr
 WaitPPC				blr
@@ -967,8 +967,8 @@ UnLockTaskList			blr
 ;;;;;;ClearExcMMU		blr	
 ChangeMMU			blr
 ;;;;;;GetInfo			blr
-CreateMsgPortPPC		blr
-DeleteMsgPortPPC		blr
+;;;;;;CreateMsgPortPPC		blr
+;;;;;;DeleteMsgPortPPC		blr
 AddPortPPC			blr
 RemPortPPC			blr
 FindPortPPC			blr
