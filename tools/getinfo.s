@@ -74,6 +74,7 @@ GoPVR		move.l 12(a2),4(a1)
 		move.l d4,20(a1)
 		
 		move.l 36(a2),d2
+		subq.l #1,d2
 		tst.l d2
 		bne.s NoOU
 		lea CACHE_ON_U-infotext(a4),a3
@@ -86,7 +87,7 @@ NoOU		subq.l #1,d2
 		move.l a3,24(a1)
 		bra.s DCache
 
-NoOL		subq.l #1,d2
+NoOL		subq.l #2,d2
 		bne.s NoOFU
 		lea CACHE_OFF_U-infotext(a4),a3
 		move.l a3,24(a1)
@@ -95,6 +96,7 @@ NoOFU		lea CACHE_OFF_L-infotext(a4),a3
 		move.l a3,24(a1)
 		
 DCache		move.l 44(a2),d2
+		subq.l #1,d2
 		tst.l d2
 		bne.s NoOU2
 		lea CACHE_ON_U-infotext(a4),a3
@@ -107,7 +109,7 @@ NoOU2		subq.l #1,d2
 		move.l a3,28(a1)
 		bra.s Done
 
-NoOL2		subq.l #1,d2
+NoOL2		subq.l #2,d2
 		bne.s NoOFU2
 		lea CACHE_OFF_U-infotext(a4),a3
 		move.l a3,28(a1)
@@ -139,7 +141,7 @@ infotext        dc.b    "CPU:                   %s   (PVR = %08lx)",10
 		dc.b    "Data Cache:            %s",10
 		dc.b    "Page table location:   %08lx",10
 		dc.b    "Page table size:       %ld KBytes",10
-		dc.b    "PPC Uptime:            %06ld s %06ld µs",10
+		dc.b    "PPC Uptime:            %ld.%06ld seconds",10
 		dc.b    "CPU load:              %ld.%02ld%%",10
 		dc.b    "System load:           %ld.%02ld%%",10
 		dc.b    0
