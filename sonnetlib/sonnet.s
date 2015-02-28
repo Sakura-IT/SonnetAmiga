@@ -43,6 +43,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
 	XREF	NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache,FreeSignalPPC
 	XREF	AllocXMsgPPC,FreeXMsgPPC,CreateMsgPortPPC,DeleteMsgPortPPC,AllocSignalPPC
+	XREF	AtomicTest,AtomicDone,SetSignalPPC,LockTaskList,UnLockTaskList
 	
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init
 	XDEF	_PowerPCBase
@@ -947,7 +948,7 @@ FindSemaphorePPC		blr
 ;;;;;;NextTagItemPPC		blr
 ;;;;;;AllocSignalPPC		blr
 ;;;;;;FreeSignalPPC		blr
-SetSignalPPC			blr
+;;;;;;SetSignalPPC		blr
 SignalPPC			blr
 WaitPPC				blr
 SetTaskPriPPC			blr
@@ -961,8 +962,8 @@ SetHardware			blr
 ModifyFPExc			blr
 WaitTime			blr
 ChangeStack			blr
-LockTaskList			blr
-UnLockTaskList			blr
+;;;;;;LockTaskList		blr
+;;;;;;UnLockTaskList		blr
 ;;;;;;SetExcMMU			blr
 ;;;;;;ClearExcMMU		blr	
 ChangeMMU			blr
@@ -1067,9 +1068,9 @@ FUNCTABLE:
 	dc.l	ConfirmInterrupt
 	
 	dc.l	FlushL1DCache
-	
-	dc.l	Reserved
-	dc.l	Reserved
+	dc.l	AtomicTest
+	dc.l	AtomicDone	
+
 	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved

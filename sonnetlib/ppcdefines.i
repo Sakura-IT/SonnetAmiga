@@ -36,8 +36,10 @@
 .set ReadyTasks,32
 .set WaitingTasks,36
 .set Init,40
+.set Atomic,44
+.set TaskListSem,48
 
-.set Debug,48
+.set Debug,52
 
 .set SonnetBusClock,66666666			#66.6 MHz
 .set SonnetTimerFreq,(SonnetBusClock/8)		#Default when EICR=0x4 at bits 30-28

@@ -33,6 +33,8 @@
 ####  Custom offsets
 
 .set _LVOFlushL1DCache		,	-150
+.set _LVOAtomicTest		,	-156
+.set _LVOAtomicDone		,	-162
 
 ####  PPC Library offsets
 

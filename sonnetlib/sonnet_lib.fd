@@ -24,6 +24,8 @@ CauseInterruptHW()()
 ##abi PPC
 ConfirmInterrupt()()
 FlushL1DCache()()
+AtomicTest()()
+AtomicDone()()
 ##bias 300
 Run68K(PPStruct)()
 WaitFor68K(PPStruct)()

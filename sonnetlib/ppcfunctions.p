@@ -5,10 +5,10 @@
 .set MH_FREE,28
 .set MC_BYTES,4
 .set MC_NEXT,0
-.set TASKPPC_TASKPTR,88
 .set TC_SIGALLOC,18
 .set TC_SIGWAIT,22
 .set TC_SIGRECVD,26
+.set TASKPPC_TASKPTR,104
 .set FunctionsLen,(EndFunctions-SetExcMMU)
 
 .global FunctionsLen
@@ -18,6 +18,7 @@
 .global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
 .global NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache,FreeSignalPPC
 .global	AllocXMsgPPC,FreeXMsgPPC,CreateMsgPortPPC,DeleteMsgPortPPC,AllocSignalPPC
+.global AtomicTest,AtomicDone,SetSignalPPC,LockTaskList,UnLockTaskList
 
 .section "LibBody","acrx"
 
@@ -1104,7 +1105,7 @@ HaveAll:	mr	r3,r4
 		
 #********************************************************************************************
 #
-#	void  DeleteMsgPortPPC(MsgPortPPC) // r4
+#	void DeleteMsgPortPPC(MsgPortPPC) // r4
 #
 #********************************************************************************************
 
@@ -1146,7 +1147,7 @@ NoPortDef:	lwz	r31,0(r13)
 
 #********************************************************************************************
 #
-#	void  FreeSignalPPC(signalNum) // r4
+#	void FreeSignalPPC(signalNum) // r4
 #
 #********************************************************************************************
 
@@ -1167,7 +1168,6 @@ FreeSignalPPC:
 		li	r5,SonnetBase
 		lwz	r5,RunningTask(r5)		
 
-		lwz	r5,TASKPPC_TASKPTR(r5)		#Task structure not in place yet!!!
 		lwz	r3,TC_SIGALLOC(r5)
 		li	r6,1
 		slw	r6,r6,r4
@@ -1200,7 +1200,9 @@ AllocSignalPPC:
 		stwu	r1,-284(r1)
 		extsb	r4,r4
 
-		lwz	r5,TASKPPC_TASKPTR(r5)
+		li	r5,SonnetBase
+		lwz	r5,RunningTask(r5)
+
 		lwz	r3,TC_SIGALLOC(r5)
 		cmpwi	r4,-1
 		beq-	RandomSig
@@ -1224,13 +1226,24 @@ NoSigHere:	li	r3,-1
 
 GetSig:		or	r3,r3,r6
 		stw	r3,TC_SIGALLOC(r5)		#Task structure not in place yet
+		stwu	r4,-4(r13)
+		
+WaitingLine:	LIBCALLPOWERPC AtomicTest		#Reentrant
 
-		lwz	r7,TC_SIGRECVD(r5)		#Original routine had disable/enable
+		mr.	r3,r3
+		beq+	WaitingLine
+
+		lwz	r7,TC_SIGRECVD(r5)
 		andc	r7,r7,r6
 		stw	r7,TC_SIGRECVD(r5)
 		lwz	r7,TC_SIGWAIT(r5)
 		andc	r7,r7,r6
 		stw	r7,TC_SIGWAIT(r5)
+
+		LIBCALLPOWERPC AtomicDone
+		
+		lwz	r4,0(r13)
+		addi	r13,r13,4
 
 EndSig:		mr	r4,r3
 		mr	r3,r4
@@ -1242,6 +1255,160 @@ EndSig:		mr	r4,r3
 		mtcr	r0
 		lwz	r2,20(r1)
 		blr	
+		
+#********************************************************************************************
+#
+#	Support: result =  AtomicTest(void) // r3 - r4 is trashed
+#
+#********************************************************************************************
 
-#********************************************************************************************			
+AtomicTest:
+		li	r4,SonnetBase
+		la	r4,Atomic(r4)
+		
+		lwarx	r0,0,r4
+		cmpwi	r0,0
+		bne-	AtomicOn
+		li	r0,-1
+		stwcx.	r0,0,r4
+		bne-	AtomicOn
+		li	r3,-1
+		b	AtomicOff
+		
+AtomicOn:	li	r3,0
+AtomicOff:	isync
+		blr
+
+
+#********************************************************************************************
+#
+#	Support: void AtomicDone(void) // r4 is trashed
+#
+#********************************************************************************************
+
+AtomicDone:		
+		sync
+		li	r4,SonnetBase
+		li	r0,0
+		stw	r0,Atomic(r4)
+		blr
+		
+#********************************************************************************************
+#
+#	oldSignals = SetSignalPPC(newSignals. signalMask) // r3=r4,r5
+#
+#********************************************************************************************
+
+SetSignalPPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+
+		li	r6,SonnetBase
+		lwz	r6,RunningTask(r6)
+
+		mr	r30,r4
+		
+WaitingLine2:	LIBCALLPOWERPC AtomicTest
+		
+		mr.	r3,r3
+		beq+	WaitingLine2
+
+		lwz	r31,TC_SIGRECVD(r6)
+		and	r30,r30,r5
+		andc	r7,r31,r5
+		or	r30,r30,r7
+		stw	r30,TC_SIGRECVD(r6)
+		
+		LIBCALLPOWERPC AtomicDone
+
+		mr	r4,r31				#Reschedule?
+		mr	r3,r4
+		lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr
+
+#********************************************************************************************
+#
+#	TaskPtr = LockTaskList(void) // r3
+#
+#********************************************************************************************
+
+LockTaskList:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		stwu	r31,-4(r13)
+
+		li	r31,SonnetBase
+		lwz	r31,RunningTask(r31)
+
+		li	r4,SonnetBase
+		lwz	r4,TaskListSem(r4)
+
+		LIBCALLPOWERPC ObtainSemaphorePPC
+
+		lwz	r3,TASKPPC_TASKPTR(r31)
+		lwz	r31,0(r13)
+		addi	r13,r13,4
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr	
+
+#********************************************************************************************
+#
+#	void UnLockTaskList(void)
+#
+#********************************************************************************************
+
+UnLockTaskList:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		
+		li	r4,SonnetBase
+		lwz	r4,TaskListSem(r4)
+
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr
+
+#********************************************************************************************
 EndFunctions:
