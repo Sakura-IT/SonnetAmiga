@@ -35,6 +35,8 @@
 .set _LVOFlushL1DCache		,	-150
 .set _LVOAtomicTest		,	-156
 .set _LVOAtomicDone		,	-162
+.set _LVOWarpSuper		,	-168
+.set _LVOWarpUser		,	-174
 
 ####  PPC Library offsets
 

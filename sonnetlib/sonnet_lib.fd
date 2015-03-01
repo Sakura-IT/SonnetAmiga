@@ -26,6 +26,8 @@ ConfirmInterrupt()()
 FlushL1DCache()()
 AtomicTest()()
 AtomicDone()()
+WarpSuper()
+WarpUser()
 ##bias 300
 Run68K(PPStruct)()
 WaitFor68K(PPStruct)()

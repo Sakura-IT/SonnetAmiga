@@ -35,6 +35,8 @@ _LVOConfirmInterrupt	=	-144
 _LVOFlushL1DCache	=	-150
 _LVOAtomicTest		=	-156
 _LVOAtomicDone		=	-162
+_LVOWarpSuper		=	-168
+_LVOWarpUser		=	-174
 
 ****  PPC Library offsets
 
