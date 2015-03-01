@@ -48,7 +48,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
 	XREF	AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
 	
-	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init
+	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init,ViolationAddress
 	XDEF	_PowerPCBase
 
 ;********************************************************************************************
@@ -397,7 +397,11 @@ PCIMem	dc.b "pcidma memory",0
 
 MasterControl
 	move.l #"INIT",d6
-	move.l SonnetBase(pc),a4
+	move.l SonnetBase(pc),a4	
+	move.l 4(a4),a6
+	move.l _LVOWarpSuper+2(a6),d0
+	addq.l #4,d0	
+	move.l d0,ViolationAddress(a4)
 	move.l d6,Init(a4)
 	lea Buffer(pc),a4
 	move.l 4.w,a6
@@ -553,6 +557,11 @@ CpxLoop	move.l MediatorBase(pc),a5
 Error2	move.l d4,d1	
 xSonnet	rts
 
+;********************************************************************************************
+;
+;	CPUTyoe = GetCPU(void) // d0
+;
+;********************************************************************************************
 
 GetCPU	movem.l d1-a6,-(a7)
 	move.l SonnetBase(pc),a1

@@ -1,7 +1,7 @@
 .include ppcdefines.i
 .include sonnet_libppc.i
 
-.global PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init
+.global PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init,ViolationAddress
 
 .set	PPCLen,(PPCEnd-PPCCode)
 .set	PP_CODE,0
@@ -73,12 +73,6 @@ SetLen:	mr	r30,r28
 	bl	mmuSetup
 	bl	Epic
 	bl	Caches
-
-	mfspr	r3,PVR				#Get CPU Type
-	li	r1,SonnetBase
-	stw	r3,CPUInfo(r1)
-	mfspr	r3,HID1				#Get CPU Multiplier
-	stw	r3,CPUHID1(r1)			
 
 	loadreg	r3,0x8000			#Start hardcoded at 0x8000
 						#This should become the idle task
@@ -1150,6 +1144,8 @@ FillEm:	addi	r17,r17,0x100
 	bdnz	FillEm
 	bl	EIntEnd
 
+#********************************************************************************************
+
 EInt:	stw	r13,-4(r1)			#Create local stack
 	subi	r13,r1,4
 	stwu	r1,-4096(r1)
@@ -1160,8 +1156,8 @@ EInt:	stw	r13,-4(r1)			#Create local stack
 	stwu	r6,-4(r13)
 	stwu	r7,-4(r13)
 		
-	mfspr	r6,srr0
-	mfspr	r7,srr1
+	mfsrr0	r6
+	mfsrr1	r7
 	
 	mfmsr	r5
 	ori	r5,r5,(PSL_IR|PSL_DR)
@@ -1181,10 +1177,6 @@ EInt:	stw	r13,-4(r1)			#Create local stack
 	b	TestRoutine
 	
 NoHEAR:	li	r3,SonnetBase
-	mfspr	r5,HID0
-	stw	r5,CPUHID0(r3)
-	mfspr	r5,SDR1
-	stw	r5,CPUSDR1(r3)
 	
 	lwz	r5,RunningTask(r3)
 	cmpwi	r5,0				#HACK!
@@ -1212,8 +1204,8 @@ NoRunning:
 	sync
 	stw	r5,0xb0(r3)			#Write 0 to EOI to End Interrupt
 	
-NoEOI:	mtspr	srr0,r6
-	mtspr	srr1,r7
+NoEOI:	mtsrr0	r6
+	mtsrr1	r7
 	
 	sync
 	
@@ -1242,6 +1234,8 @@ TagEnd:	mflr	r4
 	mtlr	r0
 	blrl	
 	b	NoHEAR
+
+#********************************************************************************************
 	
 EIntEnd:
 	mflr	r4
@@ -1253,8 +1247,10 @@ EIntEnd:
 	li	r6,0
 	bl	copy_and_flush
 	bl	PrIntEnd
+
+#********************************************************************************************
 	
-PrInt:						#Privalege Exception
+PrInt:						#Privilege Exception
 	mtsprg	1,r3
 	mfspr	r3,HID0
 	ori	r3,r3,0xc00
@@ -1265,8 +1261,8 @@ PrInt:						#Privalege Exception
 	mtsprg	3,r0
 	mfsrr0	r3
 	
-	lis	r0,0x7c00
-	ori	r0,r0,0xffff			#Check for correct address (TODO)
+	li	r0,SonnetBase
+	lwz	r0,ViolationAddress(r0)
 	
 	cmplw	r0,r3
 	bne-	.HaltErr
@@ -1284,6 +1280,8 @@ PrInt:						#Privalege Exception
 .HaltErr:
 	nop
 	b .HaltErr
+
+#********************************************************************************************
 	
 PrIntEnd:
 	mflr	r4
@@ -1292,9 +1290,13 @@ PrIntEnd:
 	li	r6,0
 	bl	copy_and_flush
 	bl	DcIntEnd
+
+#********************************************************************************************
 		
 DcInt:	nop					#Decrementer Exception
 	rfi	
+
+#********************************************************************************************
 
 DcIntEnd:
 	mflr	r4
@@ -1304,5 +1306,7 @@ DcIntEnd:
 	bl	copy_and_flush
 		
 	mtlr	r15
-	blr	
+	blr
+	
+#********************************************************************************************	
 PPCEnd:

@@ -354,7 +354,6 @@ CmpTimePPC:
 #********************************************************************************************
 
 AllocVecPPC:
-
 		stw	r2,20(r1)			#Should be 32 aligned instead of 4?
 		mflr	r0
 		stw	r0,8(r1)
@@ -387,7 +386,7 @@ AllocVecPPC:
 		lwz	r20,PPCMemHeader(r20)
 		lwz	r5,MH_FREE(r20)
 		subfco	r31,r5,r4
-		cmp	0,0,r5,r4
+		cmpw	r5,r4
 		bge+	.Link6
 		b	.error
 .Link6:
@@ -395,12 +394,12 @@ AllocVecPPC:
 		addi	r23,r20,MH_FIRST
 .MemLoop:	lwz	r5,MC_BYTES(r21)
 		subfco	r31,r5,r4
-		cmp	0,0,r5,r4
+		cmpw	r5,r4
 		blt	.Link7
 		b	.FoundMem
 .Link7:
 		lwz	r30,MC_NEXT(r21)
-		cmpi	0,0,r30,0
+		cmpwi	r30,0
 		bne+	.Link8
 		b	.error
 .Link8:
@@ -415,7 +414,7 @@ AllocVecPPC:
 		addco.	r3,r3,r29
 		lwz	r5,MC_BYTES(r21)
 		subfco	r31,r5,r4
-		cmp	0,0,r5,r4
+		cmpw	r5,r4
 		beq-	.Yep
 		b	.MaybePerfect
 		
@@ -425,14 +424,14 @@ AllocVecPPC:
 .MaybePerfect:	addi	r29,r0,4
 		addco.	r4,r4,r29
 		subfco	r31,r5,r4
-		cmp	0,0,r5,r4
+		cmpw	r5,r4
 		bne	.Link9
 		b	.Yep
 .Link9:
 		addi	r29,r0,4
 		addco.	r4,r4,r29
 		subfco	r31,r5,r4
-		cmp	0,0,r5,r4
+		cmpw	r5,r4
 		bne	.Link10
 		b	.Yep
 .Link10:
@@ -524,18 +523,18 @@ FreeVecPPC:	stw	r2,20(r1)
 		lwz	r20,PPCMemHeader(r20)
 		addi	r23,r20,MH_FIRST
 		lwz	r5,0(r23)
-		cmpi	0,0,r5,0
+		cmpwi	r5,0
 		bne+	.Link12
 		b	.error2
 .Link12:
 		mr	r21,r5
 .MHLoop:	subfco	r31,r5,r4
-		cmp	0,0,r5,r4
+		cmpw	r5,r4
 		ble	.Link13
 		b	.FoundMH
 .Link13:
 		lwz	r5,MC_NEXT(r21)
-		cmpi	0,0,r5,0
+		cmpwi	r5,0
 		bne+	.Link14
 		b	.error2
 .Link14:
@@ -544,7 +543,7 @@ FreeVecPPC:	stw	r2,20(r1)
 
 .FoundMH:	mr	r21,r4
 		lwz	r6,-4(r21)
-		cmpi	0,0,r6,0
+		cmpwi	r6,0
 		bne+	.Link15
 		b	.error2
 .Link15:
@@ -554,7 +553,7 @@ FreeVecPPC:	stw	r2,20(r1)
 		subf.	r4,r29,r4
 		addco.	r6,r6,r4
 		subfco	r31,r6,r5
-		cmp	0,0,r6,r5
+		cmpw	r6,r5
 		bne	.Link16
 		b	.OnlyChunk
 .Link16:
@@ -622,6 +621,20 @@ GetInfo:	stw	r2,20(r1)
 		stwu	r5,-4(r13)
 		stwu	r4,-4(r13)
 		li	r6,1
+		
+		LIBCALLPOWERPC WarpSuper
+		
+		li	r5,SonnetBase
+		mfspr	r3,PVR
+		stw	r3,CPUInfo(r5)
+		mfspr	r3,HID1
+		stw	r3,CPUHID1(r5)
+		mfspr	r3,HID0
+		stw	r3,CPUHID0(r5)
+		mfspr	r3,SDR1
+		stw	r3,CPUSDR1(r5)
+		
+		LIBCALLPOWERPC WarpUser		
 		
 .TagLoop:	mflr	r5
 		
@@ -2425,9 +2438,9 @@ User:
 
 WarpSuper:
 		li	r0,-1			#READ PVR (warp funcion -130)
-		mfspr	r3,PVR			#IF user then exception; r0/r3=0
+.Violation:	mfspr	r3,PVR			#IF user then exception; r0/r3=0
 		mr	r3,r0			#IF super then r0/r3=-1
-		blr				#See Program Exception ($700) NOT YET DONE!!
+		blr				#See Program Exception ($700)
 
 #********************************************************************************************
 #
