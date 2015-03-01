@@ -13,6 +13,7 @@
 .set SS_WAITQUEUE,16
 .set SS_OWNER,40
 .set SS_QUEUECOUNT,44
+.set SSPPC_RESERVE,46
 .set SSPPC_LOCK,50
 .set FunctionsLen,(EndFunctions-SetExcMMU)
 
@@ -25,7 +26,8 @@
 .global	AllocXMsgPPC,FreeXMsgPPC,CreateMsgPortPPC,DeleteMsgPortPPC,AllocSignalPPC
 .global AtomicTest,AtomicDone,SetSignalPPC,LockTaskList,UnLockTaskList
 .global	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
-.global	ReleaseSemaphorePPC
+.global	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
+.global AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
 
 .section "LibBody","acrx"
 
@@ -1419,7 +1421,7 @@ UnLockTaskList:
 
 #********************************************************************************************
 #
-#	status = InitSemaphrePPC(SignalSemaphorePPC) // r3=r4
+#	status = InitSemaphorePPC(SignalSemaphorePPC) // r3=r4
 #
 #********************************************************************************************
 
@@ -1435,27 +1437,26 @@ InitSemaphorePPC:
 		stwu	r31,-4(r13)
 		mr	r31,r4
 
-		addi	r5,r31,16
+		addi	r5,r31,SS_WAITQUEUE
 		stw	r5,8(r5)
 		li	r0,0
 		stwu	r0,4(r5)
 		stwu	r5,-4(r5)
 		li	r0,0
-		stw	r0,40(r31)
-		sth	r0,14(r31)
+		stw	r0,SS_OWNER(r31)
+		sth	r0,SS_NESTCOUNT(r31)
 		li	r0,-1
-		sth	r0,44(r31)
+		sth	r0,SS_QUEUECOUNT(r31)
 		li	r4,32
 		lis	r5,1
 		ori	r5,r5,1
 		li	r6,32
 
-
 		LIBCALLPOWERPC AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.SemDone
-		stw	r3,46(r31)
+		stw	r3,SSPPC_RESERVE(r31)
 		li	r3,-1
 		b	.SemDone
 
@@ -1473,7 +1474,7 @@ InitSemaphorePPC:
 
 #********************************************************************************************
 #
-#	void FreeSemaphrePPC(SignalSemaphorePPC) // r4
+#	void FreeSemaphorePPC(SignalSemaphorePPC) // r4
 #
 #********************************************************************************************
 
@@ -1489,7 +1490,7 @@ FreeSemaphorePPC:
 		mr.	r4,r4
 		beq-	.NoSemDef
 
-		lwz	r4,46(r4)
+		lwz	r4,SSPPC_RESERVE(r4)
 
 		LIBCALLPOWERPC FreeVecPPC
 
@@ -1504,7 +1505,7 @@ FreeSemaphorePPC:
 
 #********************************************************************************************
 #
-#	void ObtainSemapohrePPC(SignalSemaphorePPC) // r4
+#	void ObtainSemaphorePPC(SignalSemaphorePPC) // r4
 #
 #********************************************************************************************
 
@@ -1568,11 +1569,11 @@ ObtainSemaphorePPC:
 		subi	r13,r13,12
 		subi	r5,r29,12
 		stw	r3,8(r5)
-		lwz	r4,26(r3)
+		lwz	r4,TC_SIGRECVD(r3)
 		ori	r4,r4,16
 		xori	r4,r4,16
-		stw	r4,26(r3)
-		addi	r4,r30,16
+		stw	r4,TC_SIGRECVD(r3)
+		addi	r4,r30,SS_WAITQUEUE
 		addi	r4,r4,4
 		lwz	r3,4(r4)
 		stw	r5,4(r4)
@@ -1623,7 +1624,7 @@ ObtainSemaphorePPC:
 
 #********************************************************************************************
 #
-#	status = AttemptSemapohrePPC(SignalSemaphorePPC) // r4
+#	status = AttemptSemaphorePPC(SignalSemaphorePPC) // r4
 #
 #********************************************************************************************
 
@@ -1705,7 +1706,7 @@ AttemptSemaphorePPC:
 
 #********************************************************************************************
 #
-#	void ReleaseSemapohrePPC(SignalSemaphorePPC) // r4
+#	void ReleaseSemaphorePPC(SignalSemaphorePPC) // r4
 #
 #********************************************************************************************
 
@@ -1733,9 +1734,6 @@ ReleaseSemaphorePPC:
 		stwu	r5,-4(r13)
 		stwu	r4,-4(r13)
 		stwu	r3,-4(r13)
-
-		lwz	r3,52(r3)
-		lwz	r2,46(r3)
 
 		mr	r31,r4
 
@@ -1912,6 +1910,537 @@ ReleaseSemaphorePPC:
 .DeadEnd:	nop					#Not Yet Implemented
 		b .DeadEnd
 
+#********************************************************************************************
+#
+#	status =  AddSemaphorePPC(SignalSemaphorePPC) // r4
+#
+#********************************************************************************************
+
+AddSemaphorePPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+
+		mr	r30,r4
+		
+		LIBCALLPOWERPC InitSemaphorePPC
+
+		mr.	r3,r3
+		beq-	.NoInitSem
+
+		li	r4,SonnetBase
+		lwz	r4,SemListSem(r4)
+		
+		LIBCALLPOWERPC ObtainSemaphorePPC
+		
+		li	r4,SonnetBase
+		lwz	r4,Semaphores(r4)
+		mr	r5,r30
+		
+		LIBCALLPOWERPC EnqueuePPC
+		
+		li	r4,SonnetBase
+		lwz	r4,SemListSem(r4)
+		
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		li	r3,-1
+
+.NoInitSem:	lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr	
+
+#********************************************************************************************
+#
+#	void RemSemaphorePPC(SignalSemaphorePPC) // r4
+#
+#********************************************************************************************
+
+RemSemaphorePPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		stwu	r31,-4(r13)
+
+		mr	r31,r4
+
+		LIBCALLPOWERPC FreeSemaphorePPC
+
+		li	r4,SonnetBase
+		lwz	r4,SemListSem(r4)
+		
+		LIBCALLPOWERPC ObtainSemaphorePPC
+
+		mr	r4,r31
+
+		LIBCALLPOWERPC RemovePPC
+
+		li	r4,SonnetBase
+		lwz	r4,SemListSem(r4)
+
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		lwz	r31,0(r13)
+		addi	r13,r13,4
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr
+
+#********************************************************************************************
+#
+#	SignalsemaphorePPC = FindSemaphorePPC(SemaphoreName) // r3=r4
+#
+#********************************************************************************************
+
+FindSemaphorePPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+
+		mr	r30,r4
+
+		li	r4,SonnetBase
+		lwz	r4,SemListSem(r4)
+
+		LIBCALLPOWERPC ObtainSemaphorePPC
+
+		li	r4,SonnetBase
+		lwz	r4,Semaphores(r4)
+		mr	r5,r30
+
+		LIBCALLPOWERPC FindNamePPC
+
+		mr	r30,r3
+
+		li	r4,SonnetBase
+		lwz	r4,SemListSem(r4)
+		
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		mr	r3,r30
+		lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr
+
+#********************************************************************************************
+#
+#	void AddPortPPC(MsgPortPPC) // r4
+#
+#********************************************************************************************
+
+AddPortPPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+
+		mr	r30,r4
+		addi	r3,r30,20
+		stw	r3,8(r3)
+		li	r0,0
+		stwu	r0,4(r3)
+		stwu	r3,-4(r3)
+
+		li	r4,SonnetBase
+		lwz	r4,PortListSem(r4)
+
+		LIBCALLPOWERPC ObtainSemaphorePPC
+
+		li	r4,SonnetBase
+		lwz	r4,Ports(r4)
+		mr	r5,r30
+
+		LIBCALLPOWERPC EnqueuePPC
+
+		li	r4,SonnetBase
+		lwz	r4,PortListSem(r4)
+		
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr	
+
+#********************************************************************************************
+#
+#	void RemPortPPC(MsgPortPPC) // r4
+#
+#********************************************************************************************
+
+RemPortPPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		stwu	r31,-4(r13)
+
+		mr	r31,r4
+
+		li	r4,SonnetBase
+		lwz	r4,PortListSem(r4)
+
+		LIBCALLPOWERPC ObtainSemaphorePPC
+
+		mr	r4,r31
+		lwz	r3,0(r4)
+		lwz	r4,4(r4)
+		stw	r4,4(r3)
+		stw	r3,0(r4)
+		
+		li	r4,SonnetBase
+		lwz	r4,PortListSem(r4)
+		
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		lwz	r31,0(r13)
+		addi	r13,r13,4
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr	
+
+#********************************************************************************************
+#
+#	void FIndPortPPC(name) // r4
+#
+#********************************************************************************************
+
+FindPortPPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		stwu	r31,-4(r13)
+
+		mr	r31,r3
+		mr	r5,r4
+
+		li	r4,SonnetBase
+		lwz	r4,PortListSem(r4)
+
+		LIBCALLPOWERPC ObtainSemaphorePPC
+
+		li	r4,SonnetBase
+		lwz	r4,Ports(r4)		
+
+		LIBCALLPOWERPC FindNamePPC
+
+		mr	r31,r3
+		li	r4,SonnetBase
+		lwz	r4,PortListSem(r4)
+
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		mr	r3,r31
+		lwz	r31,0(r13)
+		addi	r13,r13,4
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr	
+
+#********************************************************************************************
+#
+#	message = WaitPortPPC(MsgPortPPC) // r4 	FUNCTION NOT DONE YET!!!
+#
+#********************************************************************************************
+
+WaitPortPPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+
+		mr	r28,r3				#UNKNOWN AS OF YET (switch?)
+		mr	r31,r4
+
+		addi	r4,r31,48
+
+		LIBCALLPOWERPC ObtainSemaphorePPC
+
+		addi	r5,r31,34
+		lwz	r4,42(r31)
+		cmplw	r4,r5
+		beq-	.Link33
+
+.WaitInLine:	LIBCALLPOWERPC AtomicTest
+
+		mr.	r3,r3
+		beq+	.WaitInLine
+		
+		lbz	r3,628(r28)
+		mr.	r3,r3
+		beq-	.Link34
+
+		LIBCALLPOWERPC AtomicDone
+
+.Link35:	lbz	r3,628(r28)
+		mr.	r3,r3
+		bne+	.Link35
+		b	.WaitInLine
+		
+.Link34:	stw	r31,610(r28)
+		li	r0,-1
+		stb	r0,628(r28)
+
+		LIBCALLPOWERPC AtomicDone
+
+		li	r4,0				#UNKNOWN AS OF YET
+		lwz	r3,17652(r2)
+		lwz	r0,-166(r3)
+		mtlr	r0
+		blrl	
+
+.Link36:	lbz	r3,628(r28)
+		mr.	r3,r3
+		bne+	.Link36
+
+.Link33:	lwz	r3,20(r31)
+		lwz	r4,0(r3)
+		mr.	r4,r4
+		bne-	.Link37
+
+		lbz	r5,15(r31)
+		addi	r30,r31,20
+		li	r4,1
+		slw	r29,r4,r5
+.Link42:	addi	r4,r31,48
+
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		mr	r4,r29
+
+		LIBCALLPOWERPC WaitPPC
+
+		mr	r27,r3
+		addi	r4,r31,48
+
+		LIBCALLPOWERPC ObtainSemaphorePPC
+
+		addi	r5,r31,34
+		lwz	r4,42(r31)
+		cmplw	r4,r5
+		beq-	.Link38
+
+.WaitInLine2:	LIBCALLPOWERPC AtomicTest
+
+		mr.	r3,r3
+		beq+	.WaitInLine2
+		
+		lbz	r3,628(r28)
+		mr.	r3,r3
+		beq-	.Link39
+
+		LIBCALLPOWERPC AtomicDone
+
+.Link40:	lbz	r3,628(r28)
+		mr.	r3,r3
+		bne+	.Link40
+		b	.WaitInLine2
+
+.Link39:	stw	r31,610(r28)
+		li	r0,-1
+		stb	r0,628(r28)
+
+		LIBCALLPOWERPC AtomicDone
+
+		li	r4,0				#UNKNOWN AS OF YET
+		lwz	r3,17652(r2)
+		lwz	r0,-166(r3)
+		mtlr	r0
+		blrl	
+
+.Link41:	lbz	r3,628(r28)
+		mr.	r3,r3
+		bne+	.Link41
+		
+.Link38:	mr	r3,r27
+		lwz	r5,20(r31)
+		lwz	r4,0(r5)
+		mr.	r4,r4
+		beq+	.Link42
+		mr	r3,r5
+.Link37:	mr	r5,r3
+		addi	r4,r31,48
+
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		mr	r3,r5
+		lwz	r27,0(r13)
+		lwz	r28,4(r13)
+		lwz	r29,8(r13)
+		lwz	r30,12(r13)
+		lwz	r31,16(r13)
+		addi	r13,r13,20
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr
+		
+#********************************************************************************************
+#
+#	SuperKey = Super(void) // r3 (0 on first switch, -1 on the rest)
+#
+#********************************************************************************************
+
+Super:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		
+		LIBCALLPOWERPC WarpSuper
+
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr	
+
+#********************************************************************************************
+#
+#	void User(SuperKey) // r4
+#
+#********************************************************************************************
+
+User:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+
+		mr.	r4,r4
+		bne-	.WrongKey
+
+		LIBCALLPOWERPC WarpUser
+
+.WrongKey:	lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr
+
+#********************************************************************************************
+#
+#	Support: SuperKey = WarpSuper(void) // r3
+#
+#********************************************************************************************
+
+WarpSuper:
+		li	r0,-1			#READ PVR (warp funcion -130)
+		mfspr	r3,PVR			#IF user then exception; r0/r3=0
+		mr	r3,r0			#IF super then r0/r3=-1
+		blr				#See Program Exception ($700) NOT YET DONE!!
+
+#********************************************************************************************
+#
+#	void User(SuperKey) // r4
+#
+#********************************************************************************************
+
+WarpUser:
+		mfmsr	r0			
+		ori	r0,r0,0x4000		#SET Bit 17 (PR) To User
+		mtmsr	r0
+		isync	
+		blr
 
 #********************************************************************************************
 EndFunctions:

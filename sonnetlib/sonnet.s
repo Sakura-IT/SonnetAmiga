@@ -45,7 +45,8 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	AllocXMsgPPC,FreeXMsgPPC,CreateMsgPortPPC,DeleteMsgPortPPC,AllocSignalPPC
 	XREF	AtomicTest,AtomicDone,SetSignalPPC,LockTaskList,UnLockTaskList
 	XREF	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
-	XREF	ReleaseSemaphorePPC
+	XREF	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
+	XREF	AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
 	
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init
 	XDEF	_PowerPCBase
@@ -922,7 +923,7 @@ CausePPCInterrupt		rts
 
 Run68K				blr
 WaitFor68K			blr
-SPrintF				blr
+SPrintF				blr			;debug feature
 Run68KLowLevel			blr
 ;;;;;;AllocVecPPC		blr
 ;;;;;;FreeVecPPC		blr
@@ -931,12 +932,12 @@ DeleteTaskPPC			blr
 FindTaskPPC			blr
 ;;;;;;InitSemaphorePPC		blr
 ;;;;;;FreeSemaphorePPC		blr
-AddSemaphorePPC			blr
-RemSemaphorePPC			blr
+;;;;;;AddSemaphorePPC		blr
+;;;;;;RemSemaphorePPC		blr
 ;;;;;;ObtainSemaphorePPC	blr
 ;;;;;;AttemptSemaphorePPC	blr
 ;;;;;;ReleaseSemaphorePPC	blr
-FindSemaphorePPC		blr
+;;;;;;FindSemaphorePPC		blr
 ;;;;;;InsertPPC			blr
 ;;;;;;AddHeadPPC		blr
 ;;;;;;AddTailPPC		blr
@@ -958,8 +959,8 @@ Signal68K			blr
 SetCache			blr
 SetExcHandler			blr
 RemExcHandler			blr
-Super				blr
-User				blr
+;;;;;;Super			blr
+;;;;;;User			blr
 SetHardware			blr
 ModifyFPExc			blr
 WaitTime			blr
@@ -972,10 +973,10 @@ ChangeMMU			blr
 ;;;;;;GetInfo			blr
 ;;;;;;CreateMsgPortPPC		blr
 ;;;;;;DeleteMsgPortPPC		blr
-AddPortPPC			blr
-RemPortPPC			blr
-FindPortPPC			blr
-WaitPortPPC			blr
+;;;;;;AddPortPPC		blr
+;;;;;;RemPortPPC		blr
+;;;;;;FindPortPPC		blr
+;;;;;;WaitPortPPC		blr
 PutMsgPPC			blr
 GetMsgPPC			blr
 ReplyMsgPPC			blr
@@ -1072,9 +1073,9 @@ FUNCTABLE:
 	dc.l	FlushL1DCache
 	dc.l	AtomicTest
 	dc.l	AtomicDone	
-
-	dc.l	Reserved
-	dc.l	Reserved
+	dc.l	WarpSuper
+	dc.l	WarpUser
+	
 	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved

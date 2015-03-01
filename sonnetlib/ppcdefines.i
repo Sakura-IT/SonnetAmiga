@@ -32,14 +32,18 @@
 .set CPUHID0,16
 .set CPUHID1,20
 .set CPUSDR1,24
-.set RunningTask,28
-.set ReadyTasks,32
-.set WaitingTasks,36
+.set RunningTask,28				#Pointer
+.set ReadyTasks,32				#Should be list!
+.set WaitingTasks,36				#Should be list!
 .set Init,40
 .set Atomic,44
-.set TaskListSem,48
+.set TaskListSem,48				#Pointer
+.set Semaphores,52				#Should be list!
+.set SemListSem,56				#Pointer
+.set PortListSem,60				#Pointer
+.set Ports,64					#Should be list!
 
-.set Debug,52
+.set Debug,68
 
 .set SonnetBusClock,66666666			#66.6 MHz
 .set SonnetTimerFreq,(SonnetBusClock/8)		#Default when EICR=0x4 at bits 30-28
