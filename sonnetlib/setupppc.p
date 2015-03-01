@@ -118,8 +118,7 @@ End:	mflr	r4
 	sync
 
 	lwz	r28,0(r14)
-	stw	r28,0x7c(r14)
-	stw	r29,0x84(r14)
+	stw	r14,Atomic(r14)
 	stw	r28,4(r29)			#Signal 68k that PPC is initialized
 
 	loadreg r6,"INIT"
@@ -1253,8 +1252,47 @@ EIntEnd:
 	li	r5,EIntEnd-EInt
 	li	r6,0
 	bl	copy_and_flush
-	bl	DcIntEnd
+	bl	PrIntEnd
 	
+PrInt:						#Privalege Exception
+	mtsprg	1,r3
+	mfspr	r3,HID0
+	ori	r3,r3,0xc00
+	xori	r3,r3,0xc00
+	mtspr	HID0,r3
+	mfcr	r3
+	mtsprg	2,r3
+	mtsprg	3,r0
+	mfsrr0	r3
+	
+	lis	r0,0x7c00
+	ori	r0,r0,0xffff			#Check for correct address (TODO)
+	
+	cmplw	r0,r3
+	bne-	.HaltErr
+	addi	r3,r3,4				#Next instruction
+	mtsrr0	r3
+	mfsrr1	r3
+	ori	r3,r3,0x4000			#Set to Super
+	xori	r3,r3,0x4000
+	mtsrr1	r3
+	mfsprg	r3,2
+	mtcr	r3
+	mfsprg	r3,1
+	li	r0,0				#SuperKey
+	rfi
+.HaltErr:
+	nop
+	b .HaltErr
+	
+PrIntEnd:
+	mflr	r4
+	li	r3,0x700
+	li	r5,PrIntEnd-PrInt
+	li	r6,0
+	bl	copy_and_flush
+	bl	DcIntEnd
+		
 DcInt:	nop					#Decrementer Exception
 	rfi	
 
