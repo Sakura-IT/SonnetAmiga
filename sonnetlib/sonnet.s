@@ -44,6 +44,8 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache,FreeSignalPPC
 	XREF	AllocXMsgPPC,FreeXMsgPPC,CreateMsgPortPPC,DeleteMsgPortPPC,AllocSignalPPC
 	XREF	AtomicTest,AtomicDone,SetSignalPPC,LockTaskList,UnLockTaskList
+	XREF	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
+	XREF	ReleaseSemaphorePPC
 	
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init
 	XDEF	_PowerPCBase
@@ -927,13 +929,13 @@ Run68KLowLevel			blr
 CreateTaskPPC			blr
 DeleteTaskPPC			blr
 FindTaskPPC			blr
-InitSemaphorePPC		blr
-FreeSemaphorePPC		blr
+;;;;;;InitSemaphorePPC		blr
+;;;;;;FreeSemaphorePPC		blr
 AddSemaphorePPC			blr
 RemSemaphorePPC			blr
-ObtainSemaphorePPC		blr
-AttemptSemaphorePPC		blr
-ReleaseSemaphorePPC		blr
+;;;;;;ObtainSemaphorePPC	blr
+;;;;;;AttemptSemaphorePPC	blr
+;;;;;;ReleaseSemaphorePPC	blr
 FindSemaphorePPC		blr
 ;;;;;;InsertPPC			blr
 ;;;;;;AddHeadPPC		blr
