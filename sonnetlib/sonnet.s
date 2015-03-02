@@ -1,6 +1,9 @@
 
 COMMAND		EQU $4	
 IMR0		EQU $50
+OMISR		EQU $30
+OMIMR		EQU $34
+OMR0		EQU $58
 LMBAR		EQU $10
 PCSRBAR		EQU $14
 OMBAR		EQU $300
@@ -34,7 +37,9 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	include dos/dos_lib.i
 	include exec/ports.i
 	include dos/dosextens.i
-	include sonnet_lib.i
+	include	exec/interrupts.i
+	include hardware/intbits.i
+	include sonnet_lib.i	
 	
 	XREF	FunctionsLen
 	
@@ -47,6 +52,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
 	XREF	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
 	XREF	AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
+	XREF	Interrupt68k
 	
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init,ViolationAddress
 	XDEF	_PowerPCBase
@@ -175,6 +181,7 @@ Sonnet	move.l d7,a0
 	lea $100(a5),a5
 	
 	move.l PCI_SPACE1(a2),a3		;PCSRBAR Sonnet
+	move.l a3,EUMBAddr-Buffer(a4)
 	or.b #15,d0				;64kb
 	rol.w #8,d0
 	swap d0
@@ -310,6 +317,21 @@ RLoc	add.l d2,(a2)+
 
 	move.l d0,a1
 	jsr _LVOAddLibrary(a6)
+	
+	lea MyInterrupt(pc),a1
+	lea SonInt(pc),a2
+	move.l a2,IS_CODE(a1)
+	lea IntData(pc),a2
+	move.l a2,IS_DATA(a1)
+	lea IntName(pc),a2
+	move.l a2,LN_NAME(a1)
+	moveq.l #-1,d0
+	move.b d0,LN_PRI(a1)
+	moveq.l #NT_INTERRUPT,d0
+	move.b d0,LN_TYPE(a1)
+	moveq.l #INTB_PORTS,d0
+	jsr _LVOAddIntServer(a6)
+	
 	lea PrcTags(pc),a1
 	move.l a1,d1
 	move.l DosBase(pc),a6
@@ -391,6 +413,8 @@ pcilib	dc.b "pci.library",0
 MemName	dc.b "Sonnet memory",0
 	cnop	0,2
 PCIMem	dc.b "pcidma memory",0
+	cnop	0,2
+IntName	dc.b "Gort",0
 	cnop	0,4
 	
 ;********************************************************************************************
@@ -462,7 +486,32 @@ PrcTags	dc.l NP_Entry,0,NP_Name,0,NP_Priority,125,0,0
 PrcName	dc.b "MasterControl",0
 
 	cnop 0,4
+	
+;********************************************************************************************
 
+SonInt	movem.l d1-a6,-(a7)
+	move.l EUMBAddr(pc),a2
+	move.l #$01000000,d2
+	move.l OMISR(a2),d3
+	and.l d2,d3
+	beq.s NoInt	
+	move.l 4.w,a6
+	move.l OMR0(a2),d6
+	lea PrcName(pc),a1
+	jsr _LVOFindTask(a6)
+	tst.l d0
+	beq.s NoInt
+	move.l d0,a1
+	move.l #17,d0
+	jsr _LVOSignal(a6)
+	move.l d2,OMISR(a2)	
+NoInt	movem.l (a7)+,d1-a6
+	moveq.l #0,d0
+	rts
+
+IntData	dc.l 0
+
+;********************************************************************************************
 
 Open	move.l	a6,d0
 	tst.l	d0
@@ -476,6 +525,8 @@ Open	move.l	a6,d0
 	bclr	#3,Buffer
 NoA6	rts
 
+;********************************************************************************************
+
 Close	moveq.l #0,d0
 	subq.w	#1,LIB_OPENCNT(a6)
 	bne.s	NoExp
@@ -483,20 +534,30 @@ Close	moveq.l #0,d0
 	bne.s	Expunge
 NoExp	rts
 
+;********************************************************************************************
+
 Expunge	moveq.l #0,d0
 	rts
+
+;********************************************************************************************
 	
 Reserved:
 	moveq.l #0,d0
 	rts
+
+;********************************************************************************************
 	
 GetDriverID:
 	move.l #DriverID,d0
 	rts
 
+;********************************************************************************************
+
 SupportedProtocol:
 	moveq.l #1,d0
 	rts
+
+;********************************************************************************************
 
 InitBootArea:
 	movem.l d1-a6,-(a7)
@@ -509,11 +570,15 @@ InitBootArea:
 	rol.w #8,d0
 	and.b #$f0,d0
 	bra.s Error
+	
+;********************************************************************************************
 
 BootPowerPC:
 	movem.l d1-a6,-(a7)
 	move.l #"STRT",d5
 	bra.s StrtPPC
+
+;********************************************************************************************
 	
 CauseInterruptHW:
 	movem.l d1-a6,-(a7)
@@ -1042,6 +1107,8 @@ PCIBase		ds.l	1
 ROMMem		ds.l	1
 ComProc		ds.l	1
 SonAddr		ds.l	1
+EUMBAddr	ds.l	1
+MyInterrupt	ds.b	IS_SIZE
 
 DATATABLE:
 	INITBYTE	LN_TYPE,NT_LIBRARY
@@ -1083,9 +1150,9 @@ FUNCTABLE:
 	dc.l	AtomicTest
 	dc.l	AtomicDone	
 	dc.l	WarpSuper
-	dc.l	WarpUser
+	dc.l	WarpUser	
+	dc.l	Interrupt68k
 	
-	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved

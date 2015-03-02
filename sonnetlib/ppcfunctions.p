@@ -28,6 +28,7 @@
 .global	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
 .global	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
 .global AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
+.global Interrupt68k
 
 .section "LibBody","acrx"
 
@@ -2453,6 +2454,21 @@ WarpUser:
 		ori	r0,r0,0x4000		#SET Bit 17 (PR) To User
 		mtmsr	r0
 		isync	
+		blr
+		
+#********************************************************************************************
+#
+#	void Interrupt68k(Message) // r4 (r4 is a 32 bit word which is passed to the 68k)
+#
+#********************************************************************************************
+
+Interrupt68k:
+		stw	r3,-8(r1)
+		
+		lis	r3,EUMB
+		stw	r4,0x58(r3)
+		
+		lwz	r3,-8(r1)
 		blr
 
 #********************************************************************************************

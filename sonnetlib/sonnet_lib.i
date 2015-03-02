@@ -37,6 +37,7 @@ _LVOAtomicTest		=	-156
 _LVOAtomicDone		=	-162
 _LVOWarpSuper		=	-168
 _LVOWarpUser		=	-174
+_LVOInterrupt68k	=	-180
 
 ****  PPC Library offsets
 

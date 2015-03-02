@@ -1223,17 +1223,6 @@ NoEOI:	mtsrr0	r6
 	
 TestRoutine:
 	b	NoHEAR	
-	li	r3,SonnetBase
-	lwz	r3,PowerPCBase(r3)
-	bl	TagEnd
-.long		0,0	
-TagEnd:	mflr	r4
-	li	r0,SonnetBase
-	stw	r4,Debug(r0)
-	lwz	r0,_LVOGetSysTimePPC+2(r3)
-	mtlr	r0
-	blrl	
-	b	NoHEAR
 
 #********************************************************************************************
 	

@@ -37,6 +37,7 @@
 .set _LVOAtomicDone		,	-162
 .set _LVOWarpSuper		,	-168
 .set _LVOWarpUser		,	-174
+.set _LVOInterrupt68k		,	-180
 
 ####  PPC Library offsets
 
