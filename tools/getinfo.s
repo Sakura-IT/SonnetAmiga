@@ -1,10 +1,15 @@
-		
+FUNC_CNT	EQU	-30		* Skip 4 standard vectors
+FUNCDEF		MACRO
+_LVO\1		EQU	FUNC_CNT 
+FUNC_CNT	SET	FUNC_CNT-6	* Standard offset-6 bytes each
+		ENDM   
+
 		include powerpc/powerpc.i
 
 		include powerpc/powerpc_lib.i
 		include exec/exec_lib.i
 		include dos/dos_lib.i
-		
+
 ;************************************************************************************************
 
 		section code
@@ -177,3 +182,4 @@ Tags		dc.l	PPCINFO_CPU,0,PPCINFO_PVR,0,PPCINFO_CPUCLOCK,0,PPCINFO_BUSCLOCK,0
 		dc.l	0,0
 	
 ;************************************************************************************************
+
