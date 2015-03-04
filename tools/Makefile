@@ -24,7 +24,7 @@ $(GETINFO_EXE) : $(OBJ_GETINFO)
 	$(ASM68K) $(ASM68KPARAM) -o $@ $<
 
 clean :
-	$(RMRF) $(OBJECTS) $(EXECUTABLE)
+	$(RMRF) $(OBJ_GETINFO) $(GETINFO_EXE)
 
 distribution : $(GETINFO_EXE)
 	$(LHA) a $(DISTRNAME) $(GETINFO_EXE)
