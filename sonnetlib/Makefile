@@ -4,7 +4,7 @@ LD=vlink
 LHA=lha
 RMRF=rm -rf
 
-ASM68KPARAM=-I$(INCLUDE_I) -m68020up -Fhunk
+ASM68KPARAM=-I$(INCLUDE_I) -m68020up -Fhunk -no-opt
 ASMPPCPARAM=-many -mppc32 -Fhunk
 
 OBJECTS68K=sonnet.o
