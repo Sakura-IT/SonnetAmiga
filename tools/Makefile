@@ -5,7 +5,7 @@ LHA=lha
 RMRF=rm -rf
 
 ASM68KPARAM=-I$(INCLUDE_I) -m68020up -Fhunk -no-opt
-ASMPPCPARAM=-many -mppc32 -Fhunk -no-opt
+ASMPPCPARAM=-many -mppc32 -Fhunk
 
 OBJ_GETINFO=getinfo.o
 GETINFO_EXE=getinfo
