@@ -1,0 +1,7 @@
+ASM68KPARAM+=-I$(INCLUDE_I) 
+RM=rm -f                                                                        
+
+ifndef INCLUDE_I
+    $(error INCLUDE_I is undefined, read the TOOLCHAIN file)
+endif
+

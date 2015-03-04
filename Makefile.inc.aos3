@@ -1,0 +1,3 @@
+ASM68KPARAM+=-Iinclude_i:
+RM=delete force 
+

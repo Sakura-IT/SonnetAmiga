@@ -1,12 +1,3 @@
-ASM68K=vasmm68k_mot
-ASMPPC=vasmppc_std
-LD=vlink
-LHA=lha
-RMRF=rm -rf
-
-ASM68KPARAM=-I$(INCLUDE_I) -m68020up -Fhunk -no-opt
-ASMPPCPARAM=-many -mppc32 -Fhunk
-
 OBJECTS68K=sonnet.o
 OBJECTSPPC=ppcfunctions.o setupppc.o
 INCLUDES=ppcdefines.i pci.i
@@ -26,7 +17,7 @@ $(EXECUTABLE) : $(OBJECTS68K) $(OBJECTSPPC)
 	$(ASM68K) $(ASM68KPARAM) -o $@ $<
 
 clean :
-	$(RMRF) $(OBJECTS) $(EXECUTABLE)
+	$(RM) $(OBJECTS) $(EXECUTABLE)
 
 distribution : $(EXECUTABLE)
 	$(LHA) a $(DISTRNAME) $(EXECUTABLE)
