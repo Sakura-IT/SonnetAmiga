@@ -5,6 +5,7 @@ Buliding of sonnet.library and associated programs requires the following tools:
 - GNU Make.
 - AmigaOS 3.9 NDK - currently this requires some manual fixing, as not all 
   includes are present with the distribution, see issue #6 on GitHub. 
+- WarpOS 5.1 include files (WarpUP_V51Upd.lha on AmiNet). 
 
 Building is supported on both AmigaOS and UNIX-likes, just export HOST variable
 when running make, i.e.:
@@ -16,4 +17,7 @@ UNIX-like OSes with INCLUDE_I environment variable. For example:
 
 $ INCLUDE_I=/opt/amiga-cross/NDK_3.9/Include/include_i/
 $ export INCLUDE_I
+
+Obviously, when building on UNIX, WarpOS includes must also be installed below
+$INCLUDE_I path.
 
