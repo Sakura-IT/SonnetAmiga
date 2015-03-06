@@ -43,8 +43,9 @@
 .set PortListSem,60				#Pointer
 .set Ports,64					#Should be list!
 .set ViolationAddress,68			#Pointer
+.set MCTask,72					#Pointer
 
-.set Debug,72
+.set Debug,76
 
 .set SonnetBusClock,66666666			#66.6 MHz
 .set SonnetTimerFreq,(SonnetBusClock/8)		#Default when EICR=0x4 at bits 30-28

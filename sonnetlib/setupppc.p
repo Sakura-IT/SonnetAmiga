@@ -2,6 +2,7 @@
 .include sonnet_libppc.i
 
 .global PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init,ViolationAddress
+.global MCTask
 
 .set	PPCLen,(PPCEnd-PPCCode)
 .set	PP_CODE,0
@@ -1222,6 +1223,14 @@ NoEOI:	mtsrr0	r6
 	rfi
 	
 TestRoutine:
+	li	r4,50
+	loadreg r5,"Test"
+	LIBCALLPOWERPC AllocXMsgPPC
+	
+	mr	r4,r3
+	
+	LIBCALLPOWERPC FreeXMsgPPC
+
 	b	NoHEAR	
 
 #********************************************************************************************

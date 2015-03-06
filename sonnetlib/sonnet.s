@@ -52,9 +52,10 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
 	XREF	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
 	XREF	AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
-	XREF	Interrupt68k
+	XREF	Interrupt68k,PutXMsgPPC
 	
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init,ViolationAddress
+	XREF	MCTask
 	XDEF	_PowerPCBase
 
 ;********************************************************************************************
@@ -86,11 +87,44 @@ INIT	movem.l d1-a6,-(a7)
 	move.l 4.w,a6
 	lea Buffer(pc),a4
 	
+	lea DosLib(pc),a1
+	moveq.l #37,d0
+	jsr _LVOOpenLibrary(a6)
+	tst.l d0
+	beq.s Clean				;Open dos.library
+	move.l d0,DosBase-Buffer(a4)
+	
+	lea ExpLib(pc),a1
+	moveq.l #37,d0
+	jsr _LVOOpenLibrary(a6)			;Open expansion.library
+	tst.l d0
+	beq.s Clean
+	move.l d0,ExpBase-Buffer(a4)
+	
+	move.l d0,a6
+	sub.l a0,a0
+	move.l #$89e,d0				;ELBOX
+	moveq.l #33,d1				;Mediator MKII
+	jsr _LVOFindConfigDev(a6)		;Find A3000/A4000 mediator (for now)
+	move.l 4.w,a6
+	tst.l d0
+	beq.s Clean
+
+	move.l d0,a1
+	move.l cd_BoardAddr(a1),d0		;Start address Configspace Mediator
+	move.l d0,MediatorBase-Buffer(a4)
+	
 	lea MemList(a6),a0
 	lea MemName(pc),a1
 	jsr _LVOFindName(a6)
 	tst.l d0
-	bne.s Exit
+	bne.s Clean	
+	
+	moveq.l #0,d0
+	lea pcilib(pc),a1
+	jsr _LVOOpenLibrary(a6)
+	move.l d0,PCIBase-Buffer(a4)
+	
 	lea MemList(a6),a0
 	lea PCIMem(pc),a1
 	jsr _LVOFindName(a6)
@@ -121,48 +155,18 @@ FreeROM	move.l d0,a1
 	jmp _LVOFreeMem(a6)
 	
 FndMem	move.l d0,d7
-	moveq.l #0,d0
-	lea pcilib(pc),a1
-	jsr _LVOOpenLibrary(a6)
-	tst.l d0
-	beq.s Exit
-	move.l d0,PCIBase-Buffer(a4)
 	
-	lea DosLib(pc),a1
-	moveq.l #37,d0
-	jsr _LVOOpenLibrary(a6)
-	tst.l d0
-	beq.s Clean				;Open dos.library
-	move.l d0,DosBase-Buffer(a4)
-	
-	lea ExpLib(pc),a1
-	moveq.l #37,d0
-	jsr _LVOOpenLibrary(a6)			;Open expansion.library
-	tst.l d0
+	move.l PCIBase(pc),d0
 	beq.s Clean
-	move.l d0,ExpBase-Buffer(a4)
+	move.l d0,a2
 	
-	move.l d0,a6
-	sub.l a0,a0
-	move.l #$89e,d0				;ELBOX
-	moveq.l #33,d1				;Mediator MKII
-	jsr _LVOFindConfigDev(a6)		;Find A3000/A4000 mediator (for now)
-	move.l 4.w,a6
-	tst.l d0
-	beq Clean
-
-	move.l d0,a1
-	move.l cd_BoardAddr(a1),d0		;Start address Configspace Mediator
-	move.l d0,MediatorBase-Buffer(a4)
-	
-	move.l PCIBase(pc),a2
 	move.l PCI_List(a2),a2
 Loop1	move.l LN_SUCC(a2),d6
 	beq Clean
 	move.l PCI_VENDORID(a2),d1
 	cmp.l #$10570004,d1
 	beq.s Sonnet
-Loop2	move.l d6,a2
+	move.l d6,a2
 	bra.s Loop1	
 	
 Sonnet	move.l d7,a0
@@ -325,7 +329,7 @@ RLoc	add.l d2,(a2)+
 	move.l a2,IS_DATA(a1)
 	lea IntName(pc),a2
 	move.l a2,LN_NAME(a1)
-	moveq.l #-1,d0
+	moveq.l #10,d0
 	move.b d0,LN_PRI(a1)
 	moveq.l #NT_INTERRUPT,d0
 	move.b d0,LN_TYPE(a1)
@@ -350,9 +354,9 @@ NoLib	move.l a5,a1
 
 ;********************************************************************************************
 
-Dirty	move.l MediatorBase(pc),a0
-	moveq.l #0,d2
-	moveq.l #$3f,d1
+Dirty	move.l MediatorBase(pc),a0		;WARNING!!!! : EUMB register gets redefined
+	moveq.l #0,d2				;after pci.library initiation!!! 
+	moveq.l #$3f,d1				;This affects the INT2 interrupt!!
 	move.b #$60,(a0)			;Start address PCI Mem ($60000000)
 CpLoop	move.l a0,a5
 	add.l #$800000,a5			;Start address PCI config
@@ -373,33 +377,66 @@ CpLoop	move.l a0,a5
 VooDone	addq.l #1,d2	
 	dbf d1,CpLoop
 	bra Clean
-
-MPC107	move.l #$62B00000,a5
-	move.l a5,a1
-	lea $100(a5),a5
 	
-	move.l #$00300064,d5			;EUMB at $64003000
+MPC107	move.l #$62b00000,a1
+	move.l PCIBase(pc),d5
+	beq.s HardCr
+	nop					;Insert code
+	
+	move.l PCSRBAR(a5),d5
+	rol.w #8,d5
+	swap d5
+	rol.w #8,d5
+	move.l d5,a3
+	bra.s SoftCr
+	
+HardCr	move.l #$00300064,d5			;EUMB at $64003000
 	move.l d5,PCSRBAR(a5)
 	move.l COMMAND(a5),d5
 	bset #25,d5				;Set PCI Memory bit
 	move.l d5,COMMAND(a5)
 	
 	move.l #$64003000,a3			;EUMB at $64003000
-	move.l #$0F00B062,OTWR(a3)		;Host outbound PCI mem at $62B00000, 64kb (Code in GFXMem?)
-	move.l #$0000F0FF,OMBAR(a3)		;Processor outbound mem at $FFF00000
+SoftCr	move.l a3,EUMBAddr-Buffer(a4)
 
-	move.l OTWR(a3),d5
+	move.l PCIBase(pc),d5
+	beq.s HC2
+	move.l d5,a1
+	move.l PCI_List(a1),a1
+Loop12	move.l LN_SUCC(a1),d5
+	beq Clean
+	move.l PCI_VENDORID(a1),d1
+	cmp.l #$121a0005,d1
+	beq.s Voodoo2
+	move.l d5,a1
+	bra.s Loop12
+	
+Voodoo2	move.l PCI_SPACE1(a1),d1
+	add.l #$b00000,d1
+	move.l d1,a1
+	or.l #$f,d1
+	rol.w #8,d1
+	swap d1
+	rol.w #8,d1
+	move.l d1,OTWR(a3)		
+	bra.s SC2
+
+HC2	move.l #$0F00B062,OTWR(a3)		;Host outbound PCI mem at $62B00000, 64kb (Code in GFXMem?)
+SC2	move.l #$0000F0FF,OMBAR(a3)		;Processor outbound mem at $FFF00000
+
 	moveq.l #0,d4
 	move.l a5,d5
 	lea $100(a1),a5
 	bra EndDrty
 
-
 VooDoo3	movem.l d0-a6,-(a7)
+	move.l PCIBase(pc),d5
+	bne.s V3SC	
 	move.l	#$62,d5				;Set BAR Voodoo at $62000000
 	move.l d5,$14(a5)
-	move.l COMMAND(a5),d5
-	bset #25,d5				;Set PCI Memory bit (Voodoo3)
+V3SC	move.l COMMAND(a5),d5
+	or.l #$07000000,d5
+;	bset #25,d5				;Set PCI Memory bit (Voodoo3)
 	move.l d5,COMMAND(a5)
 	movem.l (a7)+,d0-a6
 	bra VooDone
@@ -421,7 +458,10 @@ IntName	dc.b "Gort",0
 
 MasterControl
 	move.l #"INIT",d6
-	move.l SonnetBase(pc),a4	
+	move.l SonnetBase(pc),a4
+	move.l 4.w,a6
+	move.l ThisTask(a6),d0
+	move.l d0,MCTask(a4)		
 	move.l 4(a4),a6
 	move.l _LVOWarpSuper+2(a6),d0
 	addq.l #4,d0	
@@ -434,6 +474,7 @@ NextMsg	move.l ThisTask(a6),a0
 	lea pr_MsgPort(a0),a0
 	move.l a0,d6
 	jsr _LVOWaitPort(a6)
+;	ILLEGAL
 GetLoop	move.l d6,a0
 	jsr _LVOGetMsg(a6)
 	move.l d0,d7
@@ -502,8 +543,8 @@ SonInt	movem.l d1-a6,-(a7)
 	tst.l d0
 	beq.s NoInt
 	move.l d0,a1
-	move.l #17,d0
-	jsr _LVOSignal(a6)
+	move.l #SIGF_DOS,d0			;Is this the standard signal
+	jsr _LVOSignal(a6)			;for WaitPort?
 	move.l d2,OMISR(a2)	
 NoInt	movem.l (a7)+,d1-a6
 	moveq.l #0,d0
@@ -1058,7 +1099,7 @@ FreeAllMem			blr
 CopyMemPPC			blr
 ;;;;;;AllocXMsgPPC		blr
 ;;;;;;FreeXMsgPPC		blr
-PutXMsgPPC			blr
+;;;;;;PutXMsgPPC		blr
 ;;;;;;GetSysTimePPC		blr
 ;;;;;;AddTimePPC		blr
 ;;;;;;SubTimePPC		blr

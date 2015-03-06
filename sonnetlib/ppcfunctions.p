@@ -28,7 +28,7 @@
 .global	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
 .global	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
 .global AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
-.global Interrupt68k
+.global Interrupt68k,PutXMsgPPC
 
 .section "LibBody","acrx"
 
@@ -569,7 +569,7 @@ FreeVecPPC:	stw	r2,20(r1)
 		stw	r29,0(r21)
 		lwz	r30,0(r21)
 		addco.	r30,r30,r7
-		stw	r30,0(r7)
+		stw	r30,0(r21)
 
 .MoreChunks:	stw	r4,0(r23)
 		lwz	r30,MH_FREE(r20)
@@ -2469,6 +2469,37 @@ Interrupt68k:
 		stw	r4,0x58(r3)
 		
 		lwz	r3,-8(r1)
+		blr
+
+#********************************************************************************************
+#
+#	void PutXMsgPPC(MsgPort, message) // r4,r5
+#
+#********************************************************************************************
+
+PutXMsgPPC:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+	
+		la	r4,20(r4)
+
+		LIBCALLPOWERPC AddTailPPC
+		
+		LIBCALLPOWERPC Interrupt68k
+
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
 		blr
 
 #********************************************************************************************
