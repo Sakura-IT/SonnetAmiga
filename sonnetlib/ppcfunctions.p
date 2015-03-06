@@ -28,7 +28,7 @@
 .global	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
 .global	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
 .global AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
-.global Interrupt68k,PutXMsgPPC
+.global Interrupt68K,PutXMsgPPC,WaitPPC,Run68K,Signal68K
 
 .section "LibBody","acrx"
 
@@ -2458,11 +2458,11 @@ WarpUser:
 		
 #********************************************************************************************
 #
-#	void Interrupt68k(Message) // r4 (r4 is a 32 bit word which is passed to the 68k)
+#	void Interrupt68K(Message) // r4 (r4 is a 32 bit word which is passed to the 68k)
 #
 #********************************************************************************************
 
-Interrupt68k:
+Interrupt68K:
 		stw	r3,-8(r1)
 		
 		lis	r3,EUMB
@@ -2491,7 +2491,7 @@ PutXMsgPPC:
 
 		LIBCALLPOWERPC AddTailPPC
 		
-		LIBCALLPOWERPC Interrupt68k
+		LIBCALLPOWERPC Signal68K
 
 		lwz	r1,0(r1)
 		lwz	r13,-4(r1)
@@ -2502,5 +2502,90 @@ PutXMsgPPC:
 		lwz	r2,20(r1)
 		blr
 
+#********************************************************************************************
+#
+#	signals = WaitPPC(signalSet) // r3=r4 (HACKED FUNCTION)
+#
+#********************************************************************************************
+
+WaitPPC:	stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)	
+
+		li	r3,SonnetBase		#Just for PoC
+		loadreg r5,"DONE"
+FakeWait:	lwz	r4,Init(r3)
+		cmpw	r4,r5
+		bne+ FakeWait
+
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr
+		
+#********************************************************************************************
+#
+#	status = Run68K(PPStruct) // r3=r4
+#
+#********************************************************************************************
+
+Run68K:		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		
+		LIBCALLPOWERPC PutXMsgPPC
+		
+		LIBCALLPOWERPC WaitPPC
+
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr
+		
+#********************************************************************************************
+#
+#	void Signal68K(task, signals) // r4,r5
+#
+#********************************************************************************************
+
+Signal68K:	stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		
+		LIBCALLPOWERPC Interrupt68K
+
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr
+	
+	
 #********************************************************************************************
 EndFunctions:

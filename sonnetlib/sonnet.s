@@ -52,7 +52,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
 	XREF	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
 	XREF	AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
-	XREF	Interrupt68k,PutXMsgPPC
+	XREF	Interrupt68K,PutXMsgPPC,WaitPPC,Run68K,Signal68K
 	
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init,ViolationAddress
 	XREF	MCTask
@@ -162,7 +162,7 @@ FndMem	move.l d0,d7
 	
 	move.l PCI_List(a2),a2
 Loop1	move.l LN_SUCC(a2),d6
-	beq Clean
+	beq.s Clean
 	move.l PCI_VENDORID(a2),d1
 	cmp.l #$10570004,d1
 	beq.s Sonnet
@@ -177,7 +177,7 @@ Sonnet	move.l d7,a0
 	move.l #$10000,d0
 	jsr _LVOAllocAbs(a6)			;Allocate fake ROM in VGA Mem
 	tst.l d0
-	beq Clean
+	beq.s Clean
 
 	move.l d0,ROMMem-Buffer(a4)
 	move.l d0,a5
@@ -432,7 +432,7 @@ SC2	move.l #$0000F0FF,OMBAR(a3)		;Processor outbound mem at $FFF00000
 VooDoo3	movem.l d0-a6,-(a7)
 	move.l PCIBase(pc),d5
 	bne.s V3SC	
-	move.l	#$62,d5				;Set BAR Voodoo at $62000000
+	moveq.l	#$62,d5				;Set BAR Voodoo at $62000000
 	move.l d5,$14(a5)
 V3SC	move.l COMMAND(a5),d5
 	or.l #$07000000,d5
@@ -492,8 +492,20 @@ GetLoop	move.l d6,a0
 	bra.s GetLoop
 
 MsgT68k	move.l d7,a1
-	jsr _LVOReplyMsg(a6)
+	move.b LN_TYPE(a1),d7
+	cmp.b #NT_MESSAGE,d7
+	beq.s Sig68k					
+	cmp.b #NT_REPLYMSG,d7				;signal PPC that 68k is done
+	bne.s NextMsg
+	move.l #"DONE",d6
+	move.l SonnetBase(pc),a0
+	move.l d6,Init(a4)		
+;	jsr _LVOReplyMsg(a6)
 	bra.s NextMsg
+
+Sig68k	nop						;move message to waiting 68k task
+	bra.s NextMsg
+
 
 MsgTPPC	move.l SonnetBase(pc),a0
 	lea MN_PPSTRUCT(a1),a2
@@ -655,7 +667,7 @@ CpxLoop	move.l MediatorBase(pc),a5
 	add.l d0,a5
 	move.l (a5),d4
 	cmp.l #$FFFFFFFF,d4
-	beq Error2
+	beq.s Error2
 	cmp.l #$57100400,d4
 	beq.s xSonnet
 	addq.l #1,d2	
@@ -678,7 +690,7 @@ GetCPU	movem.l d1-a6,-(a7)
 	beq.s G3
 	subq.l #4,d0
 	beq.s G4
-	move.l #0,d0
+	moveq.l #0,d0
 	bra.s ExCPU
 G3	move.l #CPUF_G3,d0
 	bra.s ExCPU
@@ -734,7 +746,7 @@ xProces	move.l d0,Port(a5)
 	move.l d1,MN_REPLYPORT(a1)
 	move.l d1,MN_MIRROR(a1)
 	lea MN_PPSTRUCT(a1),a2
-	move.l #PP_SIZE/4-1,d0
+	moveq.l #PP_SIZE/4-1,d0
 	move.l PStruct(a5),a0
 CpMsg	move.l (a0)+,(a2)+
 	dbf d0,CpMsg
@@ -795,7 +807,7 @@ GtLoop	move.l Port(a5),a0
 	
 DizDone	move.l PStruct(a5),a1
 	lea MN_PPSTRUCT(a0),a0
-	move.l #PP_SIZE/4-1,d0
+	moveq.l #PP_SIZE/4-1,d0
 CpBck	move.l (a0)+,(a1)+
 	dbf d0,CpBck
 	moveq.l #0,d7
@@ -837,7 +849,7 @@ xBack	move.l (a7)+,a6
 	movem.l (a7)+,d0-a5				;Correct Sequence?
 	move.l a6,a1
 	move.l (a7)+,a6
-	jsr _LVOReplyMsg(a6)	
+;	jsr _LVOReplyMsg(a6)	
 	bra GtLoop
 
 ;********************************************************************************************
@@ -965,7 +977,7 @@ SetCache68K
 	beq.s ICInv
 	cmp.l #CACHE_DCACHEINV,d2	
 	beq.s DCFlush
-	bra CacheIt
+	bra.s CacheIt
 	
 DCOff	moveq.l #0,d0
 	move.l #CACRF_EnableD,d1
@@ -980,12 +992,12 @@ DCOn	move.l #CACRF_EnableD,d0
 	bra.s CacheIt
 
 ICOff	moveq.l #0,d0
-	move.l #CACRF_EnableI,d1
+	moveq.l #CACRF_EnableI,d1
 	move.l 4.w,a6
 	jsr _LVOCacheControl(a6)
 	bra.s CacheIt
 	
-ICOn	move.l #CACRF_EnableI,d0
+ICOn	moveq.l #CACRF_EnableI,d0
 	move.l d0,d1
 	move.l 4.w,a6	
 	bra.s CacheIt
@@ -1007,7 +1019,7 @@ ICInv	tst.l a2
 	beq.s NoStrtA
 	move.l a2,a0
 	move.l d3,d0
-	move.l #CACRF_ClearI,d1
+	moveq.l #CACRF_ClearI,d1
 	move.l 4.w,a6
 	jsr _LVOCacheClearE(a6)	
 	bra.s CacheIt
@@ -1036,7 +1048,7 @@ PutXMsg				rts
 ;;;;;;CreatePPCTask		rts
 CausePPCInterrupt		rts
 
-Run68K				blr
+;;;;;;Run68K			blr
 WaitFor68K			blr
 SPrintF				blr			;debug feature
 Run68KLowLevel			blr
@@ -1068,9 +1080,9 @@ FindTaskPPC			blr
 ;;;;;;FreeSignalPPC		blr
 ;;;;;;SetSignalPPC		blr
 SignalPPC			blr
-WaitPPC				blr
+;;;;;;WaitPPC			blr
 SetTaskPriPPC			blr
-Signal68K			blr
+;;;;;;Signal68K			blr
 SetCache			blr
 SetExcHandler			blr
 RemExcHandler			blr
@@ -1192,7 +1204,7 @@ FUNCTABLE:
 	dc.l	AtomicDone	
 	dc.l	WarpSuper
 	dc.l	WarpUser	
-	dc.l	Interrupt68k
+	dc.l	Interrupt68K
 	
 	dc.l	Reserved
 	dc.l	Reserved
