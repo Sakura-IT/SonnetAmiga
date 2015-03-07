@@ -24,6 +24,27 @@
 	blrl
 .endm
 
+.macro BUILDSTACKPPC
+	stw	r2,20(r1)
+	mflr	r0
+	stw	r0,8(r1)
+	mfcr	r0
+	stw	r0,4(r1)
+	stw	r13,-4(r1)
+	subi	r13,r1,4
+	stwu	r1,-284(r1)
+.endm
+
+.macro DSTRYSTACKPPC
+	lwz	r1,0(r1)
+	lwz	r13,-4(r1)
+	lwz	r0,8(r1)
+	mtlr	r0
+	lwz	r0,4(r1)
+	mtcr	r0
+	lwz	r2,20(r1)
+.endm
+
 #Sonnet Base:
 .set SonnetBase,0
 .set PowerPCBase,4
