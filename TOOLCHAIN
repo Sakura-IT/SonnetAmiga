@@ -1,11 +1,22 @@
-Buliding of sonnet.library and associated programs requires the following tools:
+Buliding of sonnet.library and associated programs requires a specially 
+prepared development environment.
 
-- vasm (current source as of 2015-03-03 or newer).
-- vlink (current source as of 2015-03-03 or newer).
-- GNU Make.
-- AmigaOS 3.9 NDK - currently this requires some manual fixing, as not all 
-  includes are present with the distribution, see issue #6 on GitHub. 
-- WarpOS 5.1 include files (WarpUP_V51Upd.lha on AmiNet). 
+# Prerequisites
+
+* vasm - current source as of 2015-03-03 or newer.
+* vlink - current source as of 2015-03-03 or newer.
+* GNU Make - any fairly new version will suffice.
+* AmigaOS 3.9 NDK - currently this requires some manual fixing, issue #6 on
+  GitHub and below for further instructions. 
+* WarpOS 5.1 include files (WarpUP_V51Upd.lha on AmiNet). 
+* patch - if you want to automatically fix the NDK, available on AmiNet.
+
+# Fixing the NDK
+
+Apply the following patch to the AmigaOS 3.9 NDK:
+http://sonnet.uguu.waw.pl/patch-ndk-1.diff
+
+# Building
 
 Building is supported on both AmigaOS and UNIX-likes, just export HOST variable
 when running make, i.e.:
