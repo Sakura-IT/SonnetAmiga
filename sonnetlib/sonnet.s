@@ -52,7 +52,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
 	XREF	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
 	XREF	AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
-	XREF	Interrupt68K,PutXMsgPPC,WaitPPC,Run68K,Signal68K
+	XREF	PutXMsgPPC,WaitFor68K,Run68K,Signal68K
 	
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init,ViolationAddress
 	XREF	MCTask
@@ -1049,7 +1049,7 @@ PutXMsg				rts
 CausePPCInterrupt		rts
 
 ;;;;;;Run68K			blr
-WaitFor68K			blr
+;;;;;;WaitFor68K		blr
 SPrintF				blr			;debug feature
 Run68KLowLevel			blr
 ;;;;;;AllocVecPPC		blr
@@ -1080,7 +1080,7 @@ FindTaskPPC			blr
 ;;;;;;FreeSignalPPC		blr
 ;;;;;;SetSignalPPC		blr
 SignalPPC			blr
-;;;;;;WaitPPC			blr
+WaitPPC				blr
 SetTaskPriPPC			blr
 ;;;;;;Signal68K			blr
 SetCache			blr
@@ -1203,9 +1203,9 @@ FUNCTABLE:
 	dc.l	AtomicTest
 	dc.l	AtomicDone	
 	dc.l	WarpSuper
-	dc.l	WarpUser	
-	dc.l	Interrupt68K
-	
+	dc.l	WarpUser
+		
+	dc.l	Reserved	
 	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved
