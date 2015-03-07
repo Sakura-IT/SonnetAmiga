@@ -3,7 +3,6 @@ OBJECTSPPC=ppcfunctions.o setupppc.o
 INCLUDES=ppcdefines.i pci.i
 
 EXECUTABLE=sonnet.library
-DISTRNAME=sonnet.lha
 
 all: $(EXECUTABLE) 
 
@@ -17,8 +16,5 @@ $(EXECUTABLE) : $(OBJECTS68K) $(OBJECTSPPC)
 	$(ASM68K) $(ASM68KPARAM) -o $@ $<
 
 clean :
-	$(RM) $(OBJECTS) $(EXECUTABLE)
-
-distribution : $(EXECUTABLE)
-	$(LHA) a $(DISTRNAME) $(EXECUTABLE)
+	$(RM) $(OBJECTS68K) $(OBJECTSPPC) $(EXECUTABLE)
 

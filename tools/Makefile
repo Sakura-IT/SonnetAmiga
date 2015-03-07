@@ -1,8 +1,6 @@
 OBJ_GETINFO=getinfo.o
 GETINFO_EXE=getinfo
 
-DISTRNAME=tools.lha
-
 all: $(GETINFO_EXE) 
 
 $(GETINFO_EXE) : $(OBJ_GETINFO)
@@ -16,7 +14,4 @@ $(GETINFO_EXE) : $(OBJ_GETINFO)
 
 clean :
 	$(RM) $(OBJ_GETINFO) $(GETINFO_EXE)
-
-distribution : $(GETINFO_EXE)
-	$(LHA) a $(DISTRNAME) $(GETINFO_EXE)
 

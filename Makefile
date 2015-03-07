@@ -5,7 +5,7 @@ ASMPPC=vasmppc_std
 LD=vlink
 LHA=lha
 
-ASM68KPARAM=-I$(INCLUDE_I) -m68020up -Fhunk -no-opt
+ASM68KPARAM=-m68020up -Fhunk -no-opt
 ASMPPCPARAM=-many -mppc32 -Fhunk    
 
 DISTRIBUTION=sonnet.lha
