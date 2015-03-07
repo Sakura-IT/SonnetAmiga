@@ -15,6 +15,10 @@
 .set SS_QUEUECOUNT,44
 .set SSPPC_RESERVE,46
 .set SSPPC_LOCK,50
+.set MP_SIGTASK,16
+.set MP_MSGLIST,20
+.set pr_MsgPort,92
+
 .set FunctionsLen,(EndFunctions-SetExcMMU)
 
 .global FunctionsLen
@@ -28,7 +32,7 @@
 .global	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
 .global	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
 .global AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
-.global Interrupt68K,PutXMsgPPC,WaitPPC,Run68K,Signal68K
+.global PutXMsgPPC,WaitFor68K,Run68K,Signal68K
 
 .section "LibBody","acrx"
 
@@ -355,15 +359,8 @@ CmpTimePPC:
 #********************************************************************************************
 
 AllocVecPPC:
-		stw	r2,20(r1)			#Should be 32 aligned instead of 4?
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
-		
+		BUILDSTACKPPC			#Should be 32 aligned instead of 4?
+
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
@@ -483,13 +480,7 @@ AllocVecPPC:
 		lwzu	r31,4(r13)
 		addi	r13,r13,4
 		
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		DSTRYSTACKPPC
 		
 		blr
 		
@@ -499,15 +490,9 @@ AllocVecPPC:
 #
 #********************************************************************************************		
 		
-FreeVecPPC:	stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
-		
+FreeVecPPC:	
+		BUILDSTACKPPC
+				
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
@@ -591,13 +576,7 @@ FreeVecPPC:	stw	r2,20(r1)
 		lwzu	r31,4(r13)
 		addi	r13,r13,4
 		
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		DSTRYSTACKPPC
 		
 		blr	
 
@@ -607,14 +586,8 @@ FreeVecPPC:	stw	r2,20(r1)
 #
 #********************************************************************************************		
 
-GetInfo:	stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+GetInfo:	
+		BUILDSTACKPPC
 
 		stwu	r8,-4(r13)
 		stwu	r7,-4(r13)
@@ -658,13 +631,7 @@ GetInfo:	stw	r2,20(r1)
 		lwzu	r8,4(r13)
 		addi	r13,r13,4
 		
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		DSTRYSTACKPPC
 		
 		blr
 
@@ -769,14 +736,8 @@ GetInfo:	stw	r2,20(r1)
 #********************************************************************************************
 
 GetSysTimePPC:	
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+		
 		stwu	r7,-4(r13)
 		stwu	r6,-4(r13)
 
@@ -800,13 +761,9 @@ GetSysTimePPC:
 		stw	r3,4(r6)
 		lwz	r6,0(r13)
 		lwzu	r7,4(r13)
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+		
 		blr
 
 .Link17:	mfctr	r0
@@ -983,14 +940,8 @@ FlushL1DCache:
 
 
 AllocXMsgPPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 
@@ -1008,13 +959,9 @@ AllocXMsgPPC:
 .NoMaam:	lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+				
 		blr		
 		
 #********************************************************************************************
@@ -1024,24 +971,12 @@ AllocXMsgPPC:
 #********************************************************************************************		
 
 FreeXMsgPPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
 		
 		LIBCALLPOWERPC FreeVecPPC
 		
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		DSTRYSTACKPPC
+		
 		blr		
 
 #********************************************************************************************
@@ -1051,14 +986,8 @@ FreeXMsgPPC:
 #********************************************************************************************
 
 CreateMsgPortPPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 
@@ -1117,13 +1046,9 @@ CreateMsgPortPPC:
 		lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+
 		blr
 		
 #********************************************************************************************
@@ -1133,14 +1058,8 @@ CreateMsgPortPPC:
 #********************************************************************************************
 
 DeleteMsgPortPPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+		
 		stwu	r31,-4(r13)
 		mr.	r31,r4
 		beq-	.NoPortDef
@@ -1159,13 +1078,9 @@ DeleteMsgPortPPC:
 
 .NoPortDef:	lwz	r31,0(r13)
 		addi	r13,r13,4
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+
+		DSTRYSTACKPPC
+				
 		blr
 
 #********************************************************************************************
@@ -1175,14 +1090,7 @@ DeleteMsgPortPPC:
 #********************************************************************************************
 
 FreeSignalPPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
 
 		extsb	r4,r4
 		cmpwi	r4,-1
@@ -1197,13 +1105,9 @@ FreeSignalPPC:
 		andc	r3,r3,r6
 		stw	r3,TC_SIGALLOC(r5)
 
-.NoSigDef:	lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+.NoSigDef:	
+		DSTRYSTACKPPC
+		
 		blr
 
 #********************************************************************************************
@@ -1213,14 +1117,8 @@ FreeSignalPPC:
 #********************************************************************************************
 
 AllocSignalPPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+		
 		extsb	r4,r4
 
 		li	r5,SonnetBase
@@ -1270,13 +1168,9 @@ AllocSignalPPC:
 
 .EndSig:	mr	r4,r3
 		mr	r3,r4
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+		
 		blr	
 		
 #********************************************************************************************
@@ -1323,14 +1217,8 @@ AtomicDone:
 #********************************************************************************************
 
 SetSignalPPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 
@@ -1357,13 +1245,9 @@ SetSignalPPC:
 		lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+		
 		blr
 
 #********************************************************************************************
@@ -1373,14 +1257,8 @@ SetSignalPPC:
 #********************************************************************************************
 
 LockTaskList:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+		
 		stwu	r31,-4(r13)
 
 		li	r31,SonnetBase
@@ -1394,13 +1272,9 @@ LockTaskList:
 		lwz	r3,TASKPPC_TASKPTR(r31)
 		lwz	r31,0(r13)
 		addi	r13,r13,4
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+		
 		blr	
 
 #********************************************************************************************
@@ -1410,27 +1284,15 @@ LockTaskList:
 #********************************************************************************************
 
 UnLockTaskList:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
 		
 		li	r4,SonnetBase
 		lwz	r4,TaskListSem(r4)
 
 		LIBCALLPOWERPC ReleaseSemaphorePPC
 
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		DSTRYSTACKPPC
+		
 		blr
 
 #********************************************************************************************
@@ -1440,14 +1302,8 @@ UnLockTaskList:
 #********************************************************************************************
 
 InitSemaphorePPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+				
 		stwu	r31,-4(r13)
 		mr	r31,r4
 
@@ -1476,15 +1332,10 @@ InitSemaphorePPC:
 
 .SemDone:	lwz	r31,0(r13)
 		addi	r13,r13,4
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+		
 		blr	
-
 
 #********************************************************************************************
 #
@@ -1493,14 +1344,8 @@ InitSemaphorePPC:
 #********************************************************************************************
 
 FreeSemaphorePPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+				
 		mr.	r4,r4
 		beq-	.NoSemDef
 
@@ -1508,13 +1353,9 @@ FreeSemaphorePPC:
 
 		LIBCALLPOWERPC FreeVecPPC
 
-.NoSemDef:	lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+.NoSemDef:	
+		DSTRYSTACKPPC
+
 		blr
 
 #********************************************************************************************
@@ -1524,14 +1365,8 @@ FreeSemaphorePPC:
 #********************************************************************************************
 
 ObtainSemaphorePPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+				
 		mfctr	r0
 		stwu	r0,-4(r13)
 		stwu	r31,-4(r13)
@@ -1627,13 +1462,9 @@ ObtainSemaphorePPC:
 		lwz	r0,0(r13)
 		addi	r13,r13,4
 		mtctr	r0
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+
 		blr
 
 #********************************************************************************************
@@ -1643,14 +1474,8 @@ ObtainSemaphorePPC:
 #********************************************************************************************
 
 AttemptSemaphorePPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+		
 		mfctr	r0
 		stwu	r0,-4(r13)
 		stwu	r31,-4(r13)
@@ -1709,13 +1534,9 @@ AttemptSemaphorePPC:
 		lwz	r0,0(r13)
 		addi	r13,r13,4
 		mtctr	r0
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+
 		blr
 
 #********************************************************************************************
@@ -1725,14 +1546,8 @@ AttemptSemaphorePPC:
 #********************************************************************************************
 
 ReleaseSemaphorePPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+		
 		mfctr	r0
 		stwu	r0,-4(r13)
 		stwu	r31,-4(r13)
@@ -1911,13 +1726,9 @@ ReleaseSemaphorePPC:
 		lwz	r0,0(r13)
 		addi	r13,r13,4
 		mtctr	r0
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+
 		blr	
 
 .Error68k:	LIBCALLPOWERPC AtomicDone
@@ -1931,14 +1742,8 @@ ReleaseSemaphorePPC:
 #********************************************************************************************
 
 AddSemaphorePPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+				
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 
@@ -1970,13 +1775,9 @@ AddSemaphorePPC:
 .NoInitSem:	lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+		
 		blr	
 
 #********************************************************************************************
@@ -1986,14 +1787,8 @@ AddSemaphorePPC:
 #********************************************************************************************
 
 RemSemaphorePPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+				
 		stwu	r31,-4(r13)
 
 		mr	r31,r4
@@ -2016,13 +1811,9 @@ RemSemaphorePPC:
 
 		lwz	r31,0(r13)
 		addi	r13,r13,4
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+
 		blr
 
 #********************************************************************************************
@@ -2032,14 +1823,8 @@ RemSemaphorePPC:
 #********************************************************************************************
 
 FindSemaphorePPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+				
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 
@@ -2067,13 +1852,9 @@ FindSemaphorePPC:
 		lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+
 		blr
 
 #********************************************************************************************
@@ -2083,14 +1864,8 @@ FindSemaphorePPC:
 #********************************************************************************************
 
 AddPortPPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 
@@ -2120,13 +1895,9 @@ AddPortPPC:
 		lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+		
 		blr	
 
 #********************************************************************************************
@@ -2136,16 +1907,9 @@ AddPortPPC:
 #********************************************************************************************
 
 RemPortPPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+		
 		stwu	r31,-4(r13)
-
 		mr	r31,r4
 
 		li	r4,SonnetBase
@@ -2166,13 +1930,9 @@ RemPortPPC:
 
 		lwz	r31,0(r13)
 		addi	r13,r13,4
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+
 		blr	
 
 #********************************************************************************************
@@ -2182,16 +1942,9 @@ RemPortPPC:
 #********************************************************************************************
 
 FindPortPPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+		
 		stwu	r31,-4(r13)
-
 		mr	r31,r3
 		mr	r5,r4
 
@@ -2214,36 +1967,25 @@ FindPortPPC:
 		mr	r3,r31
 		lwz	r31,0(r13)
 		addi	r13,r13,4
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+		
 		blr	
 
 #********************************************************************************************
 #
-#	message = WaitPortPPC(MsgPortPPC) // r4 	FUNCTION NOT DONE YET!!!
+#	message = WaitPortPPC(MsgPortPPC) // r4 (UNDER DEVELOPMENT)
 #
 #********************************************************************************************
 
 WaitPortPPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
+		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
-
 		mr	r28,r3				#UNKNOWN AS OF YET (switch?)
 		mr	r31,r4
 
@@ -2365,13 +2107,9 @@ WaitPortPPC:
 		lwz	r30,12(r13)
 		lwz	r31,16(r13)
 		addi	r13,r13,20
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		
+		DSTRYSTACKPPC
+		
 		blr
 		
 #********************************************************************************************
@@ -2381,24 +2119,12 @@ WaitPortPPC:
 #********************************************************************************************
 
 Super:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
 		
 		LIBCALLPOWERPC WarpSuper
+		
+		DSTRYSTACKPPC
 
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
 		blr	
 
 #********************************************************************************************
@@ -2408,27 +2134,16 @@ Super:
 #********************************************************************************************
 
 User:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		BUILDSTACKPPC
 
 		mr.	r4,r4
 		bne-	.WrongKey
 
 		LIBCALLPOWERPC WarpUser
 
-.WrongKey:	lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+.WrongKey:	
+		DSTRYSTACKPPC
+		
 		blr
 
 #********************************************************************************************
@@ -2455,109 +2170,79 @@ WarpUser:
 		mtmsr	r0
 		isync	
 		blr
-		
-#********************************************************************************************
-#
-#	void Interrupt68K(Message) // r4 (r4 is a 32 bit word which is passed to the 68k)
-#
-#********************************************************************************************
-
-Interrupt68K:
-		stw	r3,-8(r1)
-		
-		lis	r3,EUMB
-		stw	r4,0x58(r3)
-		
-		lwz	r3,-8(r1)
-		blr
 
 #********************************************************************************************
 #
-#	void PutXMsgPPC(MsgPort, message) // r4,r5
+#	void PutXMsgPPC(MsgPort, message) // r4,r5 (UNDER DEVELOPMENT)
 #
 #********************************************************************************************
 
 PutXMsgPPC:
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
-	
-		la	r4,20(r4)
+		BUILDSTACKPPC
+		
+		stwu	r31,-4(r13)
+		mr	r31,r4
+		la	r4,MP_MSGLIST(r4)
 
 		LIBCALLPOWERPC AddTailPPC
 		
+		mr 	r4,r31
+		
+		lwz	r4,MP_SIGTASK(r4)	#Port flags to be implemented (PA_SIGNAL etc)
+		mr.	r4,r4
+		beq-	.NoSigTask
+		li	r5,0x100
+		
 		LIBCALLPOWERPC Signal68K
 
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+.NoSigTask:	lwz	r31,0(r13)
+		addi	r13,r13,4
+		
+		DSTRYSTACKPPC
+		
 		blr
 
 #********************************************************************************************
 #
-#	signals = WaitPPC(signalSet) // r3=r4 (HACKED FUNCTION)
+#	status = WaitFor68K(PStruct) // r3=r4 (HACKED FUNCTION - UNDER DEVELOPMENT)
 #
 #********************************************************************************************
 
-WaitPPC:	stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)	
+WaitFor68K:	
+		BUILDSTACKPPC
 
 		li	r3,SonnetBase		#Just for PoC
 		loadreg r5,"DONE"
-FakeWait:	lwz	r4,Init(r3)
-		cmpw	r4,r5
-		bne+ FakeWait
+.FakeWait:	lwz	r6,Init(r3)
+		cmpw	r6,r5
+		bne+ 	.FakeWait
 
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		stw	r3,Init(r3)
+
+		DSTRYSTACKPPC
+				
 		blr
 		
 #********************************************************************************************
 #
-#	status = Run68K(PPStruct) // r3=r4
+#	status = Run68K(PPStruct) // r3=r4 (UNDER DEVELOPMENT)
 #
 #********************************************************************************************
 
-Run68K:		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+Run68K:		
+		BUILDSTACKPPC
+		
+		mr	r5,r4
+		li	r6,SonnetBase
+		lwz	r6,MCTask(r6)
+		lwz	r4,pr_MsgPort(r6)
 		
 		LIBCALLPOWERPC PutXMsgPPC
 		
-		LIBCALLPOWERPC WaitPPC
+		LIBCALLPOWERPC WaitFor68K
 
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
+		DSTRYSTACKPPC
+		
 		blr
 		
 #********************************************************************************************
@@ -2566,26 +2251,16 @@ Run68K:		stw	r2,20(r1)
 #
 #********************************************************************************************
 
-Signal68K:	stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+Signal68K:	
+		BUILDSTACKPPC
 		
-		LIBCALLPOWERPC Interrupt68K
+		lis	r3,EUMB
+		stw	r4,0x58(r3)
+		stw	r5,0x5c(r3)		#Need to disable OMR1 interrupts?
 
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-		lwz	r2,20(r1)
-		blr
-	
+		DSTRYSTACKPPC
+		
+		blr	
 	
 #********************************************************************************************
 EndFunctions:
