@@ -8,6 +8,7 @@
 .set	PP_CODE,0
 .set	PP_OFFSET,4
 .set	PP_REGS,20
+.set	SSPPC_SIZE,52
 
 #********************************************************************************************
 	
@@ -76,6 +77,7 @@ SetLen:	mr	r30,r28
 	bl	Caches
 
 	loadreg	r3,0x8000			#Start hardcoded at 0x8000
+	mr	r31,r3
 						#This should become the idle task
 	loadreg	r1,0x7fefc			#Userstack in unused mem (See BootPPC.s)
 	lis	r15,0
@@ -84,13 +86,14 @@ SetLen:	mr	r30,r28
 	loadreg	r13,0x28000			#SDA2 (0x20000-0x30000)
 	bl	End
 	
-Start:		nop				#Dummy entry at absolute 0x8000
+Start:	
+	nop					#Dummy entry at absolute 0x8000
 	b	Start
 	
 ExitCode:
 	li	r30,SonnetBase			#Exit code of processes (in development)
 	li	r29,1
-	stw	r29,ReadyTasks(r30)
+	stw	r29,ReadyTasks+4(r30)		#HACK
 	stw 	r4,0x70(r30)
 	lwz	r29,0x80(r30)
 	addi	r29,r29,1
@@ -121,11 +124,27 @@ WInit:	lwz	r28,Init(r14)
 	cmplw	r28,r6
 	bne	WInit				#Wait for 68k to set up library
 
+	la	r4,ReadyTasks(r14)
+	LIBCALLPOWERPC NewListPPC
+	
+	la	r4,WaitingTasks(r14)
+	LIBCALLPOWERPC NewListPPC
+	
+	la	r4,Semaphores(r14)
+	LIBCALLPOWERPC NewListPPC
+	
+	la	r4,Ports(r14)
+	LIBCALLPOWERPC NewListPPC
+
+	li	r4,SSPPC_SIZE*3			#Memory for 3 Semaphores
+	LIBCALLPOWERPC AllocVecPPC
+
 	mfmsr	r14
 	ori	r14,r14,0x8000			#Enable External Exceptions and Decrementer
 	mtmsr	r14				#Exception
 	isync
 	
+	mr	r3,r31
 	mtspr	srr0,r3
 	isync
 	mtspr	srr1,r14
@@ -1191,6 +1210,10 @@ NoHEAR:	li	r3,SonnetBase
 	lwz	r5,PP_OFFSET(r6)
 	lwz	r6,PP_CODE(r6)
 	add	r6,r6,r5
+	
+	stw	r5,90(r3)
+	stw	r6,94(r3)
+	
 	li	r5,0
 	stw	r5,RunningTask(r3)	
 	sync	

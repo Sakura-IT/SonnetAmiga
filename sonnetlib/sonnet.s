@@ -316,7 +316,6 @@ RLoc	add.l d2,(a2)+
 	move.l a1,(a1)					;Sonnet relocated mem at $0
 	move.l d0,_PowerPCBase-Buffer(a4)
 	moveq.l #0,d1
-	move.l d1,ReadyTasks(a1)
 	move.l d1,RunningTask(a1)
 
 	move.l d0,a1
@@ -510,18 +509,16 @@ Sig68k	nop						;move message to waiting 68k task
 MsgTPPC	move.l SonnetBase(pc),a0
 	lea MN_PPSTRUCT(a1),a2
 	move.l a2,RunningTask(a0)
-
-	move.l #"TPPC",64(a0)
-	move.l _PowerPCBase(pc),a6
-	
+	move.l _PowerPCBase(pc),a6	
 	jsr _LVOCauseInterruptHW(a6)			;Force reschedule. Is this faster than
+	
 	move.l 4.w,a6					;just wait for normal reschedule?
 	move.l SonnetBase(pc),a0
 	move.l d7,a1
 	moveq.l #0,d1
-PPCWait	tst.l ReadyTasks(a0)				:QUICK HACK
+PPCWait	tst.l ReadyTasks+4(a0)				:QUICK HACK
 	beq.s PPCWait
-	move.l d1,ReadyTasks(a0)
+	move.l d1,ReadyTasks+4(a0)
 	jsr _LVOReplyMsg(a6)				
 	bra NextMsg
 
