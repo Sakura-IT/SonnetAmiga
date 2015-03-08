@@ -1,4 +1,5 @@
 SonnetAmiga
+===========
 
 This project is an attempt at reimplementation of WarpOS for Sonnet Crescendo
 7200 PCI cards.
@@ -6,12 +7,29 @@ This project is an attempt at reimplementation of WarpOS for Sonnet Crescendo
 The main part of the project is sonnet.library, which aims at API and ABI
 compatibility with WarpOS powerpc.library.
 
-The only supported PCI bridge is Elbox Mediator 4000 Mk-II. It is necessary 
-to have graphics card installed and currently the only supported card is 3Dfx 
-Voodoo 3.
-
 This project is in very early stage of development. Don't expect it to do
 anything useful (yet).
 
+# Hardware
+
+The only supported PCI bridge is ELBOX Mediator 4000 Mk-II. It is necessary 
+to have graphics card installed and currently the only supported card is 3Dfx 
+Voodoo 3.
+
+# Building
+
 See TOOLCHAIN file for building instructions.
+
+# Bugs
+
+We're using GitHub Issues for bug tracking:
+https://github.com/Sakura-IT/SonnetAmiga/issues
+
+If you find any new bugs, please report them.
+
+# Disclaimers
+
+We, the developers, are officially stating that all code interacting with 
+Mediator boards was developed without access to the official Mediator SDK.
+This project is not endorsed by ELBOX in any way.
 
