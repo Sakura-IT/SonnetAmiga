@@ -86,18 +86,17 @@ SetLen:	mr	r30,r28
 	loadreg	r13,0x28000			#SDA2 (0x20000-0x30000)
 	bl	End
 	
-Start:	
-	nop					#Dummy entry at absolute 0x8000
+Start:						#Dummy entry at absolute 0x8000
+	nop
+	nop
+	nop
 	b	Start
 	
 ExitCode:
 	li	r30,SonnetBase			#Exit code of processes (in development)
 	li	r29,1
 	stw	r29,ReadyTasks+4(r30)		#HACK
-	stw 	r4,0x70(r30)
-	lwz	r29,0x80(r30)
-	addi	r29,r29,1
-	stw	r29,0x80(r30)
+	nop
 Pause:	nop
 	nop
 	b	Pause
@@ -123,7 +122,13 @@ End:	mflr	r4
 WInit:	lwz	r28,Init(r14)
 	cmplw	r28,r6
 	bne	WInit				#Wait for 68k to set up library
-
+	
+	li	r3,0x7000			#No harm 
+	mtctr	r3
+Delay2:
+	bdnz	Delay2
+	
+	lwz	r14,0(r14)
 	la	r4,ReadyTasks(r14)
 	LIBCALLPOWERPC NewListPPC
 	
@@ -138,14 +143,26 @@ WInit:	lwz	r28,Init(r14)
 
 	li	r4,SSPPC_SIZE*3			#Memory for 3 Semaphores
 	LIBCALLPOWERPC AllocVecPPC
-
+	
+	mr	r30,r3
+	mr	r4,r3
+	stw 	r4,TaskListSem(r14)
+	LIBCALLPOWERPC InitSemaphorePPC
+	
+	addi	r4,r30,SSPPC_SIZE
+	stw	r4,SemListSem(r14)
+	LIBCALLPOWERPC InitSemaphorePPC
+	
+	addi	r4,r30,SSPPC_SIZE*2
+	stw	r4,PortListSem(r14)
+	LIBCALLPOWERPC InitSemaphorePPC
+	
 	mfmsr	r14
-	ori	r14,r14,0x8000			#Enable External Exceptions and Decrementer
+	ori	r14,r14,PSL_EE			#Enable External Exceptions and Decrementer
 	mtmsr	r14				#Exception
 	isync
 	
-	mr	r3,r31
-	mtspr	srr0,r3
+	mtspr	srr0,r31
 	isync
 	mtspr	srr1,r14
 	isync
@@ -157,7 +174,7 @@ WInit:	lwz	r28,Init(r14)
 						#Clear MSR to diable interrupts and checks
 Reset:	mflr	r15
 	mfmsr	r1
-	andi.	r1,r1,0x40
+	andi.	r1,r1,PSL_IP
 	sync
 	mtmsr	r1				#Clear MSR, keep Interrupt Prefix for now 
 	isync
@@ -527,12 +544,13 @@ tlblp:
 	tlbie r3
 	sync
 	addi r3,r3,0x1000
-	cmp 0,0,r3,r5				#check if all TLBs invalidated yet
+	cmpw r3,r5				#check if all TLBs invalidated yet
 	blt tlblp
 	
 	mfmsr	r4
-	ori	r4,r4,0x00000030		#Translation enable 
-	andi.	r4,r4,0xffbf			#Exception prefix from 0xfff00000 to 0x0
+	ori	r4,r4,(PSL_IR|PSL_DR)		#Translation enable
+	andi.	r4,r4,~PSL_IP@l			#Exception prefix from 0xfff00000 to 0x0
+	
 	mtmsr	r4
 	isync
 
@@ -1171,7 +1189,7 @@ EInt:	stw	r13,-4(r1)			#Create local stack
 	stwu	r1,-4096(r1)
 		
 	stwu	r3,-4(r13)
-#	stwu	r4,-4(r13)
+	stwu	r4,-4(r13)
 	stwu 	r5,-4(r13)		
 	stwu	r6,-4(r13)
 	stwu	r7,-4(r13)
@@ -1210,14 +1228,31 @@ NoHEAR:	li	r3,SonnetBase
 	lwz	r5,PP_OFFSET(r6)
 	lwz	r6,PP_CODE(r6)
 	add	r6,r6,r5
-	
-	stw	r5,90(r3)
-	stw	r6,94(r3)
-	
 	li	r5,0
 	stw	r5,RunningTask(r3)	
 	sync	
 
+	lis	r3,EUMB
+	lis	r5,0x100			#Clear IM0 bit to clear interrupt
+	stw	r5,0x100(r3)
+	eieio
+	clearreg r5
+	lis	r3,EUMBEPICPROC
+	sync
+	stw	r5,0xb0(r3)			#Write 0 to EOI to End Interrupt
+	
+	mtsrr0	r6
+	mtsrr1	r7
+	
+	sync
+	
+	addi	r13,r13,20
+	
+	lwz	r1,0(r1)
+	lwz	r13,-4(r1)			#Destroy local stack
+	
+	rfi	
+	
 NoRunning:	
 	lis	r3,EUMB
 	lis	r5,0x100			#Clear IM0 bit to clear interrupt
@@ -1236,7 +1271,7 @@ NoEOI:	mtsrr0	r6
 	lwz	r7,0(r13)
 	lwzu	r6,4(r13)
 	lwzu	r5,4(r13)
-#	lwzu	r4,4(r13)
+	lwzu	r4,4(r13)
 	lwzu	r3,4(r13)
 	addi	r13,r13,4
 	
@@ -1246,13 +1281,6 @@ NoEOI:	mtsrr0	r6
 	rfi
 	
 TestRoutine:
-	li	r4,50
-	loadreg r5,"Test"
-	LIBCALLPOWERPC AllocXMsgPPC
-	
-	mr	r4,r3
-	
-	LIBCALLPOWERPC FreeXMsgPPC
 
 	b	NoHEAR	
 
@@ -1299,7 +1327,6 @@ PrInt:						#Privilege Exception
 	li	r0,0				#SuperKey
 	rfi
 .HaltErr:
-	nop
 	b .HaltErr
 
 #********************************************************************************************
