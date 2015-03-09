@@ -1,6 +1,6 @@
 This file contains information related to the build process.
 
-Buliding of sonnet.library and associated programs requires a specially 
+Buliding the sonnet.library and associated programs requires a specially 
 prepared development environment. 
 
 # Prerequisites
@@ -11,10 +11,15 @@ prepared development environment.
 * AmigaOS 3.9 NDK - currently this requires some manual fixing, issue #6 on
   GitHub and below for further instructions. 
 * WarpOS 5.1 include files (WarpUP_V51Upd.lha on AmiNet). 
-* patch - if you want to automatically fix the NDK, available on AmiNet.
+* patch - if you want to automatically fix the NDK (available on AmiNet).
 
 Note that latest stable version of vasm and vlink do not have the necessary
-features, you need to build them from the current source.
+features, you need to build them from the current source (the author of
+vasm/vlink does not provide daily binary builds).
+
+Building the project on AmigaOS does not require GeekGadgets installed, but
+finding a working version of GNU Make that does not depend on ixemul.library
+might be difficult.
 
 # Fixing the NDK
 

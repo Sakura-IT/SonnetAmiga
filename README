@@ -12,9 +12,11 @@ anything useful (yet).
 
 # Hardware
 
-The only supported PCI bridge is ELBOX Mediator 4000 Mk-II. It is necessary 
-to have graphics card installed and currently the only supported card is 3Dfx 
-Voodoo 3.
+SonnetAmiga has the following hardware requirements:
+- Amiga 3000/4000/4000T.
+- ELBOX Mediator 3000/4000 Mk-II.
+- Sonnet Crescendo 7200 with local memory installed.
+- 3Dfx Voodoo 3.
 
 # Building
 
@@ -25,7 +27,10 @@ See TOOLCHAIN file for building instructions.
 We're using GitHub Issues for bug tracking:
 https://github.com/Sakura-IT/SonnetAmiga/issues
 
-If you find any new bugs, please report them.
+If you find any new bugs, please report them. Note that repository on GitHub
+is just a public mirror of CVS development repostiory. Therefore, if you are
+crazy enough to send patches, don't use GitHub Pull Requests, just make a
+unified diff and attach it to the issue. Or mail it.
 
 # Disclaimers
 
