@@ -52,7 +52,8 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
 	XREF	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
 	XREF	AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
-	XREF	PutXMsgPPC,WaitFor68K,Run68K,Signal68K,CopyMemPPC
+	XREF	PutXMsgPPC,WaitFor68K,Run68K,Signal68K,CopyMemPPC,SetReplyPortPPC
+	XREF	TrySemaphorePPC
 	
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init,ViolationAddress
 	XREF	MCTask
@@ -1113,14 +1114,14 @@ FreeAllMem			blr
 ;;;;;;AddTimePPC		blr
 ;;;;;;SubTimePPC		blr
 ;;;;;;CmpTimePPC		blr
-SetReplyPortPPC			blr
+;;;;;;SetReplyPortPPC		blr
 SnoopTask			blr
 EndSnoopTask			blr
 GetHALInfo			blr
 SetScheduling			blr
 FindTaskByID			blr
 SetNiceValue			blr
-TrySemaphorePPC			blr
+;;;;;;TrySemaphorePPC		blr
 AllocPrivateMem			blr
 FreePrivateMem			blr
 ;;;;;;ResetPPC			blr

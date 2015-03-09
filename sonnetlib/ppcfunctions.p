@@ -32,7 +32,8 @@
 .global	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
 .global	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
 .global AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
-.global PutXMsgPPC,WaitFor68K,Run68K,Signal68K,CopyMemPPC
+.global PutXMsgPPC,WaitFor68K,Run68K,Signal68K,CopyMemPPC,SetReplyPortPPC
+.global	TrySemaphorePPC
 
 .section "LibBody","acrx"
 
@@ -2347,7 +2348,189 @@ CopyMemPPC:
 
 .ExitCopy:	DSTRYSTACKPPC
 
-		blr	
+		blr
+		
+#********************************************************************************************
+#
+#	oldport = SetReplyPortPPC(Message, MsgPortPPC) // r3=r4,r5
+#
+#********************************************************************************************
+			
+SetReplyPortPPC:
+		BUILDSTACKPPC
+		
+		lwz	r3,14(r4)
+		stw	r5,14(r4)
+		
+		DSTRYSTACKPPC
+		
+		blr
+
+#********************************************************************************************
+#
+#	status = TrySemaphorePPC(SignalSemaphorePPC, Timeout) // r3=r4,r5
+#
+#********************************************************************************************
+
+TrySemaphorePPC:
+		BUILDSTACKPPC
+
+		mfctr	r0
+		stwu	r0,-4(r13)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r12,-4(r13)
+		stwu	r11,-4(r13)
+		stwu	r10,-4(r13)
+		stwu	r9,-4(r13)
+		stwu	r8,-4(r13)
+		stwu	r7,-4(r13)
+		stwu	r6,-4(r13)
+		stwu	r5,-4(r13)
+		stwu	r4,-4(r13)
+
+		li	r31,SonnetBase
 	
+		mr	r30,r4
+		mr	r28,r5
+		
+.WaitAt1:	LIBCALLPOWERPC AtomicTest
+		mr.	r3,r3
+		beq+	.WaitAt1
+		
+		lwz	r4,SSPPC_RESERVE(r30)
+.WaitAt2:	LIBCALLPOWERPC AtomicTest
+		mr.	r3,r3
+		beq+	.WaitAt2
+		
+		lha	r5,SS_QUEUECOUNT(r30)
+		addi	r5,r5,1
+		sth	r5,SS_QUEUECOUNT(r30)
+		extsh.	r0,r5
+		bne-	.NoTimer
+		lwz	r3,RunningTask(r31)
+		stw	r3,SS_OWNER(r30)
+		lwz	r4,SSPPC_RESERVE(r30)
+		
+		LIBCALLPOWERPC AtomicDone
+		
+		LIBCALLPOWERPC AtomicDone		#Check all calls for r4 switch...
+
+		b	.Jump1
+		
+.NoTimer:	lwz	r3,RunningTask(r31)
+		lwz	r4,SS_OWNER(r30)
+		cmplw	r3,r4
+		bne-	.Diff1
+		lwz	r4,SSPPC_RESERVE(r30)
+		
+		LIBCALLPOWERPC AtomicDone
+		
+		LIBCALLPOWERPC AtomicDone		#See above...
+
+		b	.Jump1
+		
+.Diff1:		stwu	r29,-4(r13)
+		mr	r29,r13
+		subi	r13,r13,12
+		subi	r5,r29,12
+		stw	r3,8(r5)
+		lwz	r4,26(r3)
+		ori	r4,r4,16
+		xori	r4,r4,16
+		stw	r4,26(r3)
+		addi	r4,r30,16
+		addi	r4,r4,4
+		lwz	r3,4(r4)
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
+		lwz	r4,SSPPC_RESERVE(r30)
+		
+		LIBCALLPOWERPC AtomicDone
+
+		LIBCALLPOWERPC AtomicDone		#See above...
+		
+		lis	r4,0
+		ori	r4,r4,16
+		mr	r5,r28
+		
+		LIBCALLPOWERPC WaitTime
+		
+		mr	r28,r3
+.WeirdWait:	lhz	r3,SSPPC_LOCK(r30)
+		mr.	r3,r3
+		bne+	.WeirdWait
+		
+.WaitAt3:	LIBCALLPOWERPC AtomicTest
+		mr.	r3,r3
+		beq+	.WaitAt3
+		lhz	r3,SSPPC_LOCK(r30)
+		mr.	r3,r3
+		beq-	.Jump3
+		
+		LIBCALLPOWERPC AtomicDone
+
+		b	.WeirdWait
+		
+.Jump3:		lwz	r3,RunningTask(r31)
+		lwz	r4,TC_SIGRECVD(r3)
+		or	r4,r28,r4
+		mr	r27,r4
+		ori	r4,r4,16
+		xori	r4,r4,16
+		stw	r4,TC_SIGRECVD(r3)
+		subi	r4,r29,12
+		rlwinm.	r0,r28,28,31,31
+		bne-	.Jump2
+		lwz	r3,0(r4)
+		lwz	r4,4(r4)
+		stw	r4,4(r3)
+		stw	r3,0(r4)
+		
+.Jump2:		LIBCALLPOWERPC AtomicDone
+
+		mr	r13,r29
+		lwz	r29,0(r13)
+		addi	r13,r13,4
+		rlwinm.	r0,r28,28,31,31
+		beq-	.Exit1
+		lha	r5,SS_NESTCOUNT(r30)
+		subi	r5,r5,1
+		sth	r5,SS_NESTCOUNT(r30)
+.Jump1:		li	r3,-1
+		b	.Exit2
+		
+.Exit1:		li	r3,0
+.Exit2:		lha	r5,SS_NESTCOUNT(r30)
+		addi	r5,r5,1
+		sth	r5,SS_NESTCOUNT(r30)
+		lwz	r4,0(r13)
+		lwz	r5,4(r13)
+		lwz	r6,8(r13)
+		lwz	r7,12(r13)
+		lwz	r8,16(r13)
+		lwz	r9,20(r13)
+		lwz	r10,24(r13)
+		lwz	r11,28(r13)
+		lwz	r12,32(r13)
+		lwz	r27,36(r13)
+		lwz	r28,40(r13)
+		lwz	r29,44(r13)
+		lwz	r30,48(r13)
+		lwz	r31,52(r13)
+		addi	r13,r13,56
+		lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtctr	r0
+
+		DSTRYSTACKPPC
+
+		blr	
+
 #********************************************************************************************
 EndFunctions:
