@@ -5,9 +5,11 @@
 .global MCTask
 
 .set	PPCLen,(PPCEnd-PPCCode)
-.set	PP_CODE,0
-.set	PP_OFFSET,4
-.set	PP_REGS,20
+.set	MN_IDENTIFIER,0
+.set	MN_MIRROR,4
+.set	PP_CODE,8
+.set	PP_OFFSET,12
+.set	PP_REGS,28
 .set	SSPPC_SIZE,52
 
 #********************************************************************************************
@@ -1224,6 +1226,8 @@ NoHEAR:	li	r3,SonnetBase
 	addi	r6,r6,ExitCode-Start
 	mtlr	r6
 	lwz	r6,RunningTask(r3)
+	lwz	r4,MN_MIRROR(r3)
+	stw	r4,TempMirror(r3)
 	lwz	r4,PP_REGS+4(r6)
 	lwz	r5,PP_OFFSET(r6)
 	lwz	r6,PP_CODE(r6)

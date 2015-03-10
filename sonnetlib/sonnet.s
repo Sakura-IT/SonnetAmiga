@@ -503,12 +503,13 @@ MsgT68k	move.l d7,a1
 ;	jsr _LVOReplyMsg(a6)
 	bra.s NextMsg
 
-Sig68k	nop						;move message to waiting 68k task
+Sig68k	move.l MN_MIRROR(a1),a0
+	jsr _LVOPutMsg(a6)				;move message to waiting 68k task
 	bra.s NextMsg
 
 
 MsgTPPC	move.l SonnetBase(pc),a0
-	lea MN_PPSTRUCT(a1),a2
+	lea MN_IDENTIFIER(a1),a2
 	move.l a2,RunningTask(a0)
 	move.l _PowerPCBase(pc),a6	
 	jsr _LVOCauseInterruptHW(a6)			;Force reschedule. Is this faster than
@@ -703,9 +704,9 @@ ExCPU	movem.l (a7)+,d1-a6
 ;
 ;********************************************************************************************
 	
-MN_MIRROR	EQU MN_LENGTH+2
-MN_IDENTIFIER	EQU MN_MIRROR+4
-MN_PPSTRUCT	EQU MN_IDENTIFIER+4
+MN_IDENTIFIER	EQU MN_LENGTH+2
+MN_MIRROR	EQU MN_IDENTIFIER+4
+MN_PPSTRUCT	EQU MN_MIRROR+4
 
 
 PStruct	EQU -12

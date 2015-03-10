@@ -23,6 +23,12 @@
 .set MP_PPC_INTMSG,34
 .set MP_PPC_SEM,48
 .set pr_MsgPort,92
+.set MN_SIZE,20
+.set MN_IDENTIFIER,20
+.set MN_MIRROR,24
+.set MN_PPSTRUCT,28
+.set PP_SIZE,144
+
 
 .set FunctionsLen,(EndFunctions-SetExcMMU)
 
@@ -2257,14 +2263,46 @@ WaitFor68K:
 Run68K:		
 		BUILDSTACKPPC
 		
-		mr	r5,r4
-		li	r6,SonnetBase
-		lwz	r6,MCTask(r6)
-		lwz	r4,pr_MsgPort(r6)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		mr	r31,r4
+		
+		li	r4,MN_SIZE+PP_SIZE+76
+		li	r5,0
+		LIBCALLPOWERPC AllocXMsgPPC		
+		mr.	r30,r3
+		beq-	.MsgError
+			
+		subi	r4,r30,4			#r29 = PPStruct -4
+		addi	r29,r30,MN_PPSTRUCT-4		#r30 = msg
+		
+		li	r6,36
+		mtctr	r6
+.CopyPP:	lwzu	r7,4(r4)
+		stwu	r7,4(r29)
+		bdnz+	.CopyPP
+		
+		loadreg	r5,"T68K"
+		stw	r5,MN_IDENTIFIER(r30)
+		li	r5,0
+		lwz	r5,TempMirror(r5)
+		stw	r5,MN_MIRROR(r30)
+		mr	r5,r30
+		
+		lwz	r4,MCTask(r4)
+		lwz	r4,pr_MsgPort(r4)
 		
 		LIBCALLPOWERPC PutXMsgPPC
 		
+		mr	r4,r30
+		
 		LIBCALLPOWERPC WaitFor68K
+		
+.MsgError:	lwz	r29,0(r13)
+		lwzu	r30,4(r13)
+		lwzu	r31,4(r13)
+		addi	r13,r13,4
 
 		DSTRYSTACKPPC
 		
