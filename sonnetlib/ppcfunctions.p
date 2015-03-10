@@ -5,6 +5,8 @@
 .set MH_FREE,28
 .set MC_BYTES,4
 .set MC_NEXT,0
+.set LH_HEAD,0
+.set LH_TAILPRED,8
 .set TC_SIGALLOC,18
 .set TC_SIGWAIT,22
 .set TC_SIGRECVD,26
@@ -15,8 +17,11 @@
 .set SS_QUEUECOUNT,44
 .set SSPPC_RESERVE,46
 .set SSPPC_LOCK,50
+.set MP_SIGBIT,15
 .set MP_SIGTASK,16
 .set MP_MSGLIST,20
+.set MP_PPC_INTMSG,34
+.set MP_PPC_SEM,48
 .set pr_MsgPort,92
 
 .set FunctionsLen,(EndFunctions-SetExcMMU)
@@ -1150,7 +1155,8 @@ AllocSignalPPC:
 		stw	r3,TC_SIGALLOC(r5)		#Task structure not in place yet
 		stwu	r4,-4(r13)
 		
-.WaitingLine:	LIBCALLPOWERPC AtomicTest		#Reentrant
+.WaitingLine:	li	r4,Atomic
+		LIBCALLPOWERPC AtomicTest		#Reentrant
 
 		mr.	r3,r3
 		beq+	.WaitingLine
@@ -1162,6 +1168,7 @@ AllocSignalPPC:
 		andc	r7,r7,r6
 		stw	r7,TC_SIGWAIT(r5)
 
+		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 		
 		lwz	r4,0(r13)
@@ -1176,7 +1183,7 @@ AllocSignalPPC:
 		
 #********************************************************************************************
 #
-#	Support: result =  AtomicTest(void) // r3 - r4 is trashed
+#	Support: result =  AtomicTest(TestLocation) // r3=r4
 #
 #********************************************************************************************
 
@@ -1200,15 +1207,14 @@ AtomicTest:
 
 #********************************************************************************************
 #
-#	Support: void AtomicDone(void) // r4 is trashed
+#	Support: void AtomicDone(TestLocation) // r4
 #
 #********************************************************************************************
 
 AtomicDone:		
 		sync
-		li	r4,SonnetBase
 		li	r0,0
-		stw	r0,Atomic(r4)
+		stw	r0,0(r4)
 		blr
 		
 #********************************************************************************************
@@ -1228,7 +1234,8 @@ SetSignalPPC:
 
 		mr	r30,r4
 		
-.WaitingLine2:	LIBCALLPOWERPC AtomicTest
+.WaitingLine2:	li	r4,Atomic
+		LIBCALLPOWERPC AtomicTest
 		
 		mr.	r3,r3
 		beq+	.WaitingLine2
@@ -1239,6 +1246,7 @@ SetSignalPPC:
 		or	r30,r30,r7
 		stw	r30,TC_SIGRECVD(r6)
 		
+		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
 		mr	r4,r31				#Reschedule?
@@ -1387,7 +1395,8 @@ ObtainSemaphorePPC:
 		li	r31,SonnetBase
 		mr	r30,r4
 
-.WaitRes:	LIBCALLPOWERPC AtomicTest
+.WaitRes:	li	r4,Atomic
+		LIBCALLPOWERPC AtomicTest
 
 		mr.	r3,r3
 		beq+	.WaitRes
@@ -1400,6 +1409,7 @@ ObtainSemaphorePPC:
 		lwz	r3,RunningTask(r31)
 		stw	r3,SS_OWNER(r30)
 		
+		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
 		b	.Obtained
@@ -1409,7 +1419,7 @@ ObtainSemaphorePPC:
 		cmplw	r3,r4
 		bne-	.SemNotFree
 
-
+		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
 		b	.Obtained
@@ -1431,6 +1441,7 @@ ObtainSemaphorePPC:
 		stw	r3,4(r5)
 		stw	r5,0(r3)
 
+		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
 		lis	r4,0
@@ -1494,7 +1505,8 @@ AttemptSemaphorePPC:
 		li	r31,SonnetBase
 		mr	r30,r4
 
-.WaitRes2:	LIBCALLPOWERPC AtomicTest
+.WaitRes2:	li	r4,Atomic
+		LIBCALLPOWERPC AtomicTest
 
 		mr.	r3,r3
 		beq+	.WaitRes2
@@ -1517,7 +1529,8 @@ AttemptSemaphorePPC:
 		sth	r5,SS_NESTCOUNT(r30)
 		li	r6,-1
 
-.Occupied:	LIBCALLPOWERPC AtomicDone
+.Occupied:	li	r4,Atomic
+		LIBCALLPOWERPC AtomicDone
 
 		mr	r3,r6
 		lwz	r4,0(r13)
@@ -1567,7 +1580,8 @@ ReleaseSemaphorePPC:
 
 		mr	r31,r4
 
-.WaitRes3:	LIBCALLPOWERPC AtomicTest
+.WaitRes3:	li	r4,Atomic
+		LIBCALLPOWERPC AtomicTest
 
 		mr.	r3,r3
 		beq+	.WaitRes3
@@ -1584,6 +1598,7 @@ ReleaseSemaphorePPC:
 		subi	r5,r5,1
 		sth	r5,SS_QUEUECOUNT(r31)
 
+		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
 		b	.Released
@@ -1597,6 +1612,7 @@ ReleaseSemaphorePPC:
 		mr.	r5,r5
 		bge-	.NotLast
 
+		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
 		b	.Released
@@ -1604,6 +1620,7 @@ ReleaseSemaphorePPC:
 .NotLast:	li	r0,1
 		sth	r0,SSPPC_LOCK(r31)
 		
+		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
 		addi	r4,r31,SS_WAITQUEUE
@@ -1732,7 +1749,8 @@ ReleaseSemaphorePPC:
 
 		blr	
 
-.Error68k:	LIBCALLPOWERPC AtomicDone
+.Error68k:	li	r4,Atomic
+		LIBCALLPOWERPC AtomicDone
 .DeadEnd:	nop					#Not Yet Implemented
 		b .DeadEnd
 
@@ -1990,16 +2008,17 @@ WaitPortPPC:
 		mr	r28,r3				#UNKNOWN AS OF YET (switch?)
 		mr	r31,r4
 
-		addi	r4,r31,48
+		addi	r4,r31,MP_PPC_SEM
 
 		LIBCALLPOWERPC ObtainSemaphorePPC
 
-		addi	r5,r31,34
-		lwz	r4,42(r31)
+		addi	r5,r31,MP_PPC_INTMSG
+		lwz	r4,MP_PPC_INTMSG+LH_TAILPRED(r31)
 		cmplw	r4,r5
 		beq-	.Link33
 
-.WaitInLine:	LIBCALLPOWERPC AtomicTest
+.WaitInLine:	li	r4,Atomic
+		LIBCALLPOWERPC AtomicTest
 
 		mr.	r3,r3
 		beq+	.WaitInLine
@@ -2008,6 +2027,7 @@ WaitPortPPC:
 		mr.	r3,r3
 		beq-	.Link34
 
+		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
 .Link35:	lbz	r3,628(r28)
@@ -2019,6 +2039,7 @@ WaitPortPPC:
 		li	r0,-1
 		stb	r0,628(r28)
 
+		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
 		li	r4,0				#UNKNOWN AS OF YET
@@ -2031,16 +2052,16 @@ WaitPortPPC:
 		mr.	r3,r3
 		bne+	.Link36
 
-.Link33:	lwz	r3,20(r31)
-		lwz	r4,0(r3)
+.Link33:	lwz	r3,MP_MSGLIST(r31)
+		lwz	r4,LH_HEAD(r3)
 		mr.	r4,r4
 		bne-	.Link37
 
-		lbz	r5,15(r31)
-		addi	r30,r31,20
+		lbz	r5,MP_SIGBIT(r31)
+		addi	r30,r31,MP_MSGLIST
 		li	r4,1
 		slw	r29,r4,r5
-.Link42:	addi	r4,r31,48
+.Link42:	addi	r4,r31,MP_PPC_SEM
 
 		LIBCALLPOWERPC ReleaseSemaphorePPC
 
@@ -2049,16 +2070,17 @@ WaitPortPPC:
 		LIBCALLPOWERPC WaitPPC
 
 		mr	r27,r3
-		addi	r4,r31,48
+		addi	r4,r31,MP_PPC_SEM
 
 		LIBCALLPOWERPC ObtainSemaphorePPC
 
-		addi	r5,r31,34
-		lwz	r4,42(r31)
+		addi	r5,r31,MP_PPC_INTMSG
+		lwz	r4,MP_PPC_INTMSG+LH_TAILPRED(r31)
 		cmplw	r4,r5
 		beq-	.Link38
 
-.WaitInLine2:	LIBCALLPOWERPC AtomicTest
+.WaitInLine2:	li	r4,Atomic
+		LIBCALLPOWERPC AtomicTest
 
 		mr.	r3,r3
 		beq+	.WaitInLine2
@@ -2067,6 +2089,7 @@ WaitPortPPC:
 		mr.	r3,r3
 		beq-	.Link39
 
+		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
 .Link40:	lbz	r3,628(r28)
@@ -2078,6 +2101,7 @@ WaitPortPPC:
 		li	r0,-1
 		stb	r0,628(r28)
 
+		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
 		li	r4,0				#UNKNOWN AS OF YET
@@ -2091,13 +2115,13 @@ WaitPortPPC:
 		bne+	.Link41
 		
 .Link38:	mr	r3,r27
-		lwz	r5,20(r31)
-		lwz	r4,0(r5)
+		lwz	r5,MP_MSGLIST(r31)
+		lwz	r4,LH_HEAD(r5)
 		mr.	r4,r4
 		beq+	.Link42
 		mr	r3,r5
 .Link37:	mr	r5,r3
-		addi	r4,r31,48
+		addi	r4,r31,MP_PPC_SEM
 
 		LIBCALLPOWERPC ReleaseSemaphorePPC
 
@@ -2397,7 +2421,8 @@ TrySemaphorePPC:
 		mr	r30,r4
 		mr	r28,r5
 		
-.WaitAt1:	LIBCALLPOWERPC AtomicTest
+.WaitAt1:	li	r4,Atomic
+		LIBCALLPOWERPC AtomicTest
 		mr.	r3,r3
 		beq+	.WaitAt1
 		
@@ -2413,11 +2438,12 @@ TrySemaphorePPC:
 		bne-	.NoTimer
 		lwz	r3,RunningTask(r31)
 		stw	r3,SS_OWNER(r30)
-		lwz	r4,SSPPC_RESERVE(r30)
 		
+		lwz	r4,SSPPC_RESERVE(r30)		
 		LIBCALLPOWERPC AtomicDone
 		
-		LIBCALLPOWERPC AtomicDone		#Check all calls for r4 switch...
+		li	r4,Atomic
+		LIBCALLPOWERPC AtomicDone
 
 		b	.Jump1
 		
@@ -2425,11 +2451,12 @@ TrySemaphorePPC:
 		lwz	r4,SS_OWNER(r30)
 		cmplw	r3,r4
 		bne-	.Diff1
-		lwz	r4,SSPPC_RESERVE(r30)
 		
+		lwz	r4,SSPPC_RESERVE(r30)		
 		LIBCALLPOWERPC AtomicDone
 		
-		LIBCALLPOWERPC AtomicDone		#See above...
+		li	r4,Atomic
+		LIBCALLPOWERPC AtomicDone
 
 		b	.Jump1
 		
@@ -2449,11 +2476,12 @@ TrySemaphorePPC:
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
-		lwz	r4,SSPPC_RESERVE(r30)
 		
+		lwz	r4,SSPPC_RESERVE(r30)		
 		LIBCALLPOWERPC AtomicDone
 
-		LIBCALLPOWERPC AtomicDone		#See above...
+		li	r4,Atomic
+		LIBCALLPOWERPC AtomicDone
 		
 		lis	r4,0
 		ori	r4,r4,16
@@ -2466,13 +2494,15 @@ TrySemaphorePPC:
 		mr.	r3,r3
 		bne+	.WeirdWait
 		
-.WaitAt3:	LIBCALLPOWERPC AtomicTest
+.WaitAt3:	li	r4,Atomic
+		LIBCALLPOWERPC AtomicTest
 		mr.	r3,r3
 		beq+	.WaitAt3
 		lhz	r3,SSPPC_LOCK(r30)
 		mr.	r3,r3
 		beq-	.Jump3
 		
+		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
 		b	.WeirdWait
@@ -2492,7 +2522,8 @@ TrySemaphorePPC:
 		stw	r4,4(r3)
 		stw	r3,0(r4)
 		
-.Jump2:		LIBCALLPOWERPC AtomicDone
+.Jump2:		li	r4,Atomic
+		LIBCALLPOWERPC AtomicDone
 
 		mr	r13,r29
 		lwz	r29,0(r13)
