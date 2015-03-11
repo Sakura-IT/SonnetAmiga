@@ -1195,6 +1195,8 @@ EInt:	stw	r13,-4(r1)			#Create local stack
 	stwu 	r5,-4(r13)		
 	stwu	r6,-4(r13)
 	stwu	r7,-4(r13)
+	stwu	r8,-4(r13)
+	stwu	r9,-4(r13)
 		
 	mfsrr0	r6
 	mfsrr1	r7
@@ -1219,8 +1221,10 @@ EInt:	stw	r13,-4(r1)			#Create local stack
 NoHEAR:	li	r3,SonnetBase
 	
 	lwz	r9,RunningTask(r3)
-	cmpwi	r9,0				#HACK!
-	beq	NoRunning
+	lwz	r9,MN_IDENTIFIER(r9)
+	loadreg	r8,"TPPC"
+	cmpw	r9,r8				#HACK!
+	bne	NoRunning
 		
 	loadreg	r6,0x8000
 	addi	r6,r6,ExitCode-Start
@@ -1286,7 +1290,9 @@ NoEOI:	mtsrr0	r6
 	
 	sync
 	
-	lwz	r7,0(r13)
+	lwz	r9,0(r13)
+	lwzu	r8,4(r13)
+	lwzu	r7,4(r13)
 	lwzu	r6,4(r13)
 	lwzu	r5,4(r13)
 	lwzu	r4,4(r13)

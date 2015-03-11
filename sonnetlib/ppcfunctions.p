@@ -384,10 +384,9 @@ AllocVecPPC:
 		stwu	r7,-4(r13)
 		stwu	r6,-4(r13)
 
-		andi.	r3,r0,0
-		addi	r29,r0,4
-		addco.	r4,r4,r29
-.Align:		andi.	r29,r4,3
+		li	r3,0
+		addi	r4,r4,32
+.Align:		andi.	r29,r4,31
 		beq+	.Aligned
 		addi	r4,r4,1
 		b	.Align
@@ -420,7 +419,7 @@ AllocVecPPC:
 .FoundMem:	mr	r22,r21
 		addco.	r22,r22,r4
 		mr	r3,r21
-		addi	r29,r0,4
+		li	r29,4
 		addco.	r3,r3,r29
 		lwz	r5,MC_BYTES(r21)
 		subfco	r31,r5,r4
@@ -431,21 +430,21 @@ AllocVecPPC:
 .Yep:		lwz	r22,MC_NEXT(r21)
 		b	.JmpPerfect
 
-.MaybePerfect:	addi	r29,r0,4
+.MaybePerfect:	li	r29,4
 		addco.	r4,r4,r29
 		subfco	r31,r5,r4
 		cmpw	r5,r4
 		bne	.Link9
 		b	.Yep
 .Link9:
-		addi	r29,r0,4
+		li	r29,4
 		addco.	r4,r4,r29
 		subfco	r31,r5,r4
 		cmpw	r5,r4
 		bne	.Link10
 		b	.Yep
 .Link10:
-		addi	r29,r0,8
+		li	r29,8
 		subfco	r28,r4,r29
 		subf.	r4,r29,r4
 		lwz	r29,MC_NEXT(r21)
@@ -462,10 +461,10 @@ AllocVecPPC:
 		stw	r30,MH_FREE(r20)
 		stw	r22,MC_NEXT(r23)
 		stw	r4,MC_NEXT(r21)
-		addi	r29,r0,5
+		li	r29,5
 		subfco	r28,r4,r29
 		subf.	r4,r29,r4
-		addi	r29,r0,4
+		li	r29,4
 		addco.	r21,r21,r29
 .ClrMem:	andi.	r30,r30,0
 		stb	r30,0(r21)
