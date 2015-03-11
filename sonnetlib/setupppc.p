@@ -1218,34 +1218,48 @@ EInt:	stw	r13,-4(r1)			#Create local stack
 	
 NoHEAR:	li	r3,SonnetBase
 	
-	lwz	r5,RunningTask(r3)
-	cmpwi	r5,0				#HACK!
+	lwz	r9,RunningTask(r3)
+	cmpwi	r9,0				#HACK!
 	beq	NoRunning
 		
 	loadreg	r6,0x8000
 	addi	r6,r6,ExitCode-Start
 	mtlr	r6
-	lwz	r6,RunningTask(r3)
+
+	lwz	r8,RunningTask(r3)
 	lwz	r4,MN_MIRROR(r3)
 	stw	r4,TempMirror(r3)
-	lwz	r4,PP_REGS+4(r6)
-	lwz	r5,PP_OFFSET(r6)
-	lwz	r6,PP_CODE(r6)
-	add	r6,r6,r5
-	li	r5,0
-	stw	r5,RunningTask(r3)	
+	lwz	r2,PP_REGS+12*4(r8)
+	lwz	r4,PP_REGS+1*4(r8)
+	lwz	r5,PP_REGS+8*4(r8)
+	lwz	r6,PP_REGS+9*4(r8)
+	lwz	r22,PP_REGS+2*4(r8)
+	lwz	r23,PP_REGS+3*4(r8)
+	lwz	r24,PP_REGS+4*4(r8)
+	lwz	r25,PP_REGS+5*4(r8)
+	lwz	r26,PP_REGS+6*4(r8)
+	lwz	r27,PP_REGS+7*4(r8)
+	lwz	r28,PP_REGS+10*4(r8)
+	lwz	r29,PP_REGS+11*4(r8)
+	lwz	r30,PP_REGS+13*4(r8)
+	lwz	r31,PP_REGS+14*4(r8)
+	lwz	r9,PP_OFFSET(r8)
+	lwz	r8,PP_CODE(r8)
+	add	r8,r8,r9
+	li	r9,0
+	stw	r9,RunningTask(r3)	
 	sync	
 
 	lis	r3,EUMB
-	lis	r5,0x100			#Clear IM0 bit to clear interrupt
-	stw	r5,0x100(r3)
+	lis	r9,0x100			#Clear IM0 bit to clear interrupt
+	stw	r9,0x100(r3)
 	eieio
-	clearreg r5
+	clearreg r9
 	lis	r3,EUMBEPICPROC
 	sync
-	stw	r5,0xb0(r3)			#Write 0 to EOI to End Interrupt
+	stw	r9,0xb0(r3)			#Write 0 to EOI to End Interrupt
 	
-	mtsrr0	r6
+	mtsrr0	r8
 	mtsrr1	r7
 	
 	sync

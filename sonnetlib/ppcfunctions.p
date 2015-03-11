@@ -2274,7 +2274,7 @@ Run68K:
 		mr.	r30,r3
 		beq-	.MsgError
 			
-		subi	r4,r30,4			#r29 = PPStruct -4
+		subi	r4,r31,4			#r29 = PPStruct -4
 		addi	r29,r30,MN_PPSTRUCT-4		#r30 = msg
 		
 		li	r6,36
