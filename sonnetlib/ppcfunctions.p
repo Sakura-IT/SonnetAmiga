@@ -2269,14 +2269,16 @@ Run68K:
 		
 		li	r4,MN_SIZE+PP_SIZE+76
 		li	r5,0
-		LIBCALLPOWERPC AllocXMsgPPC		
+		
+		LIBCALLPOWERPC AllocXMsgPPC
+		
 		mr.	r30,r3
 		beq-	.MsgError
 			
 		subi	r4,r31,4			#r29 = PPStruct -4
 		addi	r29,r30,MN_PPSTRUCT-4		#r30 = msg
 		
-		li	r6,36
+		li	r6,PP_SIZE/4
 		mtctr	r6
 .CopyPP:	lwzu	r7,4(r4)
 		stwu	r7,4(r29)
@@ -2284,14 +2286,16 @@ Run68K:
 		
 		loadreg	r5,"T68K"
 		stw	r5,MN_IDENTIFIER(r30)
-		li	r5,0
+		li	r5,SonnetBase
 		lwz	r5,TempMirror(r5)
 		stw	r5,MN_MIRROR(r30)
-		mr	r5,r30
 		
+		li	r4,SonnetBase
 		lwz	r4,MCTask(r4)
-		lwz	r4,pr_MsgPort(r4)
+		la	r4,pr_MsgPort(r4)
 		
+		mr	r5,r30
+				
 		LIBCALLPOWERPC PutXMsgPPC
 		
 		mr	r4,r30

@@ -4,6 +4,7 @@ IMR0		EQU $50
 OMISR		EQU $30
 OMIMR		EQU $34
 OMR0		EQU $58
+OMR1		EQU $5C
 LMBAR		EQU $10
 PCSRBAR		EQU $14
 OMBAR		EQU $300
@@ -474,7 +475,6 @@ NextMsg	move.l ThisTask(a6),a0
 	lea pr_MsgPort(a0),a0
 	move.l a0,d6
 	jsr _LVOWaitPort(a6)
-;	ILLEGAL
 GetLoop	move.l d6,a0
 	jsr _LVOGetMsg(a6)
 	move.l d0,d7
@@ -545,18 +545,15 @@ SonInt	movem.l d1-a6,-(a7)
 	move.l EUMBAddr(pc),a2
 	move.l #$01000000,d2
 	move.l OMISR(a2),d3
+	move.l d3,d4
 	and.l d2,d3
 	beq.s NoInt	
 	move.l 4.w,a6
-	move.l OMR0(a2),d6
-	lea PrcName(pc),a1
-	jsr _LVOFindTask(a6)
-	tst.l d0
-	beq.s NoInt
-	move.l d0,a1
-	move.l #SIGF_DOS,d0			;Is this the standard signal
+	move.l OMR0(a2),a1
+	move.l OMR1(a2),d0
+
 	jsr _LVOSignal(a6)			;for WaitPort?
-	move.l d2,OMISR(a2)	
+	move.l d4,OMISR(a2)	
 NoInt	movem.l (a7)+,d1-a6
 	moveq.l #0,d0
 	rts
@@ -704,7 +701,7 @@ ExCPU	movem.l (a7)+,d1-a6
 ;
 ;********************************************************************************************
 	
-MN_IDENTIFIER	EQU MN_LENGTH+2
+MN_IDENTIFIER	EQU MN_SIZE
 MN_MIRROR	EQU MN_IDENTIFIER+4
 MN_PPSTRUCT	EQU MN_MIRROR+4
 

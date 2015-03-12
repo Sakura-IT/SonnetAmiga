@@ -1231,7 +1231,7 @@ NoHEAR:	li	r3,SonnetBase
 	mtlr	r6
 
 	lwz	r8,RunningTask(r3)
-	lwz	r4,MN_MIRROR(r3)
+	lwz	r4,MN_MIRROR(r8)
 	stw	r4,TempMirror(r3)
 	lwz	r2,PP_REGS+12*4(r8)
 	lwz	r4,PP_REGS+1*4(r8)
