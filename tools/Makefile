@@ -23,7 +23,7 @@ $(TEMPLATE_EXE) : $(OBJ_TEMPLATE)
 	$(ASM68K) $(ASM68KPARAM) -o $@ $<
 
 %.rs : %
-	$(IRA) $< $@
+	$(IRA) $(IRAPARAM) $< $@
 
 clean :
 	$(RM) $(OBJ_GETINFO) $(GETINFO_EXE) $(GETINFO_EXE_RS) $(OBJ_TEMPLATE) $(TEMPLATE_EXE) $(TEMPLATE_EXE_RS)

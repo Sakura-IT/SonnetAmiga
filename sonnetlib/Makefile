@@ -19,7 +19,7 @@ $(EXECUTABLE) : $(OBJECTS68K) $(OBJECTSPPC)
 	$(ASM68K) $(ASM68KPARAM) -o $@ $<
 
 %.rs : %
-	$(IRA) $< $@
+	$(IRA) $(IRAPARAM) $< $@
 
 clean :
 	$(RM) $(OBJECTS68K) $(OBJECTSPPC) $(EXECUTABLE) $(EXECUTABLE_RS)

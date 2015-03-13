@@ -6,6 +6,7 @@ LD=vlink
 LHA=lha
 IRA=ira
 
+IRAPARAM=-M68020
 ASM68KPARAM=-m68020up -Fhunk -no-opt
 ASMPPCPARAM=-many -mppc32 -Fhunk    
 
