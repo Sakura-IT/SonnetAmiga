@@ -4,6 +4,7 @@ ASM68K=vasmm68k_mot
 ASMPPC=vasmppc_std
 LD=vlink
 LHA=lha
+IRA=ira
 
 ASM68KPARAM=-m68020up -Fhunk -no-opt
 ASMPPCPARAM=-many -mppc32 -Fhunk    
@@ -24,6 +25,10 @@ $(SONNETLIB_N) :
 
 $(TOOLS_N) :
 	$(MAKE) -C $(TOOLS_N)
+
+disasm68k :
+	$(MAKE) -C $(SONNETLIB_N) disasm68k
+	$(MAKE) -C $(TOOLS_N) disasm68k
 	
 clean :
 	$(MAKE) -C $(SONNETLIB_N) clean
