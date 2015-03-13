@@ -4,9 +4,8 @@
 
 #************************************************************************************************
 
-#.section "ppccode","acrx",0x1005	#MUST be in Sonnet memory!
-.section "ppccode","acrx"		#code ($3E9) plus memory attributes not working atm.
-		
+.section "ppccode","acrx",0x1005	#MUST be in Sonnet memory!
+
 #************************************************************************************************
 
 @_PPC_Code:
