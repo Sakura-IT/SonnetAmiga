@@ -5,8 +5,8 @@ prepared development environment.
 
 # Prerequisites
 
-* vasm - current source as of 2015-03-03 or newer.
-* vlink - current source as of 2015-03-03 or newer.
+* vasm - current source as of 2015-03-13 or newer.
+* vlink - current source as of 2015-03-13 or newer.
 * GNU Make - any fairly new version will suffice.
 * AmigaOS 3.9 NDK - currently this requires some manual fixing, issue #6 on
   GitHub and below for further instructions. 
