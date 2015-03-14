@@ -56,8 +56,8 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	PutXMsgPPC,WaitFor68K,Run68K,Signal68K,CopyMemPPC,SetReplyPortPPC
 	XREF	TrySemaphorePPC
 	
-	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init,ViolationAddress
-	XREF	MCTask
+	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,MCTask,Init,ViolationAddress
+	XREF	ReadyTasks
 	XDEF	_PowerPCBase
 
 ;********************************************************************************************
@@ -509,19 +509,11 @@ Sig68k	move.l MN_MIRROR(a1),a0
 
 
 MsgTPPC	move.l SonnetBase(pc),a0
-	lea MN_IDENTIFIER(a1),a2
-	move.l a2,RunningTask(a0)
+	move.l a1,ReadyTasks+4(a0)
 	move.l _PowerPCBase(pc),a6	
 	jsr _LVOCauseInterruptHW(a6)			;Force reschedule. Is this faster than
 	
 	move.l 4.w,a6					;just wait for normal reschedule?
-	move.l SonnetBase(pc),a0
-	move.l d7,a1
-	moveq.l #0,d1
-PPCWait	tst.l ReadyTasks+4(a0)				:QUICK HACK
-	beq.s PPCWait
-	move.l d1,ReadyTasks+4(a0)
-	jsr _LVOReplyMsg(a6)				
 	bra NextMsg
 
 MsgF68k	move.l d7,a1
@@ -795,7 +787,7 @@ GtLoop	move.l Port(a5),a0
 	beq.s Stacker
 	move.l d0,a0
 	move.l MN_IDENTIFIER(a0),d0
-	cmp.l #"TPPC",d0
+	cmp.l #"FPPC",d0
 	beq.s DizDone
 	cmp.l #"T68k",d0
 	beq.s Runk86

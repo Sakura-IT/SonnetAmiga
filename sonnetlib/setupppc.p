@@ -5,12 +5,13 @@
 .global MCTask
 
 .set	PPCLen,(PPCEnd-PPCCode)
-.set	MN_IDENTIFIER,0
-.set	MN_MIRROR,4
-.set	PP_CODE,8
-.set	PP_OFFSET,12
-.set	PP_REGS,28
+.set	MN_IDENTIFIER,20
+.set	MN_MIRROR,24
+.set	PP_CODE,28
+.set	PP_OFFSET,32
+.set	PP_REGS,48
 .set	SSPPC_SIZE,52
+.set	pr_MsgPort,92
 
 #********************************************************************************************
 	
@@ -95,10 +96,19 @@ Start:						#Dummy entry at absolute 0x8000
 	b	Start
 	
 ExitCode:
-	li	r30,SonnetBase			#Exit code of processes (in development)
-	li	r29,1
-	stw	r29,ReadyTasks+4(r30)		#HACK
-	nop
+	li	r4,SonnetBase			#Exit code of processes (in development)
+	lwz	r5,RunningTask(r4)
+	loadreg r31,"FPPC"
+	stw	r31,MN_IDENTIFIER(r5)
+	
+	lwz	r4,MCTask(r4)
+	la	r4,pr_MsgPort(r4)
+			
+	LIBCALLPOWERPC PutXMsgPPC
+	
+	li	r3,0
+	stw	r3,RunningTask(r3)
+	
 Pause:	nop
 	nop
 	b	Pause
@@ -1220,11 +1230,20 @@ EInt:	stw	r13,-4(r1)			#Create local stack
 	
 NoHEAR:	li	r3,SonnetBase
 	
-	lwz	r9,RunningTask(r3)
+	lwz	r9,ReadyTasks+4(r3)
 	lwz	r9,MN_IDENTIFIER(r9)
 	loadreg	r8,"TPPC"
-	cmpw	r9,r8				#HACK!
+	cmpw	r9,r8
 	bne	NoRunning
+	
+	lwz	r9,RunningTask(r3)		#HACK!
+	mr.	r9,r9
+	bne	NoRunning
+	
+	lwz	r9,ReadyTasks+4(r3)
+	stw	r9,RunningTask(r3)
+	li	r6,0
+	stw	r6,ReadyTasks+4(r3)
 		
 	loadreg	r6,0x8000
 	addi	r6,r6,ExitCode-Start
@@ -1250,8 +1269,6 @@ NoHEAR:	li	r3,SonnetBase
 	lwz	r9,PP_OFFSET(r8)
 	lwz	r8,PP_CODE(r8)
 	add	r8,r8,r9
-	li	r9,0
-	stw	r9,RunningTask(r3)	
 	sync	
 
 	lis	r3,EUMB
