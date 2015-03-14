@@ -1,5 +1,6 @@
 .include ppcdefines.i
 .include sonnet_libppc.i
+.include ppcmacros-std.i
 
 .global PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init,ViolationAddress
 .global MCTask
@@ -1231,14 +1232,16 @@ EInt:	stw	r13,-4(r1)			#Create local stack
 NoHEAR:	li	r3,SonnetBase
 	
 	lwz	r9,ReadyTasks+4(r3)
+	mr.	r9,r9
+	beq	NoReschedule
 	lwz	r9,MN_IDENTIFIER(r9)
 	loadreg	r8,"TPPC"
 	cmpw	r9,r8
-	bne	NoRunning
+	bne	NoReschedule
 	
 	lwz	r9,RunningTask(r3)		#HACK!
 	mr.	r9,r9
-	bne	NoRunning
+	bne	NoReschedule
 	
 	lwz	r9,ReadyTasks+4(r3)
 	stw	r9,RunningTask(r3)
@@ -1292,7 +1295,7 @@ NoHEAR:	li	r3,SonnetBase
 	
 	rfi	
 	
-NoRunning:	
+NoReschedule:	
 	lis	r3,EUMB
 	lis	r5,0x100			#Clear IM0 bit to clear interrupt
 	stw	r5,0x100(r3)

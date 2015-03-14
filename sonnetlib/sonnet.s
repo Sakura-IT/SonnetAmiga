@@ -1,5 +1,5 @@
 
-COMMAND		EQU $4	
+COMMAND		EQU $4
 IMR0		EQU $50
 OMISR		EQU $30
 OMIMR		EQU $34
@@ -9,7 +9,7 @@ LMBAR		EQU $10
 PCSRBAR		EQU $14
 OMBAR		EQU $300
 OTWR		EQU $308
-WP_CONTROL	EQU $F48		
+WP_CONTROL	EQU $F48
 WP_TRIG01	EQU $c0000000
 MEMF_PPC	EQU $1000
 StackSize	EQU $80000
@@ -17,12 +17,12 @@ blr		MACRO
 		dc.l $4E800020
 		ENDM
 
-FUNC_CNT	 EQU	-30		* Skip 4 standard vectors	
+FUNC_CNT	 EQU	-30		* Skip 4 standard vectors
 FUNCDEF		 MACRO
 _LVO\1		 EQU	FUNC_CNT
 FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 		 ENDM
-		
+
 	include	exec/exec_lib.i
 	include exec/initializers.i
 	include	exec/nodes.i
@@ -40,10 +40,10 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	include dos/dosextens.i
 	include	exec/interrupts.i
 	include hardware/intbits.i
-	include sonnet_lib.i	
-	
+	include sonnet_lib.i
+
 	XREF	FunctionsLen
-	
+
 	XREF	SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
@@ -55,7 +55,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
 	XREF	PutXMsgPPC,WaitFor68K,Run68K,Signal68K,CopyMemPPC,SetReplyPortPPC
 	XREF	TrySemaphorePPC
-	
+
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,MCTask,Init,ViolationAddress
 	XREF	ReadyTasks
 	XDEF	_PowerPCBase
@@ -85,24 +85,25 @@ ROMTAG:
 ENDSKIP:
 	ds.w	1
 
-INIT	movem.l d1-a6,-(a7)
+INIT:
+	movem.l d1-a6,-(a7)
 	move.l 4.w,a6
 	lea Buffer(pc),a4
-	
+
 	lea DosLib(pc),a1
 	moveq.l #37,d0
 	jsr _LVOOpenLibrary(a6)
 	tst.l d0
 	beq.s Clean				;Open dos.library
 	move.l d0,DosBase-Buffer(a4)
-	
+
 	lea ExpLib(pc),a1
 	moveq.l #37,d0
 	jsr _LVOOpenLibrary(a6)			;Open expansion.library
 	tst.l d0
 	beq.s Clean
 	move.l d0,ExpBase-Buffer(a4)
-	
+
 	move.l d0,a6
 	sub.l a0,a0
 	move.l #$89e,d0				;ELBOX
@@ -115,25 +116,25 @@ INIT	movem.l d1-a6,-(a7)
 	move.l d0,a1
 	move.l cd_BoardAddr(a1),d0		;Start address Configspace Mediator
 	move.l d0,MediatorBase-Buffer(a4)
-	
+
 	lea MemList(a6),a0
 	lea MemName(pc),a1
 	jsr _LVOFindName(a6)
 	tst.l d0
-	bne.s Clean	
-	
+	bne.s Clean
+
 	moveq.l #0,d0
 	lea pcilib(pc),a1
 	jsr _LVOOpenLibrary(a6)
 	move.l d0,PCIBase-Buffer(a4)
-	
+
 	lea MemList(a6),a0
 	lea PCIMem(pc),a1
 	jsr _LVOFindName(a6)
 	tst.l d0
 	bne.s FndMem
 	bra Dirty				;No initialized VGA found
-	
+
 Clean	move.l ROMMem(pc),d0
 	beq.s NoROM
 	bsr.s FreeROM
@@ -144,12 +145,12 @@ NoPCI	move.l DosBase(pc),d0
 	beq.s NoDos
 	bsr.s ClsLib
 NoDos	move.l ExpBase(pc),d0
-	beq.s Exit	
+	beq.s Exit
 	bsr.s ClsLib
 Exit	move.l _PowerPCBase(pc),d0
 	movem.l (a7)+,d1-a6
 	rts
-	
+
 ClsLib  move.l d0,a1
 	jmp _LVOCloseLibrary(a6)
 FreeROM	move.l d0,a1
@@ -157,11 +158,11 @@ FreeROM	move.l d0,a1
 	jmp _LVOFreeMem(a6)
 	
 FndMem	move.l d0,d7
-	
+
 	move.l PCIBase(pc),d0
 	beq.s Clean
 	move.l d0,a2
-	
+
 	move.l PCI_List(a2),a2
 Loop1	move.l LN_SUCC(a2),d6
 	beq.s Clean
@@ -169,8 +170,8 @@ Loop1	move.l LN_SUCC(a2),d6
 	cmp.l #$10570004,d1
 	beq.s Sonnet
 	move.l d6,a2
-	bra.s Loop1	
-	
+	bra.s Loop1
+
 Sonnet	move.l d7,a0
 	move.l MH_UPPER(a0),d1
 	sub.l #$10000,d1
@@ -185,7 +186,7 @@ Sonnet	move.l d7,a0
 	move.l d0,a5
 	move.l a5,a1
 	lea $100(a5),a5
-	
+
 	move.l PCI_SPACE1(a2),a3		;PCSRBAR Sonnet
 	move.l a3,EUMBAddr-Buffer(a4)
 	or.b #15,d0				;64kb
@@ -194,23 +195,23 @@ Sonnet	move.l d7,a0
 	rol.w #8,d0
 	move.l d0,OTWR(a3)
 	move.l #$0000F0FF,OMBAR(a3)		;Processor outbound mem at $FFF00000
-	
+
 	move.l a2,d4
 EndDrty	move.l #$48003f00,(a5)
 	lea $3f00(a5),a5
 	lea PPCCode(pc),a2
 	move.l #PPCLen,d6
 	lsr.l #2,d6
-	subq.l #1,d6	
+	subq.l #1,d6
 
 loop2	move.l (a2)+,(a5)+
 	dbf d6,loop2
 	jsr _LVOCacheClearU(a6)
-	
+
 	move.l #$abcdabcd,$6004(a1)		;Code Word
 	move.l #$abcdabcd,$6008(a1)		;Sonnet Mem Start (Translated to PCI)
 	move.l #$abcdabcd,$600c(a1)		;Sonnet Mem Len
-	
+
 	tst.l d4
 	bne.s NoCmm
 	move.l d5,a5
@@ -223,7 +224,7 @@ NoCmm	move.l #WP_TRIG01,WP_CONTROL(a3)	;Negate HRESET
 Wait	move.l $6004(a1),d5
 	cmp.l #"Boon",d5
 	bne.s Wait
-	
+
 	move.l #StackSize,d7			;Set stack
 	move.l $6008(a1),d5
 	move.l d5,SonnetBase-Buffer(a4)
@@ -231,7 +232,7 @@ Wait	move.l $6004(a1),d5
 	move.l $600c(a1),d6
 	sub.l d7,d6
 	add.l d6,d7
-		
+
 	moveq.l #16,d0
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_REVERSE,d1
 	jsr _LVOAllocVec(a6)
@@ -243,7 +244,7 @@ Wait	move.l $6004(a1),d5
 	move.l 4(a1),4(a0)
 	move.l 8(a1),8(a0)
 	move.l 12(a1),12(a0)
-		
+
 	move.l a0,a1
 	move.l d5,a0
 	move.w #$0a32,LN_TYPE(a0)
@@ -259,19 +260,19 @@ Wait	move.l $6004(a1),d5
 	add.l a0,d6
 	move.l d6,MH_UPPER(a0)
 	move.l d1,MH_FREE(a0)
-	move.l a0,a1	
+	move.l a0,a1
 	move.l a0,a5
-	
-	jsr _LVODisable(a6)	
+
+	jsr _LVODisable(a6)
 	lea MemList(a6),a0
 	tst.l d4
 	beq.s NoPCILb
-	
+
 	move.l d4,a2
 	sub.l #StackSize,d5
 	move.l d5,PCI_SPACE0(a2)
 	moveq.l #0,d6
-	sub.l d7,d6		
+	sub.l d7,d6
 	move.l d6,PCI_SPACELEN0(a2)
 NoPCILb	jsr _LVOEnqueue(a6)
 
@@ -290,7 +291,7 @@ NoPCILb	jsr _LVOEnqueue(a6)
 	subq.l #1,d1
 MoveSon	move.l (a0)+,(a1)+
 	dbf d1,MoveSon
-	
+
 	sub.l a0,a1
 	move.l a1,d2
 	move.l d0,a1
@@ -304,14 +305,14 @@ MoveSon	move.l (a0)+,(a1)+
 	move.l #(EndFlag-FUNCTABLE)/4-1,d0
 RLoc	add.l d2,(a2)+
 	dbf d0,RLoc
-	
+
 	sub.l	a2,a2
 	moveq.l #124,d0
 	moveq.l #0,d1
-	jsr _LVOMakeLibrary(a6)	
+	jsr _LVOMakeLibrary(a6)
 	tst.l d0
 	beq.s NoLib
-	
+
 	move.l SonnetBase(pc),a1
 	move.l d0,4(a1)					;PowerPCBase at $4
 	move.l a5,8(a1)					;Memheader at $8
@@ -322,7 +323,7 @@ RLoc	add.l d2,(a2)+
 
 	move.l d0,a1
 	jsr _LVOAddLibrary(a6)
-	
+
 	lea MyInterrupt(pc),a1
 	lea SonInt(pc),a2
 	move.l a2,IS_CODE(a1)
@@ -336,27 +337,27 @@ RLoc	add.l d2,(a2)+
 	move.b d0,LN_TYPE(a1)
 	moveq.l #INTB_PORTS,d0
 	jsr _LVOAddIntServer(a6)
-	
+
 	lea PrcTags(pc),a1
 	move.l a1,d1
 	move.l DosBase(pc),a6
 	jsr _LVOCreateNewProc(a6)
 	move.l 4.w,a6
-	
+
 NoLib	move.l a5,a1
 	jsr _LVORemove(a6)
 	move.w #$0a01,8(a5)
 	move.l a5,a1
 	lea MemList(a6),a0
 	jsr _LVOEnqueue(a6)
-	jsr _LVOEnable(a6)		
+	jsr _LVOEnable(a6)
 
 	bra Clean
 
 ;********************************************************************************************
 
 Dirty	move.l MediatorBase(pc),a0		;WARNING!!!! : EUMB register gets redefined
-	moveq.l #0,d2				;after pci.library initiation!!! 
+	moveq.l #0,d2				;after pci.library initiation!!!
 	moveq.l #$3f,d1				;This affects the INT2 interrupt!!
 	move.b #$60,(a0)			;Start address PCI Mem ($60000000)
 CpLoop	move.l a0,a5
@@ -375,22 +376,22 @@ CpLoop	move.l a0,a5
 	beq.s MPC107
 	cmp.l #$0005121a,d6
 	beq VooDoo3
-VooDone	addq.l #1,d2	
+VooDone	addq.l #1,d2
 	dbf d1,CpLoop
 	bra Clean
-	
+
 MPC107	move.l #$62b00000,a1
 	move.l PCIBase(pc),d5
 	beq.s HardCr
 	nop					;Insert code
-	
+
 	move.l PCSRBAR(a5),d5
 	rol.w #8,d5
 	swap d5
 	rol.w #8,d5
 	move.l d5,a3
 	bra.s SoftCr
-	
+
 HardCr	move.l #$00300064,d5			;EUMB at $64003000
 	move.l d5,PCSRBAR(a5)
 	move.l COMMAND(a5),d5
@@ -411,7 +412,7 @@ Loop12	move.l LN_SUCC(a1),d5
 	beq.s Voodoo2
 	move.l d5,a1
 	bra.s Loop12
-	
+
 Voodoo2	move.l PCI_SPACE1(a1),d1
 	add.l #$b00000,d1
 	move.l d1,a1
@@ -419,7 +420,7 @@ Voodoo2	move.l PCI_SPACE1(a1),d1
 	rol.w #8,d1
 	swap d1
 	rol.w #8,d1
-	move.l d1,OTWR(a3)		
+	move.l d1,OTWR(a3)
 	bra.s SC2
 
 HC2	move.l #$0F00B062,OTWR(a3)		;Host outbound PCI mem at $62B00000, 64kb (Code in GFXMem?)
@@ -432,7 +433,7 @@ SC2	move.l #$0000F0FF,OMBAR(a3)		;Processor outbound mem at $FFF00000
 
 VooDoo3	movem.l d0-a6,-(a7)
 	move.l PCIBase(pc),d5
-	bne.s V3SC	
+	bne.s V3SC
 	moveq.l	#$62,d5				;Set BAR Voodoo at $62000000
 	move.l d5,$14(a5)
 V3SC	move.l COMMAND(a5),d5
@@ -454,18 +455,18 @@ PCIMem	dc.b "pcidma memory",0
 	cnop	0,2
 IntName	dc.b "Gort",0
 	cnop	0,4
-	
+
 ;********************************************************************************************
 
-MasterControl
+MasterControl:
 	move.l #"INIT",d6
 	move.l SonnetBase(pc),a4
 	move.l 4.w,a6
 	move.l ThisTask(a6),d0
-	move.l d0,MCTask(a4)		
+	move.l d0,MCTask(a4)
 	move.l 4(a4),a6
 	move.l _LVOWarpSuper+2(a6),d0
-	addq.l #4,d0	
+	addq.l #4,d0
 	move.l d0,ViolationAddress(a4)
 	move.l d6,Init(a4)
 	lea Buffer(pc),a4
@@ -483,7 +484,7 @@ GetLoop	move.l d6,a0
 	move.l MN_IDENTIFIER(a1),d0
 	cmp.l #"TPPC",d0
 	beq.s MsgTPPC
-	cmp.l #"T68k",d0
+	cmp.l #"T68K",d0
 	beq.s MsgT68k
 	cmp.l #"FPPC",d0
 	beq.s MsgFPPC
@@ -494,26 +495,26 @@ GetLoop	move.l d6,a0
 MsgT68k	move.l d7,a1
 	move.b LN_TYPE(a1),d7
 	cmp.b #NT_MESSAGE,d7
-	beq.s Sig68k					
-	cmp.b #NT_REPLYMSG,d7				;signal PPC that 68k is done
+	beq.s Sig68k
+	cmp.b #NT_REPLYMSG,d7				;signal PPC that 68k is done (HACK)
 	bne.s NextMsg
 	move.l #"DONE",d6
 	move.l SonnetBase(pc),a0
-	move.l d6,Init(a4)		
-;	jsr _LVOReplyMsg(a6)
+	move.l d6,Init(a0)
 	bra.s NextMsg
 
-Sig68k	move.l MN_MIRROR(a1),a0
+Sig68k	move.l ThisTask(a6),a0
+	lea pr_MsgPort(a0),a0
+	move.l a0,MN_REPLYPORT(a1)
+	move.l MN_MIRROR(a1),a0
 	jsr _LVOPutMsg(a6)				;move message to waiting 68k task
 	bra.s NextMsg
 
-
 MsgTPPC	move.l SonnetBase(pc),a0
 	move.l a1,ReadyTasks+4(a0)
-	move.l _PowerPCBase(pc),a6	
-	jsr _LVOCauseInterruptHW(a6)			;Force reschedule. Is this faster than
-	
-	move.l 4.w,a6					;just wait for normal reschedule?
+	move.l _PowerPCBase(pc),a6			;Force reschedule. Is this faster than
+	jsr _LVOCauseInterruptHW(a6)			;just wait for normal reschedule?
+	move.l 4.w,a6
 	bra NextMsg
 
 MsgF68k	move.l d7,a1
@@ -522,7 +523,7 @@ MsgF68k	move.l d7,a1
 
 MsgFPPC	move.l d7,a1
 	jsr _LVOReplyMsg(a6)
-	bra NextMsg	
+	bra NextMsg
 
 	cnop 0,4
 
@@ -530,10 +531,11 @@ PrcTags	dc.l NP_Entry,0,NP_Name,0,NP_Priority,125,0,0
 PrcName	dc.b "MasterControl",0
 
 	cnop 0,4
-	
+
 ;********************************************************************************************
 
-SonInt	movem.l d1-a6,-(a7)
+SonInt:
+	movem.l d1-a6,-(a7)
 	move.l EUMBAddr(pc),a2
 	move.l #$01000000,d2
 	move.l OMISR(a2),d3
@@ -543,9 +545,8 @@ SonInt	movem.l d1-a6,-(a7)
 	move.l 4.w,a6
 	move.l OMR0(a2),a1
 	move.l OMR1(a2),d0
-
-	jsr _LVOSignal(a6)			;for WaitPort?
-	move.l d4,OMISR(a2)	
+	jsr _LVOSignal(a6)
+	move.l d4,OMISR(a2)
 NoInt	movem.l (a7)+,d1-a6
 	moveq.l #0,d0
 	rts
@@ -554,7 +555,8 @@ IntData	dc.l 0
 
 ;********************************************************************************************
 
-Open	move.l	a6,d0
+Open:
+	move.l	a6,d0
 	tst.l	d0
 	beq.s	NoA6
 	move.l	d0,a6
@@ -568,7 +570,8 @@ NoA6	rts
 
 ;********************************************************************************************
 
-Close	moveq.l #0,d0
+Close:
+	moveq.l #0,d0
 	subq.w	#1,LIB_OPENCNT(a6)
 	bne.s	NoExp
 	btst	#3,Buffer
@@ -577,17 +580,18 @@ NoExp	rts
 
 ;********************************************************************************************
 
-Expunge	moveq.l #0,d0
+Expunge:
+	moveq.l #0,d0
 	rts
 
 ;********************************************************************************************
-	
+
 Reserved:
 	moveq.l #0,d0
 	rts
 
 ;********************************************************************************************
-	
+
 GetDriverID:
 	move.l #DriverID,d0
 	rts
@@ -606,12 +610,12 @@ InitBootArea:
 	addq.l #1,d1
 	beq.s Error
 	move.l LMBAR(a5),d0
-	rol.w #8,d0	
+	rol.w #8,d0
 	swap d0
 	rol.w #8,d0
 	and.b #$f0,d0
 	bra.s Error
-	
+
 ;********************************************************************************************
 
 BootPowerPC:
@@ -620,16 +624,16 @@ BootPowerPC:
 	bra.s StrtPPC
 
 ;********************************************************************************************
-	
+
 CauseInterruptHW:
 	movem.l d1-a6,-(a7)
 	move.l #"HEAR",d5
 StrtPPC	lea Buffer(pc),a4
 	move.l SonAddr(pc),d0
 	beq.s First
-	move.l d0,a5	
+	move.l d0,a5
 	bra.s NoFirst
-	
+
 First	bsr.s FindSonnet
 	move.l a5,SonAddr-Buffer(a4)
 NoFirst	addq.l #1,d1
@@ -643,6 +647,8 @@ NoFirst	addq.l #1,d1
 Error	nop
 	movem.l (a7)+,d1-a6
 	rts
+	
+;********************************************************************************************
 
 FindSonnet:
 	moveq.l #0,d2
@@ -658,9 +664,9 @@ CpxLoop	move.l MediatorBase(pc),a5
 	beq.s Error2
 	cmp.l #$57100400,d4
 	beq.s xSonnet
-	addq.l #1,d2	
+	addq.l #1,d2
 	dbf d1,CpxLoop
-Error2	move.l d4,d1	
+Error2	move.l d4,d1
 xSonnet	rts
 
 ;********************************************************************************************
@@ -669,7 +675,8 @@ xSonnet	rts
 ;
 ;********************************************************************************************
 
-GetCPU	movem.l d1-a6,-(a7)
+GetCPU:
+	movem.l d1-a6,-(a7)
 	move.l SonnetBase(pc),a1
 	move.l 12(a1),d0
 	and.w #$0,d0
@@ -686,30 +693,28 @@ G4	move.l #CPUF_G4,d0
 ExCPU	movem.l (a7)+,d1-a6
 	rts
 
-
 ;********************************************************************************************
 ;
 ;	status = RunPPC(PPStruct) // d0=a0
 ;
 ;********************************************************************************************
-	
+
 MN_IDENTIFIER	EQU MN_SIZE
 MN_MIRROR	EQU MN_IDENTIFIER+4
 MN_PPSTRUCT	EQU MN_MIRROR+4
-
 
 PStruct	EQU -12
 Msg	EQU -8
 Port	EQU -4
 
-
-RunPPC	link a5,#-12
+RunPPC:
+	link a5,#-12
 	movem.l d1-a6,-(a7)
 	moveq.l #0,d0
 	move.l d0,Msg(a5)
 	move.l d0,Port(a5)
-	move.l a0,PStruct(a5)	
-	lea Buffer(pc),a4	
+	move.l a0,PStruct(a5)
+	lea Buffer(pc),a4
 	move.l 4.w,a6
 	move.l ThisTask(a6),a1
 	cmp.b #NT_PROCESS,LN_TYPE(a1)
@@ -717,7 +722,7 @@ RunPPC	link a5,#-12
 	lea pr_MsgPort(a1),a1
 	move.l a1,d0
 	bra.s xProces
-	
+
 xTask	jsr _LVOCreateMsgPort(a6)			;Not done yet. How to find this Port?
 	tst.l d0
 	beq Cannot
@@ -728,7 +733,7 @@ xProces	move.l d0,Port(a5)
 	tst.l d0
 	beq Cannot
 	move.l d0,Msg(a5)
-	move.l Port(a5),d1	
+	move.l Port(a5),d1
 	move.l d0,a1
 	move.w #MN_SIZE+PP_SIZE+76,MN_LENGTH(a1)
 	move.l d1,MN_REPLYPORT(a1)
@@ -757,14 +762,14 @@ Fast	move.l d7,a0
 	move.l #"TPPC",MN_IDENTIFIER(a1)
 	jsr _LVOPutMsg(a6)
 	bra.s Stacker
-	
+
 ;********************************************************************************************
 ;
 ;	status = WaitForPPC(PPStruct) // d0=a0
 ;
 ;********************************************************************************************
 
-WaitForPPC
+WaitForPPC:
 	link a5,#-12
 	movem.l d1-a6,-(a7)
 	lea Buffer(pc),a4
@@ -773,11 +778,11 @@ WaitForPPC
 	move.l ThisTask(a6),a1
 	cmp.b #NT_PROCESS,LN_TYPE(a1)
 	beq.s yProces
-	
+
 	ILLEGAL						;Not done yet. How to create this port?
-	
+
 yProces	lea pr_MsgPort(a1),a1
-	move.l a1,Port(a5)	
+	move.l a1,Port(a5)
 
 Stacker	move.l Port(a5),a0
 	jsr _LVOWaitPort(a6)
@@ -789,10 +794,10 @@ GtLoop	move.l Port(a5),a0
 	move.l MN_IDENTIFIER(a0),d0
 	cmp.l #"FPPC",d0
 	beq.s DizDone
-	cmp.l #"T68k",d0
+	cmp.l #"T68K",d0
 	beq.s Runk86
 	bra.s GtLoop
-	
+
 DizDone	move.l PStruct(a5),a1
 	lea MN_PPSTRUCT(a0),a0
 	moveq.l #PP_SIZE/4-1,d0
@@ -815,7 +820,7 @@ EndIt	move.l d7,d0
 	movem.l (a7)+,d1-a6
 	unlk a5
 	rts
-	
+
 FreeIt	move.l d0,a1
 	jmp _LVOFreeVec(a6)
 FreePrt	move.l d0,a0
@@ -832,21 +837,21 @@ Runk86	movem.l d0-a6,-(a7)				;68k routines called from PPC
 	movem.l (a6)+,d0-a5				;Correct sequence?
 	move.l (a6),a6
 	rts
-	
+
 xBack	move.l (a7)+,a6
-	movem.l (a7)+,d0-a5				;Correct Sequence?
+	movem.l (a7)+,d0-a5				;To do: place results back in PPSTRUCT
 	move.l a6,a1
 	move.l (a7)+,a6
-;	jsr _LVOReplyMsg(a6)	
+	jsr _LVOReplyMsg(a6)
 	bra GtLoop
 
 ;********************************************************************************************
 ;
 ;	PPCState = GetPCState(void) // d0
 ;
-;********************************************************************************************	
+;********************************************************************************************
 
-GetPPCState
+GetPPCState:
 	move.l a0,-(a7)
 	move.l d1,-(a7)
 	moveq.l #PPCSTATEF_POWERSAVE,d0			;If no waiting then POWERSAVE
@@ -867,11 +872,11 @@ NoRun	move.l (a7)+,d1
 ;
 ;********************************************************************************************
 
-CreatePPCTask	
+CreatePPCTask:
 	movem.l d1-a6,-(a7)
-	
+
 	RUNPOWERPC	_PowerPCBase,CreateTaskPPC
-	
+
 	movem.l (a7)+,d1-a6
 	rts
 
@@ -880,8 +885,8 @@ CreatePPCTask
 ;	memblock = AllocVec32(memsize) // d0 = d0 (d1 is ignored)
 ;
 ;********************************************************************************************
-	
-AllocVec32
+
+AllocVec32:
 	move.l a6,-(a7)
 	add.l #$38,d0
 	move.l 4.w,a6
@@ -893,15 +898,15 @@ AllocVec32
 	move.l d0,a0
 	move.l d1,-4(a0)
 	move.l (A7)+,a6
-	rts	
+	rts
 
 ;********************************************************************************************
 ;
 ;	void FreeVec32(memblock) // a1
 ;
 ;********************************************************************************************
-	
-FreeVec32
+
+FreeVec32:
 	move.l a6,-(a7)
 	move.l a1,d0
 	move.l -4(a1),a1
@@ -915,7 +920,7 @@ FreeVec32
 ;
 ;********************************************************************************************
 
-AllocXMsg
+AllocXMsg:
 	movem.l d2-d3,-(a7)
 	move.l a0,d2
 	add.l #$14,d0
@@ -927,7 +932,7 @@ AllocXMsg
 	move.l d2,MN_REPLYPORT(a0)
 	move.w d3,MN_LENGTH(a0)
 NoAl32	movem.l (a7)+,d2-d3
-	rts	
+	rts
 
 ;********************************************************************************************
 ;
@@ -935,7 +940,7 @@ NoAl32	movem.l (a7)+,d2-d3
 ;
 ;********************************************************************************************
 
-FreeXMsg
+FreeXMsg:
 	move.l a0,a1
 	jsr _LVOFreeVec32(a6)
 	rts
@@ -946,7 +951,7 @@ FreeXMsg
 ;
 ;********************************************************************************************
 
-SetCache68K
+SetCache68K:
 	movem.l d2-d4/a2/a6,-(a7)
 	move.l d0,d2
 	move.l a0,a2
@@ -963,10 +968,10 @@ SetCache68K
 	beq.s DCFlush
 	cmp.l #CACHE_ICACHEINV,d2
 	beq.s ICInv
-	cmp.l #CACHE_DCACHEINV,d2	
+	cmp.l #CACHE_DCACHEINV,d2
 	beq.s DCFlush
 	bra.s CacheIt
-	
+
 DCOff	moveq.l #0,d0
 	move.l #CACRF_EnableD,d1
 	move.l 4.w,a6
@@ -984,10 +989,10 @@ ICOff	moveq.l #0,d0
 	move.l 4.w,a6
 	jsr _LVOCacheControl(a6)
 	bra.s CacheIt
-	
+
 ICOn	moveq.l #CACRF_EnableI,d0
 	move.l d0,d1
-	move.l 4.w,a6	
+	move.l 4.w,a6
 	bra.s CacheIt
 
 DCFlush	tst.l a2
@@ -1009,16 +1014,15 @@ ICInv	tst.l a2
 	move.l d3,d0
 	moveq.l #CACRF_ClearI,d1
 	move.l 4.w,a6
-	jsr _LVOCacheClearE(a6)	
+	jsr _LVOCacheClearE(a6)
 	bra.s CacheIt
-	
+
 NoStrtA	move.l 4.w,a6
 	jsr _LVOCacheClearU(a6)
-	
+
 CacheIt	movem.l (a7)+,d2-d4/a2/a6
-	rts	
-	
-	
+	rts
+
 ;********************************************************************************************
 
 ;;;;;;RunPPC			rts
@@ -1310,12 +1314,10 @@ FUNCTABLE:
 	dc.l	AddUniqueSemaphorePPC
 	dc.l	IsExceptionMode
 
-
 EndFlag	dc.l	$ffffffff
 LibName
 	dc.b	"sonnet.library",0,0
 IDString
-	DC.B	"$VER: sonnet.library 1.0 (26-Feb-15)",0
+	DC.B	"$VER: sonnet.library 1.0 (14-Mar-15)",0
 	cnop	0,4
 EndCP	end
-	

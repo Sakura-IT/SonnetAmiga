@@ -1,5 +1,6 @@
 .include ppcdefines.i
 .include sonnet_libppc.i
+.include ppcmacros-std.i
 
 .set MH_FIRST,16
 .set MH_FREE,28
@@ -28,6 +29,8 @@
 .set MN_MIRROR,24
 .set MN_PPSTRUCT,28
 .set PP_SIZE,144
+.set NT_MESSAGE,5
+.set LN_TYPE,8
 
 
 .set FunctionsLen,(EndFunctions-SetExcMMU)
@@ -2211,6 +2214,8 @@ PutXMsgPPC:
 		BUILDSTACKPPC
 		
 		stwu	r31,-4(r13)
+		li	r31,NT_MESSAGE
+		stb	r31,LN_TYPE(r5)
 		mr	r31,r4
 		la	r4,MP_MSGLIST(r4)
 
@@ -2292,8 +2297,7 @@ Run68K:
 		
 		li	r4,SonnetBase
 		lwz	r4,MCTask(r4)
-		la	r4,pr_MsgPort(r4)
-		
+		la	r4,pr_MsgPort(r4)		
 		mr	r5,r30
 				
 		LIBCALLPOWERPC PutXMsgPPC
@@ -2301,6 +2305,10 @@ Run68K:
 		mr	r4,r30
 		
 		LIBCALLPOWERPC WaitFor68K
+							#To do: place from msg back to PPSTRUCT							
+		mr	r4,r30
+		
+		LIBCALLPOWERPC FreeXMsgPPC
 		
 .MsgError:	lwz	r29,0(r13)
 		lwzu	r30,4(r13)
