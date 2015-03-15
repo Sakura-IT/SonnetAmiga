@@ -1,9 +1,7 @@
 The TO-DO list:
 
-MAIN PROBLEM:	How to load PPC Code/Data to memory with attributes $1005
-		This is slow memory for the 68k. You want to keep the 68k
-		out of this memory for the most part.
-		Refer to GetInfo_Data1005 for hunk adjustments.
+MAIN PROBLEM:	How to use structures returned from 68k library functions.
+		Patch AllocVec or use the MMU to catch Amiga mem space calls?
 
 *)	Get code execution on the Sonnet		*DONE
 *)	Initialize Memory on the Sonnet			*DONE
@@ -11,38 +9,12 @@ MAIN PROBLEM:	How to load PPC Code/Data to memory with attributes $1005
 *)	Initialize BATs, L2, EPIC etc.			*DONE
 *)	Implement external interrupt			*DONE
 *)	Implement timer interrupt			*DONE
-*)	Implement a PPC<->68k message system
-	*)	WaitFor68k
-	*)	WaitForPPC				*DONE
-	*)	PutXMsg
-	*)	FindPortPPC
-	*)	WaitPortPPC
-	*)	GetMsgPPC
-	*)	ReplyMsgPPC
-	*)	AllocMsgPPC
-	*)	FreeMsgPPC
-	*)	AllocXMsg				*DONE
-	*)	FreeXMsg				*DONE
-	*)	AllocXMsgPPC				*DONE
-	*)	FreeXMsgPPC				*DONE
-	*)	PutXMsgPPC
-*)	Implement basic library functionality
-	*)	RunPPC(XL)				*DONE
-	*)	AllocVecPPC				*DONE
-	*)	FreeVecPPC				*DONE
-	*)	CreateTaskPPC
-	*)	DeleteTaskPPC
-	*)	Run68K(XL)
-	*)	NewListPPC				*DONE
-	*)	InsertPPC				*DONE
-	*)	EnqueuePPC				*DONE
-	*)	AddHeadPPC				*DONE
-	*)	RemovePPC				*DONE
-	*)	RemHeadPPC				*DONE
-*)	Add a preemptive scheduler
-	*)	Ready/Wait/added list
-*)	Implement basic auxilary functionality for demo program
-	*)	GetInfo					*DONE
-	*)	GetCPU					*DONE
-*)	Implement rest of exceptions plus error messaging
-*)	Implemented remaining functions
+*)	Adding memattributes to hunks (vasm/vlink)	*DONE
+*)	Implement a PPC->68k message system		*DONE
+*)	Implement basic library functionality		*DONE
+*)	Implement a preemptive scheduler
+*)	Implement an internal PPC message system
+		*) Scheduler is a prerequisite
+*)	Implement a 68k->PPC message system
+		*) Internal PPC message system is a prerequisite
+*)	Implement remaining functions
