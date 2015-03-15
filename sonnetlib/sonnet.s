@@ -54,7 +54,16 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
 	XREF	AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
 	XREF	PutXMsgPPC,WaitFor68K,Run68K,Signal68K,CopyMemPPC,SetReplyPortPPC
-	XREF	TrySemaphorePPC
+	XREF	TrySemaphorePPC,CreatePoolPPC
+
+	XREF	SPrintF,Run68KLowLevel,CreateTaskPPC,DeleteTaskPPC,FindTaskPPC,SignalPPC
+	XREF	WaitPPC,SetTaskPriPPC,SetCache,SetExcHandler,RemExcHandler,SetHardware
+	XREF	ModifyFPExc,WaitTime,ChangeStack,ChangeMMU,PutMsgPPC,GetMsgPPC,ReplyMsgPPC
+	XREF	FreeAllMem,SnoopTask,EndSnoopTask,GetHALInfo,SetScheduling,FindTaskByID
+	XREF	SetNiceValue,AllocPrivateMem,FreePrivateMem,SetExceptPPC,ObtainSemaphoreSharedPPC
+	XREF	AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
+	XREF	AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
+	XREF	AddUniqueSemaphorePPC,IsExceptionMode
 
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,MCTask,Init,ViolationAddress
 	XREF	ReadyTasks
@@ -834,12 +843,12 @@ Runk86	movem.l d0-a6,-(a7)				;68k routines called from PPC
 	add.l PP_OFFSET(a1),a0
 	move.l a0,-(a7)
 	lea PP_REGS(a1),a6				;PP_STACKSIZE & PP_STACKPTR to be done
-	movem.l (a6)+,d0-a5				;Correct sequence?
+	movem.l (a6)+,d0-a5
 	move.l (a6),a6
 	rts
 
 xBack	move.l (a7)+,a6
-	movem.l (a7)+,d0-a5				;To do: place results back in PPSTRUCT
+	movem.l (a7)+,d0-a5
 	move.l a6,a1
 	move.l (a7)+,a6
 	jsr _LVOReplyMsg(a6)
@@ -1022,121 +1031,44 @@ NoStrtA	move.l 4.w,a6
 
 CacheIt	movem.l (a7)+,d2-d4/a2/a6
 	rts
-
+	
+;********************************************************************************************
+;
+;	void PowerDebugMode(debuglevel) // d0 -> NO DEBUGLEVEL IN SONNETLIB
+;
 ;********************************************************************************************
 
-;;;;;;RunPPC			rts
-;;;;;;WaitForPPC		rts
-;;;;;;GetCPU			rts
-PowerDebugMode			rts			;debug feature
-;;;;;;AllocVec32		rts
-;;;;;;FreeVec32			rts
-SPrintF68K			rts			;debug feature
-;;;;;;AllocXMsg			rts
-;;;;;;FreeXMsg			rts
-PutXMsg				rts
-;;;;;;GetPPCState		rts
-;;;;;;SetCache68K		rts
-;;;;;;CreatePPCTask		rts
-CausePPCInterrupt		rts
+PowerDebugMode:
+	rts
+	
+;********************************************************************************************
+;
+;	void SPrintF68K(Formatstring, values) // a0,a1 -> NO DEBUGLEVEL IN SONNETLIB
+;
+;********************************************************************************************	
 
-;;;;;;Run68K			blr
-;;;;;;WaitFor68K		blr
-SPrintF				blr			;debug feature
-Run68KLowLevel			blr
-;;;;;;AllocVecPPC		blr
-;;;;;;FreeVecPPC		blr
-CreateTaskPPC			blr
-DeleteTaskPPC			blr
-FindTaskPPC			blr
-;;;;;;InitSemaphorePPC		blr
-;;;;;;FreeSemaphorePPC		blr
-;;;;;;AddSemaphorePPC		blr
-;;;;;;RemSemaphorePPC		blr
-;;;;;;ObtainSemaphorePPC	blr
-;;;;;;AttemptSemaphorePPC	blr
-;;;;;;ReleaseSemaphorePPC	blr
-;;;;;;FindSemaphorePPC		blr
-;;;;;;InsertPPC			blr
-;;;;;;AddHeadPPC		blr
-;;;;;;AddTailPPC		blr
-;;;;;;RemovePPC			blr
-;;;;;;RemHeadPPC		blr
-;;;;;;RemTailPPC		blr
-;;;;;;EnqueuePPC		blr
-;;;;;;FindNamePPC		blr
-;;;;;;FindTagItemPPC		blr
-;;;;;;GetTagDataPPC		blr
-;;;;;;NextTagItemPPC		blr
-;;;;;;AllocSignalPPC		blr
-;;;;;;FreeSignalPPC		blr
-;;;;;;SetSignalPPC		blr
-SignalPPC			blr
-WaitPPC				blr
-SetTaskPriPPC			blr
-;;;;;;Signal68K			blr
-SetCache			blr
-SetExcHandler			blr
-RemExcHandler			blr
-;;;;;;Super			blr
-;;;;;;User			blr
-SetHardware			blr
-ModifyFPExc			blr
-WaitTime			blr
-ChangeStack			blr
-;;;;;;LockTaskList		blr
-;;;;;;UnLockTaskList		blr
-;;;;;;SetExcMMU			blr
-;;;;;;ClearExcMMU		blr	
-ChangeMMU			blr
-;;;;;;GetInfo			blr
-;;;;;;CreateMsgPortPPC		blr
-;;;;;;DeleteMsgPortPPC		blr
-;;;;;;AddPortPPC		blr
-;;;;;;RemPortPPC		blr
-;;;;;;FindPortPPC		blr
-;;;;;;WaitPortPPC		blr
-PutMsgPPC			blr
-GetMsgPPC			blr
-ReplyMsgPPC			blr
-FreeAllMem			blr
-;;;;;;CopyMemPPC		blr
-;;;;;;AllocXMsgPPC		blr
-;;;;;;FreeXMsgPPC		blr
-;;;;;;PutXMsgPPC		blr
-;;;;;;GetSysTimePPC		blr
-;;;;;;AddTimePPC		blr
-;;;;;;SubTimePPC		blr
-;;;;;;CmpTimePPC		blr
-;;;;;;SetReplyPortPPC		blr
-SnoopTask			blr
-EndSnoopTask			blr
-GetHALInfo			blr
-SetScheduling			blr
-FindTaskByID			blr
-SetNiceValue			blr
-;;;;;;TrySemaphorePPC		blr
-AllocPrivateMem			blr
-FreePrivateMem			blr
-;;;;;;ResetPPC			blr
-;;;;;;NewListPPC		blr
-SetExceptPPC			blr
-ObtainSemaphoreSharedPPC	blr
-AttemptSemaphoreSharedPPC	blr
-ProcurePPC			blr
-VacatePPC			blr
-CauseInterrupt			blr
-CreatePoolPPC			blr
-DeletePoolPPC			blr
-AllocPooledPP			blr
-FreePooledPPC			blr
-RawDoFmtPPC			blr
-PutPublicMsgPPC			blr
-AddUniquePortPPC		blr
-AddUniqueSemaphorePPC		blr
-IsExceptionMode			blr
+SPrintF68K:
+	rts
+	
+;********************************************************************************************
+;
+;	void PutXMsg(MsgPortPPC, message) // a0,a1 -> TO BE IMPLEMENTED
+;
+;********************************************************************************************
 
+PutXMsg:
+	rts
 
+;********************************************************************************************
+;
+;	void CausePPCInterrupt(void) // -> TO BE IMPLEMENTED
+;
+;********************************************************************************************
+
+CausePPCInterrupt:
+	rts
+
+;********************************************************************************************
 
 DriverID
 	dc.b "WarpUp hardware driver for Sonnet Crescendo 7200 PCI",0
@@ -1306,7 +1238,7 @@ FUNCTABLE:
 	dc.l	CauseInterrupt
 	dc.l	CreatePoolPPC
 	dc.l	DeletePoolPPC
-	dc.l	AllocPooledPP
+	dc.l	AllocPooledPPC
 	dc.l	FreePooledPPC
 	dc.l	RawDoFmtPPC
 	dc.l	PutPublicMsgPPC

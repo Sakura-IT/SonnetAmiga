@@ -32,7 +32,6 @@
 .set NT_MESSAGE,5
 .set LN_TYPE,8
 
-
 .set FunctionsLen,(EndFunctions-SetExcMMU)
 
 .global FunctionsLen
@@ -47,7 +46,16 @@
 .global	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
 .global AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
 .global PutXMsgPPC,WaitFor68K,Run68K,Signal68K,CopyMemPPC,SetReplyPortPPC
-.global	TrySemaphorePPC
+.global	TrySemaphorePPC,CreatePoolPPC
+
+.global SPrintF,Run68KLowLevel,CreateTaskPPC,DeleteTaskPPC,FindTaskPPC,SignalPPC
+.global WaitPPC,SetTaskPriPPC,SetCache,SetExcHandler,RemExcHandler,SetHardware
+.global ModifyFPExc,WaitTime,ChangeStack,ChangeMMU,PutMsgPPC,GetMsgPPC,ReplyMsgPPC
+.global FreeAllMem,SnoopTask,EndSnoopTask,GetHALInfo,SetScheduling,FindTaskByID
+.global SetNiceValue,AllocPrivateMem,FreePrivateMem,SetExceptPPC,ObtainSemaphoreSharedPPC
+.global AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
+.global AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
+.global AddUniqueSemaphorePPC,IsExceptionMode
 
 .section "LibBody","acrx"
 
@@ -2226,7 +2234,7 @@ PutXMsgPPC:
 		lwz	r4,MP_SIGTASK(r4)	#Port flags to be implemented (PA_SIGNAL etc)
 		mr.	r4,r4
 		beq-	.NoSigTask
-		li	r5,0x100
+		li	r5,0x100		#Fixed at the moment
 		
 		LIBCALLPOWERPC Signal68K
 
@@ -2281,8 +2289,7 @@ Run68K:
 		beq-	.MsgError
 			
 		subi	r4,r31,4			#r29 = PPStruct -4
-		addi	r29,r30,MN_PPSTRUCT-4		#r30 = msg
-		
+		addi	r29,r30,MN_PPSTRUCT-4		#r30 = msg		
 		li	r6,PP_SIZE/4
 		mtctr	r6
 .CopyPP:	lwzu	r7,4(r4)
@@ -2305,10 +2312,20 @@ Run68K:
 		mr	r4,r30
 		
 		LIBCALLPOWERPC WaitFor68K
-							#To do: place from msg back to PPSTRUCT							
+		
+		subi	r4,r31,4
+		addi	r29,r30,MN_PPSTRUCT-4		
+		li	r6,PP_SIZE/4
+		mtctr	r6
+.CopyPPB:	lwzu	r7,4(r29)
+		stwu	r7,4(r4)
+		bdnz+	.CopyPPB
+
 		mr	r4,r30
 		
 		LIBCALLPOWERPC FreeXMsgPPC
+		
+		li	r3,0
 		
 .MsgError:	lwz	r29,0(r13)
 		lwzu	r30,4(r13)
@@ -2610,7 +2627,60 @@ TrySemaphorePPC:
 
 		DSTRYSTACKPPC
 
+		blr
+		
+#********************************************************************************************
+#
+#	Poolheader = CreatePoolPPC(attr, puddlesize, treshsize) // r3=r4,r5,r6 r4 is ignored
+#
+#********************************************************************************************		
+
+CreatePoolPPC:
+		nop
 		blr	
+
+SPrintF:			blr			#debug feature
+Run68KLowLevel:			blr
+CreateTaskPPC:			blr
+DeleteTaskPPC:			blr
+FindTaskPPC:			blr
+SignalPPC:			blr
+WaitPPC:			blr
+SetTaskPriPPC:			blr
+SetCache:			blr
+SetExcHandler:			blr
+RemExcHandler:			blr
+SetHardware:			blr
+ModifyFPExc:			blr
+WaitTime:			blr
+ChangeStack:			blr
+ChangeMMU:			blr
+PutMsgPPC:			blr
+GetMsgPPC:			blr
+ReplyMsgPPC:			blr
+FreeAllMem:			blr
+SnoopTask:			blr
+EndSnoopTask:			blr
+GetHALInfo:			blr
+SetScheduling:			blr
+FindTaskByID:			blr
+SetNiceValue:			blr
+AllocPrivateMem:		blr
+FreePrivateMem:			blr
+SetExceptPPC:			blr
+ObtainSemaphoreSharedPPC:	blr
+AttemptSemaphoreSharedPPC:	blr
+ProcurePPC:			blr
+VacatePPC:			blr
+CauseInterrupt:			blr
+DeletePoolPPC:			blr
+AllocPooledPPC:			blr
+FreePooledPPC:			blr
+RawDoFmtPPC:			blr
+PutPublicMsgPPC:		blr
+AddUniquePortPPC:		blr
+AddUniqueSemaphorePPC:		blr
+IsExceptionMode:		blr
 
 #********************************************************************************************
 EndFunctions:
