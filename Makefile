@@ -7,7 +7,7 @@ LHA=lha
 IRA=ira
 
 IRAPARAM=-M68020
-ASM68KPARAM=-m68020up -Fhunk -no-opt
+ASM68KPARAM=-m68020up -Fhunk
 ASMPPCPARAM=-many -mppc32 -Fhunk    
 
 DISTRIBUTION=sonnet.lha
