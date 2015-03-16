@@ -97,13 +97,33 @@ Start:						#Dummy entry at absolute 0x8000
 	b	Start
 	
 ExitCode:
-	li	r4,SonnetBase			#Exit code of processes (in development)
-	lwz	r5,RunningTask(r4)
-	loadreg r31,"FPPC"
-	stw	r31,MN_IDENTIFIER(r5)
+	li	r8,SonnetBase			#Exit code of processes (in development)
+	lwz	r9,RunningTask(r8)
+	loadreg r7,"FPPC"
+	stw	r7,MN_IDENTIFIER(r9)
 	
-	lwz	r4,MCTask(r4)
-	la	r4,pr_MsgPort(r4)
+	stw	r2,PP_REGS+12*4(r9)
+	stw	r3,PP_REGS+0*4(r9)
+	stw	r4,PP_REGS+1*4(r9)
+	stw	r5,PP_REGS+8*4(r9)
+	stw	r6,PP_REGS+9*4(r9)
+	stw	r22,PP_REGS+2*4(r9)
+	stw	r23,PP_REGS+3*4(r9)
+	stw	r24,PP_REGS+4*4(r9)
+	stw	r25,PP_REGS+5*4(r9)
+	stw	r26,PP_REGS+6*4(r9)
+	stw	r27,PP_REGS+7*4(r9)
+	stw	r28,PP_REGS+10*4(r9)
+	stw	r29,PP_REGS+11*4(r9)
+	stw	r30,PP_REGS+13*4(r9)
+	stw	r31,PP_REGS+14*4(r9)
+	
+	stw	r3,0xa8(r8)
+	stw	r4,0xac(r8)
+	
+	lwz	r8,MCTask(r8)
+	la	r4,pr_MsgPort(r8)
+	mr	r5,r9
 			
 	LIBCALLPOWERPC PutXMsgPPC
 	
@@ -1234,8 +1254,8 @@ NoHEAR:	li	r3,SonnetBase
 	lwz	r9,ReadyTasks+4(r3)
 	mr.	r9,r9
 	beq	NoReschedule
-	lwz	r9,MN_IDENTIFIER(r9)
-	loadreg	r8,"TPPC"
+	lwz	r9,MN_IDENTIFIER(r9)	
+	loadreg	r8,"TPPC"	
 	cmpw	r9,r8
 	bne	NoReschedule
 	
@@ -1256,6 +1276,7 @@ NoHEAR:	li	r3,SonnetBase
 	lwz	r4,MN_MIRROR(r8)
 	stw	r4,TempMirror(r3)
 	lwz	r2,PP_REGS+12*4(r8)
+	lwz	r3,PP_REGS+0*4(r8)
 	lwz	r4,PP_REGS+1*4(r8)
 	lwz	r5,PP_REGS+8*4(r8)
 	lwz	r6,PP_REGS+9*4(r8)
@@ -1274,25 +1295,28 @@ NoHEAR:	li	r3,SonnetBase
 	add	r8,r8,r9
 	sync	
 
-	lis	r3,EUMB
-	lis	r9,0x100			#Clear IM0 bit to clear interrupt
-	stw	r9,0x100(r3)
-	eieio
-	clearreg r9
-	lis	r3,EUMBEPICPROC
-	sync
-	stw	r9,0xb0(r3)			#Write 0 to EOI to End Interrupt
-	
+	li	r9,0
+	stw	r3,0xa0(r9)
+	stw	r4,0xa4(r9)
+
 	mtsrr0	r8
 	mtsrr1	r7
 	
+	sync	
+
+	lis	r8,EUMB
+	lis	r9,0x100			#Clear IM0 bit to clear interrupt
+	stw	r9,0x100(r8)
+	eieio
+	clearreg r9
+	lis	r8,EUMBEPICPROC
 	sync
 	
+	stw	r9,0xb0(r8)			#Write 0 to EOI to End Interrupt		
 	addi	r13,r13,20
-	
 	lwz	r1,0(r1)
 	lwz	r13,-4(r1)			#Destroy local stack
-	
+
 	rfi	
 	
 NoReschedule:	

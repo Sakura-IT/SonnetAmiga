@@ -930,11 +930,11 @@ FindTagItemPPC:
 
 #********************************************************************************************
 #
-#	Support: void Flush_L1_DCache(void)
+#	Support: void FlushL1DCache(void)
 #
 #********************************************************************************************
-
-FlushL1DCache:			
+FlushL1DCache:
+			
 		li	r4,0x7000
 
 		li	r6,0x400
@@ -954,6 +954,20 @@ FlushL1DCache:
 
 		blr
 
+		li	r3,0
+		lis	r4,0x10
+		
+.Fl11:		cmplw	cr1,r3,r4
+		beq 	cr1,.Fl12
+		lbz	r5,0(r3)
+		addi	r3,r3,L1_CACHE_LINE_SIZE
+		b	.Fl11
+		
+.Fl12:		sync
+		isync
+		
+		blr
+								
 #********************************************************************************************
 #
 #	message = AllocXMsgPPC(bodysize, replyport) // r3=r4,r5
@@ -2228,6 +2242,8 @@ PutXMsgPPC:
 		la	r4,MP_MSGLIST(r4)
 
 		LIBCALLPOWERPC AddTailPPC
+		
+		LIBCALLPOWERPC FlushL1DCache
 		
 		mr 	r4,r31
 		
