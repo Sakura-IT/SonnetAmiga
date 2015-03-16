@@ -118,9 +118,6 @@ ExitCode:
 	stw	r30,PP_REGS+13*4(r9)
 	stw	r31,PP_REGS+14*4(r9)
 	
-	stw	r3,0xa8(r8)
-	stw	r4,0xac(r8)
-	
 	lwz	r8,MCTask(r8)
 	la	r4,pr_MsgPort(r8)
 	mr	r5,r9
@@ -1295,13 +1292,8 @@ NoHEAR:	li	r3,SonnetBase
 	add	r8,r8,r9
 	sync	
 
-	li	r9,0
-	stw	r3,0xa0(r9)
-	stw	r4,0xa4(r9)
-
 	mtsrr0	r8
 	mtsrr1	r7
-	
 	sync	
 
 	lis	r8,EUMB
