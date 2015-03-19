@@ -31,6 +31,8 @@
 .set PP_SIZE,144
 .set NT_MESSAGE,5
 .set LN_TYPE,8
+.set HW_NOTAVAILABLE,0
+.set ATTEMPT_SUCCESS,-1
 
 .set FunctionsLen,(EndFunctions-SetExcMMU)
 
@@ -490,7 +492,11 @@ AllocVecPPC:
 		subi	r29,r29,1
 		rlwimi	r4,r29,0,16,31
 
-.error:		lwz	r6,0(r13)
+.error:		mr	r31,r3
+		LIBCALLPOWERPC FlushL1DCache
+		mr	r3,r31
+		
+		lwz	r6,0(r13)
 		lwzu	r7,4(r13)
 		lwzu	r20,4(r13)
 		lwzu	r21,4(r13)
@@ -586,7 +592,11 @@ FreeVecPPC:
 		subfco	r28,r3,r29
 		subf.	r3,r29,r3
 
-.error2:	lwz	r6,0(r13)
+.error2:	mr	r31,r3
+		LIBCALLPOWERPC FlushL1DCache
+		mr	r3,r31
+		
+		lwz	r6,0(r13)
 		lwzu	r7,4(r13)
 		lwzu	r20,4(r13)
 		lwzu	r21,4(r13)
@@ -2647,55 +2657,328 @@ TrySemaphorePPC:
 		
 #********************************************************************************************
 #
+#	Void SetCache(cacheflags, start, length) // r4,r5,r6
+#
+#********************************************************************************************	
+		
+SetCache:						#need to Implement CACR flags
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+
+		mr	r30,r4
+
+		cmplwi	r4,CACHE_DCACHEFLUSH
+		beq-	.DCACHEFLUSH
+		cmplwi	r4,CACHE_ICACHEINV
+		beq-	.ICACHEINV
+		cmplwi	r4,CACHE_ICACHEOFF
+		beq-	.ICACHEOFF
+		cmplwi	r4,CACHE_ICACHEON
+		beq-	.ICACHEON
+		cmplwi	r4,CACHE_ICACHEUNLOCK
+		beq-	.ICACHEUNLOCK
+		cmplwi	r4,CACHE_DCACHEON
+		beq-	.DCACHEON
+		cmplwi	r4,CACHE_DCACHEUNLOCK
+		beq-	.DCACHEUNLOCK
+		cmplwi	r4,CACHE_ICACHELOCK
+		beq-	.ICACHELOCK
+		cmplwi	r4,CACHE_DCACHEOFF
+		beq-	.DCACHEOFF
+		cmplwi	r4,CACHE_DCACHELOCK
+		beq-	.DCACHELOCK
+		cmplwi	r4,CACHE_DCACHEINV
+		beq-	.DCACHEINV
+		b	.DoneCache
+
+.DCACHEINV: 	mr.	r5,r5
+		beq-	.DoneCache
+		mr.	r6,r6
+		beq-	.DoneCache
+		mr	r4,r5
+		mr	r5,r6
+
+		LIBCALLPOWERPC WarpSuper
+
+		add	r5,r5,r4
+		lis	r0,-1
+		ori	r0,r0,65504
+		and	r4,r4,r0
+		addi	r5,r5,31
+		and	r5,r5,r0
+		sub	r5,r5,r4
+		rlwinm	r5,r5,27,5,31
+		mtctr	r5
+.DInvalidate:	dcbi	r0,r4
+		addi	r4,r4,L1_CACHE_LINE_SIZE
+		bdnz+	.DInvalidate
+		sync
+		
+		LIBCALLPOWERPC WarpUser
+		
+		b	.DoneCache
+
+.DCACHELOCK:	mr.	r5,r5
+		beq-	.DoneCache
+		mr.	r6,r6
+		beq-	.DoneCache
+
+		mr	r29,r5
+		mr	r31,r6
+		
+		LIBCALLPOWERPC FlushL1DCache
+		
+		mr	r4,r29
+		mr	r5,r31
+		
+		add	r5,r5,r4
+		lis	r0,-1
+		ori	r0,r0,65504
+		and	r4,r4,r0
+		addi	r5,r5,31
+		and	r5,r5,r0
+		sub	r5,r5,r4
+		rlwinm	r5,r5,27,5,31
+		mtctr	r5
+.FillLoop:	lwz	r0,0(r4)
+		addi	r4,r4,32
+		bdnz+	.FillLoop
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_DLOCK
+		sync	
+		mtspr	HID0,r0
+		sync	
+		isync		
+
+		b	.DoneCache
+				
+.DCACHEOFF:	LIBCALLPOWERPC FlushL1DCache
+		LIBCALLPOWERPC WarpUser
+		
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		xori	r0,r0,HID0_DCE
+		sync	
+		mtspr	HID0,r0
+		
+		b	.DoneCache
+
+.ICACHELOCK:	LIBCALLPOWERPC WarpSuper
+
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_ILOCK
+		isync	
+		mtspr	HID0,r0
+
+		LIBCALLPOWERPC WarpUser
+
+		b	.DoneCache
+
+.DCACHEUNLOCK:	LIBCALLPOWERPC WarpSuper
+
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_DLOCK
+		xori	r0,r0,HID0_DLOCK
+		mtspr	HID0,r0
+		sync	
+		isync		
+
+		LIBCALLPOWERPC WarpUser
+		
+		b	.DoneCache
+
+.DCACHEON:	LIBCALLPOWERPC WarpSuper
+
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		mtspr	HID0,r0
+		isync
+		
+		LIBCALLPOWERPC WarpUser
+		
+		b	.DoneCache
+
+.ICACHEUNLOCK:	LIBCALLPOWERPC WarpSuper
+
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_ILOCK
+		xori	r0,r0,HID0_ILOCK
+		mtspr	HID0,r0
+		isync
+		
+		LIBCALLPOWERPC WarpUser
+
+		b	.DoneCache
+
+.ICACHEON:	LIBCALLPOWERPC WarpSuper
+
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_ICE
+		mtspr	HID0,r0
+		isync
+
+		LIBCALLPOWERPC WarpUser
+		
+		b	.DoneCache
+
+.ICACHEOFF:	LIBCALLPOWERPC WarpSuper
+		
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_ICE
+		xori	r0,r0,HID0_ICE
+		isync	
+		mtspr	HID0,r0
+
+		LIBCALLPOWERPC WarpUser
+
+		b	.DoneCache
+
+.ICACHEINV:	mr.	r5,r5		
+		beq-	.ICACHEINVALL
+		mr.	r6,r6
+		beq-	.ICACHEINVALL
+		mr	r4,r5
+		mr	r5,r6
+		
+		add	r5,r5,r4
+		lis	r0,-1
+		ori	r0,r0,65504
+		and	r4,r4,r0
+		addi	r5,r5,31
+		and	r5,r5,r0
+		sub	r5,r5,r4
+		rlwinm	r5,r5,27,5,31
+		mtctr	r5
+.Invalidate:	icbi	r0,r4
+		addi	r4,r4,L1_CACHE_LINE_SIZE
+		bdnz+	.Invalidate
+		isync	
+		b	.DoneCache
+
+.ICACHEINVALL:  
+		LIBCALLPOWERPC WarpSuper
+		
+		b	.Mojo1
+.Mojo2:		mfspr	r0,HID0
+		ori	r0,r0,HID0_ICFI
+		mtspr	HID0,r0
+		xori	r0,r0,HID0_ICFI
+		mtspr	HID0,r0
+		isync	
+		b 	.Mojo3
+.Mojo1:		b 	.Mojo2
+		
+.Mojo3:		LIBCALLPOWERPC WarpUser
+		
+		b	.DoneCache
+
+.DCACHEFLUSH:	mr.	r5,r5
+		beq-	.DCACHEFLUSHALL
+		mr.	r6,r6
+		beq-	.DCACHEFLUSHALL
+		mr	r4,r5
+		mr	r5,r6
+		
+		add	r5,r5,r4
+		lis	r0,-1
+		ori	r0,r0,65504
+		and	r4,r4,r0
+		addi	r5,r5,31
+		and	r5,r5,r0
+		sub	r5,r5,r4
+		rlwinm	r5,r5,27,5,31
+		mtctr	r5
+.Flush:		dcbf	r0,r4
+		addi	r4,r4,L1_CACHE_LINE_SIZE
+		bdnz+	.Flush
+		sync	
+		b	.DoneCache
+
+.DCACHEFLUSHALL:
+		LIBCALLPOWERPC FlushL1DCache
+
+.DoneCache:	lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
+		
+		DSTRYSTACKPPC
+		
+		blr
+				
+#********************************************************************************************
+#
 #	Poolheader = CreatePoolPPC(attr, puddlesize, treshsize) // r3=r4,r5,r6 r4 is ignored
 #
 #********************************************************************************************		
 
 CreatePoolPPC:
-		nop
-		blr	
+		li	r3,0
+		blr
+		
+#********************************************************************************************
 
 SPrintF:			blr			#debug feature
 Run68KLowLevel:			blr
-CreateTaskPPC:			blr
+CreateTaskPPC:			li	r3,0
+				blr
 DeleteTaskPPC:			blr
-FindTaskPPC:			blr
+FindTaskPPC:			li	r3,0
+				blr
 SignalPPC:			blr
-WaitPPC:			blr
-SetTaskPriPPC:			blr
-SetCache:			blr
-SetExcHandler:			blr
+WaitPPC:			li	r3,0
+				blr
+SetTaskPriPPC:			li	r3,0
+				blr
+SetExcHandler:			li	r3,0
+				blr
 RemExcHandler:			blr
-SetHardware:			blr
+SetHardware:			li	r3,HW_NOTAVAILABLE
+				blr
 ModifyFPExc:			blr
-WaitTime:			blr
+WaitTime:			li	r3,0
+				blr
 ChangeStack:			blr
 ChangeMMU:			blr
 PutMsgPPC:			blr
-GetMsgPPC:			blr
+GetMsgPPC:			li	r3,0
+				blr
 ReplyMsgPPC:			blr
 FreeAllMem:			blr
-SnoopTask:			blr
+SnoopTask:			li	r3,0
+				blr
 EndSnoopTask:			blr
 GetHALInfo:			blr
 SetScheduling:			blr
-FindTaskByID:			blr
-SetNiceValue:			blr
-AllocPrivateMem:		blr
+FindTaskByID:			li	r3,0
+				blr
+SetNiceValue:			li	r3,0
+				blr
+AllocPrivateMem:		li	r3,0
+				blr
 FreePrivateMem:			blr
-SetExceptPPC:			blr
+SetExceptPPC:			li	r3,0
+				blr
 ObtainSemaphoreSharedPPC:	blr
-AttemptSemaphoreSharedPPC:	blr
+AttemptSemaphoreSharedPPC:	li	r3,ATTEMPT_SUCCESS
+				blr
 ProcurePPC:			blr
 VacatePPC:			blr
 CauseInterrupt:			blr
 DeletePoolPPC:			blr
-AllocPooledPPC:			blr
+AllocPooledPPC:			li	r3,0
+				blr
 FreePooledPPC:			blr
-RawDoFmtPPC:			blr
+RawDoFmtPPC:			li	r3,0
+				blr
 PutPublicMsgPPC:		blr
-AddUniquePortPPC:		blr
-AddUniqueSemaphorePPC:		blr
+AddUniquePortPPC:		li	r3,0
+				blr
+AddUniqueSemaphorePPC:		li	r3,0
+				blr
 IsExceptionMode:		blr
 
 #********************************************************************************************

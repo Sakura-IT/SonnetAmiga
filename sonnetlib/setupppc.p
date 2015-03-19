@@ -16,17 +16,17 @@
 .set	pr_MsgPort,92
 
 #********************************************************************************************
-	
-.section "PPCFunctions","acrx"
+
+.section "PPCSetup","acrx"
 
 PPCCode:					#0x4000	System initialization
 	lis	r22,CMD_BASE
-	lis	r29,VEC_BASE
+	lis	r29,VEC_BASE			#0xfff00000
 	ori	r29,r29,0x6000			#For initial communication
 
 	bl	Reset
-	
-	setpcireg PICR1
+
+	setpcireg PICR1				#Setup various PCI registers of the Sonnet
 	loadreg r25,VAL_PICR1
 	bl	ConfigWrite32
 	setpcireg PICR2
@@ -38,24 +38,24 @@ PPCCode:					#0x4000	System initialization
 	setpcireg EUMBBAR
 	lis	r25,EUMB
 	bl	ConfigWrite32
-	
+
 	bl	ConfigMem			#Result = Sonnet Mem Len in r8
 	bl	InstallExceptions		#Put exceptions in place
-	
+
 	lis	r27,0x8000			#Upper boundary PCI Memory Mediator
 	mr	r26,r8				#Oops, hardcoded
 
 	li	r28,17
-	mtctr	r28	
+	mtctr	r28
 	li	r28,1
 	li	r25,29
-	
+
 Loop1:	slw.	r26,r26,r28
 	blt	Fndbit
 	addi	r25,r25,-1
 	bdnz	Loop1
 	b	ExitCode
-	
+
 Fndbit:	slw.	r26,r26,r28
 	beq	SetLen
 	addi	r25,r25,1
@@ -65,7 +65,7 @@ SetLen:	mr	r30,r28
 	slw	r30,r30,r28
 	subf	r27,r30,r27
 	lis	r26,EUMB
-	ori	r26,r26,ITWR	
+	ori	r26,r26,ITWR
 	stwbrx	r25,0,r26			#debug = 0x19 (=48MB, Development system)
 	sync
 
@@ -76,21 +76,21 @@ SetLen:	mr	r30,r28
 
 	stw	r27,8(r29)			#MemStart
 	stw	r8,12(r29)			#MemLen
-	
-	bl	mmuSetup
-	bl	Epic
-	bl	Caches
+
+	bl	mmuSetup			#Setup BATs. Needs to be changed to tables
+	bl	Epic				#Setup the EPIC controller
+	bl	Caches				#Setup the L1 and L2 cache
 
 	loadreg	r3,0x8000			#Start hardcoded at 0x8000
 	mr	r31,r3
-						#This should become the idle task
-	loadreg	r1,0x7fefc			#Userstack in unused mem (See BootPPC.s)
+
+	loadreg	r1,0x7fefc			#Userstack in unused mem (See sonnet.s)
 	lis	r15,0
 	stw	r15,0(r1)
 	loadreg	r2,0x18000			#SDA (0x10000-0x20000)
 	loadreg	r13,0x28000			#SDA2 (0x20000-0x30000)
 	bl	End
-	
+
 Start:						#Dummy entry at absolute 0x8000
 	nop
 	nop
@@ -101,7 +101,7 @@ ExitCode:
 	li	r8,SonnetBase			#Exit code of processes (in development)
 	lwz	r9,RunningTask(r8)
 	loadreg r7,"FPPC"
-	stw	r7,MN_IDENTIFIER(r9)	
+	stw	r7,MN_IDENTIFIER(r9)
 	stw	r2,PP_REGS+12*4(r9)
 	stw	r3,PP_REGS+0*4(r9)
 	stw	r4,PP_REGS+1*4(r9)
@@ -116,7 +116,7 @@ ExitCode:
 	stw	r28,PP_REGS+10*4(r9)
 	stw	r29,PP_REGS+11*4(r9)
 	stw	r30,PP_REGS+13*4(r9)
-	stw	r31,PP_REGS+14*4(r9)	
+	stw	r31,PP_REGS+14*4(r9)
 	stfd	f0,PP_FREGS+0*8(r9)
 	stfd	f1,PP_FREGS+1*8(r9)
 	stfd	f2,PP_FREGS+2*8(r9)
@@ -124,27 +124,27 @@ ExitCode:
 	stfd	f4,PP_FREGS+4*8(r9)
 	stfd	f5,PP_FREGS+5*8(r9)
 	stfd	f6,PP_FREGS+6*8(r9)
-	stfd	f7,PP_FREGS+7*8(r9)	
+	stfd	f7,PP_FREGS+7*8(r9)
 	lwz	r8,MCTask(r8)
 	la	r4,pr_MsgPort(r8)
 	mr	r5,r9
-			
+
 	LIBCALLPOWERPC PutXMsgPPC
-	
+
 	li	r3,0
 	stw	r3,RunningTask(r3)
-	
+
 Pause:	nop
 	nop
 	b	Pause
 
 End:	mflr	r4
-	
+
 	addi	r5,r4,End-Start
 	subf	r5,r4,r5
 	li	r6,0
-	bl	copy_and_flush			#Put program in Sonnet Mem instead if PCI Mem
-	
+	bl	copy_and_flush			#Put program in Sonnet Mem instead of PCI Mem
+
 	lis	r14,0				#Reset
 	mtdec	r14				#Decrementer,
 	mtspr	285,r14				#Time Base Upper and
@@ -154,56 +154,58 @@ End:	mflr	r4
 	lwz	r28,0(r14)
 	stw	r14,Atomic(r14)
 	stw	r28,4(r29)			#Signal 68k that PPC is initialized
-	
+
 	loadreg r6,"INIT"
 WInit:	lwz	r28,Init(r14)
 	cmplw	r28,r6
 	bne	WInit				#Wait for 68k to set up library
-	
-	li	r3,0x7000			#BUG! Not sure why this delay is needed
+
+	loadreg	r3,1000000			#BUG! Not sure why this delay is needed
 	mtctr	r3
-Delay2:	
+Delay2:
 	bdnz	Delay2
-	
+
 	lwz	r14,0(r14)
 	la	r4,ReadyTasks(r14)
 	LIBCALLPOWERPC NewListPPC
-	
+
 	la	r4,WaitingTasks(r14)
 	LIBCALLPOWERPC NewListPPC
-	
+
 	la	r4,Semaphores(r14)
 	LIBCALLPOWERPC NewListPPC
-	
+
 	la	r4,Ports(r14)
 	LIBCALLPOWERPC NewListPPC
 
 	li	r4,SSPPC_SIZE*3			#Memory for 3 Semaphores
 	LIBCALLPOWERPC AllocVecPPC
-	
+
 	mr	r30,r3
 	mr	r4,r3
 	stw 	r4,TaskListSem(r14)
 	LIBCALLPOWERPC InitSemaphorePPC
-	
+
 	addi	r4,r30,SSPPC_SIZE
 	stw	r4,SemListSem(r14)
 	LIBCALLPOWERPC InitSemaphorePPC
-	
+
 	addi	r4,r30,SSPPC_SIZE*2
 	stw	r4,PortListSem(r14)
 	LIBCALLPOWERPC InitSemaphorePPC
-	
+
+	LIBCALLPOWERPC FlushL1DCache
+
 	mfmsr	r14
 	ori	r14,r14,PSL_EE			#Enable External Exceptions and Decrementer
 	mtmsr	r14				#Exception
 	isync
 	
-	mtspr	srr0,r31
+	mtsrr0	r31
 	isync
-	mtspr	srr1,r14
+	mtsrr1	r14
 	isync
-	sync	
+	sync
 	rfi					#To user code
 
 #********************************************************************************************
@@ -215,7 +217,7 @@ Reset:	mflr	r15
 	sync
 	mtmsr	r1				#Clear MSR, keep Interrupt Prefix for now 
 	isync
-						#Zero-out registers  
+						#Zero-out registers
 	andi.   r0, r0, 0
 	mtspr   SPRG0, r0
 	mtspr   SPRG1, r0
@@ -225,7 +227,7 @@ Reset:	mflr	r15
 	lis	r3,HID0_NHR@h
 	ori	r3,r3,HID0_NHR@l
 	mfspr	r4,HID0
-	and	r3,r4, r3			#Clear other bits 
+	and	r3,r4, r3			#Clear other bits
 	mtspr	HID0,r3
 	sync
 
@@ -262,7 +264,7 @@ ifpdr_value:
 	lfs	f8,0(r3)
 	lfs	f9,0(r3)
 	lfs	f10,0(r3)
-	lfs	f11,0(r3)	
+	lfs	f11,0(r3)
 	lfs	f12,0(r3)
 	lfs	f13,0(r3)
 	lfs	f14,0(r3)
@@ -272,7 +274,7 @@ ifpdr_value:
 	lfs	f18,0(r3)
 	lfs	f19,0(r3)
 	lfs	f20,0(r3)
-	lfs	f21,0(r3)	
+	lfs	f21,0(r3)
 	lfs	f22,0(r3)
 	lfs	f23,0(r3)
 	lfs	f24,0(r3)
@@ -289,12 +291,12 @@ ifpdr_value:
 	mtspr	ibat0u,r1
 	mtspr	ibat1u,r1
 	mtspr	ibat2u,r1
-	mtspr	ibat3u,r1	
+	mtspr	ibat3u,r1
 	mtspr	dbat0u,r1
 	mtspr	dbat1u,r1
 	mtspr	dbat2u,r1
 	mtspr	dbat3u,r1
-	
+
 	isync
 	sync
 	sync
@@ -321,16 +323,16 @@ ifpdr_value:
 	sync
 						#Turn off caches and invalidate them 
 
-	mfl2cr	r3				
-	rlwinm  r3,r3,0,1,31	  	   	#turn off the L2 enable bit 
-	mtl2cr	r3				
+	mfl2cr	r3
+	rlwinm  r3,r3,0,1,31	  	   	#turn off the L2 enable bit
+	mtl2cr	r3
 	isync
 
 	oris	r3,r3,L2CR_L2I@h
-	mtl2cr	r3				
+	mtl2cr	r3
 	sync
 Wait1:
-	mfl2cr	r3				
+	mfl2cr	r3
 	andi.	r3,r3,L2CR_L2IP@l
 	cmpwi	r3,L2CR_L2IP@l
 	beq	Wait1				#Wait for invalidate done 
@@ -341,11 +343,11 @@ Wait1:
 	rlwinm  r4,r3,0,18,15			#Clear d16 and d17 to disable L1 cache 
 	sync
 	isync
-	mtspr   HID0,r4 			#turn off caches 
+	mtspr   HID0,r4 			#turn off caches
 	isync
 
 	lis	r3,0
-	ori	r3,r3,HID0_ICFI@l		#Invalidates instruction caches 
+	ori	r3,r3,HID0_ICFI@l		#Invalidates instruction caches
 	or	r4,r4,r3
 	sync
 	isync
@@ -354,7 +356,7 @@ Wait1:
 	isync
 
 	lis	r3,0
-	ori	r3,r3,HID0_DCFI@l		#Invalidates data caches 
+	ori	r3,r3,HID0_DCFI@l		#Invalidates data caches
 	or	r4,r4,r3
 	sync
 	isync
@@ -362,7 +364,7 @@ Wait1:
 	andc	r4,r4,r3
 	isync
 
-	li	r11,0x2000			#No harm 
+	li	r11,0x2000			#No harm
 	mtctr	r11
 Delay1:
 	bdnz	Delay1
@@ -372,8 +374,8 @@ Delay1:
 	isync
 	ori	r4,r4,(HID0_ICE|HID0_ICFI)
 	isync
-	mtspr	HID0,r4				#turn on i-cache for speed 
-	rlwinm	r4,r4,0,21,19			#clear the ICFI bit 
+	mtspr	HID0,r4				#turn on i-cache for speed
+	rlwinm	r4,r4,0,21,19			#clear the ICFI bit
 	isync
 	mtspr	HID0,r4
 
@@ -382,13 +384,12 @@ Delay1:
 
 #********************************************************************************************
 
-
 Epic:	lis	r26,EUMB
 	loadreg	r27,EPIC_GCR
 	add	r27,r26,r27
-	li	r28,0xa0				
+	li	r28,0xa0
 	stw	r28,0(r27)			#Reset EPIC
-	
+
 ResLoop:
 	lwz	r28,0(r27)
 	andi.	r28,r28,0x80
@@ -396,29 +397,29 @@ ResLoop:
 
 	li	r28,0x20
 	stw	r28,0(r27)			#Set Mixed Mode
-	
+
 	loadreg	r28,0x80050042
 	loadreg	r27,EPIC_IIVPR3
 	add	r27,r26,r27
 	stwbrx	r28,0,r27			#Set MU interrupt, Pri = 5, Vector = 0x42
 	sync
-	
+
 	loadreg r28,Quantum			#Set Slice/Quantum
 	loadreg r27,EPIC_GTBCR0
 	add	r27,r26,r27
 	stwbrx	r28,0,r27
-	sync	
+	sync
 	loadreg r28,0x80040043
 	loadreg r27,EPIC_GTVPR0
 	add	r27,r26,r27
 	stwbrx	r28,0,r27
-	sync	
-	
+	sync
+
 	loadreg	r27,EPIC_EICR
 	add	r27,r26,r27
 	lwz	r28,0(r27)
 	rlwinm	r28,r28,0,21,19			#Doc says Set SIE = 0
-	stw	r28,0(r27)	
+	stw	r28,0(r27)
 	sync
 
 	loadreg	r27,EPIC_IIVPR3
@@ -427,22 +428,22 @@ ResLoop:
 	rlwinm	r28,r28,0,25,23			#Doc says Mask M bit now. Can maybe already at
 	stw	r28,0(r27)			#while setting the interrupt above?
 	sync
-	
+
 	loadreg	r27,EPIC_GTVPR0
 	add 	r27,r26,r27
 	lwz	r28,0(r27)
 	rlwinm	r28,r28,0,25,23			#Doc says Mask M bit now. Can maybe already at
 	stw	r28,0(r27)			#while setting the interrupt above?
-	sync	
-	
+	sync
+
 	loadreg	r27,EPIC_PCTPR
 	add	r27,r26,r27
 	lis	r28,0
 	stw	r28,0(r27)			#Doc says Set Pri (Task) = 0
-	
+
 	loadreg	r27,EPIC_FRR
 	add	r27,r26,r27
-	
+
 	lwbrx	r28,0,r27
 	rlwinm	r28,r28,16,21,31		#Get FRR[NIRQ]
 
@@ -456,10 +457,10 @@ ClearInts:
 	sync
 	stw	r27,0xb0(r26)			#EOI
 	bdnz	ClearInts
-	
+
 	blr
-	
-#********************************************************************************************	
+
+#********************************************************************************************
 
 						#Enable L1 data cache 
 Caches:	mfspr	r4,HID0	
@@ -467,35 +468,33 @@ Caches:	mfspr	r4,HID0
 	isync
 	mtspr	HID0,r4				#Enable D-cache
 	isync
-	
 						# Set up on chip L2 cache controller.
 
 	lis	r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST@h
 	ori	r4,r4,0
-	
-	mtl2cr	r4				
+
+	mtl2cr	r4
 	sync
-	mfl2cr	r5				
+	mfl2cr	r5
 	oris	r5,r5,L2CR_L2I@h
-	mtl2cr	r5				
+	mtl2cr	r5
 	sync
-	
+
 Wait2:
-	mfl2cr	r3				
+	mfl2cr	r3
 	andi.	r3,r3,L2CR_L2IP@l
 	cmpwi	r3,L2CR_L2IP@l
 	beq	Wait2				#Wait for invalidate done 
 
 	oris	r4,r4,L2CR_L2E@h
-	mtl2cr	r4				#Enable L2 cache 
+	mtl2cr	r4				#Enable L2 cache
 	sync
 	isync
 	blr
 
-
 #********************************************************************************************
-	
-mmuSetup:					#Could be simpler
+
+mmuSetup:					#Could be simpler. To be converted to tables
 
 	lis r4,IBAT0L_VAL@h
 	ori r4,r4,IBAT0L_VAL@l
@@ -533,9 +532,9 @@ mmuSetup:					#Could be simpler
 	ori r4,r4,IBAT2L_VAL@l
 	lis r3,IBAT2U_VAL@h
 	ori r3,r3,IBAT2U_VAL@l
-	
+
 	or r3,r3,r27
-	
+
 	mtspr ibat2l,r4
 	mtspr ibat2u,r3
 	isync
@@ -544,9 +543,9 @@ mmuSetup:					#Could be simpler
 	ori r4,r4,DBAT2L_VAL@l
 	lis r3,DBAT2U_VAL@h
 	ori r3,r3,DBAT2U_VAL@l
-	
+
 	or r3,r3,r27
-	
+
 	mtspr dbat2l,r4
 	mtspr dbat2u,r3
 	isync
@@ -559,7 +558,6 @@ mmuSetup:					#Could be simpler
 	mtspr ibat3u,r3
 	isync
 
-	
 	lis r4,DBAT3L_VAL@h
 	ori r4,r4,DBAT3L_VAL@l
 	lis r3,DBAT3U_VAL@h
@@ -568,7 +566,7 @@ mmuSetup:					#Could be simpler
 	mtspr dbat3u,r3
 	isync
 						#BATs are now set up, now invalidate tlb entries
-	lis r3,0	
+	lis r3,0
 	lis r5,0x4				#750/MAX have 2x as many tlbs as 603e (Would be 0x2)
 	isync
 
@@ -576,25 +574,25 @@ mmuSetup:					#Could be simpler
 #tlbie must increase the value in bits 14:19 (750, MAX) or 15:19(603e)
 #by one each iteration.
 
-
 tlblp:
 	tlbie r3
 	sync
 	addi r3,r3,0x1000
 	cmpw r3,r5				#check if all TLBs invalidated yet
 	blt tlblp
-	
+
 	mfmsr	r4
-	ori	r4,r4,(PSL_IR|PSL_DR)		#Translation enable
 	andi.	r4,r4,~PSL_IP@l			#Exception prefix from 0xfff00000 to 0x0
-	
+	ori	r4,r4,(PSL_IR|PSL_DR)		#Translation enable
 	mtmsr	r4
 	isync
+	sync
 
 	blr
-#********************************************************************************************		
+
+#********************************************************************************************
 	
-ConfigWrite32:
+ConfigWrite32:					#Various PCI command routines
 	lis	r20,CONFIG_ADDR
 	lis 	r21,CONFIG_DAT
 	stwbrx	r23,0,r20
@@ -611,7 +609,7 @@ ConfigWrite16:
 	sthbrx	r25,0,r21
 	sync
 	blr
-		
+
 ConfigWrite8:
 	lis	r20,CONFIG_ADDR
 	stwbrx	r23,0,r20
@@ -1185,7 +1183,7 @@ copy_and_flush:
 	addi	r6,r6,-4
 cachel:	li	r0,L1_CACHE_LINE_SIZE/4
 	mtctr	r0
-cachel1:	addi	r6,r6,4			#copy a cache line 
+cachel1:	addi	r6,r6,4			#copy a cache line
 	lwzx	r0,r6,r4
 	stwx	r0,r6,r3
 	bdnz	cachel1
@@ -1199,13 +1197,13 @@ cachel1:	addi	r6,r6,4			#copy a cache line
 	addi	r5,r5,4
 	addi	r6,r6,4
 	blr
-	
+
 #********************************************************************************************
 
 InstallExceptions:
 	mflr	r15
 	bl	GtCode
-Halt:	ori	r0,r0,0		         	#no-op
+Halt:	nop
 	b	Halt
 GtCode:	mflr	r16
 	li	r17,0
@@ -1224,27 +1222,27 @@ FillEm:	addi	r17,r17,0x100
 EInt:	stw	r13,-4(r1)			#Create local stack
 	subi	r13,r1,4
 	stwu	r1,-4096(r1)
-		
+
 	stwu	r3,-4(r13)
 	stwu	r4,-4(r13)
-	stwu 	r5,-4(r13)		
+	stwu 	r5,-4(r13)
 	stwu	r6,-4(r13)
 	stwu	r7,-4(r13)
 	stwu	r8,-4(r13)
 	stwu	r9,-4(r13)
-		
+
 	mfsrr0	r6
 	mfsrr1	r7
-	
+
 	mfmsr	r5
 	ori	r5,r5,(PSL_IR|PSL_DR|PSL_FP)
 	mtmsr	r5				#Reenable MMU (can affect srr0/srr1 acc Docs)
-	isync
-	
+	isync					#Also reenable FPU
+
 	lis	r3,EUMBEPICPROC
 	lwz	r5,0xa0(r3)			#Read IACKR to acknowledge it
 	eieio
-	
+
 	rlwinm	r5,r5,8,0,31
 	cmpwi	r5,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
 	beq	NoEOI
@@ -1252,26 +1250,26 @@ EInt:	stw	r13,-4(r1)			#Create local stack
 	bne	NoHEAR
 
 	b	TestRoutine
-	
+
 NoHEAR:	li	r3,SonnetBase
-	
+
 	lwz	r9,ReadyTasks+4(r3)
 	mr.	r9,r9
 	beq	NoReschedule
-	lwz	r9,MN_IDENTIFIER(r9)	
-	loadreg	r8,"TPPC"	
+	lwz	r9,MN_IDENTIFIER(r9)
+	loadreg	r8,"TPPC"
 	cmpw	r9,r8
 	bne	NoReschedule
-	
-	lwz	r9,RunningTask(r3)		#HACK!
+
+	lwz	r9,RunningTask(r3)		#HACK! No task structure yet
 	mr.	r9,r9
 	bne	NoReschedule
-	
+
 	lwz	r9,ReadyTasks+4(r3)
 	stw	r9,RunningTask(r3)
 	li	r6,0
 	stw	r6,ReadyTasks+4(r3)
-		
+
 	loadreg	r6,0x8000
 	addi	r6,r6,ExitCode-Start
 	mtlr	r6
@@ -1305,11 +1303,11 @@ NoHEAR:	li	r3,SonnetBase
 	lwz	r9,PP_OFFSET(r8)
 	lwz	r8,PP_CODE(r8)
 	add	r8,r8,r9
-	sync	
+	sync
 
 	mtsrr0	r8
 	mtsrr1	r7
-	sync	
+	sync
 
 	lis	r8,EUMB
 	lis	r9,0x100			#Clear IM0 bit to clear interrupt
@@ -1318,15 +1316,15 @@ NoHEAR:	li	r3,SonnetBase
 	clearreg r9
 	lis	r8,EUMBEPICPROC
 	sync
-	
-	stw	r9,0xb0(r8)			#Write 0 to EOI to End Interrupt		
+
+	stw	r9,0xb0(r8)			#Write 0 to EOI to End Interrupt
 	addi	r13,r13,20
 	lwz	r1,0(r1)
 	lwz	r13,-4(r1)			#Destroy local stack
 
-	rfi	
-	
-NoReschedule:	
+	rfi
+
+NoReschedule:
 	lis	r3,EUMB
 	lis	r5,0x100			#Clear IM0 bit to clear interrupt
 	stw	r5,0x100(r3)
@@ -1335,12 +1333,12 @@ NoReschedule:
 	lis	r3,EUMBEPICPROC
 	sync
 	stw	r5,0xb0(r3)			#Write 0 to EOI to End Interrupt
-	
+
 NoEOI:	mtsrr0	r6
 	mtsrr1	r7
-	
+
 	sync
-	
+
 	lwz	r9,0(r13)
 	lwzu	r8,4(r13)
 	lwzu	r7,4(r13)
@@ -1349,15 +1347,15 @@ NoEOI:	mtsrr0	r6
 	lwzu	r4,4(r13)
 	lwzu	r3,4(r13)
 	addi	r13,r13,4
-	
+
 	lwz	r1,0(r1)
 	lwz	r13,-4(r1)			#Destroy local stack
-	
+
 	rfi
-	
+
 TestRoutine:
 
-	b	NoHEAR	
+	b	NoHEAR
 
 #********************************************************************************************
 	
@@ -1373,7 +1371,7 @@ EIntEnd:
 	bl	PrIntEnd
 
 #********************************************************************************************
-	
+
 PrInt:						#Privilege Exception
 	mtsprg	1,r3
 	mfspr	r3,HID0
@@ -1384,10 +1382,10 @@ PrInt:						#Privilege Exception
 	mtsprg	2,r3
 	mtsprg	3,r0
 	mfsrr0	r3
-	
+
 	li	r0,SonnetBase
 	lwz	r0,ViolationAddress(r0)
-	
+
 	cmplw	r0,r3
 	bne-	.HaltErr
 	addi	r3,r3,4				#Next instruction
@@ -1405,7 +1403,7 @@ PrInt:						#Privilege Exception
 	b .HaltErr
 
 #********************************************************************************************
-	
+
 PrIntEnd:
 	mflr	r4
 	li	r3,0x700
@@ -1415,9 +1413,9 @@ PrIntEnd:
 	bl	DcIntEnd
 
 #********************************************************************************************
-		
+
 DcInt:	nop					#Decrementer Exception
-	rfi	
+	rfi
 
 #********************************************************************************************
 
@@ -1427,9 +1425,9 @@ DcIntEnd:
 	li	r5,DcIntEnd-DcInt
 	li	r6,0
 	bl	copy_and_flush
-		
+
 	mtlr	r15
 	blr
-	
-#********************************************************************************************	
+
+#********************************************************************************************
 PPCEnd:

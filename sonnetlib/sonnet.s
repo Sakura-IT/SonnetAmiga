@@ -153,8 +153,7 @@ NoPCI	move.l DosBase(pc),d0
 NoDos	move.l ExpBase(pc),d0
 	beq.s Exit
 	bsr.s ClsLib
-Exit	jsr _LVOCacheClearU(a6)
-	move.l _PowerPCBase(pc),d0
+Exit	move.l _PowerPCBase(pc),d0
 	movem.l (a7)+,d1-a6
 	rts
 
@@ -321,13 +320,14 @@ RLoc	add.l d2,(a2)+
 	beq.s NoLib
 
 	move.l SonnetBase(pc),a1
+	move.l a1,a2
+	moveq.l #$3f,d1
+ClearB	clr.l (a2)+
+	dbf d1,ClearB
 	move.l d0,4(a1)					;PowerPCBase at $4
 	move.l a5,8(a1)					;Memheader at $8
 	move.l a1,(a1)					;Sonnet relocated mem at $0
 	move.l d0,_PowerPCBase-Buffer(a4)
-	moveq.l #0,d1
-	move.l d1,RunningTask(a1)
-	move.l d1,Init(a1)
 
 	move.l d0,a1
 	jsr _LVOAddLibrary(a6)
@@ -352,7 +352,8 @@ RLoc	add.l d2,(a2)+
 	jsr _LVOCreateNewProc(a6)
 	move.l 4.w,a6
 
-NoLib	move.l a5,a1
+NoLib	jsr _LVOCacheClearU(a6)
+	move.l a5,a1
 	jsr _LVORemove(a6)
 	move.w #$0a01,8(a5)
 	move.l a5,a1
@@ -519,7 +520,8 @@ Sig68k	move.l ThisTask(a6),a0
 	jsr _LVOPutMsg(a6)				;move message to waiting 68k task
 	bra.s NextMsg
 
-MsgTPPC	move.l SonnetBase(pc),a0
+MsgTPPC	jsr _LVOCacheClearU(a6)
+	move.l SonnetBase(pc),a0
 	move.l a1,ReadyTasks+4(a0)
 	move.l _PowerPCBase(pc),a6			;Force reschedule. Is this faster than
 	jsr _LVOCauseInterruptHW(a6)			;just wait for normal reschedule?
@@ -1103,7 +1105,7 @@ CausePPCInterrupt:
 
 DriverID
 	dc.b "WarpUp hardware driver for Sonnet Crescendo 7200 PCI",0
-	cnop	0,2
+	cnop	0,4
 
 Buffer		ds.l	1
 _PowerPCBase	ds.l	1
@@ -1117,6 +1119,8 @@ ComProc		ds.l	1
 SonAddr		ds.l	1
 EUMBAddr	ds.l	1
 MyInterrupt	ds.b	IS_SIZE
+
+	cnop	0,4
 
 DATATABLE:
 	INITBYTE	LN_TYPE,NT_LIBRARY
