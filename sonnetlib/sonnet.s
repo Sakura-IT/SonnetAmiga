@@ -153,7 +153,8 @@ NoPCI	move.l DosBase(pc),d0
 NoDos	move.l ExpBase(pc),d0
 	beq.s Exit
 	bsr.s ClsLib
-Exit	move.l _PowerPCBase(pc),d0
+Exit	jsr _LVOCacheClearU(a6)
+	move.l _PowerPCBase(pc),d0
 	movem.l (a7)+,d1-a6
 	rts
 
@@ -326,6 +327,7 @@ RLoc	add.l d2,(a2)+
 	move.l d0,_PowerPCBase-Buffer(a4)
 	moveq.l #0,d1
 	move.l d1,RunningTask(a1)
+	move.l d1,Init(a1)
 
 	move.l d0,a1
 	jsr _LVOAddLibrary(a6)
@@ -478,7 +480,8 @@ MasterControl:
 	lea Buffer(pc),a4
 	move.l 4.w,a6
 	
-NextMsg	move.l ThisTask(a6),a0
+NextMsg	jsr _LVOCacheClearU(a6)
+	move.l ThisTask(a6),a0
 	lea pr_MsgPort(a0),a0
 	move.l a0,d6
 	jsr _LVOWaitPort(a6)
@@ -832,14 +835,35 @@ FreeIt	move.l d0,a1
 FreePrt	move.l d0,a0
 	jmp _LVODeleteMsgPort(a6)
 
-Runk86	movem.l d0-a6,-(a7)				;68k routines called from PPC
+Runk86	btst.b #AFB_FPU40,AttnFlags+1(a6)
+	beq.s NoFPU
+	fmove.d fp0,-(a7)
+	fmove.d fp1,-(a7)
+	fmove.d fp2,-(a7)
+	fmove.d fp3,-(a7)
+	fmove.d fp4,-(a7)
+	fmove.d fp5,-(a7)
+	fmove.d fp6,-(a7)
+	fmove.d fp7,-(a7)
+NoFPU	movem.l d0-a6,-(a7)				;68k routines called from PPC
 	move.l a0,-(a7)
 	lea MN_PPSTRUCT(a0),a1
 	pea xBack(pc)
 	move.l PP_CODE(a1),a0
 	add.l PP_OFFSET(a1),a0
 	move.l a0,-(a7)
-	lea PP_REGS(a1),a6				;PP_STACKSIZE & PP_STACKPTR to be done
+	btst #AFB_FPU40,AttnFlags+1(a6)
+	beq.s NoFPU3
+	lea PP_FREGS(a1),a6
+	fmove.d (a6)+,fp0
+	fmove.d (a6)+,fp1
+	fmove.d (a6)+,fp2
+	fmove.d (a6)+,fp3
+	fmove.d (a6)+,fp4
+	fmove.d (a6)+,fp5
+	fmove.d (a6)+,fp6
+	fmove.d (a6)+,fp7
+NoFPU3	lea PP_REGS(a1),a6				;PP_STACKSIZE & PP_STACKPTR to be done
 	movem.l (a6)+,d0-a5
 	move.l (a6),a6
 	rts
@@ -848,7 +872,17 @@ xBack	move.l (a7)+,a6
 	movem.l (a7)+,d0-a5
 	move.l a6,a1
 	move.l (a7)+,a6
-	jsr _LVOReplyMsg(a6)
+	btst.b #AFB_FPU40,AttnFlags+1(a6)
+	beq.s NoFPU2
+	fmove.d (a7)+,fp7
+	fmove.d (a7)+,fp6
+	fmove.d (a7)+,fp5
+	fmove.d (a7)+,fp4
+	fmove.d (a7)+,fp3
+	fmove.d (a7)+,fp2
+	fmove.d (a7)+,fp1
+	fmove.d (a7)+,fp0
+NoFPU2	jsr _LVOReplyMsg(a6)
 	bra GtLoop
 
 ;********************************************************************************************

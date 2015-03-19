@@ -11,6 +11,7 @@
 .set	PP_CODE,28
 .set	PP_OFFSET,32
 .set	PP_REGS,48
+.set	PP_FREGS,108
 .set	SSPPC_SIZE,52
 .set	pr_MsgPort,92
 
@@ -100,8 +101,7 @@ ExitCode:
 	li	r8,SonnetBase			#Exit code of processes (in development)
 	lwz	r9,RunningTask(r8)
 	loadreg r7,"FPPC"
-	stw	r7,MN_IDENTIFIER(r9)
-	
+	stw	r7,MN_IDENTIFIER(r9)	
 	stw	r2,PP_REGS+12*4(r9)
 	stw	r3,PP_REGS+0*4(r9)
 	stw	r4,PP_REGS+1*4(r9)
@@ -116,8 +116,15 @@ ExitCode:
 	stw	r28,PP_REGS+10*4(r9)
 	stw	r29,PP_REGS+11*4(r9)
 	stw	r30,PP_REGS+13*4(r9)
-	stw	r31,PP_REGS+14*4(r9)
-	
+	stw	r31,PP_REGS+14*4(r9)	
+	stfd	f0,PP_FREGS+0*8(r9)
+	stfd	f1,PP_FREGS+1*8(r9)
+	stfd	f2,PP_FREGS+2*8(r9)
+	stfd	f3,PP_FREGS+3*8(r9)
+	stfd	f4,PP_FREGS+4*8(r9)
+	stfd	f5,PP_FREGS+5*8(r9)
+	stfd	f6,PP_FREGS+6*8(r9)
+	stfd	f7,PP_FREGS+7*8(r9)	
 	lwz	r8,MCTask(r8)
 	la	r4,pr_MsgPort(r8)
 	mr	r5,r9
@@ -147,15 +154,15 @@ End:	mflr	r4
 	lwz	r28,0(r14)
 	stw	r14,Atomic(r14)
 	stw	r28,4(r29)			#Signal 68k that PPC is initialized
-
+	
 	loadreg r6,"INIT"
 WInit:	lwz	r28,Init(r14)
 	cmplw	r28,r6
 	bne	WInit				#Wait for 68k to set up library
 	
-	li	r3,0x7000			#No harm 
+	li	r3,0x7000			#BUG! Not sure why this delay is needed
 	mtctr	r3
-Delay2:
+Delay2:	
 	bdnz	Delay2
 	
 	lwz	r14,0(r14)
@@ -223,8 +230,8 @@ Reset:	mflr	r15
 	sync
 
 						#Set MPU/MSR to a known state. Turn on FP 
- 	lis	r3,PPC_MSR_FP@h
-	ori	r3,r3,PPC_MSR_FP@l
+ 	lis	r3,PSL_FP@h
+	ori	r3,r3,PSL_FP@l
 	or	r3,r1,r3
 	sync
 	mtmsr 	r3
@@ -1230,7 +1237,7 @@ EInt:	stw	r13,-4(r1)			#Create local stack
 	mfsrr1	r7
 	
 	mfmsr	r5
-	ori	r5,r5,(PSL_IR|PSL_DR)
+	ori	r5,r5,(PSL_IR|PSL_DR|PSL_FP)
 	mtmsr	r5				#Reenable MMU (can affect srr0/srr1 acc Docs)
 	isync
 	
@@ -1287,6 +1294,14 @@ NoHEAR:	li	r3,SonnetBase
 	lwz	r29,PP_REGS+11*4(r8)
 	lwz	r30,PP_REGS+13*4(r8)
 	lwz	r31,PP_REGS+14*4(r8)
+	lfd	f0,PP_FREGS+0*8(r8)
+	lfd	f1,PP_FREGS+1*8(r8)
+	lfd	f2,PP_FREGS+2*8(r8)
+	lfd	f3,PP_FREGS+3*8(r8)
+	lfd	f4,PP_FREGS+4*8(r8)
+	lfd	f5,PP_FREGS+5*8(r8)
+	lfd	f6,PP_FREGS+6*8(r8)
+	lfd	f7,PP_FREGS+7*8(r8)
 	lwz	r9,PP_OFFSET(r8)
 	lwz	r8,PP_CODE(r8)
 	add	r8,r8,r9
