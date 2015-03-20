@@ -12,6 +12,8 @@
 .set TC_SIGWAIT,22
 .set TC_SIGRECVD,26
 .set TASKPPC_TASKPTR,104
+.set TASKPPC_ID,208
+.set TASKPPC_NICE,212
 .set SS_NESTCOUNT,14
 .set SS_WAITQUEUE,16
 .set SS_OWNER,40
@@ -280,7 +282,7 @@ FindNamePPC:
 
 #********************************************************************************************
 #
-#	void ResetPPC(void)	// Dummy (as in powerpc.library
+#	void ResetPPC(void)	// Dummy (as in powerpc.library)
 #
 #********************************************************************************************
 
@@ -3132,6 +3134,290 @@ ModifyFPExc:
 		mtcr	r0
 		lwz	r2,20(r1)
 		blr	
+		
+#********************************************************************************************
+#
+#	status = AddUniquePortPPC(MsgPortPPC) // r3=r4. r4 has an initialized LN_NAME
+#
+#********************************************************************************************
+
+AddUniquePortPPC:
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+
+		mr	r30,r4
+		li	r29,-1
+
+		li	r4,SonnetBase
+		lwz	r4,PortListSem(r4)
+		LIBCALLPOWERPC ObtainSemaphorePPC
+
+		lwz	r4,10(r30)
+		LIBCALLPOWERPC FindPortPPC
+
+		mr.	r3,r3
+		bne-	.Duplicate
+		
+		mr	r4,r30
+		LIBCALLPOWERPC AddPortPPC
+		b	.SkipDup
+
+.Duplicate:	li	r29,0
+.SkipDup:	li	r4,SonnetBase
+		lwz	r4,PortListSem(r4)
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		mr	r3,r29
+
+		lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
+		
+		DSTRYSTACKPPC
+
+		blr
+		
+#********************************************************************************************
+#
+#	status =  AddUniqueSemaphorePPC(SignalSemaphorePPC) // r3=r4. r4 has an initialized LN_NAME
+#
+#********************************************************************************************
+
+AddUniqueSemaphorePPC:
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+
+		mr	r30,r4
+		li	r29,-1
+
+		li	r4,SonnetBase
+		lwz	r4,SemListSem(r4)
+		LIBCALLPOWERPC ObtainSemaphorePPC
+
+		lwz	r4,10(r30)
+		LIBCALLPOWERPC FindSemaphorePPC
+
+		mr.	r3,r3
+		bne-	.Duplicate2
+
+		mr	r4,r30
+		LIBCALLPOWERPC AddSemaphorePPC
+		
+		b	.SkipDup2
+
+.Duplicate2:	li	r29,0
+.SkipDup2:	li	r4,SonnetBase
+		lwz	r4,SemListSem(r4)
+
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		mr	r3,r29
+
+		lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
+
+		DSTRYSTACKPPC
+
+		blr
+		
+#********************************************************************************************
+#
+#	status =  PutPublicMsgPPC(Portname, message) // r3=r4,r5
+#
+#********************************************************************************************	
+	
+PutPublicMsgPPC:
+		BUILDSTACKPPC		
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+
+		mr	r31,r4
+		mr	r30,r5
+		li	r29,-1
+
+		li	r4,SonnetBase
+		lwz	r4,PortListSem(r4)
+		LIBCALLPOWERPC ObtainSemaphorePPC
+
+		mr	r4,r31
+		LIBCALLPOWERPC FindPortPPC
+
+		mr.	r3,r3
+		beq-	.PortNotFound
+
+		mr	r4,r3
+		mr	r5,r30
+		LIBCALLPOWERPC PutMsgPPC
+
+		b	.SkipStatus
+
+.PortNotFound:	li	r29,0
+.SkipStatus:	li	r4,SonnetBase
+		lwz	r4,PortListSem(r4)
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		mr	r3,r29
+		lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
+
+		DSTRYSTACKPPC
+
+		blr
+#********************************************************************************************
+#
+#	void AllocPrivateMem(void)	// Dummy (as in powerpc.library)
+#
+#********************************************************************************************
+
+AllocPrivateMem:
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
+
+		DSTRYSTACKPPC
+		
+		blr	
+
+#********************************************************************************************
+#
+#	void FreePrivateMem(void)	// Dummy (as in powerpc.library)
+#
+#********************************************************************************************
+
+FreePrivateMem:
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
+
+		DSTRYSTACKPPC
+		
+		blr
+		
+#********************************************************************************************
+#
+#	TaskPPC = FindTaskByID(taskID) // r3=r4
+#
+#********************************************************************************************
+
+FindTaskByID:		
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+
+		li	r29,0
+		mr	r31,r4
+
+		LIBCALLPOWERPC LockTaskList
+
+		mr	r30,r3
+.NextNode:	lwz	r4,0(r3)
+		mr.	r4,r4
+		beq-	.EndSearch
+
+		lwz	r5,TASKPPC_ID(r3)		#Original: 14(task)=taskppc?
+		cmpw	r5,r31
+		bne-	.IncorrectID
+
+		mr	r29,r3
+		b	.EndSearch
+
+.IncorrectID:	mr	r3,r4
+		b	.NextNode
+
+.EndSearch:	mr	r4,r30
+
+		LIBCALLPOWERPC UnLockTaskList
+
+		mr	r3,r29
+
+		lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
+		
+		DSTRYSTACKPPC
+
+		blr
+		
+#********************************************************************************************
+#
+#	OldNice = SetNiceValue(TaskPPC, Nice) // r3=r4,r5
+#
+#********************************************************************************************
+	
+SetNiceValue:
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+
+		mr	r31,r4
+		cmpwi	r5,-20
+		bge-	.SetMin
+		li	r5,-20
+.SetMin:	cmpwi	r5,20
+		ble-	.SetMax
+		li	r5,20
+.SetMax:	mr	r30,r5
+
+		LIBCALLPOWERPC LockTaskList
+
+		lwz	r29,TASKPPC_NICE(r31)
+		stw	r30,TASKPPC_NICE(r31)
+		mr	r4,r3
+
+		LIBCALLPOWERPC UnLockTaskList
+
+		mr	r3,r29
+
+		lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+
+		blr
 
 #********************************************************************************************
 #
@@ -3176,13 +3462,6 @@ SnoopTask:			li	r3,0
 EndSnoopTask:			blr
 GetHALInfo:			blr
 SetScheduling:			blr
-FindTaskByID:			li	r3,0
-				blr
-SetNiceValue:			li	r3,0
-				blr
-AllocPrivateMem:		li	r3,0
-				blr
-FreePrivateMem:			blr
 SetExceptPPC:			li	r3,0
 				blr
 ObtainSemaphoreSharedPPC:	blr
@@ -3197,12 +3476,8 @@ AllocPooledPPC:			li	r3,0
 FreePooledPPC:			blr
 RawDoFmtPPC:			li	r3,0
 				blr
-PutPublicMsgPPC:		blr
-AddUniquePortPPC:		li	r3,0
+IsExceptionMode:		li	r3,0
 				blr
-AddUniqueSemaphorePPC:		li	r3,0
-				blr
-IsExceptionMode:		blr
 
 #********************************************************************************************
 EndFunctions:
