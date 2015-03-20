@@ -2661,14 +2661,14 @@ TrySemaphorePPC:
 #
 #********************************************************************************************	
 		
-SetCache:						#need to Implement CACR flags
+SetCache:
 		BUILDSTACKPPC
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
 
-		mr	r30,r4
+		li	r30,SonnetBase
 
 		cmplwi	r4,CACHE_DCACHEFLUSH
 		beq-	.DCACHEFLUSH
@@ -2726,6 +2726,10 @@ SetCache:						#need to Implement CACR flags
 		mr.	r6,r6
 		beq-	.DoneCache
 
+		lbz	r29,DLockState(r30)
+		mr.	r29,r29
+		bne	.DoneCache
+
 		mr	r29,r5
 		mr	r31,r6
 		
@@ -2746,6 +2750,9 @@ SetCache:						#need to Implement CACR flags
 .FillLoop:	lwz	r0,0(r4)
 		addi	r4,r4,32
 		bdnz+	.FillLoop
+		
+		LIBCALLPOWERPC WarpSuper
+		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_DLOCK
 		sync	
@@ -2753,16 +2760,30 @@ SetCache:						#need to Implement CACR flags
 		sync	
 		isync		
 
+		LIBCALLPOWERPC WarpUser
+		
+		li	r0,-1
+		stb	r0,DLockState(r30)
+
 		b	.DoneCache
 				
-.DCACHEOFF:	LIBCALLPOWERPC FlushL1DCache
-		LIBCALLPOWERPC WarpUser
+.DCACHEOFF:	lbz	r29,DState(r30)
+		mr.	r29,r29
+		bne	.DoneCache
+		
+		LIBCALLPOWERPC FlushL1DCache
+		LIBCALLPOWERPC WarpSuper
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_DCE
 		xori	r0,r0,HID0_DCE
 		sync	
 		mtspr	HID0,r0
+		
+		LIBCALLPOWERPC WarpUser
+		
+		li	r0,-1
+		stb	r0,DState(r30)
 		
 		b	.DoneCache
 
@@ -2777,7 +2798,10 @@ SetCache:						#need to Implement CACR flags
 
 		b	.DoneCache
 
-.DCACHEUNLOCK:	LIBCALLPOWERPC WarpSuper
+.DCACHEUNLOCK:	li	r0,0
+		stb	r0,DLockState(r30)
+		
+		LIBCALLPOWERPC WarpSuper
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_DLOCK
@@ -2790,7 +2814,10 @@ SetCache:						#need to Implement CACR flags
 		
 		b	.DoneCache
 
-.DCACHEON:	LIBCALLPOWERPC WarpSuper
+.DCACHEON:	li	r0,0
+		stb	r0,DState(r30)		
+		
+		LIBCALLPOWERPC WarpSuper
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_DCE
@@ -2879,6 +2906,13 @@ SetCache:						#need to Implement CACR flags
 		beq-	.DCACHEFLUSHALL
 		mr.	r6,r6
 		beq-	.DCACHEFLUSHALL
+		lbz	r29,DState(r30)
+		mr.	r29,r29
+		bne	.DoneCache
+		lbz	r29,DLockState(r30)
+		mr.	r29,r29
+		bne	.DoneCache
+		
 		mr	r4,r5
 		mr	r5,r6
 		
@@ -2898,6 +2932,13 @@ SetCache:						#need to Implement CACR flags
 		b	.DoneCache
 
 .DCACHEFLUSHALL:
+		lbz	r29,DState(r30)
+		mr.	r29,r29
+		bne	.DoneCache
+		lbz	r29,DLockState(r30)
+		mr.	r29,r29
+		bne	.DoneCache
+
 		LIBCALLPOWERPC FlushL1DCache
 
 .DoneCache:	lwz	r29,0(r13)

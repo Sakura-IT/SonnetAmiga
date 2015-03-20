@@ -20,8 +20,10 @@
 .set ViolationAddress,100			#Pointer
 .set MCTask,104					#Pointer
 .set TempMirror,108				#Pointer	HACK
-
-.set Debug,112
+.set DState,112
+.set DLockState,113
+.set Pad1,114
+.set Pad2,115
 
 .set SonnetBusClock,66666666			#66.6 MHz
 .set SonnetTimerFreq,(SonnetBusClock/8)		#Default when EICR=0x4 at bits 30-28
