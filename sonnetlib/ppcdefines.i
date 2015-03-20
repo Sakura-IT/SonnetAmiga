@@ -48,6 +48,20 @@
 .set CPUF_750,			0x00200000
 .set CPUF_7400,			0x00400000
 
+.set FPF_EN_OVERFLOW,0        				#enable overflow exception
+.set FPF_EN_UNDERFLOW,1       				#enable underflow exception
+.set FPF_EN_ZERODIVIDE,2      				#enable zerodivide exception
+.set FPF_EN_INEXACT,3         				#enable inexact op. exception
+.set FPF_EN_INVALID,4         				#enable invalid op. exception
+.set FPF_DIS_OVERFLOW,5       				#disable overflow exception
+.set FPF_DIS_UNDERFLOW,6      				#disable underflow exception
+.set FPF_DIS_ZERODIVIDE,7     				#disable zerodivide exception
+.set FPF_DIS_INEXACT,8        				#disable inexact op. exception
+.set FPF_DIS_INVALID,9        				#disable invalid op. exception
+
+.set FPF_ENABLEALL,		0x0000001f		#enable all FP exceptions
+.set FPF_DISABLEALL,		0x000003e0		#disable all FP exceptions
+
 .set HID0,1008
 .set HID0_NHR,			0x00010000
 .set HID0_ICFI,			0x00000800

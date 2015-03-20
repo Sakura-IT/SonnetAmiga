@@ -2949,7 +2949,190 @@ SetCache:
 		DSTRYSTACKPPC
 		
 		blr
-				
+
+#********************************************************************************************
+#
+#	Void ModifyFPExc(FPflags) // r4
+#
+#********************************************************************************************
+
+ModifyFPExc:
+		BUILDSTACKPPC
+
+		mr	r5,r4
+		andi.	r0,r5,1
+		beq-	.NoEnOverflow
+
+		li	r4,1					#FPF_EN_OVERFLOW
+		bl	.FP_EN
+
+.NoEnOverflow:	rlwinm.	r0,r5,(32-FPF_DIS_OVERFLOW),31,31
+		beq-	.NoDisOverflow
+
+		li	r4,1
+		bl	.FP_DIS
+
+.NoDisOverflow:	rlwinm.	r0,r5,(32-FPF_EN_UNDERFLOW),31,31
+		beq-	.NoEnUnder
+
+		li	r4,2
+		bl	.FP_EN
+
+.NoEnUnder:	rlwinm.	r0,r5,(32-FPF_DIS_UNDERFLOW),31,31
+		beq-	.NoDisUnder
+
+		li	r4,2
+		bl	.FP_DIS
+
+.NoDisUnder:	rlwinm.	r0,r5,(32-FPF_EN_ZERODIVIDE),31,31
+		beq-	.NoEnZeroDiv
+
+		li	r4,4
+		bl	.FP_EN
+
+.NoEnZeroDiv:	rlwinm.	r0,r5,(32-FPF_DIS_ZERODIVIDE),31,31
+		beq-	.NoDisZeroDiv
+
+		li	r4,4
+		bl	.FP_DIS
+
+.NoDisZeroDiv:	rlwinm.	r0,r5,(32-FPF_EN_INEXACT),31,31
+		beq-	.NoEnInexact
+
+		li	r4,8
+		bl	.FP_EN
+
+.NoEnInexact:	rlwinm.	r0,r5,(32-FPF_DIS_INEXACT),31,31
+		beq-	.NoDisInexact
+
+		li	r4,8
+		bl	.FP_DIS
+
+.NoDisInexact:	rlwinm.	r0,r5,(32-FPF_EN_INVALID),31,31
+		beq-	.NoEnInvalid
+
+		li	r4,16
+		bl	.FP_EN
+
+.NoEnInvalid:	rlwinm.	r0,r5,(32-FPF_DIS_INVALID),31,31
+		beq-	.NoDisInvalid
+
+		li	r4,16
+		bl	.FP_DIS
+
+.NoDisInvalid:	DSTRYSTACKPPC
+
+		blr
+		
+.FP_EN:		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-60(r1)
+		stwu	r3,-4(r13)
+
+		andi.	r0,r4,1
+		bnel-	.Bit0
+		rlwinm.	r0,r4,31,31,31
+		bnel-	.Bit1
+		rlwinm.	r0,r4,30,31,31
+		bnel-	.Bit2
+		rlwinm.	r0,r4,29,31,31
+		bnel-	.Bit3
+		rlwinm.	r0,r4,28,31,31
+		bnel-	.Bit4
+		b	.ExitFP_EN
+
+.Bit0:		mtfsb0	3
+		mtfsb1	25
+		blr	
+
+.Bit1:		mtfsb0	4
+		mtfsb1	26
+		blr	
+
+.Bit2:		mtfsb0	5
+		mtfsb1	27
+		blr	
+
+.Bit3:		mtfsb0	6
+		mtfsb1	28
+		blr	
+
+.Bit4:		mtfsb0	7
+		mtfsb0	8
+		mtfsb0	9
+		mtfsb0	10
+		mtfsb0	11
+		mtfsb0	12
+		mtfsb0	21
+		mtfsb0	22
+		mtfsb0	23
+		mtfsb1	24
+		blr	
+
+.ExitFP_EN:	lwz	r3,0(r13)
+		addi	r13,r13,4
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr
+		
+.FP_DIS:	stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-60(r1)
+		stwu	r3,-4(r13)
+
+		andi.	r0,r4,1
+		bnel-	.Bit_0
+		rlwinm.	r0,r4,31,31,31
+		bnel-	.Bit_1
+		rlwinm.	r0,r4,30,31,31
+		bnel-	.Bit_2
+		rlwinm.	r0,r4,29,31,31
+		bnel-	.Bit_3
+		rlwinm.	r0,r4,28,31,31
+		bnel-	.Bit_4
+		b	.ExitFP_DIS
+
+.Bit_0:		mtfsb0	25
+		blr	
+
+.Bit_1:		mtfsb0	26
+		blr	
+
+.Bit_2:		mtfsb0	27
+		blr	
+
+.Bit_3:		mtfsb0	28
+		blr	
+
+.Bit_4:		mtfsb0	24
+		blr	
+
+.ExitFP_DIS:	lwz	r3,0(r13)
+		addi	r13,r13,4
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		blr	
+
 #********************************************************************************************
 #
 #	Poolheader = CreatePoolPPC(attr, puddlesize, treshsize) // r3=r4,r5,r6 r4 is ignored
@@ -2979,7 +3162,6 @@ SetExcHandler:			li	r3,0
 RemExcHandler:			blr
 SetHardware:			li	r3,HW_NOTAVAILABLE
 				blr
-ModifyFPExc:			blr
 WaitTime:			li	r3,0
 				blr
 ChangeStack:			blr
