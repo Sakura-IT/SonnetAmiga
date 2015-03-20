@@ -84,11 +84,10 @@ SetLen:	mr	r30,r28
 	loadreg	r3,0x8000			#Start hardcoded at 0x8000
 	mr	r31,r3
 
-	loadreg	r1,0x7fefc			#Userstack in unused mem (See sonnet.s)
-	lis	r15,0
-	stw	r15,0(r1)
+	loadreg	r1,0x7fffc			#Userstack in unused mem (See sonnet.s)
+	subi	r13,r1,4
+	stwu	r1,-284(r1)
 	loadreg	r2,0x18000			#SDA (0x10000-0x20000)
-	loadreg	r13,0x28000			#SDA2 (0x20000-0x30000)
 	bl	End
 
 Start:						#Dummy entry at absolute 0x8000
@@ -133,6 +132,17 @@ ExitCode:
 
 	li	r3,0
 	stw	r3,RunningTask(r3)
+	
+	lwz	r9,0(r13)
+	lwzu	r8,4(r13)
+	lwzu	r7,4(r13)
+	lwzu	r6,4(r13)
+	lwzu	r5,4(r13)
+	lwzu	r4,4(r13)
+	lwzu	r3,4(r13)
+	addi	r13,r13,4
+	
+	DSTRYSTACKPPC
 
 Pause:	nop
 	nop
@@ -1219,9 +1229,7 @@ FillEm:	addi	r17,r17,0x100
 
 #********************************************************************************************
 
-EInt:	stw	r13,-4(r1)			#Create local stack
-	subi	r13,r1,4
-	stwu	r1,-4096(r1)
+EInt:	BUILDSTACKPPC
 
 	stwu	r3,-4(r13)
 	stwu	r4,-4(r13)
@@ -1271,7 +1279,7 @@ NoHEAR:	li	r3,SonnetBase
 	stw	r6,ReadyTasks+4(r3)
 
 	loadreg	r6,0x8000
-	addi	r6,r6,ExitCode-Start
+	addi	r6,r6,ExitCode-Start	
 	mtlr	r6
 
 	lwz	r8,RunningTask(r3)
@@ -1318,9 +1326,6 @@ NoHEAR:	li	r3,SonnetBase
 	sync
 
 	stw	r9,0xb0(r8)			#Write 0 to EOI to End Interrupt
-	addi	r13,r13,20
-	lwz	r1,0(r1)
-	lwz	r13,-4(r1)			#Destroy local stack
 
 	rfi
 
@@ -1347,9 +1352,8 @@ NoEOI:	mtsrr0	r6
 	lwzu	r4,4(r13)
 	lwzu	r3,4(r13)
 	addi	r13,r13,4
-
-	lwz	r1,0(r1)
-	lwz	r13,-4(r1)			#Destroy local stack
+	
+	DSTRYSTACKPPC
 
 	rfi
 
