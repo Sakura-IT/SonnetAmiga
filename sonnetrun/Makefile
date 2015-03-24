@@ -1,0 +1,28 @@
+OBJ_SONNETPATCH=sonnetpatch.o
+SONNETPATCH_EXE=sonnetpatch
+SONNETPATCH_EXE_RS=$(SONNETPATCH_EXE).rs
+
+ASMPPCPARAM+=-I../sonnetlib
+
+all: $(SONNETPATCH_EXE) 
+
+disasm68k : $(SONNETPATCH_EXE_RS) 
+
+$(SONNETPATCH_EXE) : $(OBJ_SONNETPATCH)
+	$(LD) -s $(OBJ_SONNETPATCH) -o $(SONNETPATCH_EXE)
+
+%.o : %.p $(INCLUDES)
+	$(ASMPPC) $(ASMPPCPARAM) -o $@ $< 
+
+%.o : %.s $(INCLUDES)
+	$(ASM68K) $(ASM68KPARAM) -o $@ $<
+
+%.o : %.c $(INCLUDES)
+	$(CC) $(CCPARAM) -c $< -o $@ 
+
+%.rs : %
+	$(IRA) $(IRAPARAM) $< $@
+
+clean :
+	$(RM) $(OBJ_SONNETPATCH) $(SONNETPATCH_EXE) $(SONNETPATCH_EXE_RS) 
+
