@@ -32,23 +32,42 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <err.h>
 #include <fcntl.h>
+#include <string.h>
+
+#define HUNK_SIZE_MASK	0x3FFFFFFF
+#define HUNK_SIZE_MEMF	0xC0000000
+
+#define HUNK_HEADER	0x3F3
+
+struct hunkheader {
+	uint32_t table_size;
+	uint32_t first_hunk;
+	uint32_t last_hunk;
+} hh;
+
+struct hunkinfo {
+	uint32_t type;
+	uint32_t size;
+	uint8_t mem_flags;
+	uint32_t mem_ext;
+};
 
 void usage(char *myname);
 
-static uint32_t as32be(const uint8_t* in)
-{
-    return (in[0] << 24) | (in[1] << 16) | (in[2] << 8) | in[3];
-}
+bool read32be(int fd, uint32_t *);
+static uint32_t as32be(const uint8_t*);
 
 int
 main(int argc, char *argv[])
 {
-	int ifd, n;
+	int ifd, i;
 
-	uint8_t hunk[4];
+	uint32_t hunk, tmp;
+	struct hunkinfo *hi;	
 
 	if (argc != 2) {
 		usage(argv[0]);
@@ -61,13 +80,64 @@ main(int argc, char *argv[])
 		return(2);
 	}
 
-	while((n = read(ifd, &hunk, sizeof(hunk)) > 0)) {
-		printf("\t%X\n", as32be(hunk));
+	read32be(ifd, &hunk);
+	if (hunk != HUNK_HEADER) {
+		fprintf(stderr, "Not an AmigaOS hunk file\n");
+		return(3);
+	}
+		
+	printf("HUNK_HEADER\n");
+
+	read32be(ifd, &tmp);
+	if (tmp != 0) {
+		fprintf(stderr, "Resident library list should be empty in load files\n");	
+		return(3);
+	}
+
+	read32be(ifd, &hh.table_size);
+	read32be(ifd, &hh.first_hunk);
+	read32be(ifd, &hh.last_hunk);
+	printf("\tHunk table size: %d\n", hh.table_size);
+	printf("\tFirst hunk: %d\n", hh.first_hunk);
+	printf("\tLast hunk: %d\n", hh.last_hunk);
+
+	hi = (struct hunkinfo *) malloc(hh.table_size * sizeof(struct hunkinfo));
+	memset(hi, 0, (size_t) (hh.table_size * sizeof(struct hunkinfo)));
+
+	for (i = 0; i < hh.table_size; i++) {
+		read32be(ifd, &tmp);
+		hi[i].size = tmp & HUNK_SIZE_MASK;
+		hi[i].mem_flags = (tmp & HUNK_SIZE_MEMF) >> 30;
+		printf("\tHunk %d size: %d longwords\n", i, hi[i].size); 
+		if (hi[i].mem_flags != 0)
+			printf("\t\tFlags: %d\n", hi[i].mem_flags);
+		if (hi[i].mem_flags == 3) {
+			read32be(ifd, &hi[i].mem_ext); 
+			printf("\t\tExtended memory attribute: %x", hi[i].mem_ext);
+		}
 	}
 
 	close(ifd);
 
 	return(0);
+}
+
+bool
+read32be(int fd, uint32_t *buf) {
+	uint8_t tmpbuf[4];
+	int n;
+
+	n = read(fd, &tmpbuf, sizeof(tmpbuf));
+
+	*buf = as32be(tmpbuf);
+
+	return true;
+}
+
+static uint32_t
+as32be(const uint8_t* in)
+{
+    return (in[0] << 24) | (in[1] << 16) | (in[2] << 8) | in[3];
 }
 
 void
