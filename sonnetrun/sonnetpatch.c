@@ -27,7 +27,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* Just a skeleton for now... */
+/* This is a proof-of-concept standalone binary patcher. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,6 +42,10 @@
 #define HUNK_SIZE_MEMF	0xC0000000
 
 #define HUNK_HEADER	0x3F3
+#define HUNK_END	0x3F2
+
+#define MEMF_CHIP	0x1	/* << 30 */
+#define MEMF_FAST	0x2	/* << 30 */
 
 struct hunkheader {
 	uint32_t table_size;
@@ -54,36 +58,90 @@ struct hunkinfo {
 	uint32_t size;
 	uint8_t mem_flags;
 	uint32_t mem_ext;
+	uint32_t relocs;
 };
 
-void usage(char *myname);
-
+void usage(char *);
 bool read32be(int fd, uint32_t *);
-static uint32_t as32be(const uint8_t*);
+uint32_t as32be(const uint8_t*);
+bool hunk_header_parse(int);
+bool hunk_all_parse(int);
+void hunk_info_print(void);
+void snprintf_memf(char *str, size_t bufsize, uint8_t memf);
+
+static struct hunkinfo *hi;	
 
 int
 main(int argc, char *argv[])
 {
-	int ifd, i;
-
-	uint32_t hunk, tmp;
-	struct hunkinfo *hi;	
+	int ifd;
 
 	if (argc != 2) {
 		usage(argv[0]);
-		return(1);
+		return 1;
 	}	
 
 	ifd = open(argv[1], O_RDONLY);
 	if (ifd < 0) { 
 		perror("Unable to open hunkfile");
-		return(2);
+		return 2;
 	}
+
+	if (!hunk_header_parse(ifd)) {
+		close(ifd);
+		return 3;
+	}
+
+	if(!hunk_all_parse(ifd)) {
+		close(ifd);
+		return 3;
+	}
+
+	hunk_info_print();
+
+	close(ifd);
+	return EXIT_SUCCESS;
+}
+
+bool
+hunk_all_parse(int ifd)
+{
+	uint32_t current_hunk;
+	uint32_t subhunkid, tmp;
+
+	current_hunk = hh.first_hunk;
+
+	while (current_hunk <= hh.last_hunk) {
+		read32be(ifd, &hi[current_hunk].type); 
+		lseek(ifd, (hi[current_hunk].size+1) * sizeof(uint32_t), SEEK_CUR);
+
+		read32be(ifd, &subhunkid);
+		if (subhunkid != HUNK_END) {
+			// probably a relocation 
+			hi[current_hunk].relocs = subhunkid;
+		
+			read32be(ifd, &tmp);	
+			while (tmp != HUNK_END) {
+				read32be(ifd, &tmp);	
+			}
+		}	
+		current_hunk++;
+	}	
+
+	return true;
+}
+
+bool
+hunk_header_parse(int ifd)
+{
+	int i;
+	uint32_t hunk, tmp;
+
 
 	read32be(ifd, &hunk);
 	if (hunk != HUNK_HEADER) {
 		fprintf(stderr, "Not an AmigaOS hunk file\n");
-		return(3);
+		return false;
 	}
 		
 	printf("HUNK_HEADER\n");
@@ -91,7 +149,7 @@ main(int argc, char *argv[])
 	read32be(ifd, &tmp);
 	if (tmp != 0) {
 		fprintf(stderr, "Resident library list should be empty in load files\n");	
-		return(3);
+		return false;
 	}
 
 	read32be(ifd, &hh.table_size);
@@ -108,18 +166,34 @@ main(int argc, char *argv[])
 		read32be(ifd, &tmp);
 		hi[i].size = tmp & HUNK_SIZE_MASK;
 		hi[i].mem_flags = (tmp & HUNK_SIZE_MEMF) >> 30;
-		printf("\tHunk %d size: %d longwords\n", i, hi[i].size); 
-		if (hi[i].mem_flags != 0)
-			printf("\t\tFlags: %d\n", hi[i].mem_flags);
-		if (hi[i].mem_flags == 3) {
+		if (hi[i].mem_flags == 3) 
 			read32be(ifd, &hi[i].mem_ext); 
-			printf("\t\tExtended memory attribute: %x", hi[i].mem_ext);
-		}
 	}
 
-	close(ifd);
+	return true;
+}
 
-	return(0);
+void
+hunk_info_print(void)
+{
+	int i;
+	char *memf_str;
+	const size_t memf_bufsize = 32;
+
+	memf_str = malloc(sizeof(char) * memf_bufsize);
+
+	for (i = 0; i < hh.table_size; i++) {
+		printf("\tHunk %d type: %#x\n", i, hi[i].type);
+		printf("\t\tSize: %d Amiga longwords (%ld bytes)\n",
+		    hi[i].size, hi[i].size * sizeof(uint32_t)); 
+		snprintf_memf(memf_str, memf_bufsize, hi[i].mem_flags);
+		printf("\t\tFlags: %s\n", memf_str);
+		if (hi[i].mem_flags == 3) 
+			printf("\t\tExtended memory attribute: %#x\n", hi[i].mem_ext);
+		if (hi[i].relocs) {
+			printf("\t\tRelocation: %#x\n", hi[i].relocs);
+		}
+	}
 }
 
 bool
@@ -129,12 +203,16 @@ read32be(int fd, uint32_t *buf) {
 
 	n = read(fd, &tmpbuf, sizeof(tmpbuf));
 
-	*buf = as32be(tmpbuf);
+	if (n != 4) {
+		fprintf(stderr, "Unaligned data!\n"); /* XXX: inform where */
+		return false;
+	}
 
+	*buf = as32be(tmpbuf);
 	return true;
 }
 
-static uint32_t
+uint32_t
 as32be(const uint8_t* in)
 {
     return (in[0] << 24) | (in[1] << 16) | (in[2] << 8) | in[3];
@@ -143,5 +221,21 @@ as32be(const uint8_t* in)
 void
 usage(char *myname) {
 	printf("%s: hunkfile\n", myname);
+}
+
+void
+snprintf_memf(char *str, size_t bufsize, uint8_t memf)
+{
+	memset(str, 0, bufsize);
+
+	if ( (memf & MEMF_CHIP) && (memf & MEMF_FAST) ) 
+		snprintf(str, bufsize, "Extended mem attributes");
+	else if (memf & MEMF_CHIP) 
+		snprintf(str, bufsize, "MEMF_CHIP");
+	else if (memf & MEMF_FAST) 
+		snprintf(str, bufsize, "MEMF_FAST");
+	else 
+		snprintf(str, bufsize, "None (implied MEMF_PUBLIC)");
+
 }
 
