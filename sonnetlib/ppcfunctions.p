@@ -381,12 +381,12 @@ CmpTimePPC:
 
 #********************************************************************************************
 #
-#	MemBlock = AllocVecPPC(Length)	// r3=r4 (r5 and r6 are ignored) Should be 4 byte aligned
+#	MemBlock = AllocVecPPC(Length)	// r3=r4 (r5 and r6 are ignored for now
 #
 #********************************************************************************************
 
 AllocVecPPC:
-		BUILDSTACKPPC			#Should be 32 aligned instead of 4?
+		BUILDSTACKPPC
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -400,13 +400,12 @@ AllocVecPPC:
 		stwu	r6,-4(r13)
 
 		li	r3,0
+		mr.	r4,r4
+		beq	.error
 		addi	r4,r4,32
-.Align:		andi.	r29,r4,31
-		beq+	.Aligned
-		addi	r4,r4,1
-		b	.Align
+		rlwinm	r4,r4,0,0,26		#Align LEN to 32
 		
-.Aligned:	li 	r20,SonnetBase
+		li 	r20,SonnetBase
 		lwz	r20,PPCMemHeader(r20)
 		lwz	r5,MH_FREE(r20)
 		subfco	r31,r5,r4
@@ -495,10 +494,17 @@ AllocVecPPC:
 		rlwimi	r4,r29,0,16,31
 
 .error:		mr	r31,r3
+
 		LIBCALLPOWERPC FlushL1DCache
-		mr	r3,r31
 		
-		lwz	r6,0(r13)
+		mr.	r3,r31
+		beq	.SkipAlign
+		
+		addi	r3,r3,39
+		rlwinm	r3,r3,0,0,26		#Align memblock to 32
+		stw	r31,-4(r3)
+		
+.SkipAlign:	lwz	r6,0(r13)
 		lwzu	r7,4(r13)
 		lwzu	r20,4(r13)
 		lwzu	r21,4(r13)
@@ -534,7 +540,8 @@ FreeVecPPC:
 		stwu	r7,-4(r13)
 		stwu	r6,-4(r13)
 		
-		addi	r3,r0,1
+		li	r3,1
+		lwz	r4,-4(r4)
 		li	r20,SonnetBase
 		lwz	r20,PPCMemHeader(r20)
 		addi	r23,r20,MH_FIRST
@@ -2248,8 +2255,10 @@ PutXMsgPPC:
 		BUILDSTACKPPC
 		
 		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
 		li	r31,NT_MESSAGE
 		stb	r31,LN_TYPE(r5)
+				
 		mr	r31,r4
 		la	r4,MP_MSGLIST(r4)
 
@@ -2266,8 +2275,9 @@ PutXMsgPPC:
 		
 		LIBCALLPOWERPC Signal68K
 
-.NoSigTask:	lwz	r31,0(r13)
-		addi	r13,r13,4
+.NoSigTask:	lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
 		
 		DSTRYSTACKPPC
 		

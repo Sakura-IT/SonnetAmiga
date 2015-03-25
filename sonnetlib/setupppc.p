@@ -213,6 +213,7 @@ Delay2:
 	
 	mtsrr0	r31
 	isync
+	ori	r14,r14,PSL_PR			#Set privilege mode to User
 	mtsrr1	r14
 	isync
 	sync
@@ -1404,7 +1405,13 @@ PrInt:						#Privilege Exception
 	li	r0,0				#SuperKey
 	rfi
 .HaltErr:
-	b .HaltErr
+	stw	r3,0xe0(r0)			#DEBUG
+	stw	r11,0xe4(r0)
+	stw	r7,0xe8(r0)
+	mfsrr1	r3
+	stw	r3,0xec(r0)
+.xxHaltErr2:	
+	b .xxHaltErr2
 
 #********************************************************************************************
 
