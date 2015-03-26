@@ -92,9 +92,12 @@ SetLen:	mr	r30,r28
 
 Start:						#Dummy entry at absolute 0x8000
 	nop
+	
+.StartX:
 	nop
 	nop
-	b	Start
+	nop
+	b	.StartX
 	
 ExitCode:
 	li	r8,SonnetBase			#Exit code of processes (in development)
@@ -128,10 +131,10 @@ ExitCode:
 	la	r4,pr_MsgPort(r8)
 	mr	r5,r9
 
-	LIBCALLPOWERPC PutXMsgPPC
-
 	li	r3,0
 	stw	r3,RunningTask(r3)
+	
+	LIBCALLPOWERPC PutXMsgPPC
 	
 	lwz	r9,0(r13)
 	lwzu	r8,4(r13)
@@ -143,6 +146,9 @@ ExitCode:
 	addi	r13,r13,4
 	
 	DSTRYSTACKPPC
+
+	
+	LIBCALLPOWERPC FlushL1DCache
 
 Pause:	nop
 	nop
@@ -206,14 +212,10 @@ Delay2:
 
 	LIBCALLPOWERPC FlushL1DCache
 
-	mfmsr	r14
-	ori	r14,r14,PSL_EE			#Enable External Exceptions and Decrementer
-	mtmsr	r14				#Exception
-	isync
-	
 	mtsrr0	r31
+	mfmsr	r14
 	isync
-	ori	r14,r14,PSL_PR			#Set privilege mode to User
+	ori	r14,r14,PSL_EE|PSL_PR			#Set privilege mode to User
 	mtsrr1	r14
 	isync
 	sync
@@ -332,63 +334,6 @@ ifpdr_value:
 	isync
 	sync
 	sync
-						#Turn off caches and invalidate them 
-
-	mfl2cr	r3
-	rlwinm  r3,r3,0,1,31	  	   	#turn off the L2 enable bit
-	mtl2cr	r3
-	isync
-
-	oris	r3,r3,L2CR_L2I@h
-	mtl2cr	r3
-	sync
-Wait1:
-	mfl2cr	r3
-	andi.	r3,r3,L2CR_L2IP@l
-	cmpwi	r3,L2CR_L2IP@l
-	beq	Wait1				#Wait for invalidate done 
-
-						#Invalidate L1 Cache 
-	mfspr   r3,HID0
-	isync
-	rlwinm  r4,r3,0,18,15			#Clear d16 and d17 to disable L1 cache 
-	sync
-	isync
-	mtspr   HID0,r4 			#turn off caches
-	isync
-
-	lis	r3,0
-	ori	r3,r3,HID0_ICFI@l		#Invalidates instruction caches
-	or	r4,r4,r3
-	sync
-	isync
-	mtspr	HID0,r4
-	andc	r4,r4,r3
-	isync
-
-	lis	r3,0
-	ori	r3,r3,HID0_DCFI@l		#Invalidates data caches
-	or	r4,r4,r3
-	sync
-	isync
-	mtspr	HID0,r4
-	andc	r4,r4,r3
-	isync
-
-	li	r11,0x2000			#No harm
-	mtctr	r11
-Delay1:
-	bdnz	Delay1
-
-	isync
-	mfspr	r4,HID0
-	isync
-	ori	r4,r4,(HID0_ICE|HID0_ICFI)
-	isync
-	mtspr	HID0,r4				#turn on i-cache for speed
-	rlwinm	r4,r4,0,21,19			#clear the ICFI bit
-	isync
-	mtspr	HID0,r4
 
 	mtlr	r15
 	blr
@@ -420,6 +365,7 @@ ResLoop:
 	add	r27,r26,r27
 	stwbrx	r28,0,r27
 	sync
+	
 	loadreg r28,0x80040043
 	loadreg r27,EPIC_GTVPR0
 	add	r27,r26,r27
@@ -1265,13 +1211,15 @@ NoHEAR:	li	r3,SonnetBase
 	lwz	r9,ReadyTasks+4(r3)
 	mr.	r9,r9
 	beq	NoReschedule
+	
+	lwz	r9,RunningTask(r3)		#HACK! No task structure yet
+	mr.	r9,r9
+	bne	NoReschedule	
+
+	lwz	r9,ReadyTasks+4(r3)	
 	lwz	r9,MN_IDENTIFIER(r9)
 	loadreg	r8,"TPPC"
 	cmpw	r9,r8
-	bne	NoReschedule
-
-	lwz	r9,RunningTask(r3)		#HACK! No task structure yet
-	mr.	r9,r9
 	bne	NoReschedule
 
 	lwz	r9,ReadyTasks+4(r3)
