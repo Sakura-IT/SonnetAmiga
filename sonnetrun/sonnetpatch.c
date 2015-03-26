@@ -40,20 +40,44 @@
 
 #include <sys/queue.h>
 
+#define HUNK_UNIT	0x3E7
+#define HUNK_NAME	0x3E8
+#define HUNK_CODE	0x3E9
+#define HUNK_DATA	0x3EA
+#define HUNK_BSS	0x3EB
+#define HUNK_RELOC32	0x3EC
+#define HUNK_RELOC32SHORT 0x3FC
+#define HUNK_RELOC16	0x3ED
+#define HUNK_RELOC8	0x3EE
+#define HUNK_DRELOC32	0x3F7
+#define HUNK_DRELOC16	0x3F8
+#define HUNK_DRELOC8	0x3F9
+#define HUNK_EXT	0x3EF
+#define HUNK_SYMBOL	0x3F0
+#define HUNK_DEBUG	0x3F1
+
+#define HUNK_END	0x3F2
+#define HUNK_HEADER	0x3F3
+#define HUNK_OVERLAY	0x3F5
+#define HUNK_BREAK	0x3F6
+
 #define HUNK_SIZE_MASK	0x3FFFFFFF
 #define HUNK_SIZE_MEMF	0xC0000000
 
-#define HUNK_HEADER	0x3F3
-#define HUNK_END	0x3F2
-
 #define MEMF_CHIP	0x1	/* << 30 */
 #define MEMF_FAST	0x2	/* << 30 */
+
+struct hunkdef {
+	uint32_t id;
+	const char *name;
+	bool reloc;		/* is it relocation hunk? */
+};
 
 struct hunkheader {
 	uint32_t table_size;
 	uint32_t first_hunk;
 	uint32_t last_hunk;
-} hh;
+};
 
 struct hunkinfo {
 	uint32_t num;
@@ -62,6 +86,8 @@ struct hunkinfo {
 	uint8_t mem_flags;
 	uint32_t mem_ext;
 	uint32_t relocs;
+	const struct hunkdef *hd;
+	const struct hunkdef *reloc_hd;
 	TAILQ_ENTRY(hunkinfo) tqe;
 };
 
@@ -71,8 +97,23 @@ uint32_t as32be(const uint8_t*);
 bool hunk_header_parse(int);
 bool hunk_all_parse(int);
 void hunk_info_print(void);
-void snprintf_memf(char *str, size_t bufsize, uint8_t memf);
+bool hunk_get_type(uint32_t, const struct hunkdef **);
+void snprintf_memf(char *, size_t, uint8_t);
 
+const struct hunkdef hunkdefs[] = {
+	{	.id = HUNK_UNIT, .name = "HUNK_UNIT", .reloc = false	},
+	{	.id = HUNK_NAME, .name = "HUNK_NAME", .reloc = false	},
+	{	.id = HUNK_CODE, .name = "HUNK_CODE", .reloc = false	},
+	{	.id = HUNK_DATA, .name = "HUNK_DATA", .reloc = false	},
+	{	.id = HUNK_BSS, .name = "HUNK_BSS", .reloc = false	},
+	{	.id = HUNK_RELOC32, .name = "HUNK_RELOC32", .reloc = true },
+	{	.id = HUNK_RELOC32SHORT, .name = "HUNK_RELOC32SHORT", .reloc = true },
+
+	{	.id = 0, .name = NULL, .reloc = false			}
+	/* XXX: add all */
+}; 
+
+struct hunkheader hh;
 TAILQ_HEAD(, hunkinfo) hiq_head;
 
 int
@@ -149,12 +190,20 @@ hunk_all_parse(int ifd)
 		}
 
 		read32be(ifd, &hip->type); 
+		if (!hunk_get_type(hip->type, &hip->hd)) 
+			fprintf(stderr, "Couldn't get description for %x\n", 
+		    hip->type);
+		
 		lseek(ifd, (hip->size+1) * sizeof(uint32_t), SEEK_CUR);
 
 		read32be(ifd, &subhunkid);
 		if (subhunkid != HUNK_END) {
 			hip->relocs = subhunkid;
-		
+
+			if (!hunk_get_type(hip->relocs, &hip->reloc_hd)) 
+				fprintf(stderr, "Couldn't get description for %x\n", 
+			    hip->type);
+
 			read32be(ifd, &tmp);	
 			while (tmp != HUNK_END) {
 				read32be(ifd, &tmp);	
@@ -214,7 +263,6 @@ hunk_header_parse(int ifd)
 void
 hunk_info_print(void)
 {
-	int i;
 	char *memf_str;
 	struct hunkinfo *hip;
 
@@ -223,16 +271,18 @@ hunk_info_print(void)
 	memf_str = malloc(sizeof(char) * memf_bufsize);
 
 	TAILQ_FOREACH(hip, &hiq_head, tqe) {
-		printf("\tHunk %d type: %#x\n", hip->num, hip->type);
-		printf("\t\tSize: %d Amiga longwords (%ld bytes)\n",
+		printf("%s (%#x) hunk number %d\n", hip->hd->name, hip->type,
+		    hip->num);
+		printf("\tSize: %d Amiga longwords (%ld bytes)\n",
 		    hip->size, hip->size * sizeof(uint32_t)); 
 		snprintf_memf(memf_str, memf_bufsize, hip->mem_flags);
-		printf("\t\tFlags: %s\n", memf_str);
+		printf("\tFlags: %s\n", memf_str);
 		if (hip->mem_flags == 3) 
 			printf("\t\tExtended memory attribute: %#x\n", 
 			    hip->mem_ext);
 		if (hip->relocs) {
-			printf("\t\tRelocation: %#x\n", hip->relocs);
+			printf("\tRelocation: %s (%#x)\n", hip->reloc_hd->name, 
+			    hip->relocs);
 		}
 	}
 }
@@ -278,5 +328,23 @@ snprintf_memf(char *str, size_t bufsize, uint8_t memf)
 	else 
 		snprintf(str, bufsize, "None (implied MEMF_PUBLIC)");
 
+}
+
+bool
+hunk_get_type(uint32_t id, const struct hunkdef **ret_hd) 
+{
+	int i;
+
+	i = 0;
+
+	while(hunkdefs[i].id != 0) {
+		if (hunkdefs[i].id == id) {
+			*ret_hd = &hunkdefs[i];
+			return true;
+		}
+		i++;
+	}
+
+	return false;
 }
 
