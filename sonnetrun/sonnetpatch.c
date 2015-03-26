@@ -38,6 +38,8 @@
 #include <fcntl.h>
 #include <string.h>
 
+#include <sys/queue.h>
+
 #define HUNK_SIZE_MASK	0x3FFFFFFF
 #define HUNK_SIZE_MEMF	0xC0000000
 
@@ -54,11 +56,13 @@ struct hunkheader {
 } hh;
 
 struct hunkinfo {
+	uint32_t num;
 	uint32_t type;
 	uint32_t size;
 	uint8_t mem_flags;
 	uint32_t mem_ext;
 	uint32_t relocs;
+	TAILQ_ENTRY(hunkinfo) tqe;
 };
 
 void usage(char *);
@@ -69,19 +73,42 @@ bool hunk_all_parse(int);
 void hunk_info_print(void);
 void snprintf_memf(char *str, size_t bufsize, uint8_t memf);
 
-static struct hunkinfo *hi;	
+TAILQ_HEAD(, hunkinfo) hiq_head;
 
 int
 main(int argc, char *argv[])
 {
 	int ifd;
+	int copt, opt_patchit;
+	char *myname;
+	char *opt_patchtok;
 
-	if (argc != 2) {
-		usage(argv[0]);
+	opt_patchit = 0;
+	myname = argv[0];
+
+	while ((copt = getopt(argc, argv, "p:")) != -1) {
+		switch (copt) {
+		case 'p':
+			opt_patchit = 1;
+			while ((opt_patchtok = strsep(&optarg, ",")) != NULL)
+				printf("%s\n", opt_patchtok); //XXX
+			break;
+		case 'h':
+		case '?':
+		default:
+			usage(myname);
+			return 1;
+		}
+	}
+	argc -= optind;	
+	argv += optind;
+
+	if (argc != 1) {
+		usage(myname);
 		return 1;
-	}	
+	}
 
-	ifd = open(argv[1], O_RDONLY);
+	ifd = open(argv[0], O_RDONLY);
 	if (ifd < 0) { 
 		perror("Unable to open hunkfile");
 		return 2;
@@ -99,6 +126,7 @@ main(int argc, char *argv[])
 
 	hunk_info_print();
 
+	// XXX: TAILQ cleanup
 	close(ifd);
 	return EXIT_SUCCESS;
 }
@@ -108,17 +136,24 @@ hunk_all_parse(int ifd)
 {
 	uint32_t current_hunk;
 	uint32_t subhunkid, tmp;
+	struct hunkinfo *tmphip, *hip;
 
-	current_hunk = hh.first_hunk;
+	current_hunk = 0; /* we start search just after header */
 
 	while (current_hunk <= hh.last_hunk) {
-		read32be(ifd, &hi[current_hunk].type); 
-		lseek(ifd, (hi[current_hunk].size+1) * sizeof(uint32_t), SEEK_CUR);
+
+		/* extract a pointer for the current hunk from the queue */
+		TAILQ_FOREACH(tmphip, &hiq_head, tqe) {
+			if(tmphip->num == current_hunk)
+				hip = tmphip;	
+		}
+
+		read32be(ifd, &hip->type); 
+		lseek(ifd, (hip->size+1) * sizeof(uint32_t), SEEK_CUR);
 
 		read32be(ifd, &subhunkid);
 		if (subhunkid != HUNK_END) {
-			// probably a relocation 
-			hi[current_hunk].relocs = subhunkid;
+			hip->relocs = subhunkid;
 		
 			read32be(ifd, &tmp);	
 			while (tmp != HUNK_END) {
@@ -126,7 +161,7 @@ hunk_all_parse(int ifd)
 			}
 		}	
 		current_hunk++;
-	}	
+	} 
 
 	return true;
 }
@@ -136,7 +171,9 @@ hunk_header_parse(int ifd)
 {
 	int i;
 	uint32_t hunk, tmp;
+	struct hunkinfo *hip;
 
+	TAILQ_INIT(&hiq_head);
 
 	read32be(ifd, &hunk);
 	if (hunk != HUNK_HEADER) {
@@ -156,18 +193,19 @@ hunk_header_parse(int ifd)
 	read32be(ifd, &hh.first_hunk);
 	read32be(ifd, &hh.last_hunk);
 	printf("\tHunk table size: %d\n", hh.table_size);
-	printf("\tFirst hunk: %d\n", hh.first_hunk);
-	printf("\tLast hunk: %d\n", hh.last_hunk);
-
-	hi = (struct hunkinfo *) malloc(hh.table_size * sizeof(struct hunkinfo));
-	memset(hi, 0, (size_t) (hh.table_size * sizeof(struct hunkinfo)));
+	printf("\tFirst hunk to load: %d\n", hh.first_hunk);
+	printf("\tLast hunk to load: %d\n", hh.last_hunk);
 
 	for (i = 0; i < hh.table_size; i++) {
 		read32be(ifd, &tmp);
-		hi[i].size = tmp & HUNK_SIZE_MASK;
-		hi[i].mem_flags = (tmp & HUNK_SIZE_MEMF) >> 30;
-		if (hi[i].mem_flags == 3) 
-			read32be(ifd, &hi[i].mem_ext); 
+		hip = (struct hunkinfo *) malloc(sizeof(struct hunkinfo));
+		memset(hip, 0, sizeof(struct hunkinfo));
+		hip->num = i;
+		hip->size = tmp & HUNK_SIZE_MASK;
+		hip->mem_flags = (tmp & HUNK_SIZE_MEMF) >> 30;
+		if (hip->mem_flags == 3) 
+			read32be(ifd, &hip->mem_ext); 
+		TAILQ_INSERT_TAIL(&hiq_head, hip, tqe);
 	}
 
 	return true;
@@ -178,20 +216,23 @@ hunk_info_print(void)
 {
 	int i;
 	char *memf_str;
+	struct hunkinfo *hip;
+
 	const size_t memf_bufsize = 32;
 
 	memf_str = malloc(sizeof(char) * memf_bufsize);
 
-	for (i = 0; i < hh.table_size; i++) {
-		printf("\tHunk %d type: %#x\n", i, hi[i].type);
+	TAILQ_FOREACH(hip, &hiq_head, tqe) {
+		printf("\tHunk %d type: %#x\n", hip->num, hip->type);
 		printf("\t\tSize: %d Amiga longwords (%ld bytes)\n",
-		    hi[i].size, hi[i].size * sizeof(uint32_t)); 
-		snprintf_memf(memf_str, memf_bufsize, hi[i].mem_flags);
+		    hip->size, hip->size * sizeof(uint32_t)); 
+		snprintf_memf(memf_str, memf_bufsize, hip->mem_flags);
 		printf("\t\tFlags: %s\n", memf_str);
-		if (hi[i].mem_flags == 3) 
-			printf("\t\tExtended memory attribute: %#x\n", hi[i].mem_ext);
-		if (hi[i].relocs) {
-			printf("\t\tRelocation: %#x\n", hi[i].relocs);
+		if (hip->mem_flags == 3) 
+			printf("\t\tExtended memory attribute: %#x\n", 
+			    hip->mem_ext);
+		if (hip->relocs) {
+			printf("\t\tRelocation: %#x\n", hip->relocs);
 		}
 	}
 }
@@ -220,7 +261,7 @@ as32be(const uint8_t* in)
 
 void
 usage(char *myname) {
-	printf("%s: hunkfile\n", myname);
+	printf("%s: [-p hnum...] hunkfile\n", myname);
 }
 
 void
