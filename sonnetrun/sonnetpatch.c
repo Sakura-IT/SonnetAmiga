@@ -38,6 +38,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <ctype.h>
+#include <assert.h>
 
 #include <sys/queue.h>
 
@@ -68,6 +69,7 @@
 #define MEMF_CHIP	0x1	/* << 30 */
 #define MEMF_FAST	0x2	/* << 30 */
 
+#define SONNET_MEM_ID	0x00001005
 /*
  * These structs do not correspond to binary format of hunk files, they are
  * used only as internal representation of hunk/patch parameters inside of
@@ -106,16 +108,21 @@ struct hunkpatch {
 };
 
 void usage(char *);
-bool read32be(int fd, uint32_t *);
-uint32_t as32be(const uint8_t*);
+bool read32be(int, uint32_t *);
+uint32_t as32be(const uint8_t *);
+bool copy32(int, int);
+bool write32be(int, uint32_t *);
 bool hunk_header_parse(int);
 bool hunk_all_parse(int);
 void hunk_info_print(void);
 bool hunk_get_type(uint32_t, const struct hunkdef **);
-bool hunk_to_patch_tokenize(char **hunklist);
+bool hunk_to_patch_tokenize(char **);
+bool hunk_header_patch_sonnet(int, int);
 void snprintf_memf(char *, size_t, uint8_t);
 bool file_close(int *);
-bool file_open(int *fd, char *path);
+bool file_open(int *, char *);
+bool file_create(int *, char *);
+
 
 const struct hunkdef hunkdefs[] = {
 	{	.id = HUNK_UNIT, .name = "HUNK_UNIT", .reloc = false	},
@@ -137,17 +144,18 @@ TAILQ_HEAD(, hunkpatch) hpq_head;
 int
 main(int argc, char *argv[])
 {
-	int ifd; //, ofd;
-	int copt, opt_patchit;
+	int ifd, ofd;
+	int copt;
+	bool opt_patchit;
 	char *myname;
 
-	opt_patchit = 0;
+	opt_patchit = false;
 	myname = argv[0];
 
 	while ((copt = getopt(argc, argv, "p:")) != -1) {
 		switch (copt) {
 		case 'p':
-			opt_patchit = 1;
+			opt_patchit = true;
 			if (!hunk_to_patch_tokenize(&optarg)) {
 				fprintf(stderr, 
 				    "Syntax error while tokenizing hunk list\n");
@@ -165,7 +173,7 @@ main(int argc, char *argv[])
 	argc -= optind;	
 	argv += optind;
 
-	if (argc != 1) {
+	if (argc < 1) {
 		usage(myname);
 		return 1;
 	}
@@ -173,21 +181,106 @@ main(int argc, char *argv[])
 	if (!file_open(&ifd, argv[0]))
 		return 2; 
 
+	if (opt_patchit) {
+		if (!file_create(&ofd, argv[1])) {
+			file_close(&ifd);
+			return 2;
+		}
+	}
+
 	if (!hunk_header_parse(ifd)) {
 		file_close(&ifd);
+		if(opt_patchit)
+			file_close(&ofd);
 		return 3;
 	}
 
 	if(!hunk_all_parse(ifd)) {
 		file_close(&ifd);
+		if(opt_patchit)
+			file_close(&ofd);
 		return 3;
 	}
 
 	hunk_info_print();
 
-	// XXX: TAILQ cleanup
+	if (opt_patchit) 
+		if (!hunk_header_patch_sonnet(ifd, ofd)) 
+			return 4;
+
+
+	// XXX: TAILQ cleanup here and above in case of errors
 	file_close(&ifd);
 	return EXIT_SUCCESS;
+}
+
+bool
+hunk_header_patch_sonnet(int ifd, int ofd)
+{
+	uint32_t rtmp, ext_mem_patch;
+	struct hunkinfo *tmphip, *hip;
+	struct hunkpatch *hpp;
+	bool need_patching;
+	int current_hunk;
+
+	current_hunk = 0;
+	ext_mem_patch = SONNET_MEM_ID;
+
+	lseek(ifd, 0, SEEK_SET); /* rewind to beginning of the file */
+
+	/* copy beginning of header as is */
+	copy32(ifd, ofd);
+	copy32(ifd, ofd);
+	copy32(ifd, ofd);
+	copy32(ifd, ofd);
+	copy32(ifd, ofd);
+
+	/* check if size definitions */
+	while (current_hunk < hh.table_size) {
+
+		hip = NULL;
+		need_patching = false;
+
+		/* extract hunkinfo for a current hunk */
+		TAILQ_FOREACH(tmphip, &hiq_head, tqe) {
+			if(tmphip->num == current_hunk) 
+				hip = tmphip;
+		}
+		assert(hip != NULL);
+
+		/* now check if the header is to be patched */
+		TAILQ_FOREACH(hpp, &hpq_head, tqe) {
+			if(hip->num == hpp->num)
+				need_patching = true;
+		}
+
+		read32be(ifd, &rtmp);
+		printf("analysing hunk %x, %x\n\n", hip->num, rtmp);
+		assert (hip->mem_flags == ((rtmp & HUNK_SIZE_MEMF) >> 30));
+
+		if (need_patching) {
+			if (hip->mem_flags & (MEMF_CHIP|MEMF_FAST)) {	
+				fprintf(stderr,
+				    "Hunk %d already using extended mem attributes!\n", 
+				    hip->num);
+				return false;
+			} else {
+				rtmp |= HUNK_SIZE_MEMF;
+				write32be(ofd, &rtmp);
+				write32be(ofd, &ext_mem_patch);
+			}
+		} else {
+			write32be(ofd, &rtmp);
+			if (hip->mem_flags & (MEMF_CHIP|MEMF_FAST)) {
+				copy32(ifd, ofd);
+			}
+		}
+
+		/* move on to next hunk size definition */
+		current_hunk++;
+	}
+
+	return true;
 }
 
 /*
@@ -244,13 +337,18 @@ file_open(int *fd, char *path)
 
 	return true;
 }
-/*
-bool
-file_create(int *ofd, char *path) 
-{
 
+bool
+file_create(int *fd, char *path) 
+{
+	*fd = open(path, O_RDWR | O_CREAT | O_TRUNC, 644);
+	if (*fd < 0) { 
+		perror("Unable to open file");
+		return false;
+	}
+	return true;
 }
-*/
+
 
 /* Parse all hunks in file, extract their IDs and relocation information. */
 bool
@@ -265,7 +363,7 @@ hunk_all_parse(int ifd)
 
 	offset = lseek(ifd, 0, SEEK_CUR); /* get current offset */
 
-	while (current_hunk <= hh.last_hunk) {
+	while (current_hunk < hh.table_size) {
 
 		/* extract a pointer for the current hunk from the queue */
 		TAILQ_FOREACH(tmphip, &hiq_head, tqe) {
@@ -338,7 +436,7 @@ hunk_header_parse(int ifd)
 		hip->num = i;
 		hip->size = tmp & HUNK_SIZE_MASK;
 		hip->mem_flags = (tmp & HUNK_SIZE_MEMF) >> 30;
-		if (hip->mem_flags == 3) 
+		if (hip->mem_flags & (MEMF_CHIP|MEMF_FAST))
 			read32be(ifd, &hip->mem_ext); 
 		TAILQ_INSERT_TAIL(&hiq_head, hip, tqe);
 	}
@@ -376,7 +474,8 @@ hunk_info_print(void)
 }
 
 bool
-read32be(int fd, uint32_t *buf) {
+read32be(int fd, uint32_t *buf) 
+{
 	uint8_t tmpbuf[4];
 	int n;
 	off_t o;
@@ -385,7 +484,7 @@ read32be(int fd, uint32_t *buf) {
 
 	if (n != 4) {
 		o = lseek(fd, 0, SEEK_CUR);
-		fprintf(stderr, "Unaligned data at %llx!\n", o); 
+		fprintf(stderr, "Unaligned read at %llx!\n", o); 
 		return false;
 	}
 
@@ -399,8 +498,50 @@ as32be(const uint8_t* in)
     return (in[0] << 24) | (in[1] << 16) | (in[2] << 8) | in[3];
 }
 
+bool
+write32be(int fd, uint32_t *buf) 
+{
+	uint8_t tmpbuf[4];
+	int n;
+	off_t o;
+
+	tmpbuf[0] = (*buf >> 24) & 0xff;
+	tmpbuf[1] = (*buf >> 16) & 0xff;
+	tmpbuf[2] = (*buf >> 8) & 0xff;
+	tmpbuf[3] = *buf & 0xff;
+
+	n = write(fd, &tmpbuf, 4);
+	if (n != 4) {
+		o = lseek(fd, 0, SEEK_CUR);
+		fprintf(stderr, "Unaligned write at %llx!\n", o); 
+		return false;
+	}
+
+	return true;
+}
+
+bool
+copy32(int ifd, int ofd)
+{
+	uint8_t buf[4];
+	int rn, wn;
+	off_t o;
+
+	rn = read(ifd, &buf, 4);
+	wn = write(ofd, &buf, 4);
+
+	if ((rn != 4) || (wn != 4)) {
+		o = lseek(ifd, 0, SEEK_CUR);
+		fprintf(stderr, "Unaligned copy at %llx!\n", o); 
+		return false;
+	}
+
+	return true;
+}
+
 void
-usage(char *myname) {
+usage(char *myname)
+{
 	printf("%s: [-p hnum...] hunkfile\n", myname);
 }
 
