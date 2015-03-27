@@ -86,10 +86,16 @@ struct hunkinfo {
 	uint8_t mem_flags;
 	uint32_t mem_ext;
 	uint32_t relocs;
+	off_t offset;		/* where does this hunk start */
 	const struct hunkdef *hd;
 	const struct hunkdef *reloc_hd;
 	TAILQ_ENTRY(hunkinfo) tqe;
 };
+
+/* which hunks need to be patched */
+/*struct hunkpatch {
+
+}*/
 
 void usage(char *);
 bool read32be(int fd, uint32_t *);
@@ -178,8 +184,11 @@ hunk_all_parse(int ifd)
 	uint32_t current_hunk;
 	uint32_t subhunkid, tmp;
 	struct hunkinfo *tmphip, *hip;
+	off_t offset;
 
 	current_hunk = 0; /* we start search just after header */
+
+	offset = lseek(ifd, 0, SEEK_CUR); /* get current offset */
 
 	while (current_hunk <= hh.last_hunk) {
 
@@ -193,8 +202,9 @@ hunk_all_parse(int ifd)
 		if (!hunk_get_type(hip->type, &hip->hd)) 
 			fprintf(stderr, "Couldn't get description for %x\n", 
 		    hip->type);
+		hip->offset = offset;
 		
-		lseek(ifd, (hip->size+1) * sizeof(uint32_t), SEEK_CUR);
+		offset = lseek(ifd, (hip->size+1) * sizeof(uint32_t), SEEK_CUR);
 
 		read32be(ifd, &subhunkid);
 		if (subhunkid != HUNK_END) {
@@ -271,8 +281,8 @@ hunk_info_print(void)
 	memf_str = malloc(sizeof(char) * memf_bufsize);
 
 	TAILQ_FOREACH(hip, &hiq_head, tqe) {
-		printf("%s (%#x) hunk number %d\n", hip->hd->name, hip->type,
-		    hip->num);
+		printf("%s (%#x) hunk number %d at offset %#llx\n", 
+		    hip->hd->name, hip->type, hip->num, hip->offset);
 		printf("\tSize: %d Amiga longwords (%ld bytes)\n",
 		    hip->size, hip->size * sizeof(uint32_t)); 
 		snprintf_memf(memf_str, memf_bufsize, hip->mem_flags);
@@ -291,11 +301,13 @@ bool
 read32be(int fd, uint32_t *buf) {
 	uint8_t tmpbuf[4];
 	int n;
+	off_t o;
 
 	n = read(fd, &tmpbuf, sizeof(tmpbuf));
 
 	if (n != 4) {
-		fprintf(stderr, "Unaligned data!\n"); /* XXX: inform where */
+		o = lseek(fd, 0, SEEK_CUR);
+		fprintf(stderr, "Unaligned data at %llx!\n", o); 
 		return false;
 	}
 
