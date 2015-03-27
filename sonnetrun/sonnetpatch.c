@@ -37,6 +37,7 @@
 #include <err.h>
 #include <fcntl.h>
 #include <string.h>
+#include <ctype.h>
 
 #include <sys/queue.h>
 
@@ -67,18 +68,24 @@
 #define MEMF_CHIP	0x1	/* << 30 */
 #define MEMF_FAST	0x2	/* << 30 */
 
+/*
+ * These structs do not correspond to binary format of hunk files, they are
+ * used only as internal representation of hunk/patch parameters inside of
+ * this program.
+ */
+/* Hunk definition. */
 struct hunkdef {
 	uint32_t id;
 	const char *name;
 	bool reloc;		/* is it relocation hunk? */
 };
-
+/* Hunk file header. */
 struct hunkheader {
 	uint32_t table_size;
 	uint32_t first_hunk;
 	uint32_t last_hunk;
 };
-
+/* Per-hunk information. */
 struct hunkinfo {
 	uint32_t num;
 	uint32_t type;
@@ -91,11 +98,12 @@ struct hunkinfo {
 	const struct hunkdef *reloc_hd;
 	TAILQ_ENTRY(hunkinfo) tqe;
 };
-
-/* which hunks need to be patched */
-/*struct hunkpatch {
-
-}*/
+/* Which hunks need to be patched. */
+struct hunkpatch {
+	/* TODO: make this more flexible */
+	uint32_t num;
+	TAILQ_ENTRY(hunkpatch) tqe;
+};
 
 void usage(char *);
 bool read32be(int fd, uint32_t *);
@@ -104,7 +112,10 @@ bool hunk_header_parse(int);
 bool hunk_all_parse(int);
 void hunk_info_print(void);
 bool hunk_get_type(uint32_t, const struct hunkdef **);
+bool hunk_to_patch_tokenize(char **hunklist);
 void snprintf_memf(char *, size_t, uint8_t);
+bool file_close(int *);
+bool file_open(int *fd, char *path);
 
 const struct hunkdef hunkdefs[] = {
 	{	.id = HUNK_UNIT, .name = "HUNK_UNIT", .reloc = false	},
@@ -121,14 +132,14 @@ const struct hunkdef hunkdefs[] = {
 
 struct hunkheader hh;
 TAILQ_HEAD(, hunkinfo) hiq_head;
+TAILQ_HEAD(, hunkpatch) hpq_head;
 
 int
 main(int argc, char *argv[])
 {
-	int ifd;
+	int ifd; //, ofd;
 	int copt, opt_patchit;
 	char *myname;
-	char *opt_patchtok;
 
 	opt_patchit = 0;
 	myname = argv[0];
@@ -137,8 +148,12 @@ main(int argc, char *argv[])
 		switch (copt) {
 		case 'p':
 			opt_patchit = 1;
-			while ((opt_patchtok = strsep(&optarg, ",")) != NULL)
-				printf("%s\n", opt_patchtok); //XXX
+			if (!hunk_to_patch_tokenize(&optarg)) {
+				fprintf(stderr, 
+				    "Syntax error while tokenizing hunk list\n");
+				return 1;
+			}
+
 			break;
 		case 'h':
 		case '?':
@@ -155,29 +170,89 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	ifd = open(argv[0], O_RDONLY);
-	if (ifd < 0) { 
-		perror("Unable to open hunkfile");
-		return 2;
-	}
+	if (!file_open(&ifd, argv[0]))
+		return 2; 
 
 	if (!hunk_header_parse(ifd)) {
-		close(ifd);
+		file_close(&ifd);
 		return 3;
 	}
 
 	if(!hunk_all_parse(ifd)) {
-		close(ifd);
+		file_close(&ifd);
 		return 3;
 	}
 
 	hunk_info_print();
 
 	// XXX: TAILQ cleanup
-	close(ifd);
+	file_close(&ifd);
 	return EXIT_SUCCESS;
 }
 
+/*
+ * Convert a string of hunk numbers (as passed by getopt) into a list of 
+ * structs describing which hunks need to be patched. 
+ */
+bool
+hunk_to_patch_tokenize(char **hunklist)
+{
+	char *patchtok;
+	struct hunkpatch *hpp;
+	bool err;
+
+	err = false;
+	TAILQ_INIT(&hpq_head);
+
+	while ((patchtok = strsep(hunklist, ",")) != NULL) {
+		printf("%s\n", patchtok); 
+		hpp = (struct hunkpatch *) malloc(sizeof(struct hunkpatch));
+		memset(hpp, 0, sizeof(struct hunkpatch));
+		if (!isdigit(patchtok[0])) /* better check than nothing */
+			err = true;
+		hpp->num = atoi(patchtok);
+		TAILQ_INSERT_TAIL(&hpq_head, hpp, tqe);
+	}
+
+	if (err) {
+		// XXX: clean up TAILQ 
+		return false;
+	}
+
+	return true;
+}
+
+bool
+file_close(int *fd)
+{
+	if (close(*fd) != 0) {
+		perror("Unable to close file");
+		return false;
+	}
+
+	return true;
+}
+
+bool 
+file_open(int *fd, char *path)
+{
+	*fd = open(path, O_RDONLY);
+	if (*fd < 0) { 
+		perror("Unable to open file");
+		return false;
+	}
+
+	return true;
+}
+/*
+bool
+file_create(int *ofd, char *path) 
+{
+
+}
+*/
+
+/* Parse all hunks in file, extract their IDs and relocation information. */
 bool
 hunk_all_parse(int ifd)
 {
@@ -225,6 +300,7 @@ hunk_all_parse(int ifd)
 	return true;
 }
 
+/* Parse hunk header, extract number of the hunks and their sizes. */
 bool
 hunk_header_parse(int ifd)
 {
@@ -295,6 +371,8 @@ hunk_info_print(void)
 			    hip->relocs);
 		}
 	}
+
+	free(memf_str);
 }
 
 bool
@@ -315,7 +393,7 @@ read32be(int fd, uint32_t *buf) {
 	return true;
 }
 
-uint32_t
+inline uint32_t
 as32be(const uint8_t* in)
 {
     return (in[0] << 24) | (in[1] << 16) | (in[2] << 8) | in[3];
