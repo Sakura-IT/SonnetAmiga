@@ -221,7 +221,7 @@ hunk_header_patch_sonnet(int ifd, int ofd)
 	struct hunkinfo *tmphip, *hip;
 	struct hunkpatch *hpp;
 	bool need_patching;
-	int current_hunk;
+	int current_hunk, n;
 
 	current_hunk = 0;
 	ext_mem_patch = SONNET_MEM_ID;
@@ -255,7 +255,7 @@ hunk_header_patch_sonnet(int ifd, int ofd)
 		}
 
 		read32be(ifd, &rtmp);
-		printf("analysing hunk %x, %x\n\n", hip->num, rtmp);
+
 		assert (hip->mem_flags == ((rtmp & HUNK_SIZE_MEMF) >> 30));
 
 		if (need_patching) {
@@ -266,6 +266,8 @@ hunk_header_patch_sonnet(int ifd, int ofd)
 				return false;
 			} else {
 				rtmp |= HUNK_SIZE_MEMF;
+				printf("Patching hunk %d size to %x, ext. attr %x\n",
+				    hip->num, rtmp, ext_mem_patch);
 				write32be(ofd, &rtmp);
 				write32be(ofd, &ext_mem_patch);
 			}
@@ -279,6 +281,10 @@ hunk_header_patch_sonnet(int ifd, int ofd)
 		/* move on to next hunk size definition */
 		current_hunk++;
 	}
+
+	/* just copy rest of the file as is */
+	while ((n = read(ifd, &rtmp, 4)) > 0)
+		write(ofd, &rtmp, n);
 
 	return true;
 }
@@ -341,7 +347,7 @@ file_open(int *fd, char *path)
 bool
 file_create(int *fd, char *path) 
 {
-	*fd = open(path, O_RDWR | O_CREAT | O_TRUNC, 644);
+	*fd = open(path, O_RDWR | O_CREAT | O_TRUNC, S_IRWXU);
 	if (*fd < 0) { 
 		perror("Unable to open file");
 		return false;
