@@ -59,7 +59,7 @@
 .global SetNiceValue,AllocPrivateMem,FreePrivateMem,SetExceptPPC,ObtainSemaphoreSharedPPC
 .global AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
 .global AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
-.global AddUniqueSemaphorePPC,IsExceptionMode
+.global AddUniqueSemaphorePPC,IsExceptionMode,SetDecInterrupt
 
 .section "LibBody","acrx"
 
@@ -2091,11 +2091,8 @@ WaitPortPPC:
 		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
-		li	r4,0				#UNKNOWN AS OF YET
-		lwz	r3,17652(r2)
-		lwz	r0,-166(r3)
-		mtlr	r0
-		blrl	
+		li	r4,0
+		LIBCALLPOWERPC SetDecInterrupt
 
 .Link36:	lbz	r3,628(r28)
 		mr.	r3,r3
@@ -2153,11 +2150,8 @@ WaitPortPPC:
 		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
-		li	r4,0				#UNKNOWN AS OF YET
-		lwz	r3,17652(r2)
-		lwz	r0,-166(r3)
-		mtlr	r0
-		blrl	
+		li	r4,0				#UNKNOWN AS OF YET (Reschedule?)
+		LIBCALLPOWERPC SetDecInterrupt
 
 .Link41:	lbz	r3,628(r28)
 		mr.	r3,r3
@@ -2240,7 +2234,7 @@ WarpSuper:
 
 WarpUser:
 		mfmsr	r0			
-		ori	r0,r0,0x4000		#SET Bit 17 (PR) To User
+		ori	r0,r0,PSL_PR		#SET Bit 17 (PR) To User
 		mtmsr	r0
 		isync	
 		blr
@@ -4107,10 +4101,7 @@ CreateTaskPPC:
 		blrl	 
  
 		li	r4,0 
-		lwz	r3,17652(r2) 
-		lwz	r0,-166(r3)			#Reschedule? 
-		mtlr	r0 
-		blrl	 
+		LIBCALLPOWERPC SetDecInterrupt
  
 		mr	r3,r31 
 		b	.SkipToEnd			#All good, go to exit 
@@ -4211,7 +4202,73 @@ CreateTaskPPC:
 		
 		DSTRYSTACKPPC
 
-		blr 
+		blr
+		 
+#********************************************************************************************
+#
+#	Void SetDecInterrupt(Delay) // r4
+#
+#********************************************************************************************
+
+SetDecInterrupt:
+		BUILDSTACKPPC
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-44(r1)
+
+		lwz	r3,52(r3)
+		lwz	r2,42(r3)
+		loadreg	r5,Quantum
+		mr	r6,r4
+		mulhw	r3,r5,r6
+		mullw	r4,r5,r6
+		lis	r5,0x3d
+		ori	r5,r5,0x900
+		bl	.GetDelay
+
+		mr.	r3,r3
+		bne-	.NotZ
+		li	r3,10
+.NotZ:		stwu	r31,-4(r13)
+
+		LIBCALLPOWERPC WarpSuper
+		
+		mtdec	r3		
+		
+		LIBCALLPOWERPC WarpUser
+
+		lwz	r31,0(r13)
+		addi	r13,r13,4
+		
+		DSTRYSTACKPPC
+
+		blr	
+
+.GetDelay:	li	r0,32
+		mtctr	r0
+		li	r6,0
+		mr.	r3,r3
+.NextCtr:	bge-	.IsPos
+		addc	r4,r4,r4
+		adde	r3,r3,r3
+		add	r6,r6,r6
+		b	.WasNeg
+
+.IsPos:		addc	r4,r4,r4
+		adde	r3,r3,r3
+		add	r6,r6,r6
+		cmplw	r5,r3
+		bgt-	.NoSubAdd
+.WasNeg:	sub.	r3,r3,r5
+		addi	r6,r6,1
+.NoSubAdd:	bdnz+	.NextCtr
+		mr	r3,r6
+		blr
 
 #********************************************************************************************
 #

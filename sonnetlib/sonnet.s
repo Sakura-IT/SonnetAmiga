@@ -60,7 +60,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	SetNiceValue,AllocPrivateMem,FreePrivateMem,SetExceptPPC,ObtainSemaphoreSharedPPC
 	XREF	AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
 	XREF	AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
-	XREF	AddUniqueSemaphorePPC,IsExceptionMode
+	XREF	AddUniqueSemaphorePPC,IsExceptionMode,SetDecInterrupt
 
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,MCTask,Init,ViolationAddress
 	XREF	ReadyTasks
@@ -1163,8 +1163,8 @@ FUNCTABLE:
 	dc.l	AtomicDone	
 	dc.l	WarpSuper
 	dc.l	WarpUser
+	dc.l	SetDecInterrupt
 		
-	dc.l	Reserved	
 	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved
