@@ -4197,6 +4197,113 @@ SetDecInterrupt:
 .NoSubAdd:	bdnz+	.NextCtr
 		mr	r3,r6
 		blr
+#********************************************************************************************
+#
+#	Status = ChangeStack(NewStackSize) // r3=r4
+#
+#********************************************************************************************
+
+ChangeStack:
+		BUILDSTACKPPC
+		
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+
+		mr	r29,r4	
+		li	r3,SonnetBase
+		lwz	r3,RunningTask(r3)		
+		mr	r28,r3
+		lwz	r5,TASKPPC_STACKSIZE(r3)
+		cmplw	r4,r5
+		blt-	.SomeError
+
+		loadreg	r5,0x10001
+		li	r6,0
+
+		LIBCALLPOWERPC AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.SomeError
+
+		mr	r30,r3
+
+		li	r4,24
+		loadreg	r5,0x10001
+		li	r6,0
+
+		LIBCALLPOWERPC AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.SomeError2
+
+		stw	r3,TASKPPC_STACKMEM(r28)
+		li	r0,1
+		sth	r0,14(r3)
+		stw	r30,16(r3)
+		stw	r29,20(r3)
+		mr	r5,r3
+		addi	r4,r28,TC_MEMENTRY
+		lwz	r3,LH_HEAD(r4)
+		stw	r5,LH_HEAD(r4)
+		stw	r3,LH_HEAD(r5)
+		stw	r4,LH_TAIL(r5)
+		stw	r5,LH_TAIL(r3)
+		lwz	r3,TC_SPLOWER(r28)
+		lwz	r4,TC_SPUPPER(r28)
+		mr	r27,r4
+		add	r5,r30,r29
+.StackLoop:	cmplw	r4,r3
+		ble-	.DoneLoop
+
+		lwzu	r0,-4(r4)
+		stwu	r0,-4(r5)
+		b	.StackLoop
+
+.DoneLoop:	sub	r3,r27,r1
+		stw	r30,TC_SPLOWER(r28)
+		add	r6,r30,r29
+		stw	r6,TC_SPUPPER(r28)
+		stw	r29,TASKPPC_STACKSIZE(r28)
+		sub	r1,r6,r3
+		sub	r6,r6,r27
+		mr	r4,r1
+.StackLoop2:	lwz	r3,0(r4)
+		mr.	r3,r3
+		beq-	.DoneChange
+
+		add	r3,r3,r6
+		stw	r3,0(r4)
+		mr	r4,r3
+		b	.StackLoop2
+
+.DoneChange:	li	r3,-1
+		b	.ExitChange
+
+.SomeError2:	mr	r4,r30
+
+		LIBCALLPOWERPC FreeVecPPC
+
+.SomeError:	li	r3,0
+
+.ExitChange:	lwz	r27,0(r13)
+		lwz	r28,4(r13)
+		lwz	r29,8(r13)
+		lwz	r30,12(r13)
+		lwz	r31,16(r13)
+		addi	r13,r13,20
+		
+		DSTRYSTACKPPC
+		
+		blr	
+
+#********************************************************************************************
+#
+#	Poolheader = CreatePoolPPC(attr, puddlesize, treshsize) // r3=r4,r5,r6 r4 is ignored
+#
+#********************************************************************************************
 
 #********************************************************************************************
 #
@@ -4227,7 +4334,6 @@ SetHardware:			li	r3,HW_NOTAVAILABLE
 				blr
 WaitTime:			li	r3,0
 				blr
-ChangeStack:			blr
 ChangeMMU:			blr
 PutMsgPPC:			blr
 GetMsgPPC:			li	r3,0
