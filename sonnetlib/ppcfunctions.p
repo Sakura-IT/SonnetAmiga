@@ -4445,6 +4445,80 @@ ProcurePPC:
 
 #********************************************************************************************
 #
+#	void VacatePPC(SignalSemaphorePPC, SemaphoreMessage) // r4,r5
+#
+#********************************************************************************************
+
+VacatePPC:
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+
+		mr	r31,r3
+		mr	r30,r4
+		mr	r29,r5
+		
+		li	r0,0
+		stw	r0,SSM_SEMAPHORE(r29)
+		stw	r0,LN_TYPE(r29)
+
+.AtomicVacate:	li	r4,Atomic
+
+		LIBCALLPOWERPC AtomicTest
+
+		mr.	r3,r3
+		beq+	.AtomicVacate
+
+		mr	r4,r29
+		lwz	r3,SS_WAITQUEUE(r30)
+.NextSSM:	cmplw	r3,r4
+		beq-	.OwnSSM
+
+		mr	r29,r3
+		lwz	r3,LN_SUCC(r29)
+		mr.	r3,r3
+		bne+	.NextSSM
+
+		li	r4,Atomic
+		
+		LIBCALLPOWERPC AtomicDone
+
+		mr	r4,r30
+		
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		b	.VacateExit
+
+.OwnSSM:	lha	r5,SS_QUEUECOUNT(r30)
+		subi	r5,r5,1
+		sth	r5,SS_QUEUECOUNT(r30)
+		mr	r5,r4
+		lwz	r3,0(r4)
+		lwz	r4,4(r4)
+		stw	r4,4(r3)
+		stw	r3,0(r4)
+
+		li	r4,Atomic
+		
+		LIBCALLPOWERPC AtomicDone
+
+		mr	r4,r5
+
+		LIBCALLPOWERPC ReplyMsgPPC
+
+.VacateExit:	lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
+
+		DSTRYSTACKPPC
+		
+		blr	
+
+#********************************************************************************************
+#
 #	Poolheader = CreatePoolPPC(attr, puddlesize, treshsize) // r3=r4,r5,r6 r4 is ignored
 #
 #********************************************************************************************		
@@ -4486,7 +4560,6 @@ SetExceptPPC:			li	r3,0
 ObtainSemaphoreSharedPPC:	blr
 AttemptSemaphoreSharedPPC:	li	r3,ATTEMPT_SUCCESS
 				blr
-VacatePPC:			blr
 CauseInterrupt:			blr
 DeletePoolPPC:			blr
 AllocPooledPPC:			li	r3,0
