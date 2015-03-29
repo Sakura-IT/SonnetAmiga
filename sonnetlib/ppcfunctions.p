@@ -2688,7 +2688,7 @@ SetCache:
 		
 		b	.DoneCache
 
-.DCACHELOCK:	mr.	r5,r5
+.DCACHELOCK:	mr.	r5,r5				#ExceptionMode should be Neg?
 		beq-	.DoneCache
 		mr.	r6,r6
 		beq-	.DoneCache
@@ -2734,7 +2734,7 @@ SetCache:
 
 		b	.DoneCache
 				
-.DCACHEOFF:	lbz	r29,DState(r30)
+.DCACHEOFF:	lbz	r29,DState(r30)			#ExceptionMode should be Neg?
 		mr.	r29,r29
 		bne	.DoneCache
 		
@@ -4346,6 +4346,15 @@ FindTaskPPC:
 .ExitFind:	DSTRYSTACKPPC
 
 		blr
+#********************************************************************************************
+#
+#	ExceptionMode = IsExceptionMode(void) // r3
+#
+#********************************************************************************************
+
+		li	r3,SonnetBase
+		lbz	r3,ExceptionMode(r3)
+		blr
 
 #********************************************************************************************
 #
@@ -4398,8 +4407,6 @@ AllocPooledPPC:			li	r3,0
 				blr
 FreePooledPPC:			blr
 RawDoFmtPPC:			li	r3,0
-				blr
-IsExceptionMode:		li	r3,0
 				blr
 
 #********************************************************************************************

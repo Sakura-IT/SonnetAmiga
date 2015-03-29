@@ -22,8 +22,8 @@
 .set TempMirror,108				#Pointer	HACK
 .set DState,112
 .set DLockState,113
-.set Pad1,114
-.set Pad2,115
+.set ExceptionMode,114
+.set Pad1,115
 .set AllTasks,116				#MLH
 
 .set SonnetBusClock,66666666			#66.6 MHz
