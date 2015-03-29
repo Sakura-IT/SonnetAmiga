@@ -25,6 +25,8 @@
 .set ExceptionMode,114
 .set Pad1,115
 .set AllTasks,116				#MLH
+.set SnoopSem,128				#Pointer
+.set SnoopList,132				#MLH
 
 .set SonnetBusClock,66666666			#66.6 MHz
 .set SonnetTimerFreq,(SonnetBusClock/8)		#Default when EICR=0x4 at bits 30-28
@@ -368,6 +370,11 @@
 .set TASKATTR_INHERITR2,0x80100013
 .set TASKATTR_ATOMIC,0x80100014
 .set TASKATTR_NOTIFYMSG,0x80100015
+.set SNOOP_CODE,0x80103000
+.set SNOOP_DATA,0x80103001
+.set SNOOP_TYPE,0x80103002
+.set SNOOP_START,1
+.set SNOOP_EXIT,2
 .set TASKPPC_ATOMIC,32
 .set TASKPPC_SYSTEM,1
 .set TASKPPC_BAT,2

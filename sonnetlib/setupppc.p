@@ -196,8 +196,11 @@ Delay2:
 	
 	la	r4,AllTasks(r14)
 	LIBCALLPOWERPC NewListPPC
+	
+	la	r4,SnoopList(r14)
+	LIBCALLPOWERPC NewListPPC
 
-	li	r4,SSPPC_SIZE*3			#Memory for 3 Semaphores
+	li	r4,SSPPC_SIZE*4			#Memory for 4 Semaphores
 	LIBCALLPOWERPC AllocVecPPC
 
 	mr	r30,r3
@@ -212,6 +215,10 @@ Delay2:
 	addi	r4,r30,SSPPC_SIZE*2
 	stw	r4,PortListSem(r14)
 	LIBCALLPOWERPC InitSemaphorePPC
+	
+	addi	r4,r30,SSPPC_SIZE*3
+	stw	r4,SnoopSem(r14)
+	LIBCALLPOWERPC InitSemaphorePPC	
 
 	LIBCALLPOWERPC FlushL1DCache
 

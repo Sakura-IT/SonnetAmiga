@@ -4515,7 +4515,106 @@ VacatePPC:
 
 		DSTRYSTACKPPC
 		
-		blr	
+		blr
+
+#********************************************************************************************
+#
+#	SnoopID = SnoopTask(SnoopTags) // r3=r4
+#
+#********************************************************************************************
+
+SnoopTask:
+		BUILDSTACKPPC
+		
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+
+		mr	r29,r3
+		li	r31,0
+		mr	r30,r4
+
+		li	r4,26
+		loadreg	r5,0x10001
+		li	r6,0
+
+		LIBCALLPOWERPC AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.NoSnoop
+
+		mr	r31,r3
+		loadreg r4,SNOOP_CODE
+		li	r5,0
+		mr	r6,r30
+
+		LIBCALLPOWERPC GetTagDataPPC
+
+		mr.	r3,r3
+		beq-	.NoSnoop
+
+		stw	r3,14(r31)
+
+		loadreg	r4,SNOOP_DATA
+		li	r5,0
+		mr	r6,r30
+		
+		LIBCALLPOWERPC GetTagDataPPC
+
+		stw	r3,18(r31)
+
+		loadreg r4,SNOOP_TYPE
+		li	r5,0
+		mr	r6,r30
+
+		LIBCALLPOWERPC GetTagDataPPC
+
+		mr.	r3,r3
+		beq-	.NoSnoop
+
+		cmplwi	r3,SNOOP_START
+		beq-	.SnoopStart
+
+		cmplwi	r3,SNOOP_EXIT
+		bne-	.NoSnoop
+
+.SnoopStart:	stw	r3,22(r31)
+
+		li	r4,SonnetBase
+		lwz	r4,SnoopSem(r4)
+		
+		LIBCALLPOWERPC ObtainSemaphorePPC
+
+		li	r4,SnoopList
+		mr	r5,r31
+
+		LIBCALLPOWERPC AddHeadPPC
+
+		li	r4,SonnetBase
+		lwz	r4,SnoopSem(r4)
+		
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		mr	r30,r31
+		b	.Snooping
+
+.NoSnoop:	li	r30,0
+		mr.	r31,r31
+		beq-	.Snooping
+		
+		mr	r4,r31
+		
+		LIBCALLPOWERPC FreeVecPPC
+
+.Snooping:	mr	r3,r30
+		lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
+
+		DSTRYSTACKPPC
+
+		blr
 
 #********************************************************************************************
 #
@@ -4550,8 +4649,6 @@ GetMsgPPC:			li	r3,0
 				blr
 ReplyMsgPPC:			blr
 FreeAllMem:			blr
-SnoopTask:			li	r3,0
-				blr
 EndSnoopTask:			blr
 GetHALInfo:			blr
 SetScheduling:			blr
