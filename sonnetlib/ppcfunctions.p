@@ -2,40 +2,6 @@
 .include sonnet_libppc.i
 .include ppcmacros-std.i
 
-.set MH_FIRST,16
-.set MH_FREE,28
-.set MC_BYTES,4
-.set MC_NEXT,0
-.set LH_HEAD,0
-.set LH_TAILPRED,8
-.set TC_SIGALLOC,18
-.set TC_SIGWAIT,22
-.set TC_SIGRECVD,26
-.set TASKPPC_TASKPTR,104
-.set TASKPPC_ID,208
-.set TASKPPC_NICE,212
-.set SS_NESTCOUNT,14
-.set SS_WAITQUEUE,16
-.set SS_OWNER,40
-.set SS_QUEUECOUNT,44
-.set SSPPC_RESERVE,46
-.set SSPPC_LOCK,50
-.set MP_SIGBIT,15
-.set MP_SIGTASK,16
-.set MP_MSGLIST,20
-.set MP_PPC_INTMSG,34
-.set MP_PPC_SEM,48
-.set pr_MsgPort,92
-.set MN_SIZE,20
-.set MN_IDENTIFIER,20
-.set MN_MIRROR,24
-.set MN_PPSTRUCT,28
-.set PP_SIZE,144
-.set NT_MESSAGE,5
-.set LN_TYPE,8
-.set HW_NOTAVAILABLE,0
-.set ATTEMPT_SUCCESS,-1
-
 .set FunctionsLen,(EndFunctions-SetExcMMU)
 
 .global FunctionsLen
@@ -1236,10 +1202,7 @@ AllocSignalPPC:
 #
 #********************************************************************************************
 
-AtomicTest:
-		li	r4,SonnetBase
-		la	r4,Atomic(r4)
-		
+AtomicTest:		
 		lwarx	r0,0,r4
 		cmpwi	r0,0
 		bne-	.AtomicOn
@@ -3456,12 +3419,11 @@ CreateTaskPPC:
 		mr	r23,r3 
  
 		lwz	r3,88(r23) 
-		lwz	r4,108(r3)			#TASKPPC_FLAGS 
-		ori	r4,r4,8				#CHOWN 
-		stw	r4,108(r3) 
- 
-		lis	r4,0x8010 
-		ori	r4,r4,0				#TASKATTR_CODE 
+		lwz	r4,TASKPPC_FLAGS(r3)
+		ori	r4,r4,TASKPPC_CHOWN 
+		stw	r4,TASKPPC_FLAGS(r3) 
+ 		
+		loadreg	r4,TASKATTR_CODE
 		li	r5,0 
 		mr	r6,r30 
  
@@ -3482,17 +3444,17 @@ CreateTaskPPC:
 		beq-	.Error01			#Error NoMem 
  
 		mr	r31,r3 
-		stw	r31,120(r31)			#TASKLINK_TASK 
-		addi	r3,r31,74			#TC_MEMENTRY -> LH_HEAD 
-		stw	r3,8(r3)			#LH_TAILPRED 
+		stw	r31,TASKLINK_TASK(r31)
+		addi	r3,r31,TC_MEMENTRY
+		stw	r3,LH_TAILPRED(r3)
 		li	r0,0 
-		stwu	r0,4(r3)			#LH_TAIL 
-		stwu	r3,-4(r3)			#LH_HEAD 
-		li	r0,100 
-		stb	r0,8(r31)			#LN_TYPE 
-		li	r0,1				#T_PROCTIME 
-		stb	r0,15(r31)			#TC_FLAGS 
-		stw	r23,188(r31)			#TASKPPC_POWERPCBASE 
+		stwu	r0,LH_TAIL(r3)
+		stwu	r3,LH_HEAD-4(r3)
+		li	r0,NT_PPCTASK 
+		stb	r0,LN_TYPE(r31) 
+		li	r0,T_PROCTIME 
+		stb	r0,TC_FLAGS(r31) 
+		stw	r23,TASKPPC_POWERPCBASE(r31)
  
 		li	r4,84 
 		lis	r5,1 
@@ -3505,7 +3467,7 @@ CreateTaskPPC:
 		beq-	.Error02			#Error NoMem 
  
 		mr	r20,r3 
-		stw	r3,130(r31)			#TASKPPC_BATSTORAGE 
+		stw	r3,TASKPPC_BATSTORAGE(r31)
  
 		li	r4,24 
 		lis	r5,1 
@@ -3525,14 +3487,14 @@ CreateTaskPPC:
 		ori	r0,r0,84 
 		stw	r0,20(r3)			#Length 
 		mr	r5,r3 
-		addi	r4,r31,74			#Link into TC_MEMENRY 
-		lwz	r3,0(r4) 
-		stw	r5,0(r4) 
-		stw	r3,0(r5) 
-		stw	r4,4(r5) 
-		stw	r5,4(r3) 
-		lis	r4,0x8010 
-		ori	r4,r4,2				#TASKATTR_NAME 
+		addi	r4,r31,TC_MEMENTRY		#Link into TC_MEMENRY 
+		lwz	r3,LH_HEAD(r4) 
+		stw	r5,LH_HEAD(r4) 
+		stw	r3,LH_HEAD(r5) 
+		stw	r4,LH_TAIL(r5) 
+		stw	r5,LH_TAIL(r3)
+		
+		loadreg	r4,TASKATTR_NAME 
 		li	r5,0				#defaultVal 
 		mr	r6,r30				#TagList 
  
@@ -3573,64 +3535,60 @@ CreateTaskPPC:
 		stw	r22,16(r3) 
 		stw	r28,20(r3) 
 		mr	r5,r3 
-		addi	r4,r31,74 
-		lwz	r3,0(r4) 
-		stw	r5,0(r4) 
-		stw	r3,0(r5) 
-		stw	r4,4(r5) 
-		stw	r5,4(r3) 
+		addi	r4,r31,TC_MEMENTRY 
+		lwz	r3,LH_HEAD(r4) 
+		stw	r5,LH_HEAD(r4) 
+		stw	r3,LH_HEAD(r5) 
+		stw	r4,LH_TAIL(r5) 
+		stw	r5,LH_TAIL(r3) 
 		mr	r3,r29 
 		mr	r4,r22 
-		stw	r4,10(r31)			#LN_NAME 
+		stw	r4,LN_NAME(r31)
  
 		bl	0x674c				#Copy Name TOBEFIXED
  
-		lis	r4,0x8010 
-		ori	r4,r4,14			#TASKATTR_SYSTEM 
+ 		loadreg r4,TASKATTR_SYSTEM
 		li	r5,0 
 		mr	r6,r30 
  
 		LIBCALLPOWERPC GetTagDataPPC
  
 		mr.	r3,r3 
-		beq-	.NotSystemTask			#Not System Task 
+		beq-	.NotSystemTask
  
 		lis	r3,0 
-		ori	r3,r3,1 
-		stw	r3,108(r31)			#TASKPPC_SYSTEM -> Flags 
+		ori	r3,r3,TASKPPC_SYSTEM 
+		stw	r3,TASKPPC_FLAGS(r31)
  
-.NotSystemTask:	lis	r4,0x8010 
-		ori	r4,r4,20			#TASKATTR_ATOMIC 
+.NotSystemTask:	loadreg	r4,TASKATTR_ATOMIC
 		li	r5,0 
 		mr	r6,r30 
  
  		LIBCALLPOWERPC GetTagDataPPC
  
 		mr.	r3,r3 
-		beq-	.NotAtomicTask			#Not Atomic Task 
+		beq-	.NotAtomicTask
  
 		lis	r3,0 
-		ori	r3,r3,32			#TASKPPC_ATOMIC 
-		lwz	r6,108(r31) 
+		ori	r3,r3,TASKPPC_ATOMIC
+		lwz	r6,TASKPPC_FLAGS(r31) 
 		or	r6,r6,r3 
-		stw	r6,108(r31)			#->Flags 
-.NotAtomicTask:	addi	r3,r31,220			#TASKPPC_TASKPOOLS 
-		stw	r3,8(r3)			#LH_TAILPRED 
+		stw	r6,TASKPPC_FLAGS(r31)
+.NotAtomicTask:	addi	r3,r31,TASKPPC_TASKPOOLS
+		stw	r3,LH_TAILPRED(r3)
 		li	r0,0 
-		stwu	r0,4(r3)			#LH_TAIL 
-		stwu	r3,-4(r3)			#LH_HEAD 
+		stwu	r0,LH_TAIL(r3)
+		stwu	r3,LH_HEAD-4(r3)
  
-		lis	r4,0x8010 
-		ori	r4,r4,3				#TASKATTR_PRI 
+ 		loadreg	r4,TASKATTR_PRI
 		li	r5,0 
 		mr	r6,r30 
  
  		LIBCALLPOWERPC GetTagDataPPC
  
-		stb	r3,9(r31)			#LN_PRI (0=Default) 
+		stb	r3,LN_PRI(r31)
  
-		lis	r4,0x8010 
-		ori	r4,r4,18			#TASKATTR_NICE 
+ 		loadreg	r4,TASKATTR_NICE
 		li	r5,0 
 		mr	r6,r30 
  
@@ -3643,34 +3601,33 @@ CreateTaskPPC:
 		ble-	.BelowMax 
 		li	r3,20 
  
-.BelowMax:	stw	r3,212(r31)			#TASKPPC_NICE (0=default) 
+.BelowMax:	stw	r3,TASKPPC_NICE(r31)
  
-		lis	r4,0x8010 
-		ori	r4,r4,15			#TASKATTR_MOTHERPRI 
+ 
+ 		loadreg	r4,TASKATTR_MOTHERPRI
 		li	r5,0 
 		mr	r6,r30 
  
  		LIBCALLPOWERPC GetTagDataPPC
  
 		mr.	r3,r3 
-		beq-	.NoMotherPri			#No Motherpri 
+		beq-	.NoMotherPri
  
 		lwz	r3,88(r23)			#ThisTask (mother) 
-		lbz	r0,9(r3) 
+		lbz	r0,LN_PRI(r3) 
 		extsb	r0,r0 
-		stb	r0,9(r31) 
-		lwz	r3,212(r3) 
-		stw	r3,212(r31)			#Copy PRI and NICE 
+		stb	r0,LN_PRI(r31) 
+		lwz	r3,TASKPPC_NICE(r3) 
+		stw	r3,TASKPPC_NICE(r31)		#Copy PRI and NICE 
  
-.NoMotherPri:	lis	r4,0x8010 
-		ori	r4,r4,4				#TASKATTR_STACKSIZE 
-		li	r5,16384 
+.NoMotherPri:	loadreg	r4,TASKATTR_STACKSIZE
+		li	r5,0x4000
 		mr	r6,r30 
  
  		LIBCALLPOWERPC GetTagDataPPC
  
-		addi	r4,r3,4096			#Default = 4096 
-		stw	r4,92(r31)			#TASKPPC_STACKSIZE 
+		addi	r4,r3,0x1000			#Default = 0x4000 or asked+0x1000 
+		stw	r4,TASKPPC_STACKSIZE(r31)
 		mr	r29,r4 
 		lis	r5,1 
 		ori	r5,r5,1 
@@ -3682,16 +3639,15 @@ CreateTaskPPC:
 		beq-	.Error06			#Error NoMem 
  
 		mr	r28,r3 
-		stw	r3,58(r31)			#TC_SPLOWER 
+		stw	r3,TC_SPLOWER(r31)
 		add	r4,r3,r29 
-		stw	r4,62(r31)			#TC_SPUPPER 
+		stw	r4,TC_SPUPPER(r31)
  
 		subi	r4,r4,56			#Align SP on 32 
-		lis	r0,-1 
-		ori	r0,r0,65520 
+		loadreg r0,0xfffffff0
 		and	r4,r4,r0 
  
-		stw	r4,54(r31)			#TC_SPREG 
+		stw	r4,TC_SPREG(r31)
  
 		li	r4,24 
 		lis	r5,1 
@@ -3704,19 +3660,19 @@ CreateTaskPPC:
 		beq-	.Error07			#Error NoMem 
  
 		mr	r27,r3 
-		stw	r3,96(r31)			#TASKPPC_STACKMEM 
+		stw	r3,TASKPPC_STACKMEM(r31)
  
 		li	r0,1				#Link into TC_MEMENTRY 
 		sth	r0,14(r3) 
 		stw	r28,16(r3) 
 		stw	r29,20(r3) 
 		mr	r5,r3 
-		addi	r4,r31,74 
-		lwz	r3,0(r4) 
-		stw	r5,0(r4) 
-		stw	r3,0(r5) 
-		stw	r4,4(r5) 
-		stw	r5,4(r3) 
+		addi	r4,r31,TC_MEMENTRY
+		lwz	r3,LH_HEAD(r4) 
+		stw	r5,LH_HEAD(r4) 
+		stw	r3,LH_HEAD(r5) 
+		stw	r4,LH_TAIL(r5) 
+		stw	r5,LH_TAIL(r3) 
  
 		li	r4,544 
 		lis	r5,1 
@@ -3728,9 +3684,9 @@ CreateTaskPPC:
 		mr.	r3,r3 
 		beq-	.Error08			#Error NoMem 
  
-		stw	r3,100(r31)			#TASKPPC_CONTEXTMEM 
-		mr	r26,r3 
-		lwz	r0,54(r31)			#TC_SPREG 
+		stw	r3,TASKPPC_CONTEXTMEM(r31)
+		mr	r26,r3
+		lwz	r0,TC_SPREG(r31)
 		stw	r0,36(r26)			#To location 9?? 
  
 		li	r4,24 
@@ -3751,23 +3707,23 @@ CreateTaskPPC:
 		ori	r0,r0,544 
 		stw	r0,20(r3) 
 		mr	r5,r3 
-		addi	r4,r31,74 
-		lwz	r3,0(r4) 
-		stw	r5,0(r4) 
-		stw	r3,0(r5) 
-		stw	r4,4(r5) 
-		stw	r5,4(r3) 
+		addi	r4,r31,TC_MEMENTRY
+		lwz	r3,LH_HEAD(r4) 
+		stw	r5,LH_HEAD(r4) 
+		stw	r3,LH_HEAD(r5) 
+		stw	r4,LH_TAIL(r5) 
+		stw	r5,LH_TAIL(r3) 
  
 		lis	r0,0 
-		ori	r0,r0,61552 
+		ori	r0,r0,61552
+		loadreg	r0,0xf070
 		stw	r0,4(r26)			#f070 to location 1?? 
 		stw	r25,148(r26)			#Code to location 37 
 		stw	r2,40(r26)			#TOC to location 10 
 		lwz	r3,8000(r2) 
 		stw	r3,0(r26)			#8000(TOC) to location 0?? 
  
-		lis	r4,0x8010 
-		ori	r4,r4,16			#TASKATTR_BAT 
+ 		loadreg	r4,TASKATTR_BAT
 		lis	r5,0 
 		ori	r5,r5,0 
 		mr	r6,r30 
@@ -3783,10 +3739,10 @@ CreateTaskPPC:
  
 		addi	r5,r23,478			#Default BATS in PowerPCBase? 
 		lis	r3,0 
-		ori	r3,r3,2				#TASKPPC_BAT 
-		lwz	r6,108(r31) 
+		ori	r3,r3,TASKPPC_BAT
+		lwz	r6,TASKPPC_FLAGS(r31) 
 		or	r6,r6,r3 
-		stw	r6,108(r31) 
+		stw	r6,TASKPPC_FLAGS(r31) 
 		b	.GetBATs 
  
 .NoBATs:	addi	r5,r23,542			#Invalid BATS in PowerPCBase? 
@@ -3811,8 +3767,7 @@ CreateTaskPPC:
 		mtlr	r0 
 		blrl	 
  
-		lis	r4,0x8010 
-		ori	r4,r4,1				#TASKATTR_EXITCODE 
+ 		loadreg	r4,TASKATTR_EXITCODE
 		li	r5,0 
 		mr	r6,r30 
  
@@ -3820,8 +3775,7 @@ CreateTaskPPC:
  
 		stw	r3,152(r26)			#152 in ContextMem; Default=0 
  
-		lis	r4,0x8010 
-		ori	r4,r4,17			#TASKATTR_PRIVATE 
+ 		loadreg r4,TASKATTR_PRIVATE
 		li	r5,0 
 		mr	r6,r30 
  
@@ -3839,8 +3793,7 @@ CreateTaskPPC:
  
 .DoPrivate:	stw	r3,76(r26)			#Store MotherTask or 1 (prv) 
  
-		lis	r4,0x8010 
-		ori	r4,r4,19			#TASKATTR_INHERITR2 
+ 		loadreg	r4,TASKATTR_INHERITR2
 		li	r5,0 
 		mr	r6,r30 
  
@@ -3852,8 +3805,7 @@ CreateTaskPPC:
 		stw	r17,156(r26)			#Mother r2 to ContextMem 156 
 		b	.DoInherit 
  
-.NoInherit:	lis	r4,0x8010 
-		ori	r4,r4,5				#TASKATTR_R2	 
+.NoInherit:	loadreg	r4,TASKATTR_R2
 		li	r5,0 
 		mr	r6,r30 
  
@@ -3861,8 +3813,7 @@ CreateTaskPPC:
  
 		stw	r3,156(r26)			#r2 to ContextMem 156 
  
-.DoInherit:	lis	r4,0x8010 
-		ori	r4,r4,6				#TASKATTR_R3 
+.DoInherit:	loadreg	r4,TASKATTR_R3
 		li	r5,0 
 		mr	r6,r30 
  
@@ -3870,8 +3821,7 @@ CreateTaskPPC:
  
 		stw	r3,44(r26)			#r3 to ContextMem 44 
  
-		lis	r4,0x8010 
-		ori	r4,r4,7				#TASKATTR_R4 
+ 		loadreg	r4,TASKATTR_R4
 		li	r5,0 
 		mr	r6,r30 
  
@@ -3879,8 +3829,7 @@ CreateTaskPPC:
  
 		stw	r3,48(r26)			#r4 to ContextMem 48 
  		
-		lis	r4,0x8010 
-		ori	r4,r4,8				#TASKATTR_R5 
+ 		loadreg	r4,TASKATTR_R5
 		li	r5,0 
 		mr	r6,r30 
  
@@ -3888,8 +3837,7 @@ CreateTaskPPC:
  
 		stw	r3,52(r26)			#r5 to ContextMem 52 
   
-		lis	r4,0x8010 
-		ori	r4,r4,9				#TASKATTR_R6 
+  		loadreg	r4,TASKATTR_R6
 		li	r5,0 
 		mr	r6,r30 
  
@@ -3897,8 +3845,7 @@ CreateTaskPPC:
  
 		stw	r3,56(r26)			#r6 to ContextMem 56 
  
-		lis	r4,0x8010 
-		ori	r4,r4,10			#TASKATTR_R7 
+ 		loadreg	r4,TASKATTR_R7
 		li	r5,0 
 		mr	r6,r30 
  
@@ -3906,8 +3853,7 @@ CreateTaskPPC:
  
 		stw	r3,60(r26)			#r7 to ContextMem 60 
  
-		lis	r4,0x8010 
-		ori	r4,r4,11			#TASKATTR_R8 
+ 		loadreg	r4,TASKATTR_R8
 		li	r5,0 
 		mr	r6,r30 
 		
@@ -3915,8 +3861,7 @@ CreateTaskPPC:
  
 		stw	r3,64(r26)			#r8 to ContextMem 64 
  
-		lis	r4,0x8010 
-		ori	r4,r4,12			#TASKATTR_R9 
+ 		loadreg	r4,TASKATTR_R9
 		li	r5,0 
 		mr	r6,r30 
  
@@ -3924,8 +3869,7 @@ CreateTaskPPC:
 	 
 		stw	r3,68(r26)			#r9 to ContextMem 68 
  
-		lis	r4,0x8010 
-		ori	r4,r4,13			#TASKATTR_R10 
+ 		loadreg	r4,TASKATTR_R10
 		li	r5,0 
 		mr	r6,r30 
  
@@ -3944,40 +3888,38 @@ CreateTaskPPC:
 		beq-	.Error10			#Error NoMem 
  
 		mr	r18,r3				#Setup a Semaphore & MsgPort 
-		addi	r4,r18,34			#Some List?? 
-		stw	r4,8(r4) 
+		addi	r4,r18,MP_PPC_INTMSG
+		stw	r4,LH_TAILPRED(r4) 
 		li	r0,0 
-		stwu	r0,4(r4) 
-		stwu	r4,-4(r4) 
+		stwu	r0,LH_TAIL(r4) 
+		stwu	r4,LH_HEAD-4(r4) 
  
-		addi	r4,r18,20			#MP_MSGLIST 
-		stw	r4,8(r4) 
+		addi	r4,r18,MP_MSGLIST
+		stw	r4,LH_TAILPRED(r4) 
 		li	r0,0 
-		stwu	r0,4(r4) 
-		stwu	r4,-4(r4) 
+		stwu	r0,LH_TAIL(r4) 
+		stwu	r4,LH_HEAD-4(r4) 
  
-		lis	r0,0 
-		ori	r0,r0,65535 
-		stw	r0,18(r31)			#0000ffff -> TC_SIGALLOC 
+ 		loadreg	r0,SYS_SIGALLOC
+		stw	r0,TC_SIGALLOC(r31)
  
-		li	r0,8 
-		stb	r0,15(r18)			#Unknown SIGBIT			 
-		addi	r4,r18,48 
+		li	r0,8 				#Unknown SIGBIT
+		stb	r0,MP_SIGBIT(r18)			 
+		addi	r4,r18,MP_PPC_SEM
  
  		LIBCALLPOWERPC InitSemaphorePPC
 	 
 		cmpwi	r3,-1				#Error 
 		bne-	.Error11 
  
-		stw	r31,16(r18)			#MP_SIGTASK 
-		li	r0,0 
-		stb	r0,14(r18)			#PA_SIGNAL 
-		li	r0,101 
-		stb	r0,8(r18)			#Type 101 = NT_PPCMSGPORT 
-		stw	r18,216(r31)			#TASKPPC_MSGPORT 
+		stw	r31,MP_SIGTASK(r18)
+		li	r0,PA_SIGNAL 
+		stb	r0,MP_FLAGS(r18)
+		li	r0,NT_PPCMSGPORT 
+		stb	r0,LN_TYPE(r18)
+		stw	r18,TASKPPC_MSGPORT(r31)
  
-		lis	r4,0x8010 
-		ori	r4,r4,21			#TASKATTR_NOTIFYMSG 
+		loadreg	r4,TASKATTR_NOTIFYMSG
 		li	r5,0 
 		mr	r6,r30 
  
@@ -4011,11 +3953,12 @@ CreateTaskPPC:
  
 		mr	r5,r3 
 		stw	r31,14(r5)			#Store Taskpointer 
-		stw	r5,104(r31)			#TASKPPC_TASKPTR 
-		lwz	r3,10(r31)			#Copy Name pointer 
-		stw	r3,10(r5) 
+		stw	r5,TASKPPC_TASKPTR(r31)
+		lwz	r3,LN_NAME(r31)			#Copy Name pointer 
+		stw	r3,LN_NAME(r5) 
  
-		addi	r4,r2,18046			#TaskListSem? 
+		li	r4,SonnetBase
+		lwz	r4,TaskListSem(r4)
  
  		LIBCALLPOWERPC ObtainSemaphorePPC
 	 
@@ -4035,7 +3978,8 @@ CreateTaskPPC:
  
 		dcbst	r0,r4				#Cache 
  
-		addi	r4,r2,18046			
+ 		li	r4,SonnetBase
+ 		lwz	r4,TaskListSem(r4)
 		
 		LIBCALLPOWERPC ReleaseSemaphorePPC
  
@@ -4049,18 +3993,15 @@ CreateTaskPPC:
 		mtlr	r0 
 		blrl	 
  
-.WaitAtomic01:	lwz	r4,17720(r2) 
- 
-		lwz	r3,17652(r2)			#Atomic 
-		lwz	r0,-142(r3) 
-		mtlr	r0 
-		blrl	 
+.WaitAtomic01:	li	r4,Atomic
+		
+		LIBCALLPOWERPC AtomicTest
  
 		mr.	r3,r3 
 		beq+	.WaitAtomic01			#Wait for Atomic 
  
-		lwz	r3,108(r31)			#TASKPPC_FLAGS 
-		andi.	r0,r3,1				#TASKPPC_SYSTEM 
+		lwz	r3,TASKPPC_FLAGS(r31)
+		andi.	r0,r3,TASKPPC_SYSTEM
 		bne-	.SystemTask			#Yes -> c684 
  
 		lwz	r4,666(r23)			#Normal Tasks +1 
@@ -4072,15 +4013,14 @@ CreateTaskPPC:
 		addi	r4,r4,1 
 		stw	r4,662(r23) 
  
-.SkipSystem:	stw	r4,208(r31)			#TASKPPC_ID 
-		li	r0,3				#TS_READY 
-		stb	r0,15(r31)		 
+.SkipSystem:	stw	r4,TASKPPC_ID(r31)
+		li	r0,TS_READY
+		stb	r0,TC_STATE(r31)		 
 		addi	r4,r23,102			#PowerPCBase +102 
-		mr	r5,r31				#Task 
-		lis	r0,1 
-		ori	r0,r0,34464			#0x000186a0 
-		stw	r0,176(r31)			#TASKPPC_QUANTUM 
-		lwz	r7,212(r31)			#TASKPPC_NICE 
+		mr	r5,r31				#Task
+		loadreg	r0,0x000186a0
+		stw	r0,TASKPPC_QUANTUM(r31)
+		lwz	r7,TASKPPC_NICE(r31)
 		addi	r8,r7,20 
 		rlwinm	r8,r8,2,0,29 
 		lwz	r7,654(r23) 
@@ -4089,16 +4029,14 @@ CreateTaskPPC:
 		lis	r7,2000 
 		ori	r7,r7,0 
 		divwu	r0,r7,r8 
-		stw	r0,192(r31)			#TASKPPC_DESIRED 
+		stw	r0,TASKPPC_DESIRED(r31)
 		bl	0x761c				#?? TOBEFIXED
 		li	r0,-1 
 		stb	r0,626(r23)			#Some flag? (reschedule flag?)
  
-		lwz	r4,17720(r2)			#End Atomic 
-		lwz	r3,17652(r2) 
-		lwz	r0,-148(r3) 
-		mtlr	r0 
-		blrl	 
+ 		li	r4,Atomic
+ 		
+ 		LIBCALLPOWERPC AtomicDone
  
 		li	r4,0 
 		LIBCALLPOWERPC SetDecInterrupt
@@ -4175,10 +4113,10 @@ CreateTaskPPC:
 .SkipToEnd:	mr	r5,r3 
 		lwz	r3,88(r23) 
  
-		lwz	r4,108(r3)			#TASKPPC_FLAGS 
-		ori	r4,r4,8 
-		xori	r4,r4,8				#remove CHOWN 
-		stw	r4,108(r3) 
+		lwz	r4,TASKPPC_FLAGS(r3)
+		ori	r4,r4,TASKPPC_CHOWN 
+		xori	r4,r4,TASKPPC_CHOWN
+		stw	r4,TASKPPC_FLAGS(r3) 
  
 		mr	r3,r5				#Exit with task in r3 (or not) 
  
@@ -4212,17 +4150,7 @@ CreateTaskPPC:
 
 SetDecInterrupt:
 		BUILDSTACKPPC
-		stw	r2,20(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-44(r1)
 
-		lwz	r3,52(r3)
-		lwz	r2,42(r3)
 		loadreg	r5,Quantum
 		mr	r6,r4
 		mulhw	r3,r5,r6
@@ -4330,3 +4258,4 @@ IsExceptionMode:		li	r3,0
 
 #********************************************************************************************
 EndFunctions:
+
