@@ -4615,6 +4615,49 @@ SnoopTask:
 		DSTRYSTACKPPC
 
 		blr
+		
+#********************************************************************************************
+#
+#	void EndSnoopTask(SnoopID) // r4
+#
+#********************************************************************************************
+		
+EndSnoopTask:
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+
+		mr	r31,r4
+
+		mr.	r31,r31
+		beq-	.NoEndSnoop
+
+		li	r4,SonnetBase
+		lwz	r4,SnoopSem(r4)
+		
+		LIBCALLPOWERPC ObtainSemaphorePPC
+
+		mr	r4,r31
+		
+		LIBCALLPOWERPC RemovePPC
+
+		li	r4,SonnetBase
+		lwz	r4,SnoopSem(r4)
+		
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		mr	r4,r31
+		
+		LIBCALLPOWERPC FreeVecPPC
+
+.NoEndSnoop:	lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
+		
+		DSTRYSTACKPPC
+
+		blr	
 
 #********************************************************************************************
 #
@@ -4649,7 +4692,6 @@ GetMsgPPC:			li	r3,0
 				blr
 ReplyMsgPPC:			blr
 FreeAllMem:			blr
-EndSnoopTask:			blr
 GetHALInfo:			blr
 SetScheduling:			blr
 SetExceptPPC:			li	r3,0
