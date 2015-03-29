@@ -1317,9 +1317,12 @@ TestRoutine:
 	
 EIntEnd:
 	mflr	r4
-	li	r3,0x500
+	li	r3,SonnetBase
 	loadreg	r5,0x48002b00
-	stw	r5,0(r3)
+	stw	r5,0x500(r3)
+	loadreg r5,0x48002700
+	stw	r5,0x900(r3)	
+	
 	li	r3,0x3000			#Jump from Exception (0x500) immediatly to 0x3000
 	li	r5,EIntEnd-EInt
 	li	r6,0
@@ -1372,22 +1375,7 @@ PrIntEnd:
 	li	r5,PrIntEnd-PrInt
 	li	r6,0
 	bl	copy_and_flush
-	bl	DcIntEnd
-
-#********************************************************************************************
-
-DcInt:	nop					#Decrementer Exception
-	rfi
-
-#********************************************************************************************
-
-DcIntEnd:
-	mflr	r4
-	li	r3,0x900
-	li	r5,DcIntEnd-DcInt
-	li	r6,0
-	bl	copy_and_flush
-
+	
 	mtlr	r15
 	blr
 
