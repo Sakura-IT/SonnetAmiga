@@ -1,6 +1,5 @@
 OBJECTS68K=sonnet.o
 OBJECTSPPC=ppcfunctions.o setupppc.o
-INCLUDES=ppcdefines.i pci.i
 
 EXECUTABLE=sonnet.library
 EXECUTABLE_RS=sonnet.library.rs
@@ -12,10 +11,10 @@ disasm68k : $(EXECUTABLE_RS)
 $(EXECUTABLE) : $(OBJECTS68K) $(OBJECTSPPC)
 	$(LD) -s $(OBJECTS68K) $(OBJECTSPPC) -o $(EXECUTABLE)
 
-%.o : %.p $(INCLUDES)
+%.o : %.p $(LOCAL_INCS) sonnet_libppc.i
 	$(ASMPPC) $(ASMPPCPARAM) -o $@ $< 
 
-%.o : %.s $(INCLUDES)
+%.o : %.s $(LOCAL_INCS) pci.i sonnet_lib.i
 	$(ASM68K) $(ASM68KPARAM) -o $@ $<
 
 %.rs : %

@@ -7,9 +7,12 @@ CC=vc
 LHA=lha
 IRA=ira
 
+LOCAL_INC_DIR=../common
+LOCAL_INCS=$(LOCAL_INC_DIR)/ppcdefines.i $(LOCAL_INC_DIR)/ppcmacros-std.i
+
 IRAPARAM=-M68020
-ASM68KPARAM=-m68020up -Fhunk
-ASMPPCPARAM=-many -mppc32 -Fhunk    
+ASM68KPARAM=-m68020up -Fhunk -I$(LOCAL_INC_DIR)
+ASMPPCPARAM=-many -mppc32 -Fhunk -I$(LOCAL_INC_DIR)
 
 DISTRIBUTION=sonnet.lha
 

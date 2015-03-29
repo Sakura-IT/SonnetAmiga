@@ -25,10 +25,10 @@ $(GETINFO_EXE) : $(OBJ_GETINFO)
 $(TEMPLATE_EXE) : $(OBJ_TEMPLATE)
 	$(LD) -s $(OBJ_TEMPLATE) -o $(TEMPLATE_EXE)
 
-%.o : %.p $(INCLUDES)
+%.o : %.p $(LOCAL_INCS)
 	$(ASMPPC) $(ASMPPCPARAM) -o $@ $< 
 
-%.o : %.s $(INCLUDES)
+%.o : %.s $(LOCAL_INCS)
 	$(ASM68K) $(ASM68KPARAM) -o $@ $<
 
 %.rs : %
