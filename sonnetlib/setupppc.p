@@ -193,6 +193,9 @@ Delay2:
 
 	la	r4,Ports(r14)
 	LIBCALLPOWERPC NewListPPC
+	
+	la	r4,AllTasks(r14)
+	LIBCALLPOWERPC NewListPPC
 
 	li	r4,SSPPC_SIZE*3			#Memory for 3 Semaphores
 	LIBCALLPOWERPC AllocVecPPC

@@ -24,6 +24,7 @@
 .set DLockState,113
 .set Pad1,114
 .set Pad2,115
+.set AllTasks,116				#MLH
 
 .set SonnetBusClock,66666666			#66.6 MHz
 .set SonnetTimerFreq,(SonnetBusClock/8)		#Default when EICR=0x4 at bits 30-28

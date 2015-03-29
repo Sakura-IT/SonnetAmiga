@@ -1282,15 +1282,13 @@ LockTaskList:
 		
 		stwu	r31,-4(r13)
 
-		li	r31,SonnetBase
-		lwz	r31,RunningTask(r31)
-
 		li	r4,SonnetBase
 		lwz	r4,TaskListSem(r4)
 
 		LIBCALLPOWERPC ObtainSemaphorePPC
 
-		lwz	r3,TASKPPC_TASKPTR(r31)
+		li	r3,AllTasks
+		
 		lwz	r31,0(r13)
 		addi	r13,r13,4
 		
@@ -3308,7 +3306,8 @@ FindTaskByID:
 		mr.	r4,r4
 		beq-	.EndSearch
 
-		lwz	r5,TASKPPC_ID(r3)		#Original: 14(task)=taskppc?
+		lwz	r3,14(r3)
+		lwz	r5,TASKPPC_ID(r3)
 		cmpw	r5,r31
 		bne-	.IncorrectID
 
@@ -3962,9 +3961,9 @@ CreateTaskPPC:
  
  		LIBCALLPOWERPC ObtainSemaphorePPC
 	 
-		addi	r4,r23,144			#PowerPCBase+144 
-		addi	r4,r4,4				#148 
-		lwz	r3,4(r4)			#152 
+		li	r4,AllTasks
+		addi	r4,r4,4
+		lwz	r3,4(r4) 
 		stw	r5,4(r4)			#Insert dummy task in list 
 		stw	r4,0(r5) 
 		stw	r3,4(r5) 
@@ -4301,9 +4300,52 @@ ChangeStack:
 
 #********************************************************************************************
 #
-#	Poolheader = CreatePoolPPC(attr, puddlesize, treshsize) // r3=r4,r5,r6 r4 is ignored
+#	TaskPPC = FindTaskPPC(Name) // r3=r4
 #
 #********************************************************************************************
+
+FindTaskPPC:
+		BUILDSTACKPPC
+
+		mr.	r4,r4
+		bne-	.NotOwnTask
+
+		li	r3,SonnetBase
+		lwz	r3,RunningTask(r3)
+		b	.ExitFind
+
+.NotOwnTask:	stwu	r31,-4(r13)
+		mr	r31,r3
+		mr	r5,r4
+
+		li	r4,SonnetBase
+		lwz	r4,TaskListSem(r4)
+
+		LIBCALLPOWERPC ObtainSemaphorePPC
+
+		li	r4,AllTasks
+		
+		LIBCALLPOWERPC FindNamePPC
+
+		mr.	r3,r3
+		beq-	.NameNotFound
+
+		lwz	r3,14(r3)			#Pointer to PPCTask in AllTasks list
+.NameNotFound:	mr	r31,r3
+
+		li	r4,SonnetBase
+		lwz	r4,TaskListSem(r4)
+		
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+
+		mr	r3,r31
+
+		lwz	r31,0(r13)
+		addi	r13,r13,4
+
+.ExitFind:	DSTRYSTACKPPC
+
+		blr
 
 #********************************************************************************************
 #
@@ -4320,8 +4362,6 @@ CreatePoolPPC:
 SPrintF:			blr			#debug feature
 Run68KLowLevel:			blr
 DeleteTaskPPC:			blr
-FindTaskPPC:			li	r3,0
-				blr
 SignalPPC:			blr
 WaitPPC:			li	r3,0
 				blr
