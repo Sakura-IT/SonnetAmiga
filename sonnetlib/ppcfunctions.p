@@ -4352,8 +4352,95 @@ FindTaskPPC:
 #
 #********************************************************************************************
 
+IsExceptionMode:
 		li	r3,SonnetBase
 		lbz	r3,ExceptionMode(r3)
+		blr
+		
+#********************************************************************************************
+#
+#	void ProcurePPC(SignalSemaphorePPC, SemaphoreMessage) // r4,r5
+#
+#********************************************************************************************
+
+ProcurePPC:
+		BUILDSTACKPPC
+		
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+
+		li	r3,SonnetBase
+		lwz	r3,RunningTask(r3)
+
+		mr	r31,r3
+		mr	r30,r4
+		mr	r29,r5
+		mr	r28,r31
+		
+		stw	r28,SSM_SEMAPHORE(r29)
+		lwz	r4,LN_NAME(r29)
+		stw	r4,LN_TYPE(r29)
+		mr.	r4,r4
+		beq-	.ExcLock
+		li	r28,0
+
+.ExcLock:	li	r4,Atomic
+
+		LIBCALLPOWERPC AtomicTest
+
+		mr.	r3,r3
+		beq+	.ExcLock
+
+		lha	r5,SS_QUEUECOUNT(r30)
+		addi	r5,r5,1
+		sth	r5,SS_QUEUECOUNT(r30)
+		extsh.	r0,r5
+		bne-	.Queue
+		stw	r28,SS_OWNER(r30)
+.IsExclusive:	stw	r30,SSM_SEMAPHORE(r29)
+		li	r0,0
+		stw	r0,LN_TYPE(r29)
+		lha	r5,SS_NESTCOUNT(r30)
+		addi	r5,r5,1
+		sth	r5,SS_NESTCOUNT(r30)
+
+		li	r4,Atomic
+		
+		LIBCALLPOWERPC AtomicDone
+
+		mr	r4,r29
+		
+		LIBCALLPOWERPC ReplyMsgPPC
+
+		b	.ProcureExit
+
+.Queue:		lwz	r4,SS_OWNER(r30)
+		cmplw	r4,r28
+		beq+	.IsExclusive
+
+		addi	r4,r30,SS_WAITQUEUE
+		mr	r5,r29
+		addi	r4,r4,4
+		lwz	r3,4(r4)
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
+
+		li	r4,Atomic
+
+		LIBCALLPOWERPC AtomicDone
+
+.ProcureExit:	lwz	r28,0(r13)
+		lwz	r29,4(r13)
+		lwz	r30,8(r13)
+		lwz	r31,12(r13)
+		addi	r13,r13,16
+
+		DSTRYSTACKPPC
+
 		blr
 
 #********************************************************************************************
@@ -4399,7 +4486,6 @@ SetExceptPPC:			li	r3,0
 ObtainSemaphoreSharedPPC:	blr
 AttemptSemaphoreSharedPPC:	li	r3,ATTEMPT_SUCCESS
 				blr
-ProcurePPC:			blr
 VacatePPC:			blr
 CauseInterrupt:			blr
 DeletePoolPPC:			blr
