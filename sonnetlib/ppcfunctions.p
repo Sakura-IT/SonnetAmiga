@@ -4784,6 +4784,88 @@ ObtainSemaphoreSharedPPC:
 		DSTRYSTACKPPC
 
 		blr
+		
+#********************************************************************************************
+#
+#	status = AttemptSemaphoreSharedPPC(SignalSemaphorPPC) // r4
+#
+#********************************************************************************************
+
+AttemptSemaphoreSharedPPC:
+
+		BUILDSTACKPPC
+
+		mfctr	r0
+		stwu	r0,-4(r13)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r12,-4(r13)
+		stwu	r11,-4(r13)
+		stwu	r10,-4(r13)
+		stwu	r9,-4(r13)
+		stwu	r8,-4(r13)
+		stwu	r7,-4(r13)
+		stwu	r6,-4(r13)
+		stwu	r5,-4(r13)
+		stwu	r4,-4(r13)
+
+		li	r31,SonnetBase
+		lwz	r31,RunningTask(r31)
+		mr	r30,r4
+
+.SharedAttempt:	li	r4,Atomic
+
+		LIBCALLPOWERPC AtomicTest
+
+		mr.	r3,r3
+		beq+	.SharedAttempt
+
+		lha	r5,SS_QUEUECOUNT(r30)
+		addi	r5,r5,1
+		mr	r3,r31
+		mr.	r5,r5
+		beq-	.NoQ
+
+		lwz	r4,SS_OWNER(r30)
+		mr.	r4,r4
+		beq-	.NoQ
+
+		cmplw	r3,r4
+		beq-	.NoQ
+
+		li	r6,ATTEMPT_FAILURE
+		b	.ItFailed
+
+.NoQ:		sth	r5,SS_QUEUECOUNT(r30)
+		lha	r5,SS_NESTCOUNT(r30)
+		addi	r5,r5,1
+		sth	r5,SS_NESTCOUNT(r30)
+		li	r6,ATTEMPT_SUCCESS
+
+.ItFailed:	li	r4,Atomic
+
+		LIBCALLPOWERPC AtomicDone
+
+		mr	r3,r6
+		lwz	r4,0(r13)
+		lwz	r5,4(r13)
+		lwz	r6,8(r13)
+		lwz	r7,12(r13)
+		lwz	r8,16(r13)
+		lwz	r9,20(r13)
+		lwz	r10,24(r13)
+		lwz	r11,28(r13)
+		lwz	r12,32(r13)
+		lwz	r30,36(r13)
+		lwz	r31,40(r13)
+		addi	r13,r13,44
+		lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtctr	r0
+
+		DSTRYSTACKPPC
+
+		blr	
 
 #********************************************************************************************
 #
@@ -4821,8 +4903,6 @@ FreeAllMem:			blr
 GetHALInfo:			blr
 SetScheduling:			blr
 SetExceptPPC:			li	r3,0
-				blr
-AttemptSemaphoreSharedPPC:	li	r3,ATTEMPT_SUCCESS
 				blr
 CauseInterrupt:			blr
 DeletePoolPPC:			blr
