@@ -4657,7 +4657,133 @@ EndSnoopTask:
 		
 		DSTRYSTACKPPC
 
-		blr	
+		blr
+		
+#********************************************************************************************
+#
+#	void ObtainSemaphoreSharedPPC(SignalSemaphorPPC) // r4
+#
+#********************************************************************************************
+
+ObtainSemaphoreSharedPPC:
+		
+		BUILDSTACKPPC
+
+		mfctr	r0
+		stwu	r0,-4(r13)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r12,-4(r13)
+		stwu	r11,-4(r13)
+		stwu	r10,-4(r13)
+		stwu	r9,-4(r13)
+		stwu	r8,-4(r13)
+		stwu	r7,-4(r13)
+		stwu	r6,-4(r13)
+		stwu	r5,-4(r13)
+		stwu	r4,-4(r13)
+		stwu	r3,-4(r13)
+
+		li	r31,SonnetBase
+		lwz	r31,RunningTask(r31)
+		mr	r30,r4
+		
+.SharedAtomic:	li	r4,Atomic
+		
+		LIBCALLPOWERPC AtomicTest
+
+		mr.	r3,r3
+		beq+	.SharedAtomic
+
+		lha	r5,SS_QUEUECOUNT(r30)
+		addi	r5,r5,1
+		sth	r5,SS_QUEUECOUNT(r30)
+		extsh.	r0,r5
+		bne-	.SharedQ
+
+		li	r4,Atomic
+		
+		LIBCALLPOWERPC AtomicDone
+
+		b	.ExitShared
+
+.SharedQ:	mr	r3,r31
+		lwz	r4,SS_OWNER(r30)
+		mr.	r4,r4
+		bne-	.HasOwner
+
+		LIBCALLPOWERPC AtomicDone
+
+		b	.ExitShared
+
+.HasOwner:	cmplw	r3,r4
+		bne-	.NotOwner
+
+		li	r4,Atomic
+		
+		LIBCALLPOWERPC AtomicDone
+
+		b	.ExitShared
+
+.NotOwner:	stwu	r29,-4(r13)
+		mr	r29,r13
+		subi	r13,r13,12
+		subi	r5,r29,12
+#		addi	r3,r3,1				#??
+		stw	r3,8(r5)
+		lwz	r4,TC_SIGRECVD(r3)
+		ori	r4,r4,16
+		xori	r4,r4,16
+		stw	r4,TC_SIGRECVD(r3)
+		
+		addi	r4,r30,SS_WAITQUEUE
+		addi	r4,r4,4
+		lwz	r3,4(r4)
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
+
+		li	r4,Atomic
+		
+		LIBCALLPOWERPC AtomicDone
+
+		lis	r4,0
+		ori	r4,r4,16
+		
+		LIBCALLPOWERPC WaitPPC
+
+		mr	r13,r29
+		lwz	r29,0(r13)
+		addi	r13,r13,4
+		b	.DoneShared
+
+.ExitShared:	lha	r5,SS_NESTCOUNT(r30)
+		addi	r5,r5,1
+		sth	r5,SS_NESTCOUNT(r30)
+
+.DoneShared:	lwz	r3,0(r13)
+		lwz	r4,4(r13)
+		lwz	r5,8(r13)
+		lwz	r6,12(r13)
+		lwz	r7,16(r13)
+		lwz	r8,20(r13)
+		lwz	r9,24(r13)
+		lwz	r10,28(r13)
+		lwz	r11,32(r13)
+		lwz	r12,36(r13)
+		lwz	r29,40(r13)
+		lwz	r30,44(r13)
+		lwz	r31,48(r13)
+		addi	r13,r13,52
+		lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtctr	r0
+
+		DSTRYSTACKPPC
+
+		blr
 
 #********************************************************************************************
 #
@@ -4696,7 +4822,6 @@ GetHALInfo:			blr
 SetScheduling:			blr
 SetExceptPPC:			li	r3,0
 				blr
-ObtainSemaphoreSharedPPC:	blr
 AttemptSemaphoreSharedPPC:	li	r3,ATTEMPT_SUCCESS
 				blr
 CauseInterrupt:			blr
