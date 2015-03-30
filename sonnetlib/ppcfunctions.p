@@ -4865,7 +4865,38 @@ AttemptSemaphoreSharedPPC:
 
 		DSTRYSTACKPPC
 
-		blr	
+		blr
+		
+#********************************************************************************************
+#
+#	void CauseInterrupt(void) // Interrupt using the Decrementer Exception
+#
+#********************************************************************************************
+	
+CauseInterrupt:
+
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		li	r31,SonnetBase
+
+		li	r0,-1
+		stb	r0,Interrupt(r31)
+
+		li	r4,0
+		
+		LIBCALLPOWERPC SetDecInterrupt
+
+.IntWait:	lbz	r0,Interrupt(r31)
+		mr.	r0,r0
+		bne+	.IntWait
+
+		lwz	r31,0(r13)
+		addi	r13,r13,4
+
+		DSTRYSTACKPPC
+
+		blr
 
 #********************************************************************************************
 #
@@ -4904,7 +4935,6 @@ GetHALInfo:			blr
 SetScheduling:			blr
 SetExceptPPC:			li	r3,0
 				blr
-CauseInterrupt:			blr
 DeletePoolPPC:			blr
 AllocPooledPPC:			li	r3,0
 				blr

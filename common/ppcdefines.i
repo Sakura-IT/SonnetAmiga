@@ -23,7 +23,7 @@
 .set DState,112
 .set DLockState,113
 .set ExceptionMode,114
-.set Pad1,115
+.set Interrupt,115
 .set AllTasks,116				#MLH
 .set SnoopSem,128				#Pointer
 .set SnoopList,132				#MLH

@@ -1286,6 +1286,9 @@ NoHEAR:	li	r3,SonnetBase
 
 	stw	r9,0xb0(r8)			#Write 0 to EOI to End Interrupt
 
+	li	r0,SonnetBase
+	stb	r0,Interrupt(r0)
+
 	rfi
 
 NoReschedule:
@@ -1313,6 +1316,9 @@ NoEOI:	mtsrr0	r6
 	addi	r13,r13,4
 	
 	DSTRYSTACKPPC
+	
+	li	r0,SonnetBase			#Only works when SonnetBase = 0
+	stb	r0,Interrupt(r0)
 
 	rfi
 
