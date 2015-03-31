@@ -853,6 +853,7 @@ NoFPU	movem.l d0-a6,-(a7)				;68k routines called from PPC
 	move.l PP_CODE(a1),a0
 	add.l PP_OFFSET(a1),a0
 	move.l a0,-(a7)
+
 	btst #AFB_FPU40,AttnFlags+1(a6)
 	beq.s NoFPU3
 	lea PP_FREGS(a1),a6
@@ -869,7 +870,41 @@ NoFPU3	lea PP_REGS(a1),a6				;PP_STACKSIZE & PP_STACKPTR to be done
 	move.l (a6),a6
 	rts
 
-xBack	move.l (a7)+,a6
+xBack	move.l a6,-(a7)
+	move.l 4(a7),a6
+	lea MN_PPSTRUCT+PP_REGS(a6),a6
+	move.l d0,(a6)+
+	move.l d1,(a6)+
+	move.l d2,(a6)+
+	move.l d3,(a6)+
+	move.l d4,(a6)+
+	move.l d5,(a6)+
+	move.l d6,(a6)+
+	move.l d7,(a6)+
+	move.l a0,(a6)+
+	move.l a1,(a6)+
+	move.l a2,(a6)+
+	move.l a3,(a6)+
+	move.l a4,(a6)+
+	move.l a5,(a6)+
+	move.l a6,a0
+	move.l (a7)+,a6
+	move.l a6,(a0)
+	move.l 4.w,a6
+	btst #AFB_FPU40,AttnFlags+1(a6)
+	beq.s NoFPU4
+	move.l (a7),a6
+	lea MN_PPSTRUCT+PP_FREGS(a6),a6
+	fmove.d fp0,(a6)+
+	fmove.d fp1,(a6)+
+	fmove.d fp2,(a6)+
+	fmove.d fp3,(a6)+
+	fmove.d fp4,(a6)+
+	fmove.d fp5,(a6)+
+	fmove.d fp6,(a6)+
+	fmove.d fp7,(a6)+
+	
+NoFPU4	move.l (a7)+,a6
 	movem.l (a7)+,d0-a5
 	move.l a6,a1
 	move.l (a7)+,a6

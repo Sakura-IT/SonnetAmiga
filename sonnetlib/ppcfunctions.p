@@ -2240,7 +2240,7 @@ PutXMsgPPC:
 
 #********************************************************************************************
 #
-#	status = WaitFor68K(PStruct) // r3=r4 (HACKED FUNCTION - UNDER DEVELOPMENT)
+#	status = WaitFor68K(PPStruct) // r3=r4 (HACKED FUNCTION - UNDER DEVELOPMENT)
 #
 #********************************************************************************************
 
@@ -2302,7 +2302,7 @@ Run68K:
 				
 		LIBCALLPOWERPC PutXMsgPPC
 		
-		mr	r4,r30
+		mr	r4,r31
 		
 		LIBCALLPOWERPC WaitFor68K
 		
