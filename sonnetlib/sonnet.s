@@ -548,16 +548,15 @@ PrcName	dc.b "MasterControl",0
 SonInt:
 	movem.l d1-a6,-(a7)
 	move.l EUMBAddr(pc),a2
-	move.l #$01000000,d2
+	move.l #$03000000,d2
 	move.l OMISR(a2),d3
-	move.l d3,d4
 	and.l d2,d3
 	beq.s NoInt	
 	move.l 4.w,a6
 	move.l OMR0(a2),a1
 	move.l OMR1(a2),d0
 	jsr _LVOSignal(a6)
-	move.l d4,OMISR(a2)
+	move.l d2,OMISR(a2)
 NoInt	movem.l (a7)+,d1-a6
 	moveq.l #0,d0
 	rts
@@ -837,7 +836,7 @@ FreeIt	move.l d0,a1
 FreePrt	move.l d0,a0
 	jmp _LVODeleteMsgPort(a6)
 
-Runk86	btst.b #AFB_FPU40,AttnFlags+1(a6)
+Runk86	btst #AFB_FPU40,AttnFlags+1(a6)
 	beq.s NoFPU
 	fmove.d fp0,-(a7)
 	fmove.d fp1,-(a7)
@@ -874,7 +873,7 @@ xBack	move.l (a7)+,a6
 	movem.l (a7)+,d0-a5
 	move.l a6,a1
 	move.l (a7)+,a6
-	btst.b #AFB_FPU40,AttnFlags+1(a6)
+	btst #AFB_FPU40,AttnFlags+1(a6)
 	beq.s NoFPU2
 	fmove.d (a7)+,fp7
 	fmove.d (a7)+,fp6
