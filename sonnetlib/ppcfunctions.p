@@ -88,7 +88,7 @@ ConfirmInterrupt:
 
 #********************************************************************************************
 #
-#	void InsertPPC(list, node, nodepredecessor) // r4,r5,r6 Node must be in Sonnet mem to work
+#	void InsertPPC(list, node, nodepredecessor) // r4,r5,r6
 #
 #********************************************************************************************
 
@@ -118,7 +118,7 @@ InsertPPC:
 
 #********************************************************************************************
 #
-#	void AddHeadPPC(list, node) // r4,r5 List/Node must be in Sonnet mem to work
+#	void AddHeadPPC(list, node) // r4,r5
 #
 #********************************************************************************************
 
@@ -132,7 +132,7 @@ AddHeadPPC:
 
 #********************************************************************************************
 #
-#	void AddTailPPC(list, node) // r4,r5 List/Node must be in Sonnet mem to work
+#	void AddTailPPC(list, node) // r4,r5
 #
 #********************************************************************************************
 
@@ -147,7 +147,7 @@ AddTailPPC:
 
 #********************************************************************************************
 #
-#	void RemovePPC(node) // r4 Node must be in sonnet mem to work
+#	void RemovePPC(node) // r4
 #
 #********************************************************************************************
 
@@ -161,7 +161,7 @@ RemovePPC:
 
 #********************************************************************************************
 #
-#	void RemHeadPPC(list) // r4 List must be in Sonnet mem to work
+#	node = RemHeadPPC(list) // r3=r4
 #
 #********************************************************************************************
 
@@ -177,7 +177,7 @@ RemHeadPPC:
 
 #********************************************************************************************
 #
-#	void RemTailPPC(list) // r4 List must be in Sonnet mem to work (this msg won't be repeated from now on
+#	node = RemTailPPC(list) // r3=r4
 #
 #********************************************************************************************
 
@@ -2291,11 +2291,10 @@ Run68K:
 		
 		loadreg	r5,"T68K"
 		stw	r5,MN_IDENTIFIER(r30)
-		li	r5,SonnetBase
-		lwz	r5,TempMirror(r5)
-		stw	r5,MN_MIRROR(r30)
-		
 		li	r4,SonnetBase
+		lwz	r5,RunningTask(r4)
+		lwz	r5,MN_MIRROR(r5)
+		stw	r5,MN_MIRROR(r30)
 		lwz	r4,MCTask(r4)
 		la	r4,pr_MsgPort(r4)		
 		mr	r5,r30

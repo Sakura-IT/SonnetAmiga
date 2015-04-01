@@ -63,7 +63,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	AddUniqueSemaphorePPC,IsExceptionMode,SetDecInterrupt
 
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,MCTask,Init,ViolationAddress
-	XREF	ReadyTasks
+	XREF	NewTasks
 	XDEF	_PowerPCBase
 
 ;********************************************************************************************
@@ -520,11 +520,13 @@ Sig68k	move.l ThisTask(a6),a0
 	jsr _LVOPutMsg(a6)				;move message to waiting 68k task
 	bra.s NextMsg
 
-MsgTPPC	jsr _LVOCacheClearU(a6)
-	move.l SonnetBase(pc),a0
-	move.l a1,ReadyTasks+4(a0)
-	move.l _PowerPCBase(pc),a6			;Force reschedule. Is this faster than
-	jsr _LVOCauseInterruptHW(a6)			;just wait for normal reschedule?
+MsgTPPC	move.l SonnetBase(pc),a0
+	lea NewTasks(a0),a0
+	clr.l (a1)
+	clr.l 4(a1)
+	jsr _LVOEnqueue(a6)
+	move.l _PowerPCBase(pc),a6			;Force reschedule
+	jsr _LVOCauseInterruptHW(a6)
 	move.l 4.w,a6
 	bra NextMsg
 
@@ -652,10 +654,11 @@ NoFirst	addq.l #1,d1
 	rol.w #8,d0
 	swap d0
 	rol.w #8,d0
-	move.l d0,a0
-	move.l d5,IMR0(a0)
-Error	nop
-	movem.l (a7)+,d1-a6
+	move.l d0,a5
+	move.l 4.w,a6
+	jsr _LVOCacheClearU(a6)
+	move.l d5,IMR0(a5)
+Error	movem.l (a7)+,d1-a6
 	rts
 	
 ;********************************************************************************************

@@ -2,7 +2,7 @@
 .include sonnet_libppc.i
 .include ppcmacros-std.i
 
-.global PPCCode,PPCLen,RunningTask,WaitingTasks,ReadyTasks,Init,ViolationAddress
+.global PPCCode,PPCLen,RunningTask,WaitingTasks,NewTasks,Init,ViolationAddress
 .global MCTask
 
 .set	PPCLen,(PPCEnd-PPCCode)
@@ -198,6 +198,9 @@ Delay2:
 	LIBCALLPOWERPC NewListPPC
 	
 	la	r4,SnoopList(r14)
+	LIBCALLPOWERPC NewListPPC
+	
+	la	r4,NewTasks(r14)
 	LIBCALLPOWERPC NewListPPC
 
 	li	r4,SSPPC_SIZE*4			#Memory for 4 Semaphores
@@ -1217,33 +1220,25 @@ EInt:	BUILDSTACKPPC
 	b	TestRoutine
 
 NoHEAR:	li	r3,SonnetBase
-
-	lwz	r9,ReadyTasks+4(r3)
-	mr.	r9,r9
-	beq	NoReschedule
-	
 	lwz	r9,RunningTask(r3)		#HACK! No task structure yet
 	mr.	r9,r9
 	bne	NoReschedule	
 
-	lwz	r9,ReadyTasks+4(r3)	
-	lwz	r9,MN_IDENTIFIER(r9)
-	loadreg	r8,"TPPC"
-	cmpw	r9,r8
-	bne	NoReschedule
+	lwz	r3,0(r3)
+	la	r4,NewTasks(r3)
+	
+	LIBCALLPOWERPC RemHeadPPC
+	
+	mr.	r9,r3
+	beq	NoReschedule
 
-	lwz	r9,ReadyTasks+4(r3)
+	li	r3,SonnetBase
 	stw	r9,RunningTask(r3)
-	li	r6,0
-	stw	r6,ReadyTasks+4(r3)
-
 	loadreg	r6,0x8000
 	addi	r6,r6,ExitCode-Start	
 	mtlr	r6
 
 	lwz	r8,RunningTask(r3)
-	lwz	r4,MN_MIRROR(r8)
-	stw	r4,TempMirror(r3)
 	lwz	r2,PP_REGS+12*4(r8)
 	lwz	r3,PP_REGS+0*4(r8)
 	lwz	r4,PP_REGS+1*4(r8)
