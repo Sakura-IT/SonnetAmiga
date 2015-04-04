@@ -2018,7 +2018,8 @@ WaitPortPPC:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
-		mr	r28,r3				#UNKNOWN AS OF YET (switch?)
+		
+		li	r28,SonnetBase
 		mr	r31,r4
 
 		addi	r4,r31,MP_PPC_SEM
@@ -2048,7 +2049,7 @@ WaitPortPPC:
 		bne+	.Link35
 		b	.WaitInLine
 		
-.Link34:	stw	r31,610(r28)
+.Link34:	stw	r31,CurrentPort(r28)
 		li	r0,-1
 		stb	r0,628(r28)
 
@@ -2107,14 +2108,14 @@ WaitPortPPC:
 		bne+	.Link40
 		b	.WaitInLine2
 
-.Link39:	stw	r31,610(r28)
+.Link39:	stw	r31,CurrentPort(r28)
 		li	r0,-1
 		stb	r0,628(r28)
 
 		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
-		li	r4,0				#UNKNOWN AS OF YET (Reschedule?)
+		li	r4,0
 		LIBCALLPOWERPC SetDecInterrupt
 
 .Link41:	lbz	r3,628(r28)
@@ -3388,6 +3389,110 @@ SetNiceValue:
 		lwz	r2,20(r1)
 
 		blr
+		
+#********************************************************************************************
+#
+#	StrLen = GetLen(String) // r3=r3 (Support)
+#
+#********************************************************************************************
+
+GetLen:	
+		li	r4,0
+		subi	r3,r3,1
+.NextChar:	lbzu	r0,1(r3)
+		mr.	r0,r0
+		beq-	.EndReached
+		addi	r4,r4,1
+		b	.NextChar
+.EndReached:	mr	r3,r4
+		blr
+		
+#********************************************************************************************
+#
+#	EndOfDestStr = CopyStr(Source, Destination) // r3=r3,r4 (Support)
+#
+#********************************************************************************************
+
+CopyStr:	
+		subi	r3,r3,1
+		subi	r4,r4,1
+.CopyNext:	lbzu	r0,1(r3)
+		stbu	r0,1(r4)
+		mr.	r0,r0
+		bne+	.CopyNext
+		addi	r3,r4,1
+		blr
+		
+#********************************************************************************************
+#
+#	void InsertOnPri(??, Task) // r4,r5 (Support)
+#
+#********************************************************************************************
+
+InsertOnPri:	
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-60(r1)
+
+		stwu	r7,-4(r13)
+		stwu	r6,-4(r13)
+		stwu	r5,-4(r13)
+		stwu	r4,-4(r13)
+		stwu	r3,-4(r13)
+
+		lwz	r3,TASKPPC_PRIORITY(r5)
+		lwz	r6,TASKPPC_PRIOFFSET(r5)
+		add	r3,r3,r6
+		lwz	r6,TASKPPC_POWERPCBASE(r5)
+		lwz	r7,658(r6)				#
+		lwz	r6,670(r6)				#
+		add	r6,r6,r7
+		cmpw	r3,r6
+		blt-	.LowerPri
+		mr	r3,r6
+		lwz	r0,TASKPPC_PRIORITY(r5)
+		sub	r0,r3,r0
+		stw	r0,TASKPPC_PRIOFFSET(r5)
+.LowerPri:	lwz	r6,0(r4)
+.Huh:		mr	r4,r6
+		lwz	r6,0(r4)
+		mr.	r6,r6
+		beq-	.GoExit
+		lwz	r0,TASKPPC_FLAGS(r4)
+		rlwinm.	r0,r0,(31-TASKPPC_EMULATOR),31,31
+		beq-	.NoEmul
+		mr	r4,r6
+		b	.GoExit
+.NoEmul:	lwz	r7,TASKPPC_PRIORITY(r4)
+		lwz	r0,TASKPPC_PRIOFFSET(r4)
+		add	r7,r7,r0
+		cmpw	r3,r7
+		ble+	.Huh
+.GoExit:	lwz	r3,4(r4)
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
+		
+		lwz	r3,0(r13)
+		lwz	r4,4(r13)
+		lwz	r5,8(r13)
+		lwz	r6,12(r13)
+		lwz	r7,16(r13)
+		addi	r13,r13,20
+		
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		
+		blr
 
 #********************************************************************************************
 #
@@ -3436,9 +3541,8 @@ CreateTaskPPC:
 		beq-	.Error01			#Error NoCode 
  
 		mr	r25,r3 
-		li	r4,246				#246 bytes 
-		lis	r5,1				#attr = $10001 
-		ori	r5,r5,1 
+		li	r4,246				#246 bytes
+		loadreg	r5,0x10001			#attr = $10001
 		li	r6,0				#default alignment 
  
  		LIBCALLPOWERPC AllocVecPPC
@@ -3506,8 +3610,8 @@ CreateTaskPPC:
 		mr.	r3,r3 
 		beq-	.Error04			#Error NoName 
  
-		mr	r29,r3 
-		bl	0x6728				#GetLen TOBEFIXED 
+		mr	r29,r3
+		bl	GetLen
  
 		addi	r3,r3,1 
 		mr	r4,r3 
@@ -3548,7 +3652,7 @@ CreateTaskPPC:
 		mr	r4,r22 
 		stw	r4,LN_NAME(r31)
  
-		bl	0x674c				#Copy Name TOBEFIXED
+		bl	CopyStr
  
  		loadreg r4,TASKATTR_SYSTEM
 		li	r5,0 
@@ -4033,7 +4137,9 @@ CreateTaskPPC:
 		ori	r7,r7,0 
 		divwu	r0,r7,r8 
 		stw	r0,TASKPPC_DESIRED(r31)
-		bl	0x761c				#?? TOBEFIXED
+		
+		bl	InsertOnPri
+		
 		li	r0,-1 
 		stb	r0,626(r23)			#Some flag? (reschedule flag?)
  
