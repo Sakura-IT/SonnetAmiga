@@ -1220,6 +1220,10 @@ EInt:	BUILDSTACKPPC
 	b	TestRoutine
 
 NoHEAR:	li	r3,SonnetBase
+	lwz	r9,TaskException(r3)
+	mr.	r9,r9
+	bne	.TaskException
+
 	lwz	r9,RunningTask(r3)		#HACK! No task structure yet
 	mr.	r9,r9
 	bne	NoReschedule	
@@ -1318,9 +1322,13 @@ NoEOI:	mtsrr0	r6
 	rfi
 
 TestRoutine:
-
 	b	NoHEAR
 
+.TaskException:
+	li	r9,0				#Will be starting point for TC_EXCEPTCODE
+	stw	r9,TaskException(r3)
+	b	NoReschedule
+	
 #********************************************************************************************
 	
 EIntEnd:

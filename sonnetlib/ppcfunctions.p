@@ -4931,12 +4931,15 @@ CheckExcSignal:
 		or	r5,r5,r4
 		stw	r5,TC_SIGRECVD(r7)
 		
+		li	r10,SonnetBase
+		stw	r7,TaskException(r10)
+		
 		li	r4,0
 
 		LIBCALLPOWERPC SetDecInterrupt
 
 		li	r10,SonnetBase
-.IntWait2:	lbz	r0,Interrupt(r10)
+.IntWait2:	lwz	r0,TaskException(r10)
 		mr.	r0,r0
 		bne+	.IntWait2
 

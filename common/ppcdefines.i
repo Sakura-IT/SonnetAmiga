@@ -19,7 +19,7 @@
 .set Ports,88					#MLH
 .set ViolationAddress,100			#Pointer
 .set MCTask,104					#Pointer
-.set UNUSED,108					#Pointer
+.set TaskException,108				#Pointer
 .set DState,112
 .set DLockState,113
 .set ExceptionMode,114
@@ -393,6 +393,7 @@
 .set TC_SIGWAIT,22
 .set TC_SIGRECVD,26
 .set TC_SIGEXCEPT,30
+.set TC_EXCEPTCODE,42
 .set TC_EXCEPTDATA,38
 .set TC_SPREG,54
 .set TC_SPLOWER,58
