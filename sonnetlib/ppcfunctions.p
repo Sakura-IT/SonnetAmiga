@@ -280,8 +280,8 @@ AddTimePPC:
 		lwz	r6,4(r4)
 		lwz	r7,4(r5)
 		add	r6,r6,r7
-		lis	r0,15
-		ori	r0,r0,16960
+		lis	r0,0xf
+		ori	r0,r0,0x4240
 		li	r3,0
 		cmplw	r6,r0
 		blt-	.Link2
@@ -308,8 +308,8 @@ SubTimePPC:
 		li	r3,0
 		mr.	r6,r6
 		bge-	.Link3
-		lis	r0,15
-		ori	r0,r0,16960
+		lis	r0,0xf
+		ori	r0,r0,0x4240
 		add	r6,r6,r0
 		li	r3,1
 .Link3:		lwz	r8,0(r4)
@@ -1261,8 +1261,11 @@ SetSignalPPC:
 		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
-		mr	r4,r31				#Reschedule?
-		mr	r3,r4
+		mr	r3,r6
+		li	r4,0
+		bl	CheckExcSignal
+
+		mr	r3,r31
 		lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
@@ -4901,6 +4904,112 @@ CauseInterrupt:
 		
 #********************************************************************************************
 #
+#	oldSignals = CheckExcSignal(Task, Signal) // r3=r3,r4 (Support)
+#
+#********************************************************************************************		
+		
+CheckExcSignal:		
+		BUILDSTACKPPC
+
+		mr	r7,r3
+		mr	r8,r4
+
+.DoAtomic:	li	r4,Atomic
+
+		LIBCALLPOWERPC AtomicTest
+
+		mr.	r3,r3
+		beq+	.DoAtomic
+
+		lwz	r5,TC_SIGRECVD(r7)
+		or	r9,r5,r8
+		lwz	r6,TC_SIGEXCEPT(r7)
+		and.	r4,r9,r6
+		beq-	.NonePending
+
+		andc	r8,r8,r4
+		or	r5,r5,r4
+		stw	r5,TC_SIGRECVD(r7)
+		
+		li	r4,0
+
+		LIBCALLPOWERPC SetDecInterrupt
+
+		li	r10,SonnetBase
+.IntWait2:	lbz	r0,Interrupt(r10)
+		mr.	r0,r0
+		bne+	.IntWait2
+
+.NonePending:	li	r4,Atomic
+
+		LIBCALLPOWERPC AtomicDone
+	
+		mr	r3,r8
+		
+		DSTRYSTACKPPC
+		
+		blr
+		
+#********************************************************************************************
+#
+#	oldSignals = SetExceptPPC(newSignals, signalMask, flag) // r3=r4,r5,r6
+#
+#********************************************************************************************
+
+SetExceptPPC:	
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+
+		mr	r29,r6
+		mr	r28,r2
+
+		li	r6,SonnetBase
+		lwz	r6,RunningTask(r6)
+		mr	r30,r4
+
+.DoAtomic2:	li	r4,Atomic
+
+		LIBCALLPOWERPC AtomicTest
+
+		mr.	r3,r3
+		beq+	.DoAtomic2
+
+		lwz	r31,TC_SIGEXCEPT(r6)
+		and	r30,r30,r5
+		andc	r7,r31,r5
+		or	r30,r30,r7
+		stw	r30,TC_SIGEXCEPT(r6)
+		mr.	r29,r29
+		beq-	.NoPassR2
+
+		stw	r28,TC_EXCEPTDATA(r6)
+
+.NoPassR2:	li	r4,Atomic
+
+		LIBCALLPOWERPC AtomicDone
+
+		mr	r3,r6
+		li	r4,0
+		bl	CheckExcSignal
+
+		mr	r3,r31
+
+		lwz	r28,0(r13)
+		lwz	r29,4(r13)
+		lwz	r30,8(r13)
+		lwz	r31,12(r13)
+		addi	r13,r13,16
+
+		DSTRYSTACKPPC
+
+		blr
+
+#********************************************************************************************
+#
 #	void DeleteTaskPPC(PPCTask) // r4
 #
 #********************************************************************************************
@@ -5168,8 +5277,6 @@ ReplyMsgPPC:			blr
 FreeAllMem:			blr
 GetHALInfo:			blr
 SetScheduling:			blr
-SetExceptPPC:			li	r3,0
-				blr
 DeletePoolPPC:			blr
 AllocPooledPPC:			li	r3,0
 				blr
