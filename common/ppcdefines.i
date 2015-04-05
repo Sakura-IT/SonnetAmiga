@@ -26,9 +26,12 @@
 .set Interrupt,115
 .set AllTasks,116				#MLH
 .set SnoopSem,128				#Pointer
-.set SnoopList,132				#MLH
+.set SnoopList,132				#MLH (424)
 .set NewTasks,144				#MLH
 .set CurrentPort,156
+.set NumAllTasks,160				#630
+.set IdSysTasks,164				#662
+.set IdDefTasks,168				#666
 
 .set SonnetBusClock,66666666			#66.6 MHz
 .set SonnetTimerFreq,(SonnetBusClock/8)		#Default when EICR=0x4 at bits 30-28
@@ -408,4 +411,9 @@
 .set MP_MSGLIST,20
 .set PA_SIGNAL,0
 .set TS_READY,3
+.set TS_REMOVED,6
 .set SSM_SEMAPHORE,20
+.set ML_NUMENTRIES,14
+.set ML_SIZE,16
+.set ME_ADDR,0
+.set ME_LENGTH,4

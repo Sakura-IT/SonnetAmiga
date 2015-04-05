@@ -918,6 +918,7 @@ FindTagItemPPC:
 #	Support: void FlushL1DCache(void)
 #
 #********************************************************************************************
+
 FlushL1DCache:
 			
 		li	r4,0x7000
@@ -1167,11 +1168,11 @@ AllocSignalPPC:
 		b	.EndSig
 
 .GetSig:	or	r3,r3,r6
-		stw	r3,TC_SIGALLOC(r5)		#Task structure not in place yet
+		stw	r3,TC_SIGALLOC(r5)
 		stwu	r4,-4(r13)
 		
 .WaitingLine:	li	r4,Atomic
-		LIBCALLPOWERPC AtomicTest		#Reentrant
+		LIBCALLPOWERPC AtomicTest
 
 		mr.	r3,r3
 		beq+	.WaitingLine
@@ -3522,11 +3523,9 @@ CreateTaskPPC:
  
 		mr	r17,r2 
 		mr	r30,r4 
-		lwz	r3,52(r3) 
-		lwz	r2,46(r3) 
-		mr	r23,r3 
- 
-		lwz	r3,88(r23) 
+ 		li	r23,SonnetBase 		
+		lwz	r3,RunningTask(r23)
+		lwz	r23,PowerPCBase(r23)
 		lwz	r4,TASKPPC_FLAGS(r3)
 		ori	r4,r4,TASKPPC_CHOWN 
 		stw	r4,TASKPPC_FLAGS(r3) 
@@ -3563,9 +3562,8 @@ CreateTaskPPC:
 		stb	r0,TC_FLAGS(r31) 
 		stw	r23,TASKPPC_POWERPCBASE(r31)
  
-		li	r4,84 
-		lis	r5,1 
-		ori	r5,r5,1 
+		li	r4,84
+		loadreg	r5,0x10001
 		li	r6,0 
  
  		LIBCALLPOWERPC AllocVecPPC
@@ -3577,8 +3575,7 @@ CreateTaskPPC:
 		stw	r3,TASKPPC_BATSTORAGE(r31)
  
 		li	r4,24 
-		lis	r5,1 
-		ori	r5,r5,1 
+		loadreg	r5,0x10001
 		li	r6,0 
  
  		LIBCALLPOWERPC AllocVecPPC
@@ -3588,11 +3585,11 @@ CreateTaskPPC:
  
 		mr	r19,r3 
 		li	r0,1 
-		sth	r0,14(r3) 
-		stw	r20,16(r3)			#Value of memory of BATSTORAGE 
+		sth	r0,ML_NUMENTRIES(r3) 
+		stw	r20,ML_SIZE+ME_ADDR(r3)		#Value of memory of BATSTORAGE 
 		lis	r0,0 
 		ori	r0,r0,84 
-		stw	r0,20(r3)			#Length 
+		stw	r0,ML_SIZE+ME_LENGTH(r3)	#Length 
 		mr	r5,r3 
 		addi	r4,r31,TC_MEMENTRY		#Link into TC_MEMENRY 
 		lwz	r3,LH_HEAD(r4) 
@@ -3615,9 +3612,8 @@ CreateTaskPPC:
  
 		addi	r3,r3,1 
 		mr	r4,r3 
-		mr	r28,r3 
-		lis	r5,1 
-		ori	r5,r5,1 
+		mr	r28,r3
+		loadreg	r5,0x10001
 		li	r6,0 
  
  		LIBCALLPOWERPC AllocVecPPC
@@ -3626,9 +3622,8 @@ CreateTaskPPC:
 		beq-	.Error04			#Error NoMem 
  
 		mr	r22,r3 
-		li	r4,24 
-		lis	r5,1 
-		ori	r5,r5,1 
+		li	r4,24
+		loadreg	r5,0x10001
 		li	r6,0 
  
  		LIBCALLPOWERPC AllocVecPPC
@@ -3638,9 +3633,9 @@ CreateTaskPPC:
  
 		mr	r21,r3				#Link name mem into  
 		li	r0,1				#TC_MEMENTRY 
-		sth	r0,14(r3) 
-		stw	r22,16(r3) 
-		stw	r28,20(r3) 
+		sth	r0,ML_NUMENTRIES(r3) 
+		stw	r22,ML_SIZE+ME_ADDR(r3) 
+		stw	r28,ML_SIZE+ME_LENGTH(r3) 
 		mr	r5,r3 
 		addi	r4,r31,TC_MEMENTRY 
 		lwz	r3,LH_HEAD(r4) 
@@ -3720,7 +3715,8 @@ CreateTaskPPC:
 		mr.	r3,r3 
 		beq-	.NoMotherPri
  
-		lwz	r3,88(r23)			#ThisTask (mother) 
+ 		li	r3,SonnetBase			#Mother task
+ 		lwz	r3,RunningTask(r3)
 		lbz	r0,LN_PRI(r3) 
 		extsb	r0,r0 
 		stb	r0,LN_PRI(r31) 
@@ -3757,8 +3753,7 @@ CreateTaskPPC:
 		stw	r4,TC_SPREG(r31)
  
 		li	r4,24 
-		lis	r5,1 
-		ori	r5,r5,1 
+		loadreg	r5,0x10001
 		li	r6,0 
  
  		LIBCALLPOWERPC AllocVecPPC
@@ -3770,9 +3765,9 @@ CreateTaskPPC:
 		stw	r3,TASKPPC_STACKMEM(r31)
  
 		li	r0,1				#Link into TC_MEMENTRY 
-		sth	r0,14(r3) 
-		stw	r28,16(r3) 
-		stw	r29,20(r3) 
+		sth	r0,ML_NUMENTRIES(r3) 
+		stw	r28,ML_SIZE+ME_ADDR(r3) 
+		stw	r29,ML_SIZE+ME_LENGTH(r3) 
 		mr	r5,r3 
 		addi	r4,r31,TC_MEMENTRY
 		lwz	r3,LH_HEAD(r4) 
@@ -3781,9 +3776,8 @@ CreateTaskPPC:
 		stw	r4,LH_TAIL(r5) 
 		stw	r5,LH_TAIL(r3) 
  
-		li	r4,544 
-		lis	r5,1 
-		ori	r5,r5,1 
+		li	r4,544
+		loadreg r5,0x10001 
 		li	r6,0 
  
  		LIBCALLPOWERPC AllocVecPPC
@@ -3796,9 +3790,8 @@ CreateTaskPPC:
 		lwz	r0,TC_SPREG(r31)
 		stw	r0,36(r26)			#To location 9?? 
  
-		li	r4,24 
-		lis	r5,1 
-		ori	r5,r5,1 
+		li	r4,24
+		loadreg r5,0x10001
 		li	r6,0 
  
  		LIBCALLPOWERPC AllocVecPPC
@@ -3808,11 +3801,11 @@ CreateTaskPPC:
  
 		mr	r24,r3				#Link into TC_MEMENTRY 
 		li	r0,1 
-		sth	r0,14(r3) 
-		stw	r26,16(r3) 
+		sth	r0,ML_NUMENTRIES(r3) 
+		stw	r26,ML_SIZE+ME_ADDR(r3) 
 		lis	r0,0 
 		ori	r0,r0,544 
-		stw	r0,20(r3) 
+		stw	r0,ML_SIZE+ME_LENGTH(r3) 
 		mr	r5,r3 
 		addi	r4,r31,TC_MEMENTRY
 		lwz	r3,LH_HEAD(r4) 
@@ -3984,9 +3977,8 @@ CreateTaskPPC:
  
 		stw	r3,72(r26)			#r10 to ContextMem 72 
  
-		li	r4,100 
-		lis	r5,1 
-		ori	r5,r5,1 
+		li	r4,100
+		loadreg	r5,0x10001
 		li	r6,32 
  
  		LIBCALLPOWERPC AllocVecPPC
@@ -4048,9 +4040,8 @@ CreateTaskPPC:
  
 		mr	r16,r3 
  
-		li	r4,18				#Dummy MirrorTask? 
-		lis	r5,1 
-		ori	r5,r5,1 
+		li	r4,18				#Dummy MirrorTask?
+		loadreg	r5,0x10001
 		li	r6,0 
  
  		LIBCALLPOWERPC AllocVecPPC
@@ -4077,10 +4068,10 @@ CreateTaskPPC:
 		stw	r3,4(r5) 
 		stw	r5,0(r3) 
  
-		lwz	r4,15728(r2) 
-		addi	r4,r4,630 
+ 		li	r4,SonnetBase
+ 		la	r4,NumAllTasks(r4)
 		lwz	r3,0(r4) 
-		addi	r3,r3,1				#Set number of tasks? 
+		addi	r3,r3,1				#Set number of tasks
 		stw	r3,0(r4) 
  
 		dcbst	r0,r4				#Cache 
@@ -4111,14 +4102,16 @@ CreateTaskPPC:
 		andi.	r0,r3,TASKPPC_SYSTEM
 		bne-	.SystemTask			#Yes -> c684 
  
-		lwz	r4,666(r23)			#Normal Tasks +1 
-		addi	r4,r4,1 
-		stw	r4,666(r23) 
+		li	r4,SonnetBase			#Normal Tasks +1
+		lwz	r5,IdDefTasks(r4)
+		addi	r5,r5,1 
+		stw	r5,IdDefTasks(r4) 
 		b	.SkipSystem 
  
-.SystemTask:	lwz	r4,662(r23)			#System Tasks +1 
-		addi	r4,r4,1 
-		stw	r4,662(r23) 
+.SystemTask:	li	r4,SonnetBase			#System Tasls +1
+		lwz	r5,IdSysTasks(r4)
+		addi	r5,r5,1
+		stw	r5,IdSysTasks(r4)
  
 .SkipSystem:	stw	r4,TASKPPC_ID(r31)
 		li	r0,TS_READY
@@ -4203,7 +4196,7 @@ CreateTaskPPC:
  
 .Error01:	mr	r0,r3 
 		lbz	r3,18737(r2) 
-		cmpwi	r3,1				#Check some flag? 
+		cmpwi	r3,1				#Check some flag? DebugMode?
 		mr	r3,r0 
 		blt-	.SetTask0 
  
@@ -4212,15 +4205,17 @@ CreateTaskPPC:
 		li	r3,0 
 		stwu	r3,-4(r13) 
 		addi	r3,r2,6154 
-		stwu	r3,-4(r13) 
-		bl	0x14058				#?? 
+		stwu	r3,-4(r13)
+		bl	0x14058				#??
+		
 		addi	r13,r13,12 
 		lwz	r3,0(r13) 
 		addi	r13,r13,4 
 .SetTask0:	li	r3,0				#Error flag in r3 
  
-.SkipToEnd:	mr	r5,r3 
-		lwz	r3,88(r23) 
+.SkipToEnd:	mr	r5,r3
+		li	r3,SonnetBase 
+		lwz	r3,RunningTask(r3)
  
 		lwz	r4,TASKPPC_FLAGS(r3)
 		ori	r4,r4,TASKPPC_CHOWN 
@@ -4695,7 +4690,8 @@ SnoopTask:
 		
 		LIBCALLPOWERPC ObtainSemaphorePPC
 
-		li	r4,SnoopList
+		li	r4,SonnetBase
+		lwz	r4,SonnetBase(r4)
 		mr	r5,r31
 
 		LIBCALLPOWERPC AddHeadPPC
@@ -5124,233 +5120,192 @@ SetExceptPPC:
 #********************************************************************************************
 
 DeleteTaskPPC:
-#0000c8d4:  90010008	stw	r0,8(r1)
-#0000c8d8:  7c000026	mfcr	r0
-#0000c8dc:  90010004	stw	r0,4(r1)
-#0000c8e0:  91a1fffc	stw	r13,-4(r1)
-#0000c8e4:  39a1fffc	subi	r13,r1,4
-#0000c8e8:  9421fee4	stwu	r1,-284(r1)
+		BUILDSTACKPPC
 
-#0000c8ec:  97edfffc	stwu	r31,-4(r13)
-#0000c8f0:  97cdfffc	stwu	r30,-4(r13)
-#0000c8f4:  97adfffc	stwu	r29,-4(r13)
-#0000c8f8:  978dfffc	stwu	r28,-4(r13)
-#0000c8fc:  976dfffc	stwu	r27,-4(r13)
-#0000c900:  974dfffc	stwu	r26,-4(r13)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
 
-#0000c904:  80630034	lwz	r3,52(r3)
-#0000c908:  8043002e	lwz	r2,46(r3)
+		li	r5,SonnetBase
+		lwz	r5,RunningTask(r5)		#ThisTask
+		li	r29,0
+		cmpw	r4,r5				#To be deleted?
+		beq-	.DelOwnTask			#Yes: then r29=-1
+		mr.	r4,r4
+		bne-	.DelOtherTask			#Other task then r29=0
+.DelOwnTask:	li	r29,-1				#0 then r29=0 (owntask)
+		mr	r4,r5
+.DelOtherTask:	mr	r31,r4				#task to r31
+		li	r30,SonnetBase
 
-#0000c90c:  3ba00000	li	r29,0
-#0000c910:  80a30058	lwz	r5,88(r3)			#ThisTask
-#0000c914:  7c042800	cmpw	r4,r5				#To be deleted?
-#0000c918:  4182000c	beq-	0xc924				#Yes: then r29=-1
-#0000c91c:  7c842379	mr.	r4,r4
-#0000c920:  4082000c	bne-	0xc92c				#Other task then r29=0
-#0000c924:  3ba0ffff	li	r29,-1				#0 then r29=0 (owntask)
-#0000c928:  7ca42b78	mr	r4,r5
-#0000c92c:  7c9f2378	mr	r31,r4				#task to r31
-#0000c930:  7c7e1b78	mr	r30,r3				#powerpcbase to r30
+		li	r4,SonnetBase
+		lwz	r4,SnoopSem(r4)
+		
+		LIBCALLPOWERPC ObtainSemaphorePPC
 
-#0000c934:  388247b6	addi	r4,r2,18358			#TaskListSem?
-#0000c938:  80623d70	lwz	r3,15728(r2)
-#0000c93c:  8003fe88	lwz	r0,-376(r3)			#ObtainSemaphore
-#0000c940:  7c0803a6	mtlr	r0
-#0000c944:  4e800021	blrl	
+		la	r28,SnoopList(r30)
+.Loop100:	lwz	r27,0(r28)
+		mr.	r27,r27
+		beq-	.EmptySnoopLst
 
-#0000c948:  839e01a8	lwz	r28,424(r30)			#??
-#0000c94c:  837c0000	lwz	r27,0(r28)
-#0000c950:  7f7bdb79	mr.	r27,r27
-#0000c954:  41820034	beq-	.Flag424EQ
+		lwz	r4,22(r28)			#Snoop type (START or EXIT)
+		cmplwi	r4,SNOOP_EXIT
+		bne-	.Link100
+		lwz	r3,14(r28)			#SNOOP_CODE
+		mtlr	r3
+		mr	r26,r2
+		lwz	r2,18(r28)			#SNOOP_DATA
+		mr	r3,r31
+		blrl					#Jump to snoop exit code
 
-#0000c958:  809c0016	lwz	r4,22(r28)
-#0000c95c:  28040002	cmplwi	r4,2
-#0000c960:  40820020	bne-	0xc980
-#0000c964:  807c000e	lwz	r3,14(r28)
-#0000c968:  7c6803a6	mtlr	r3
-#0000c96c:  7c5a1378	mr	r26,r2
-#0000c970:  805c0012	lwz	r2,18(r28)
-#0000c974:  7fe3fb78	mr	r3,r31
-#0000c978:  4e800021	blrl	
+		mr	r2,r26
+.Link100:	mr	r28,r27
+		b	.Loop100
 
-#0000c97c:  7f42d378	mr	r2,r26
-#0000c980:  7f7cdb78	mr	r28,r27
-#0000c984:  4bffffc8	b	0xc94c
+.EmptySnoopLst:	li	r4,SonnetBase
+		lwz	r4,SnoopSem(r4)
+		
+		LIBCALLPOWERPC ReleaseSemaphorePPC
 
-.Flag424EQ:	addi	r4,r2,18358			#TaskListSem?
+		mr	r3,r31
+		bl	0x13354				#?
 
-#0000c98c:  80623d70	lwz	r3,15728(r2)			#ReleaseSemaphore
-#0000c990:  8003fe7c	lwz	r0,-388(r3)
-#0000c994:  7c0803a6	mtlr	r0
-#0000c998:  4e800021	blrl	
+		mr.	r3,r3
+		beq-	.NotTwo
 
-#0000c99c:  7fe3fb78	mr	r3,r31
-#0000c9a0:  480069b5	bl	0x13354
+		mr	r27,r3
+		lbz	r4,54(r27)
+		cmplwi	r4,2
+		bne-	.NotTwo
 
-#0000c9a4:  7c631b79	mr.	r3,r3
-#0000c9a8:  41820094	beq-	0xca3c
+		lwz	r28,14(r27)
+		lis	r0,0
+		nop	
+		stw	r0,0(r28)
 
-#0000c9ac:  7c7b1b78	mr	r27,r3
-#0000c9b0:  889b0036	lbz	r4,54(r27)
-#0000c9b4:  28040002	cmplwi	r4,2
-#0000c9b8:  40820084	bne-	0xca3c
+		li	r4,CACHE_DCACHEFLUSH
+		li	r5,0
+		li	r6,0
 
-#0000c9bc:  839b000e	lwz	r28,14(r27)
-#0000c9c0:  3c000000	lis	r0,0
-#0000c9c4:  60000000	nop	
-#0000c9c8:  901c0000	stw	r0,0(r28)
+		LIBCALLPOWERPC SetCache
 
-#0000c9cc:  38800005	li	r4,5
-#0000c9d0:  38a00000	li	r5,0
-#0000c9d4:  38c00000	li	r6,0
+		lwz	r4,22(r27)			#Task
+		lwz	r5,26(r27)			#Signals
 
-#0000c9d8:  80623d70	lwz	r3,15728(r2)			#SetCache
-#0000c9dc:  8003fe04	lwz	r0,-508(r3)
-#0000c9e0:  7c0803a6	mtlr	r0
-#0000c9e4:  4e800021	blrl	
+		LIBCALLPOWERPC Signal68K
 
-#0000c9e8:  809b0016	lwz	r4,22(r27)			#Task
-#0000c9ec:  80bb001a	lwz	r5,26(r27)			#Signals
+		addi	r4,r2,18202			#?
+		
+		LIBCALLPOWERPC ObtainSemaphorePPC
 
-#0000c9f0:  80623d70	lwz	r3,15728(r2)			#Signal68K
-#0000c9f4:  8003fe0a	lwz	r0,-502(r3)
-#0000c9f8:  7c0803a6	mtlr	r0
-#0000c9fc:  4e800021	blrl	
+		mr	r4,r27
+		lwz	r3,0(r4)
+		lwz	r4,4(r4)
+		stw	r4,4(r3)
+		stw	r3,0(r4)
 
-#0000ca00:  3882471a	addi	r4,r2,18202
-#0000ca04:  80623d70	lwz	r3,15728(r2)
-#0000ca08:  8003fe88	lwz	r0,-376(r3)			#ObtainSemaphore
-#0000ca0c:  7c0803a6	mtlr	r0
-#0000ca10:  4e800021	blrl	
+		addi	r4,r2,18202
+		
+		LIBCALLPOWERPC ReleaseSemaphorePPC
 
-#0000ca14:  7f64db78	mr	r4,r27
-#0000ca18:  80640000	lwz	r3,0(r4)
-#0000ca1c:  80840004	lwz	r4,4(r4)
-#0000ca20:  90830004	stw	r4,4(r3)
-#0000ca24:  90640000	stw	r3,0(r4)
+.NotTwo:	addi	r3,r2,7178
+		bl	0x13e98				#?
 
-#0000ca28:  3882471a	addi	r4,r2,18202	
-#0000ca2c:  80623d70	lwz	r3,15728(r2)			#ReleaseSemaphore
-#0000ca30:  8003fe7c	lwz	r0,-388(r3)
-#0000ca34:  7c0803a6	mtlr	r0
-#0000ca38:  4e800021	blrl	
+		lwz	r4,TASKPPC_MSGPORT(r31)
+		mr.	r27,r4
+		beq-	.NoMsgPort
 
-#0000ca3c:  38621c0a	addi	r3,r2,7178
-#0000ca40:  48007459	bl	0x13e98
+		addi	r4,r27,MP_PPC_SEM
+		
+		LIBCALLPOWERPC FreeSemaphorePPC
 
-#0000ca44:  809f00d8	lwz	r4,216(r31)			#TASKPPC_MSGPORT
-#0000ca48:  7c9b2379	mr.	r27,r4
-#0000ca4c:  4182002c	beq-	0xca78
+		mr	r4,r27
+		
+		LIBCALLPOWERPC FreeVecPPC
 
-#0000ca50:  389b0030	addi	r4,r27,48
-#0000ca54:  80623d70	lwz	r3,15728(r2)			#FreeSemaphorePPC
-#0000ca58:  8003fe9a	lwz	r0,-358(r3)
-#0000ca5c:  7c0803a6	mtlr	r0
-#0000ca60:  4e800021	blrl	
+.NoMsgPort:	li	r4,SonnetBase
+		lwz	r4,TaskListSem(r4)
+		
+		LIBCALLPOWERPC ObtainSemaphorePPC
 
-#0000ca64:  7f64db78	mr	r4,r27
-#0000ca68:  80623d70	lwz	r3,15728(r2)			#FreeVecPPC
-#0000ca6c:  8003feb8	lwz	r0,-328(r3)
-#0000ca70:  7c0803a6	mtlr	r0
-#0000ca74:  4e800021	blrl	
+		lwz	r4,TASKPPC_TASKPTR(r31)
+		lwz	r3,0(r4)
+		lwz	r4,4(r4)
+		stw	r4,4(r3)
+		stw	r3,0(r4)
+		li	r4,SonnetBase
+		la	r4,NumAllTasks(r4)		#Tasks -1
+		lwz	r3,0(r4)
+		subi	r3,r3,1
+		stw	r3,0(r4)
+		dcbst	r0,r4
 
-#0000ca78:  3882467e	addi	r4,r2,18046		
-#0000ca7c:  80623d70	lwz	r3,15728(r2)			#ObtainSemaphore
-#0000ca80:  8003fe88	lwz	r0,-376(r3)
-#0000ca84:  7c0803a6	mtlr	r0
-#0000ca88:  4e800021	blrl	
-
-#0000ca8c:  809f0068	lwz	r4,104(r31)			#TASKPPC_TASKPTR	
-#0000ca90:  80640000	lwz	r3,0(r4)
-#0000ca94:  80840004	lwz	r4,4(r4)
-#0000ca98:  90830004	stw	r4,4(r3)
-#0000ca9c:  90640000	stw	r3,0(r4)
-#0000caa0:  80823d70	lwz	r4,15728(r2)
-#0000caa4:  38840276	addi	r4,r4,630
-#0000caa8:  80640000	lwz	r3,0(r4)
-#0000caac:  3863ffff	subi	r3,r3,1
-#0000cab0:  90640000	stw	r3,0(r4)
-#0000cab4:  7c00206c	dcbst	r0,r4
-
-#0000cab8:  3882467e	addi	r4,r2,18046			#ReleaseSemaphore
-#0000cabc:  80623d70	lwz	r3,15728(r2)
-#0000cac0:  8003fe7c	lwz	r0,-388(r3)
-#0000cac4:  7c0803a6	mtlr	r0
-#0000cac8:  4e800021	blrl
+		li	r4,SonnetBase
+		lwz	r4,TaskListSem(r4)
+		
+		LIBCALLPOWERPC ReleaseSemaphorePPC
 	
-#0000cacc:  8082454c	lwz	r4,17740(r2)
-#0000cad0:  80a24548	lwz	r5,17736(r2)
-#0000cad4:  80623d70	lwz	r3,15728(r2)
-#0000cad8:  8003fe1c	lwz	r0,-484(r3)			#SignalPPC
-#0000cadc:  7c0803a6	mtlr	r0
-#0000cae0:  4e800021	blrl	
+		lwz	r4,17740(r2)			#Task	(Voyager or Babylon 5?)
+		lwz	r5,17736(r2)			#Signal
+		
+		LIBCALLPOWERPC SignalPPC
 
-#0000cae4:  7fbdeb79	mr.	r29,r29				#This task?
-#0000cae8:  4182002c	beq-	0xcb14				#no? proceed to cb14
-#0000caec:  38000006	li	r0,6				#TS_REMOVED
-#0000caf0:  981f000f	stb	r0,15(r31)			#TC_STATE
-#0000caf4:  3800ffff	li	r0,-1
-#0000caf8:  981e0272	stb	r0,626(r30)			#Some Flag?
-#0000cafc:  38800000	li	r4,0
-#0000cb00:  806244f4	lwz	r3,17652(r2)
-#0000cb04:  8003ff5a	lwz	r0,-166(r3)			#Reschedule??
-#0000cb08:  7c0803a6	mtlr	r0
-#0000cb0c:  4e800021	blrl	
-#0000cb10:  48000000	b	0xcb10				#Halt this Task
+		mr.	r29,r29				#This task?
+		beq-	.NotOwnTask2			#no? Skip next
+		li	r0,TS_REMOVED
+		stb	r0,TC_STATE(r31)
+		li	r0,-1
+		stb	r0,626(r30)			#Some Flag?
+		
+		li	r4,0
+		
+		LIBCALLPOWERPC SetDecInterrupt
+		
+.EndTask:	b	.EndTask			#Halt this Task
 
-#0000cb14:  80824538	lwz	r4,17720(r2)
-#0000cb18:  806244f4	lwz	r3,17652(r2)
-#0000cb1c:  8003ff72	lwz	r0,-142(r3)			#Atomic
-#0000cb20:  7c0803a6	mtlr	r0
-#0000cb24:  4e800021	blrl	
+.NotOwnTask2:	li	r4,Atomic
 
+		LIBCALLPOWERPC AtomicTest
 
-#0000cb28:  7c631b79	mr.	r3,r3			
-#0000cb2c:  4182ffe8	beq+	0xcb14				#Wait Atomic
+		mr.	r3,r3			
+		beq+	.NotOwnTask2			#Wait Atomic
 
-#0000cb30:  7fe4fb78	mr	r4,r31
-#0000cb34:  80640000	lwz	r3,0(r4)			#task list
-#0000cb38:  80840004	lwz	r4,4(r4)
-#0000cb3c:  90830004	stw	r4,4(r3)
-#0000cb40:  90640000	stw	r3,0(r4)
-#0000cb44:  7fe5fb78	mr	r5,r31
-#0000cb48:  389e0082	addi	r4,r30,130			#Minitask list PPCBase
-#0000cb4c:  38840004	addi	r4,r4,4
-#0000cb50:  80640004	lwz	r3,4(r4)
-#0000cb54:  90a40004	stw	r5,4(r4)
-#0000cb58:  90850000	stw	r4,0(r5)
-#0000cb5c:  90650004	stw	r3,4(r5)
-#0000cb60:  90a30000	stw	r5,0(r3)
+		mr	r4,r31
+		lwz	r3,0(r4)			#task list
+		lwz	r4,4(r4)
+		stw	r4,4(r3)
+		stw	r3,0(r4)
+		mr	r5,r31
+		
+		addi	r4,r30,130			#??
+		addi	r4,r4,4
+		lwz	r3,4(r4)
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
 
-#0000cb64:  38000006	li	r0,6				#TS_REMOVED
-#0000cb68:  981f000f	stb	r0,15(r31)			#TC_STATE
+		li	r0,TS_REMOVED
+		stb	r0,TC_STATE(r31)
 
-#0000cb6c:  80824538	lwz	r4,17720(r2)
-#0000cb70:  806244f4	lwz	r3,17652(r2)
-#0000cb74:  8003ff6c	lwz	r0,-148(r3)			#Atomic End
-#0000cb78:  7c0803a6	mtlr	r0
-#0000cb7c:  4e800021	blrl	
+		li	r4,Atomic
+		
+		LIBCALLPOWERPC AtomicDone
 
-#0000cb80:  38621c0a	addi	r3,r2,7178
-#0000cb84:  48007385	bl	0x13f08
+		lwz	r26,0(r13)
+		lwz	r27,4(r13)
+		lwz	r28,8(r13)
+		lwz	r29,12(r13)
+		lwz	r30,16(r13)
+		lwz	r31,20(r13)
+		addi	r13,r13,24
 
-#0000cb88:  834d0000	lwz	r26,0(r13)
-#0000cb8c:  836d0004	lwz	r27,4(r13)
-#0000cb90:  838d0008	lwz	r28,8(r13)
-#0000cb94:  83ad000c	lwz	r29,12(r13)
-#0000cb98:  83cd0010	lwz	r30,16(r13)
-#0000cb9c:  83ed0014	lwz	r31,20(r13)
-#0000cba0:  39ad0018	addi	r13,r13,24
+		DSTRYSTACKPPC
 
-#0000cba4:  80210000	lwz	r1,0(r1)
-#0000cba8:  81a1fffc	lwz	r13,-4(r1)
-#0000cbac:  80010008	lwz	r0,8(r1)
-#0000cbb0:  7c0803a6	mtlr	r0
-#0000cbb4:  80010004	lwz	r0,4(r1)
-#0000cbb8:  7c0ff120	mtcr	r0
-#0000cbbc:  80410014	lwz	r2,20(r1)
-#0000cbc0:  4e800020	blr	
-		blr
+		blr	
 
 #********************************************************************************************
 #
