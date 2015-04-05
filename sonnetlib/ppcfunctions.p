@@ -2194,7 +2194,7 @@ WarpSuper:
 
 #********************************************************************************************
 #
-#	void User(SuperKey) // r4
+#	void WarpUser(void)
 #
 #********************************************************************************************
 
@@ -4113,7 +4113,7 @@ CreateTaskPPC:
 		addi	r5,r5,1
 		stw	r5,IdSysTasks(r4)
  
-.SkipSystem:	stw	r4,TASKPPC_ID(r31)
+.SkipSystem:	stw	r5,TASKPPC_ID(r31)
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r31)		 
 		addi	r4,r23,102			#PowerPCBase +102 
@@ -5305,8 +5305,169 @@ DeleteTaskPPC:
 
 		DSTRYSTACKPPC
 
-		blr	
+		blr
+		
+#********************************************************************************************
+#
+#	Status = SetHardware(hardwareflags, parameter) // r3=r4,r5
+#
+#********************************************************************************************
 
+SetHardware:
+		BUILDSTACKPPC
+		
+		cmplwi	r4,HW_TRACEON
+		beq-	.TraceOn
+		cmplwi	r4,HW_TRACEOFF
+		beq-	.TraceOff
+		cmplwi	r4,HW_BRANCHTRACEON
+		beq-	.BranchOn
+		cmplwi	r4,HW_BRANCHTRACEOFF
+		beq-	.BranchOff
+		cmplwi	r4,HW_FPEXCON
+		beq-	.FPExcOn
+		cmplwi	r4,HW_FPEXCOFF
+		beq-	.FPExcOff
+		cmplwi	r4,HW_SETIBREAK
+		beq-	.SetIBreak
+		cmplwi	r4,HW_CLEARIBREAK
+		beq-	.ClearIBreak
+		cmplwi	r4,HW_SETDBREAK
+		beq-	.SetDBreak
+		cmplwi	r4,HW_CLEARDBREAK
+		beq-	.ClearDBreak
+		b	.HWEnd
+
+.TraceOn:	LIBCALLPOWERPC WarpSuper
+
+		mfmsr	r0
+		ori	r0,r0,PSL_SE
+		mtmsr	r0
+		isync	
+		sync
+		
+		LIBCALLPOWERPC WarpUser
+
+		b	.HWEnd
+		
+.TraceOff:	LIBCALLPOWERPC WarpSuper
+
+		mfmsr	r0
+		ori	r0,r0,PSL_SE
+		xori	r0,r0,PSL_SE
+		mtmsr	r0
+		isync	
+		sync	
+		
+		LIBCALLPOWERPC WarpUser
+
+		b	.HWEnd
+
+.BranchOn:	LIBCALLPOWERPC WarpSuper
+
+		mfmsr	r0
+		ori	r0,r0,PSL_BE
+		mtmsr	r0
+		isync	
+		sync	
+		
+		LIBCALLPOWERPC WarpUser
+
+		b	.HWEnd
+
+.BranchOff:	LIBCALLPOWERPC WarpSuper
+
+		mfmsr	r0
+		ori	r0,r0,PSL_BE
+		xori	r0,r0,PSL_BE
+		mtmsr	r0
+		isync	
+		sync	
+		
+		LIBCALLPOWERPC WarpUser
+
+		b	.HWEnd
+
+.FPExcOn:	LIBCALLPOWERPC WarpSuper
+
+		mtfsfi	1,0
+		mtfsfi	2,0
+		mtfsb0	3
+		mtfsb0	12
+		mtfsb0	21
+		mtfsb0	22
+		mtfsb0	23
+		mfmsr	r0
+		ori	r0,r0,PSL_FE0|PSL_FE1
+		mtmsr	r0
+		isync	
+		sync	
+		
+		LIBCALLPOWERPC WarpUser
+
+		b	.HWEnd
+
+.FPExcOff:	LIBCALLPOWERPC WarpSuper
+
+		mfmsr	r0
+		ori	r0,r0,PSL_FE0|PSL_FE1
+		xori	r0,r0,PSL_FE0|PSL_FE1
+		mtmsr	r0
+		isync	
+		sync	
+
+		LIBCALLPOWERPC WarpUser
+
+		b	.HWEnd
+		
+.SetIBreak:	LIBCALLPOWERPC WarpSuper
+		
+		mr	r4,r5
+		loadreg	r0,0xfffffffc
+		and	r4,r4,r0
+		ori	r4,r4,3
+		mtspr	IABR,r4
+
+		LIBCALLPOWERPC WarpUser
+
+		b	.HWEnd
+
+.ClearIBreak:	LIBCALLPOWERPC WarpSuper
+
+		li	r0,0
+		mtspr	IABR,r0
+		
+		LIBCALLPOWERPC WarpUser
+
+		b	.HWEnd
+
+.SetDBreak:	LIBCALLPOWERPC WarpSuper
+		
+		mr	r4,r5
+		loadreg	r0,0xfffffff8
+		and	r4,r4,r0		
+		ori	r4,r4,7
+		mtspr	DABR,r4
+		
+		LIBCALLPOWERPC WarpUser
+		
+		b	.HWEnd
+
+.ClearDBreak:	LIBCALLPOWERPC WarpSuper
+
+		li	r0,0
+		mtspr	DABR,r0
+		
+		LIBCALLPOWERPC WarpUser
+		
+.HWEnd:		li	r4,HW_AVAILABLE
+
+		mr	r3,r4
+
+		DSTRYSTACKPPC
+
+		blr
+		
 #********************************************************************************************
 #
 #	Poolheader = CreatePoolPPC(attr, puddlesize, treshsize) // r3=r4,r5,r6 r4 is ignored
@@ -5329,8 +5490,6 @@ SetTaskPriPPC:			li	r3,0
 SetExcHandler:			li	r3,0
 				blr
 RemExcHandler:			blr
-SetHardware:			li	r3,HW_NOTAVAILABLE
-				blr
 WaitTime:			li	r3,0
 				blr
 ChangeMMU:			blr

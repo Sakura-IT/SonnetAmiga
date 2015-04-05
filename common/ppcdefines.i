@@ -70,6 +70,9 @@
 .set FPF_ENABLEALL,		0x0000001f		#enable all FP exceptions
 .set FPF_DISABLEALL,		0x000003e0		#disable all FP exceptions
 
+.set IABR,1010
+.set DABR,1013
+
 .set HID0,1008
 .set HID0_NHR,			0x00010000
 .set HID0_ICFI,			0x00000800
@@ -180,6 +183,19 @@
 .set EPIC_IVPR3,0x50260
 .set EPIC_IVPR4,0x50280
 .set EPIC_IIVPR3,0x510c0
+
+.set HW_TRACEON,1				#enable singlestep mode
+.set HW_TRACEOFF,2				#disable singlestep mode
+.set HW_BRANCHTRACEON,3				#enable branch trace mode
+.set HW_BRANCHTRACEOFF,4			#disable branch trace mode
+.set HW_FPEXCON,5				#enable FP exceptions
+.set HW_FPEXCOFF,6				#disable FP exceptions
+.set HW_SETIBREAK,7				#set instruction breakpoint
+.set HW_CLEARIBREAK,8				#clear instruction breakpoint
+.set HW_SETDBREAK,9				#set data breakpoint (604[E] only)
+.set HW_CLEARDBREAK,10
+.set HW_NOTAVAILABLE,0
+.set HW_AVAILABLE,-1
 
 .set SPRG0,272
 .set SPRG1,273
@@ -334,7 +350,6 @@
 .set LN_SUCC,0
 .set LN_TYPE,8
 .set LN_NAME,10
-.set HW_NOTAVAILABLE,0
 .set ATTEMPT_SUCCESS,-1
 .set ATTEMPT_FAILURE,0
 .set TC_MEMENTRY,74
