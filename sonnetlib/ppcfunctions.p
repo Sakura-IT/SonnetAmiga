@@ -5475,7 +5475,56 @@ SetHardware:
 #********************************************************************************************		
 
 CreatePoolPPC:
-		li	r3,0
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		
+		li	r31,0
+		
+		cmpw	r5,r6
+		blt	.TooSmall
+		
+		addi	r30,r5,31
+		loadreg r29,0xffffffe0
+		and	r30,r30,r29
+		
+		mr	r29,r4
+		mr	r28,r6
+		
+		li	r4,POOL_SIZE			#struct Pool
+		mr	r5,r29
+		li	r6,32
+		
+		LIBCALLPOWERPC AllocVecPPC
+		
+		mr.	r31,r3
+		beq-	.TooSmall
+		
+		la	r4,POOL_BLOCKLIST(r31)
+		
+		LIBCALLPOWERPC NewListPPC
+		
+		la	r4,POOL_BLOCKLIST(r31)
+		
+		LIBCALLPOWERPC NewListPPC
+		
+		stw	r29,POOL_REQUIREMENTS(r31)
+		stw	r30,POOL_PUDDLESIZE(r31)
+		stw	r28,POOL_TRESHSIZE(r31)
+		
+.TooSmall:	mr	r3,r31
+		
+		lwz	r28,0(r13)
+		lwz	r29,4(r13)
+		lwz	r30,8(r13)
+		lwz	r31,12(r13)
+		addi	r13,r13,16		
+		
+		DSTRYSTACKPPC
+
 		blr
 		
 #********************************************************************************************
