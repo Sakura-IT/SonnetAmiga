@@ -63,7 +63,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	AddUniqueSemaphorePPC,IsExceptionMode,SetDecInterrupt
 
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,MCTask,Init,ViolationAddress
-	XREF	NewTasks
+	XREF	NewTasks,SysBase,PowerPCBase
 	XDEF	_PowerPCBase
 
 ;********************************************************************************************
@@ -324,10 +324,11 @@ RLoc	add.l d2,(a2)+
 	moveq.l #$3f,d1
 ClearB	clr.l (a2)+
 	dbf d1,ClearB
-	move.l d0,4(a1)					;PowerPCBase at $4
+	move.l d0,PowerPCBase(a1)
 	move.l a5,8(a1)					;Memheader at $8
 	move.l a1,(a1)					;Sonnet relocated mem at $0
 	move.l d0,_PowerPCBase-Buffer(a4)
+	move.l a6,SysBase(a1)
 
 	move.l d0,a1
 	jsr _LVOAddLibrary(a6)
@@ -473,7 +474,7 @@ MasterControl:
 	move.l 4.w,a6
 	move.l ThisTask(a6),d0
 	move.l d0,MCTask(a4)
-	move.l 4(a4),a6
+	move.l PowerPCBase(a4),a6
 	move.l _LVOWarpSuper+2(a6),d0
 	addq.l #4,d0
 	move.l d0,ViolationAddress(a4)

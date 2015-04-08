@@ -1,7 +1,7 @@
 
 #Sonnet Base:
 .set SonnetBase,0
-.set PowerPCBase,4
+.set SysBase,4
 .set PPCMemHeader,8
 .set CPUInfo,12
 .set CPUHID0,16
@@ -33,7 +33,7 @@
 .set IdSysTasks,164				#662
 .set IdDefTasks,168				#666
 .set MemSem,172
-.set UNUSED,176
+.set PowerPCBase,176
 .set UNUSED,188
 
 .set SonnetBusClock,66666666			#66.6 MHz
