@@ -5503,7 +5503,7 @@ CreatePoolPPC:
 		mr.	r31,r3
 		beq-	.TooSmall
 		
-		la	r4,POOL_BLOCKLIST(r31)
+		la	r4,POOL_PUDDLELIST(r31)
 		
 		LIBCALLPOWERPC NewListPPC
 		
@@ -5528,8 +5528,188 @@ CreatePoolPPC:
 		blr
 		
 #********************************************************************************************
+#
+#	void DeletePoolPPC(poolheader) // r4
+#
+#********************************************************************************************
 
-SPrintF:			blr			#debug feature
+DeletePoolPPC:
+		BUILDSTACKPPC
+		
+		stwu	r31,-4(r13)
+
+		mr.	r31,r4
+		beq-	.NoHeader
+		
+.NextPuddle:	la	r4,POOL_PUDDLELIST(r31)
+		
+		LIBCALLPOWERPC RemHeadPPC
+		
+		mr.	r4,r3
+		beq	.NextBlock	
+		
+		LIBCALLPOWERPC FreeVecPPC
+		
+		b	.NextPuddle
+	
+.NextBlock:	la	r4,POOL_BLOCKLIST(r31)
+
+		LIBCALLPOWERPC RemHeadPPC
+		
+		mr.	r4,r3
+		beq	.AllFreed		
+		
+		LIBCALLPOWERPC FreeVecPPC
+		
+.AllFreed:	mr	r4,r31
+		
+		LIBCALLPOWERPC FreeVecPPC
+		
+.NoHeader:	lwz	r31,0(r13)
+		addi	r13,r13,4
+		
+		DSTRYSTACKPPC
+				
+		blr
+		
+#********************************************************************************************
+#
+#	memory = AllocPooledPPC(poolheader, size) // r3=r4,r5
+#
+#********************************************************************************************
+
+AllocPooledPPC:
+		BUILDSTACKPPC
+		
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		
+		mr	r31,r4
+		mr	r30,r5
+		
+		li	r4,SonnetBase
+		lwz	r4,MemSem(r4)
+		
+		LIBCALLPOWERPC ObtainSemaphorePPC
+		
+		
+		lwz	r29,POOL_TRESHSIZE(r31)
+		
+		cmpw	r29,r30
+		ble	.DoPuddle
+		
+		addi	r4,r30,8			#Make room for MLN
+		lwz	r5,POOL_REQUIREMENTS(r31)
+		li	r6,32
+		
+		LIBCALLPOWERPC AllocVecPPC
+		
+		mr.	r5,r3
+		
+		beq-	.NoPooledMem
+				
+		li	r0,0
+		stw	r0,0(r5)
+		stw	r0,4(r5)		
+		mr	r29,r5		
+		la	r4,POOL_BLOCKLIST(r31)
+		
+		
+		LIBCALLPOWERPC AddHeadPPC
+		
+		
+		la	r3,8(r29)			#Point beyond Minimal List Node
+		
+		
+		b	.NoPooledMem
+		
+.DoPuddle:	addi	r4,r30,8			#STUB (same as block at the moment)
+		lwz	r5,POOL_REQUIREMENTS(r31)
+		li	r6,32
+		
+		LIBCALLPOWERPC AllocVecPPC
+		
+		mr.	r5,r3
+		beq-	.NoPooledMem
+		li	r0,0
+		stw	r0,0(r5)
+		stw	r0,4(r5)
+		mr	r29,r5
+		la	r4,POOL_PUDDLELIST(r31)
+		
+		LIBCALLPOWERPC AddHeadPPC
+		
+		la	r3,8(r29)
+		
+.NoPooledMem:	li	r4,SonnetBase
+		lwz	r4,MemSem(r4)
+		
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+		
+		lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
+		
+		DSTRYSTACKPPC
+		
+		blr
+		
+#********************************************************************************************
+#
+#	void FreePooledPPC(poolheader, memory) // r4,r5
+#
+#********************************************************************************************
+
+FreePooledPPC:
+		BUILDSTACKPPC
+		
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		
+		mr	r31,r4
+		mr	r30,r5
+		
+		li	r4,SonnetBase
+		lwz	r4,MemSem(r4)
+		
+		LIBCALLPOWERPC ObtainSemaphorePPC
+		
+		
+		lwz	r29,POOL_TRESHSIZE(r31)
+		
+		cmpw	r29,r30
+		ble	.DoFrPuddle
+		
+		subi	r4,r30,8
+		
+		LIBCALLPOWERPC RemovePPC
+
+		b	.FrPooledMem
+		
+.DoFrPuddle:	subi	r4,r30,8			#STUB (same as block at the moment)
+
+		LIBCALLPOWERPC RemovePPC				
+		
+.FrPooledMem:	li	r4,SonnetBase
+		lwz	r4,MemSem(r4)
+		
+		LIBCALLPOWERPC ReleaseSemaphorePPC
+		
+		lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
+		
+		DSTRYSTACKPPC
+		
+		blr		
+
+#********************************************************************************************
+
+SPrintF:			blr
 Run68KLowLevel:			blr
 SignalPPC:			blr
 WaitPPC:			li	r3,0
@@ -5549,10 +5729,6 @@ ReplyMsgPPC:			blr
 FreeAllMem:			blr
 GetHALInfo:			blr
 SetScheduling:			blr
-DeletePoolPPC:			blr
-AllocPooledPPC:			li	r3,0
-				blr
-FreePooledPPC:			blr
 RawDoFmtPPC:			li	r3,0
 				blr
 

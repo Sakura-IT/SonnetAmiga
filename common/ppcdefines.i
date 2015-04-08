@@ -32,6 +32,9 @@
 .set NumAllTasks,160				#630
 .set IdSysTasks,164				#662
 .set IdDefTasks,168				#666
+.set MemSem,172
+.set UNUSED,176
+.set UNUSED,188
 
 .set SonnetBusClock,66666666			#66.6 MHz
 .set SonnetTimerFreq,(SonnetBusClock/8)		#Default when EICR=0x4 at bits 30-28
