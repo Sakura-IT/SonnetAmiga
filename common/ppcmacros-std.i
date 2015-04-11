@@ -66,3 +66,10 @@
 	mtlr    r0
 	blrl
 .endm
+
+.macro	CALLPOWERPC
+	lwz	r3,_PowerPCBase-_LinkerDB(r2)
+	lwz     r0,_LVO\1+2(r3)	
+	mtlr    r0
+	blrl
+.endm

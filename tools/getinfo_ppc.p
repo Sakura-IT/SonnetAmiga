@@ -43,7 +43,7 @@ PPC_Code:		stw	r2,20(r1)
 
 			la	r4,Tags-_LinkerDB(r2)
 			
-			LIBCALLPOWERPC GetInfo
+			CALLPOWERPC GetInfo
 
 			la	r4,Args-_LinkerDB(r2)
 			la	r5,Tags-_LinkerDB(r2)

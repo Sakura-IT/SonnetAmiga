@@ -615,7 +615,7 @@ GetInfo:
 		mfspr	r3,SDR1
 		stw	r3,CPUSDR1(r5)
 		
-		LIBCALLPOWERPC WarpUser		
+		LIBCALLPOWERPC WarpUser	
 		
 .TagLoop:	mflr	r5
 		

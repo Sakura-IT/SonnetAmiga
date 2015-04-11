@@ -260,7 +260,6 @@ Reset:	mflr	r15
 	and	r3,r4, r3			#Clear other bits
 	mtspr	HID0,r3
 	sync
-
 						#Set MPU/MSR to a known state. Turn on FP 
  	lis	r3,PSL_FP@h
 	ori	r3,r3,PSL_FP@l
@@ -317,21 +316,27 @@ ifpdr_value:
 	lfs	f31,0(r3)
 	sync
 						#Clear BAT and Segment mapping registers 
-	andi.	r1,r1,0
+	li	r1,0
 	mtspr	ibat0u,r1
 	mtspr	ibat1u,r1
 	mtspr	ibat2u,r1
 	mtspr	ibat3u,r1
+	mtspr	ibat0l,r1
+	mtspr	ibat1l,r1
+	mtspr	ibat2l,r1
+	mtspr	ibat3l,r1
 	mtspr	dbat0u,r1
 	mtspr	dbat1u,r1
 	mtspr	dbat2u,r1
 	mtspr	dbat3u,r1
-
+	mtspr	dbat0l,r1
+	mtspr	dbat1l,r1
+	mtspr	dbat2l,r1
+	mtspr	dbat3l,r1
 	isync
 	sync
 	sync
-	lis	r1,0x8000
-	isync
+	
 	mtsr	0,r1
 	mtsr	1,r1
 	mtsr	2,r1
@@ -540,21 +545,14 @@ mmuSetup:					#Could be simpler. To be converted to tables
 	mtspr dbat3u,r3
 	isync
 						#BATs are now set up, now invalidate tlb entries
-	lis r3,0
-	lis r5,0x4				#750/MAX have 2x as many tlbs as 603e (Would be 0x2)
-	isync
-
-#Recall that in order to invalidate TLB entries, the value issued to
-#tlbie must increase the value in bits 14:19 (750, MAX) or 15:19(603e)
-#by one each iteration.
-
-tlblp:
-	tlbie r3
-	sync
-	addi r3,r3,0x1000
-	cmpw r3,r5				#check if all TLBs invalidated yet
-	blt tlblp
-
+	li	r7,64
+	mtctr	r7
+	li	r7,0
+.tlblp:	tlbie	r7
+	addi	r7,r7,0x1000
+	bdnz+	.tlblp
+	tlbsync
+	
 	mfmsr	r4
 	andi.	r4,r4,~PSL_IP@l			#Exception prefix from 0xfff00000 to 0x0
 	ori	r4,r4,(PSL_IR|PSL_DR)		#Translation enable
@@ -1210,10 +1208,11 @@ EInt:	BUILDSTACKPPC
 	ori	r5,r5,(PSL_IR|PSL_DR|PSL_FP)
 	mtmsr	r5				#Reenable MMU (can affect srr0/srr1 acc Docs)
 	isync					#Also reenable FPU
+	sync
 
 	lis	r3,EUMBEPICPROC
 	lwz	r5,0xa0(r3)			#Read IACKR to acknowledge it
-	eieio
+	sync
 
 	rlwinm	r5,r5,8,0,31
 	cmpwi	r5,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
@@ -1224,6 +1223,7 @@ EInt:	BUILDSTACKPPC
 	b	TestRoutine
 
 NoHEAR:	li	r3,SonnetBase
+
 	lwz	r9,TaskException(r3)
 	mr.	r9,r9
 	bne	.TaskException
