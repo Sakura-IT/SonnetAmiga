@@ -5705,15 +5705,92 @@ FreePooledPPC:
 		
 		DSTRYSTACKPPC
 		
-		blr		
+		blr
+		
+#********************************************************************************************
+#
+#	signals = WaitPPC(signalSet) // r3=r4
+#
+#********************************************************************************************
+
+WaitPPC:
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+
+		lwz	r3,52(r3)
+		lwz	r2,46(r3)
+
+		li	r31,SonnetBase
+		lwz	r31,RunningTask(r31)
+
+		mr	r28,r4
+		
+.WaitPPCAtom:	li	r4,Atomic
+
+		LIBCALLPOWERPC AtomicTest
+
+		mr.	r3,r3
+		beq+	.WaitPPCAtom
+
+		stw	r28,TC_SIGWAIT(r31)
+.RecheckSig:	lwz	r6,TC_SIGRECVD(r31)
+		and	r5,r28,r6
+		mr.	r5,r5
+		bne-	.GotSignals
+
+		li	r0,TS_CHANGING
+		stb	r0,TC_STATE(r31)
+
+		li	r4,Atomic
+		
+		LIBCALLPOWERPC AtomicDone
+
+		li	r4,0
+		
+		LIBCALLPOWERPC SetDecInterrupt
+
+.WaitForRun:	lbz	r0,TC_STATE(r31)
+		cmplwi	r0,TS_RUN
+		bne+	.WaitForRun
+
+.WaitPPCAtom2:	li	r4,Atomic
+
+		LIBCALLPOWERPC AtomicTest
+
+		mr.	r3,r3
+		beq+	.WaitPPCAtom2
+		
+		lwz	r28,TC_SIGWAIT(r31)
+		b	.RecheckSig
+
+.GotSignals:	xor	r6,r5,r6
+		stw	r6,TC_SIGRECVD(r31)
+
+		li	r4,Atomic
+		
+		LIBCALLPOWERPC AtomicDone
+
+		mr	r3,r5
+
+		lwz	r28,0(r13)
+		lwz	r29,4(r13)
+		lwz	r30,8(r13)
+		lwz	r31,12(r13)
+		addi	r13,r13,16
+		
+		DSTRYSTACKPPC
+
+		blr	
 
 #********************************************************************************************
 
 SPrintF:			blr
 Run68KLowLevel:			blr
 SignalPPC:			blr
-WaitPPC:			li	r3,0
-				blr
 SetTaskPriPPC:			li	r3,0
 				blr
 SetExcHandler:			li	r3,0
