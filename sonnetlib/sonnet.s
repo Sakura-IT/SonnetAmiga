@@ -13,6 +13,8 @@ WP_CONTROL	EQU $F48
 WP_TRIG01	EQU $c0000000
 MEMF_PPC	EQU $1000
 StackSize	EQU $80000
+TASKPPC_SIZE	EQU 248
+NT_PPCTASK	EQU 100
 
 FUNC_CNT	 EQU	-30		* Skip 4 standard vectors
 FUNCDEF		 MACRO
@@ -503,15 +505,13 @@ GetLoop	move.l d6,a0
 	beq.s MsgF68k
 	bra.s GetLoop
 
-MsgT68k	move.l d7,a1
-	move.b LN_TYPE(a1),d7
+MsgT68k	move.b LN_TYPE(a1),d7
 	cmp.b #NT_MESSAGE,d7
 	beq.s Sig68k
 	cmp.b #NT_REPLYMSG,d7				;signal PPC that 68k is done (HACK)
 	bne.s NextMsg
 	move.l #"DONE",d6
-	move.l SonnetBase(pc),a0
-	move.l d6,Init(a0)
+	move.l d6,MN_IDENTIFIER(a1)
 	bra.s NextMsg
 
 Sig68k	move.l ThisTask(a6),a0
@@ -525,6 +525,7 @@ MsgTPPC	move.l SonnetBase(pc),a0
 	lea NewTasks(a0),a0
 	clr.l (a1)
 	clr.l 4(a1)
+	lea -TASKPPC_SIZE(a1),a1			;Pointer from Message to Task
 	jsr _LVOEnqueue(a6)
 	move.l _PowerPCBase(pc),a6			;Force reschedule
 	jsr _LVOCauseInterruptHW(a6)
@@ -717,12 +718,13 @@ MN_IDENTIFIER	EQU MN_SIZE
 MN_MIRROR	EQU MN_IDENTIFIER+4
 MN_PPSTRUCT	EQU MN_MIRROR+4
 
+Task	EQU -16
 PStruct	EQU -12
 Msg	EQU -8
 Port	EQU -4
 
 RunPPC:
-	link a5,#-12
+	link a5,#-16
 	movem.l d1-a6,-(a7)
 	moveq.l #0,d0
 	move.l d0,Msg(a5)
@@ -741,11 +743,19 @@ xTask	jsr _LVOCreateMsgPort(a6)			;Not done yet. How to find this Port?
 	tst.l d0
 	beq Cannot
 xProces	move.l d0,Port(a5)
-	move.l #MN_SIZE+PP_SIZE+76,d0
+	move.l #TASKPPC_SIZE+MN_SIZE+PP_SIZE+76,d0
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1
-	jsr _LVOAllocVec(a6)
+	move.l _PowerPCBase(pc),a6
+	jsr _LVOAllocVec32(a6)
+	move.l 4.w,a6
 	tst.l d0
 	beq Cannot
+	move.l d0,Task(a5)
+	move.l d0,a1
+	move.b #NT_PPCTASK,LN_TYPE(a1)
+	lea TASKPPC_SIZE+MN_SIZE+PP_SIZE(a1),a2
+	move.l a2,LN_NAME(a1)	
+	add.l #TASKPPC_SIZE,d0
 	move.l d0,Msg(a5)
 	move.l Port(a5),d1
 	move.l d0,a1
@@ -784,7 +794,7 @@ Fast	move.l d7,a0
 ;********************************************************************************************
 
 WaitForPPC:
-	link a5,#-12
+	link a5,#-16
 	movem.l d1-a6,-(a7)
 	lea Buffer(pc),a4
 	move.l a0,PStruct(a5)
@@ -821,10 +831,11 @@ CpBck	move.l (a0)+,(a1)+
 	bra.s Success
 
 Cannot	moveq.l #-1,d7	
-Success	move.l Msg(a5),d0
-	beq.s NoMsg
+Success	move.l Task(a5),d0
+	beq.s NoTask
 	bsr.s FreeIt
-NoMsg	move.l ThisTask(a6),a1
+	move.l 4.w,a6
+NoTask	move.l ThisTask(a6),a1
 	cmp.b #NT_PROCESS,LN_TYPE(a1)
 	beq.s EndIt
 	move.l Port(a5),d0
@@ -836,7 +847,8 @@ EndIt	move.l d7,d0
 	rts
 
 FreeIt	move.l d0,a1
-	jmp _LVOFreeVec(a6)
+	move.l _PowerPCBase(pc),a6
+	jmp _LVOFreeVec32(a6)
 FreePrt	move.l d0,a0
 	jmp _LVODeleteMsgPort(a6)
 
@@ -990,6 +1002,7 @@ FreeVec32:
 	move.l a6,-(a7)
 	move.l a1,d0
 	move.l -4(a1),a1
+	move.l 4.w,a6
 	jsr _LVOFreeVec(a6)
 	move.l (a7)+,a6
 	rts

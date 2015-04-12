@@ -2249,13 +2249,10 @@ PutXMsgPPC:
 WaitFor68K:	
 		BUILDSTACKPPC
 
-		li	r3,SonnetBase		#Just for PoC
 		loadreg r5,"DONE"
-.FakeWait:	lwz	r6,Init(r3)
+.FakeWait:	lwz	r6,MN_IDENTIFIER(r4)
 		cmpw	r6,r5
 		bne+ 	.FakeWait
-
-		stw	r3,Init(r3)
 
 		DSTRYSTACKPPC
 				
@@ -2295,6 +2292,7 @@ Run68K:
 		stw	r5,MN_IDENTIFIER(r30)
 		li	r4,SonnetBase
 		lwz	r5,RunningTask(r4)
+		la	r5,TASKPPC_SIZE(r5)
 		lwz	r5,MN_MIRROR(r5)
 		stw	r5,MN_MIRROR(r30)
 		lwz	r4,MCTask(r4)
@@ -2303,7 +2301,7 @@ Run68K:
 				
 		LIBCALLPOWERPC PutXMsgPPC
 		
-		mr	r4,r31
+		mr	r4,r30
 		
 		LIBCALLPOWERPC WaitFor68K
 		
@@ -3309,7 +3307,7 @@ FindTaskByID:
 		mr.	r4,r4
 		beq-	.EndSearch
 
-		lwz	r3,14(r3)
+		lwz	r3,14(r3)			#Link from mini list to big list
 		lwz	r5,TASKPPC_ID(r3)
 		cmpw	r5,r31
 		bne-	.IncorrectID

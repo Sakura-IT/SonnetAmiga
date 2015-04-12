@@ -98,6 +98,7 @@ Start:		nop					#Dummy entry at absolute 0x8000
 	
 ExitCode:	li	r8,SonnetBase			#Exit code of processes (in development)
 		lwz	r9,RunningTask(r8)
+		la	r9,TASKPPC_SIZE(r9)
 		loadreg r7,"FPPC"
 		stw	r7,MN_IDENTIFIER(r9)
 		stw	r2,PP_REGS+12*4(r9)
@@ -1193,7 +1194,7 @@ NoHEAR:		li	r3,SonnetBase
 		mr.	r9,r9
 		bne	.TaskException
 
-		lwz	r9,RunningTask(r3)		#HACK! No task structure yet
+		lwz	r9,RunningTask(r3)
 		mr.	r9,r9
 #		bne	.TrySwitch
 		bne	NoReschedule			#-> To be removed
@@ -1213,6 +1214,7 @@ NoHEAR:		li	r3,SonnetBase
 		mtlr	r6
 
 		lwz	r8,RunningTask(r3)
+		la	r8,TASKPPC_SIZE(r8)
 		lwz	r2,PP_REGS+12*4(r8)
 		lwz	r3,PP_REGS+0*4(r8)
 		lwz	r4,PP_REGS+1*4(r8)
