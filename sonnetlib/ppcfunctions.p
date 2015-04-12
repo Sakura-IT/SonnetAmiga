@@ -5208,10 +5208,7 @@ DeleteTaskPPC:
 		
 		LIBCALLPOWERPC ReleaseSemaphorePPC
 
-.NotTwo:	addi	r3,r2,7178
-		bl	0x13e98				#?
-
-		lwz	r4,TASKPPC_MSGPORT(r31)
+.NotTwo:	lwz	r4,TASKPPC_MSGPORT(r31)
 		mr.	r27,r4
 		beq-	.NoMsgPort
 
