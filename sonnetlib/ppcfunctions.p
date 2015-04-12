@@ -2249,11 +2249,26 @@ PutXMsgPPC:
 WaitFor68K:	
 		BUILDSTACKPPC
 
-		loadreg r5,"DONE"
-.FakeWait:	lwz	r6,MN_IDENTIFIER(r4)
-		cmpw	r6,r5
-		bne+ 	.FakeWait
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
 
+		mr	r31,r4
+		
+.Check68K:	loadreg r30,"DONE"
+		lwz	r6,MN_IDENTIFIER(r31)
+		cmpw	r6,r30
+		beq- 	.Done68K
+		
+		li	r4,0
+		
+		LIBCALLPOWERPC SetDecInterrupt		
+		
+		b	.Check68K				
+
+.Done68K:	lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
+		
 		DSTRYSTACKPPC
 				
 		blr
@@ -4249,23 +4264,24 @@ CreateTaskPPC:
 
 SetDecInterrupt:
 		BUILDSTACKPPC
-
+		
 		loadreg	r5,Quantum
 		mr	r6,r4
 		mulhw	r3,r5,r6
 		mullw	r4,r5,r6
-		lis	r5,0x3d
-		ori	r5,r5,0x900
+		loadreg	r5,0x3d0900
 		bl	.GetDelay
 
 		mr.	r3,r3
 		bne-	.NotZ
-		li	r3,10
+		li	r3,100
 .NotZ:		stwu	r31,-4(r13)
+		mr	r31,r3
 
 		LIBCALLPOWERPC WarpSuper
 		
-		mtdec	r3		
+		mr	r3,r31
+		mtdec	r3
 		
 		LIBCALLPOWERPC WarpUser
 
@@ -4296,6 +4312,7 @@ SetDecInterrupt:
 .NoSubAdd:	bdnz+	.NextCtr
 		mr	r3,r6
 		blr
+		
 #********************************************************************************************
 #
 #	Status = ChangeStack(NewStackSize) // r3=r4
@@ -5843,7 +5860,7 @@ SetTaskPriPPC:
 		LIBCALLPOWERPC AtomicDone
 
 		li	r4,0
-		
+
 		LIBCALLPOWERPC SetDecInterrupt
 
 		b	.ExitPri

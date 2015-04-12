@@ -245,14 +245,13 @@ Reset:		mflr	r15
 		mtmsr	r1				#Clear MSR, keep Interrupt Prefix for now 
 		isync
 							#Zero-out registers
-		andi.   r0, r0, 0
-		mtspr   SPRG0, r0
-		mtspr   SPRG1, r0
-		mtspr   SPRG2, r0
-		mtspr   SPRG3, r0
-							#Set HID0 to known state 
-		lis	r3,HID0_NHR@h
-		ori	r3,r3,HID0_NHR@l
+		li	r0,0
+		mtsprg0	r0
+		mtsprg1 r0
+		mtsprg2	r0
+		mtsprg3	r0
+			
+		loadreg	r3,HID0_NHR			#Set HID0 to known state 
 		mfspr	r4,HID0
 		and	r3,r4, r3			#Clear other bits
 		mtspr	HID0,r3
@@ -378,17 +377,17 @@ ResLoop:
 		stwbrx	r28,0,r27			#Set MU interrupt, Pri = 5, Vector = 0x42
 		sync
 
-		loadreg r28,Quantum			#Set Slice/Quantum
-		loadreg r27,EPIC_GTBCR0
-		add	r27,r26,r27
-		stwbrx	r28,0,r27
-		sync
+#		loadreg r28,Quantum			#Set Slice/Quantum
+#		loadreg r27,EPIC_GTBCR0
+#		add	r27,r26,r27
+#		stwbrx	r28,0,r27
+#		sync
 	
-		loadreg r28,0x80040043
-		loadreg r27,EPIC_GTVPR0
-		add	r27,r26,r27
-		stwbrx	r28,0,r27
-		sync
+#		loadreg r28,0x80040043
+#		loadreg r27,EPIC_GTVPR0
+#		add	r27,r26,r27
+#		stwbrx	r28,0,r27
+#		sync
 
 		loadreg	r27,EPIC_EICR
 		add	r27,r26,r27
@@ -1182,13 +1181,23 @@ EInt:		BUILDSTACKPPC
 
 		rlwinm	r5,r5,8,0,31
 		cmpwi	r5,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
-		beq	NoEOI
+		beq	.ReturnToUser
+		
 		cmpwi	r5,0x0042
 		bne	NoHEAR
 
 		b	TestRoutine
 
-NoHEAR:		li	r3,SonnetBase
+NoHEAR:		lis	r3,EUMB
+		lis	r5,0x100			#Clear IM0 bit to clear interrupt
+		stw	r5,0x100(r3)
+		eieio
+		clearreg r5
+		lis	r3,EUMBEPICPROC
+		sync
+		stw	r5,0xb0(r3)			#Write 0 to EOI to End Interrupt
+
+		li	r3,SonnetBase
 
 		lwz	r9,TaskException(r3)
 		mr.	r9,r9
@@ -1197,7 +1206,7 @@ NoHEAR:		li	r3,SonnetBase
 		lwz	r9,RunningTask(r3)
 		mr.	r9,r9
 #		bne	.TrySwitch
-		bne	NoReschedule			#-> To be removed
+		bne	.ReturnToUser			#-> To be removed
 
 		lwz	r3,0(r3)
 		la	r4,NewTasks(r3)
@@ -1205,7 +1214,7 @@ NoHEAR:		li	r3,SonnetBase
 		LIBCALLPOWERPC RemHeadPPC
 	
 		mr.	r9,r3
-		beq	NoReschedule
+		beq	.ReturnToUser
 
 .Dispatch:	li	r3,SonnetBase
 		stw	r9,RunningTask(r3)
@@ -1247,35 +1256,20 @@ NoHEAR:		li	r3,SonnetBase
 		mtsrr1	r7
 		sync
 
-		lis	r8,EUMB
-		lis	r9,0x100			#Clear IM0 bit to clear interrupt
-		stw	r9,0x100(r8)
-		eieio
-		clearreg r9
-		lis	r8,EUMBEPICPROC
-		sync
-
-		stw	r9,0xb0(r8)			#Write 0 to EOI to End Interrupt
-
-		li	r0,SonnetBase
-		stb	r0,Interrupt(r0)
+		li	r8,SonnetBase
+		stb	r8,Interrupt(r8)
+		
 		rfi
 		
 #********************************************************************************************
 
-NoReschedule:	lis	r3,EUMB
-		lis	r5,0x100			#Clear IM0 bit to clear interrupt
-		stw	r5,0x100(r3)
-		eieio
-		clearreg r5
-		lis	r3,EUMBEPICPROC
-		sync
-		stw	r5,0xb0(r3)			#Write 0 to EOI to End Interrupt
-
-NoEOI:		mtsrr0	r6
+.ReturnToUser:	mtsrr0	r6
 		mtsrr1	r7
 
 		sync
+		
+		li	r9,SonnetBase			#Only works when SonnetBase = 0
+		stb	r9,Interrupt(r9)
 
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
@@ -1288,9 +1282,6 @@ NoEOI:		mtsrr0	r6
 	
 		DSTRYSTACKPPC
 	
-		li	r0,SonnetBase			#Only works when SonnetBase = 0
-		stb	r0,Interrupt(r0)
-
 		rfi
 		
 #********************************************************************************************
@@ -1301,11 +1292,11 @@ TestRoutine:	b	NoHEAR
 
 .TaskException:	li	r9,0				#Will be starting point for TC_EXCEPTCODE
 		stw	r9,TaskException(r3)
-		b	NoReschedule
+		b	.ReturnToUser
 		
 #********************************************************************************************
 
-.TrySwitch:	lwz	r3,0(r3)			#TODO: Save Context
+.TrySwitch:	lwz	r3,0(r3)
 		mr	r8,r3
 		la	r4,NewTasks(r3)
 	
@@ -1322,17 +1313,180 @@ TestRoutine:	b	NoHEAR
 		mr.	r9,r3
 	
 		bne	.SwitchOld
-		b	NoReschedule
+		b	.ReturnToUser
 	
-.SwitchOld:	nop					#Old = Context, New = PPStruct
+.SwitchOld:	mr	r3,r8				#Old = Context, New = PPStruct
+		la	r4,ReadyTasks(r3)
+		lwz	r5,RunningTask(r3)
+		
+		bl	.StoreContext
+		
+		LIBCALLPOWERPC AddTailPPC
+		
+		b	.LoadContext
 	
 .SwitchNew:	mr	r3,r8
 		la	r4,ReadyTasks(r3)
 		lwz	r5,RunningTask(r3)
-	
+		
+		bl	.StoreContext
+		
 		LIBCALLPOWERPC AddTailPPC
 	
 		b	.Dispatch
+		
+.StoreContext:	mr	r3,r6
+		lwz	r6,TASKPPC_CONTEXTMEM(r5)
+		stw	r3,0(r6)
+		stwu	r7,4(r6)
+		stwu	r0,0(r6)
+		lwz	r0,0(r1)
+		stwu	r0,4(r6)
+		stwu	r2,4(r6)
+		lwz	r0,24(r13)
+		stwu	r0,4(r6)
+		lwz	r0,20(r13)
+		stwu	r0,4(r6)
+		lwz	r0,16(r13)
+		stwu	r0,4(r6)
+		lwz	r0,12(r13)
+		stwu	r0,4(r6)
+		lwz	r0,8(r13)
+		stwu	r0,4(r6)
+		lwz	r0,4(r13)
+		stwu	r0,4(r6)
+		lwz	r0,0(r13)
+		stwu	r0,4(r6)
+		stwu	r10,4(r6)
+		stwu	r11,4(r6)
+		stwu	r12,4(r6)
+		lwz	r3,0(r1)
+		lwz	r3,-4(r1)
+		stwu	r3,4(r6)
+		stwu	r14,4(r6)
+		stwu	r15,4(r6)
+		stwu	r16,4(r6)
+		stwu	r17,4(r6)
+		stwu	r18,4(r6)
+		stwu	r19,4(r6)
+		stwu	r20,4(r6)
+		stwu	r21,4(r6)
+		stwu	r22,4(r6)
+		stwu	r23,4(r6)
+		stwu	r24,4(r6)
+		stwu	r25,4(r6)
+		stwu	r26,4(r6)
+		stwu	r27,4(r6)
+		stwu	r28,4(r6)
+		stwu	r29,4(r6)
+		stwu	r30,4(r6)
+		stwu	r31,4(r6)
+		stfdu	f0,4(r6)
+		stfdu	f1,8(r6)
+		stfdu	f2,8(r6)
+		stfdu	f3,8(r6)
+		stfdu	f4,8(r6)
+		stfdu	f5,8(r6)
+		stfdu	f6,8(r6)
+		stfdu	f7,8(r6)
+		stfdu	f8,8(r6)
+		stfdu	f9,8(r6)
+		stfdu	f10,8(r6)
+		stfdu	f11,8(r6)
+		stfdu	f12,8(r6)
+		stfdu	f13,8(r6)
+		stfdu	f14,8(r6)
+		stfdu	f15,8(r6)		
+		stfdu	f16,8(r6)
+		stfdu	f17,8(r6)
+		stfdu	f18,8(r6)
+		stfdu	f19,8(r6)
+		stfdu	f20,8(r6)
+		stfdu	f21,8(r6)
+		stfdu	f22,8(r6)
+		stfdu	f23,8(r6)
+		stfdu	f24,8(r6)
+		stfdu	f25,8(r6)
+		stfdu	f26,8(r6)
+		stfdu	f27,8(r6)
+		stfdu	f28,8(r6)
+		stfdu	f29,8(r6)
+		stfdu	f30,8(r6)
+		stfdu	f31,8(r6)
+		blr
+			
+.LoadContext:	lwz	r9,TASKPPC_CONTEXTMEM(r9)
+		lwz	r0,0(r9)
+		mtsrr0	r0
+		lwzu	r0,4(r9)
+		mtsrr1	r0
+		lwzu	r0,4(r9)
+		lwzu	r1,4(r9)
+		lwzu	r2,4(r9)
+		lwzu	r3,4(r9)
+		lwzu	r4,4(r9)
+		lwzu	r5,4(r9)
+		lwzu	r6,4(r9)
+		lwzu	r7,4(r9)
+		lwzu	r8,4(r9)
+		lwzu	r10,4(r9)
+		mtsprg3	r10
+		lwzu	r10,4(r9)
+		lwzu	r11,4(r9)
+		lwzu	r12,4(r9)
+		lwzu	r13,4(r9)
+		lwzu	r14,4(r9)
+		lwzu	r15,4(r9)
+		lwzu	r16,4(r9)
+		lwzu	r17,4(r9)
+		lwzu	r18,4(r9)
+		lwzu	r19,4(r9)
+		lwzu	r20,4(r9)
+		lwzu	r21,4(r9)
+		lwzu	r22,4(r9)
+		lwzu	r23,4(r9)
+		lwzu	r24,4(r9)
+		lwzu	r25,4(r9)
+		lwzu	r26,4(r9)
+		lwzu	r27,4(r9)
+		lwzu	r28,4(r9)
+		lwzu	r29,4(r9)
+		lwzu	r30,4(r9)
+		lwzu	r31,4(r9)
+		lfdu	f0,4(r9)
+		lfdu	f1,8(r9)
+		lfdu	f2,8(r9)
+		lfdu	f3,8(r9)
+		lfdu	f4,8(r9)
+		lfdu	f5,8(r9)
+		lfdu	f6,8(r9)
+		lfdu	f7,8(r9)
+		lfdu	f8,8(r9)
+		lfdu	f9,8(r9)
+		lfdu	f10,8(r9)
+		lfdu	f11,8(r9)
+		lfdu	f12,8(r9)
+		lfdu	f13,8(r9)
+		lfdu	f14,8(r9)
+		lfdu	f15,8(r9)
+		lfdu	f16,8(r9)
+		lfdu	f17,8(r9)
+		lfdu	f18,8(r9)
+		lfdu	f19,8(r9)
+		lfdu	f20,8(r9)
+		lfdu	f21,8(r9)
+		lfdu	f22,8(r9)
+		lfdu	f23,8(r9)		
+		lfdu	f24,8(r9)
+		lfdu	f25,8(r9)
+		lfdu	f26,8(r9)
+		lfdu	f27,8(r9)
+		lfdu	f28,8(r9)
+		lfdu	f29,8(r9)
+		lfdu	f30,8(r9)
+		lfdu	f31,8(r9)
+		mfsprg3	r9
+		rfi
 			
 #********************************************************************************************
 	
