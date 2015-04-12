@@ -617,11 +617,8 @@ GetInfo:
 		
 		LIBCALLPOWERPC WarpUser	
 		
-.TagLoop:	mflr	r5
-		
-		LIBCALLPOWERPC NextTagItemPPC
+.TagLoop:	LIBCALLPOWERPC NextTagItemPPC
 
-		mtlr	r5
 		mr.	r3,r3
 		beq	.NoTags		
 		rlwinm	r7,r3,0,0,19
@@ -5784,15 +5781,97 @@ WaitPPC:
 		
 		DSTRYSTACKPPC
 
-		blr	
+		blr
+		
+#********************************************************************************************
+#
+#	oldpriority = SetTaskPriPPC(taskPPC, priority) // r3=r4,r5
+#
+#********************************************************************************************
+
+SetTaskPriPPC:
+		BUILDSTACKPPC
+		
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+
+		li	r31,SonnetBase
+		mr	r30,r4
+
+.PriAtomic:	li	r4,Atomic
+
+		LIBCALLPOWERPC AtomicTest
+
+		mr.	r3,r3
+		beq+	.PriAtomic
+
+		lbz	r29,LN_PRI(r30)
+		extsb	r29,r29
+		stb	r5,LN_PRI(r30)
+		lwz	r3,88(r31)
+		cmpw	r3,r30
+		beq-	.NoSelf
+
+		lbz	r0,TC_STATE(r30)
+		cmplwi	r0,TS_REMOVED
+		beq-	.DonePriChange
+
+		cmplwi	r0,TS_WAIT
+		bne-	.DonePriChange
+
+		lwz	r4,TASKPPC_TIMESTAMP2(r30)
+		mftbl	r5
+		sub	r4,r5,r4
+		lwz	r6,TASKPPC_ELAPSED2(r30)
+		add	r4,r4,r6
+		stw	r4,TASKPPC_ELAPSED2(r30)
+
+		mr	r4,r30				#RemovePPC
+		lwz	r3,LN_SUCC(r4)
+		lwz	r4,LN_PRED(r4)
+		stw	r4,LN_PRED(r3)
+		stw	r3,LN_SUCC(r4)
+		mr	r5,r30
+		li	r0,TS_READY
+		stb	r0,TC_STATE(r30)
+
+		addi	r4,r31,102			#sonnetbase +102 (some tasklist)
+		bl	InsertOnPri
+
+		lwz	r4,102(r31)
+		cmplw	r4,r30
+		bne-	.DonePriChange
+
+.NoSelf:	li	r4,Atomic
+		
+		LIBCALLPOWERPC AtomicDone
+
+		li	r4,0
+		
+		LIBCALLPOWERPC SetDecInterrupt
+
+		b	.ExitPri
+
+.DonePriChange:	li	r4,Atomic
+
+		LIBCALLPOWERPC AtomicDone
+
+.ExitPri:	mr	r3,r29
+		lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
+
+		DSTRYSTACKPPC
+
+		blr
 
 #********************************************************************************************
 
 SPrintF:			blr
 Run68KLowLevel:			blr
 SignalPPC:			blr
-SetTaskPriPPC:			li	r3,0
-				blr
 SetExcHandler:			li	r3,0
 				blr
 RemExcHandler:			blr
@@ -5811,4 +5890,3 @@ RawDoFmtPPC:			li	r3,0
 
 #********************************************************************************************
 EndFunctions:
-
