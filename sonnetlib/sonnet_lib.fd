@@ -28,7 +28,6 @@ AtomicTest()()
 AtomicDone()()
 WarpSuper()()
 WarpUser()()
-SetDecInterrupt()()
 ##bias 300
 Run68K(PPStruct)()
 WaitFor68K(PPStruct)()

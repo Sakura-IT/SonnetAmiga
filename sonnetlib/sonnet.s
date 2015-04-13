@@ -1,20 +1,22 @@
 
-COMMAND		EQU $4
-IMR0		EQU $50
-OMISR		EQU $30
-OMIMR		EQU $34
-OMR0		EQU $58
-OMR1		EQU $5C
-LMBAR		EQU $10
-PCSRBAR		EQU $14
-OMBAR		EQU $300
-OTWR		EQU $308
-WP_CONTROL	EQU $F48
-WP_TRIG01	EQU $c0000000
-MEMF_PPC	EQU $1000
-StackSize	EQU $80000
-TASKPPC_SIZE	EQU 248
-NT_PPCTASK	EQU 100
+COMMAND			EQU 	$4
+IMR0			EQU 	$50
+OMISR			EQU 	$30
+OMIMR			EQU 	$34
+OMR0			EQU 	$58
+OMR1			EQU 	$5C
+LMBAR			EQU 	$10
+PCSRBAR			EQU 	$14
+OMBAR			EQU 	$300
+OTWR			EQU 	$308
+WP_CONTROL		EQU 	$F48
+WP_TRIG01		EQU 	$c0000000
+MEMF_PPC		EQU 	$1000
+StackSize		EQU 	$80000
+TASKPPC_CTMEM		EQU 	248
+TASKPPC_SIZE		EQU 	640
+TASKPPC_CONTEXTMEM	EQU	100
+NT_PPCTASK		EQU 	100
 
 FUNC_CNT	 EQU	-30		* Skip 4 standard vectors
 FUNCDEF		 MACRO
@@ -62,7 +64,7 @@ FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
 	XREF	SetNiceValue,AllocPrivateMem,FreePrivateMem,SetExceptPPC,ObtainSemaphoreSharedPPC
 	XREF	AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
 	XREF	AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
-	XREF	AddUniqueSemaphorePPC,IsExceptionMode,SetDecInterrupt
+	XREF	AddUniqueSemaphorePPC,IsExceptionMode
 
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,MCTask,Init,ViolationAddress
 	XREF	NewTasks,SysBase,PowerPCBase
@@ -754,7 +756,9 @@ xProces	move.l d0,Port(a5)
 	move.l d0,a1
 	move.b #NT_PPCTASK,LN_TYPE(a1)
 	lea TASKPPC_SIZE+MN_SIZE+PP_SIZE(a1),a2
-	move.l a2,LN_NAME(a1)	
+	move.l a2,LN_NAME(a1)
+	lea TASKPPC_CTMEM(a1),a2
+	move.l a2,TASKPPC_CONTEXTMEM(a1)
 	add.l #TASKPPC_SIZE,d0
 	move.l d0,Msg(a5)
 	move.l Port(a5),d1
@@ -1214,8 +1218,8 @@ FUNCTABLE:
 	dc.l	AtomicDone	
 	dc.l	WarpSuper
 	dc.l	WarpUser
-	dc.l	SetDecInterrupt
-		
+	
+	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved
@@ -1336,6 +1340,6 @@ EndFlag	dc.l	$ffffffff
 LibName
 	dc.b	"sonnet.library",0,0
 IDString
-	DC.B	"$VER: sonnet.library 1.0 (14-Mar-15)",0
+	DC.B	"$VER: sonnet.library 1.0 (01-Apr-15)",0
 	cnop	0,4
 EndCP	end

@@ -159,9 +159,10 @@ End:		mflr	r4
 		bl	copy_and_flush			#Put program in Sonnet Mem instead of PCI Mem
 
 		lis	r14,0				#Reset
-		mtdec	r14				#Decrementer,
-		mtspr	285,r14				#Time Base Upper and
-		mtspr	284,r14				#Time Base Lower.
+		mtspr	285,r14				#Time Base Upper,
+		mtspr	284,r14				#Time Base Lower and
+		subi	r28,r14,2
+		mtdec	r28				#Decrementer.
 		sync
 
 		lwz	r28,0(r14)
@@ -377,17 +378,17 @@ ResLoop:
 		stwbrx	r28,0,r27			#Set MU interrupt, Pri = 5, Vector = 0x42
 		sync
 
-#		loadreg r28,Quantum			#Set Slice/Quantum
-#		loadreg r27,EPIC_GTBCR0
-#		add	r27,r26,r27
-#		stwbrx	r28,0,r27
-#		sync
+		loadreg r28,Quantum			#Set Slice/Quantum
+		loadreg r27,EPIC_GTBCR0
+		add	r27,r26,r27
+		stwbrx	r28,0,r27
+		sync
 	
-#		loadreg r28,0x80040043
-#		loadreg r27,EPIC_GTVPR0
-#		add	r27,r26,r27
-#		stwbrx	r28,0,r27
-#		sync
+		loadreg r28,0x80040043
+		loadreg r27,EPIC_GTVPR0
+		add	r27,r26,r27
+		stwbrx	r28,0,r27
+		sync
 
 		loadreg	r27,EPIC_EICR
 		add	r27,r26,r27
@@ -1156,7 +1157,9 @@ FillEm:		addi	r17,r17,0x100
 
 #********************************************************************************************
 
-EInt:		BUILDSTACKPPC
+EInt:		b	.DecInt
+
+		BUILDSTACKPPC
 
 		stwu	r3,-4(r13)
 		stwu	r4,-4(r13)
@@ -1184,11 +1187,13 @@ EInt:		BUILDSTACKPPC
 		beq	.ReturnToUser
 		
 		cmpwi	r5,0x0042
-		bne	NoHEAR
+		beq	TestRoutine
+		
+		cmpwi	r5,0x0043
+		
+#		beq	Timer
 
-		b	TestRoutine
-
-NoHEAR:		lis	r3,EUMB
+.IntReturn:	lis	r3,EUMB
 		lis	r5,0x100			#Clear IM0 bit to clear interrupt
 		stw	r5,0x100(r3)
 		eieio
@@ -1197,7 +1202,7 @@ NoHEAR:		lis	r3,EUMB
 		sync
 		stw	r5,0xb0(r3)			#Write 0 to EOI to End Interrupt
 
-		li	r3,SonnetBase
+.RDecInt:	li	r3,SonnetBase
 
 		lwz	r9,TaskException(r3)
 		mr.	r9,r9
@@ -1258,7 +1263,22 @@ NoHEAR:		lis	r3,EUMB
 
 		li	r8,SonnetBase
 		stb	r8,Interrupt(r8)
+		sync
 		
+		mr	r7,r8
+		mr	r9,r8
+		mr	r10,r8
+		mr 	r11,r8
+		mr	r12,r8
+		mr	r14,r8
+		mr	r15,r8
+		mr	r16,r8
+		mr	r17,r8
+		mr	r18,r8
+		mr	r19,r8
+		mr	r20,r8
+		mr	r21,r8
+				
 		rfi
 		
 #********************************************************************************************
@@ -1270,6 +1290,7 @@ NoHEAR:		lis	r3,EUMB
 		
 		li	r9,SonnetBase			#Only works when SonnetBase = 0
 		stb	r9,Interrupt(r9)
+		sync
 
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
@@ -1286,7 +1307,7 @@ NoHEAR:		lis	r3,EUMB
 		
 #********************************************************************************************
 
-TestRoutine:	b	NoHEAR
+TestRoutine:	b	.IntReturn
 
 #********************************************************************************************
 
@@ -1339,7 +1360,7 @@ TestRoutine:	b	NoHEAR
 		lwz	r6,TASKPPC_CONTEXTMEM(r5)
 		stw	r3,0(r6)
 		stwu	r7,4(r6)
-		stwu	r0,0(r6)
+		stwu	r0,4(r6)
 		lwz	r0,0(r1)
 		stwu	r0,4(r6)
 		stwu	r2,4(r6)
@@ -1487,13 +1508,36 @@ TestRoutine:	b	NoHEAR
 		lfdu	f31,8(r9)
 		mfsprg3	r9
 		rfi
-			
+
+#********************************************************************************************
+		
+.DecInt:	BUILDSTACKPPC
+
+		stwu	r3,-4(r13)
+		stwu	r4,-4(r13)
+		stwu 	r5,-4(r13)
+		stwu	r6,-4(r13)
+		stwu	r7,-4(r13)
+		stwu	r8,-4(r13)
+		stwu	r9,-4(r13)
+
+		mfsrr0	r6
+		mfsrr1	r7
+
+		mfmsr	r5
+		ori	r5,r5,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r5				#Reenable MMU (can affect srr0/srr1 acc Docs)
+		isync					#Also reenable FPU
+		sync
+
+		b	.RDecInt
+
 #********************************************************************************************
 	
 EIntEnd:
 		mflr	r4
 		li	r3,SonnetBase
-		loadreg	r5,0x48002b00
+		loadreg	r5,0x48002b04
 		stw	r5,0x500(r3)
 		loadreg r5,0x48002700
 		stw	r5,0x900(r3)	

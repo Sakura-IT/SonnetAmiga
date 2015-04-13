@@ -25,7 +25,7 @@
 .global SetNiceValue,AllocPrivateMem,FreePrivateMem,SetExceptPPC,ObtainSemaphoreSharedPPC
 .global AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
 .global AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
-.global AddUniqueSemaphorePPC,IsExceptionMode,SetDecInterrupt
+.global AddUniqueSemaphorePPC,IsExceptionMode
 
 .section "LibBody","acrx"
 
@@ -2054,8 +2054,7 @@ WaitPortPPC:
 		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
-		li	r4,0
-		LIBCALLPOWERPC SetDecInterrupt
+		LIBCALLPOWERPC CauseInterrupt
 
 .Link36:	lbz	r3,628(r28)
 		mr.	r3,r3
@@ -2113,8 +2112,7 @@ WaitPortPPC:
 		li	r4,Atomic
 		LIBCALLPOWERPC AtomicDone
 
-		li	r4,0
-		LIBCALLPOWERPC SetDecInterrupt
+		LIBCALLPOWERPC CauseInterrupt
 
 .Link41:	lbz	r3,628(r28)
 		mr.	r3,r3
@@ -2251,23 +2249,25 @@ WaitFor68K:
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
 
 		mr	r31,r4
 		
-.Check68K:	loadreg r30,"DONE"
+.Check68K:	LIBCALLPOWERPC FlushL1DCache
+		
+		loadreg r30,"DONE"
 		lwz	r6,MN_IDENTIFIER(r31)
 		cmpw	r6,r30
 		beq- 	.Done68K
 		
-		li	r4,0
-		
-		LIBCALLPOWERPC SetDecInterrupt		
+		LIBCALLPOWERPC CauseInterrupt
 		
 		b	.Check68K				
 
-.Done68K:	lwz	r30,0(r13)
-		lwz	r31,4(r13)
-		addi	r13,r13,8
+.Done68K:	lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
 		
 		DSTRYSTACKPPC
 				
@@ -4150,8 +4150,7 @@ CreateTaskPPC:
  		
  		LIBCALLPOWERPC AtomicDone
  
-		li	r4,0 
-		LIBCALLPOWERPC SetDecInterrupt
+		LIBCALLPOWERPC CauseInterrupt
  
 		mr	r3,r31 
 		b	.SkipToEnd			#All good, go to exit 
@@ -4274,7 +4273,7 @@ SetDecInterrupt:
 
 		mr.	r3,r3
 		bne-	.NotZ
-		li	r3,100
+		li	r3,10
 .NotZ:		stwu	r31,-4(r13)
 		mr	r31,r3
 
@@ -4987,7 +4986,7 @@ AttemptSemaphoreSharedPPC:
 		
 #********************************************************************************************
 #
-#	void CauseInterrupt(void) // Interrupt using the Decrementer Exception
+#	void CauseInterrupt(void) // Interrupt using the Decrementer Exception (Support)
 #
 #********************************************************************************************
 	
@@ -5003,7 +5002,7 @@ CauseInterrupt:
 
 		li	r4,0
 		
-		LIBCALLPOWERPC SetDecInterrupt
+		bl SetDecInterrupt
 
 .IntWait:	lbz	r0,Interrupt(r31)
 		mr.	r0,r0
@@ -5047,10 +5046,8 @@ CheckExcSignal:
 		
 		li	r10,SonnetBase
 		stw	r7,TaskException(r10)
-		
-		li	r4,0
 
-		LIBCALLPOWERPC SetDecInterrupt
+		LIBCALLPOWERPC CauseInterrupt
 
 		li	r10,SonnetBase
 .IntWait2:	lwz	r0,TaskException(r10)
@@ -5269,9 +5266,7 @@ DeleteTaskPPC:
 		li	r0,-1
 		stb	r0,626(r30)			#Some Flag?
 		
-		li	r4,0
-		
-		LIBCALLPOWERPC SetDecInterrupt
+		LIBCALLPOWERPC CauseInterrupt
 		
 .EndTask:	b	.EndTask			#Halt this Task
 
@@ -5757,10 +5752,8 @@ WaitPPC:
 		li	r4,Atomic
 		
 		LIBCALLPOWERPC AtomicDone
-
-		li	r4,0
 		
-		LIBCALLPOWERPC SetDecInterrupt
+		LIBCALLPOWERPC CauseInterrupt
 
 .WaitForRun:	lbz	r0,TC_STATE(r31)
 		cmplwi	r0,TS_RUN
@@ -5859,9 +5852,7 @@ SetTaskPriPPC:
 		
 		LIBCALLPOWERPC AtomicDone
 
-		li	r4,0
-
-		LIBCALLPOWERPC SetDecInterrupt
+		LIBCALLPOWERPC CauseInterrupt
 
 		b	.ExitPri
 
