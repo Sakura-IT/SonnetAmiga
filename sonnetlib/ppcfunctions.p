@@ -77,9 +77,8 @@ ConfirmInterrupt:
 		stw	r4,0x100(r3)
 		eieio
 
-		clearreg r4
+		li	r4,0
 		lis	r3,EUMBEPICPROC
-		sync
 		stw	r4,0xb0(r3)			#Write 0 to EOI to End Interrupt
 
 		lwz	r4,-8(r1)
@@ -467,7 +466,7 @@ AllocVecPPC:
 		beq	.SkipAlign
 		
 		addi	r3,r3,39
-		rlwinm	r3,r3,0,0,26		#Align memblock to 32
+		rlwinm	r3,r3,0,0,26		#Align memblock to 32		
 		stw	r31,-4(r3)
 		
 .SkipAlign:	lwz	r6,0(r13)
@@ -765,6 +764,7 @@ GetSysTimePPC:
 		stw	r3,4(r6)
 		lwz	r6,0(r13)
 		lwzu	r7,4(r13)
+		addi	r13,r13,4
 		
 		DSTRYSTACKPPC
 		
@@ -917,7 +917,8 @@ FindTagItemPPC:
 #********************************************************************************************
 
 FlushL1DCache:
-			
+		BUILDSTACKPPC
+		
 		li	r4,0x7000
 
 		li	r6,0x400
@@ -935,20 +936,8 @@ FlushL1DCache:
 		addi	r4,r4,L1_CACHE_LINE_SIZE
 		bdnz	.Fl2		
 
-		blr
+		DSTRYSTACKPPC
 
-		li	r3,0
-		lis	r4,0x10
-		
-.Fl11:		cmplw	cr1,r3,r4
-		beq 	cr1,.Fl12
-		lbz	r5,0(r3)
-		addi	r3,r3,L1_CACHE_LINE_SIZE
-		b	.Fl11
-		
-.Fl12:		sync
-		isync
-		
 		blr
 								
 #********************************************************************************************
@@ -2227,6 +2216,7 @@ PutXMsgPPC:
 		mr.	r4,r4
 		beq-	.NoSigTask
 		li	r5,0x100		#Fixed at the moment
+		isync
 		
 		LIBCALLPOWERPC Signal68K
 
@@ -2259,6 +2249,7 @@ WaitFor68K:
 		lwz	r6,MN_IDENTIFIER(r31)
 		cmpw	r6,r30
 		beq- 	.Done68K
+		isync
 		
 		LIBCALLPOWERPC CauseInterrupt
 		
@@ -2313,6 +2304,7 @@ Run68K:
 		lwz	r4,MCTask(r4)
 		la	r4,pr_MsgPort(r4)		
 		mr	r5,r30
+		sync
 				
 		LIBCALLPOWERPC PutXMsgPPC
 		
@@ -5007,6 +4999,7 @@ CauseInterrupt:
 .IntWait:	lbz	r0,Interrupt(r31)
 		mr.	r0,r0
 		bne+	.IntWait
+		isync
 
 		lwz	r31,0(r13)
 		addi	r13,r13,4

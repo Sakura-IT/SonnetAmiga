@@ -54,7 +54,7 @@ Loop1:		slw.	r26,r26,r28
 		blt	Fndbit
 		addi	r25,r25,-1
 		bdnz	Loop1
-		b	ExitCode
+		b	Pause
 
 Fndbit:		slw.	r26,r26,r28
 		beq	SetLen
@@ -84,10 +84,9 @@ SetLen:		mr	r30,r28
 		loadreg	r3,0x8000			#Start hardcoded at 0x8000
 		mr	r31,r3
 
-		loadreg	r1,0x7fffc			#Userstack in unused mem (See sonnet.s)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
-		loadreg	r2,0x18000			#SDA (0x10000-0x20000)
+		loadreg	r1,0x7ffe0			#Userstack in unused mem (See sonnet.s)
+		BUILDSTACKPPC
+
 		bl	End
 
 Start:		nop					#Dummy entry at absolute 0x8000
@@ -98,6 +97,7 @@ Start:		nop					#Dummy entry at absolute 0x8000
 	
 ExitCode:	li	r8,SonnetBase			#Exit code of processes (in development)
 		lwz	r9,RunningTask(r8)
+		lwz	r21,TC_SPLOWER(r9)
 		la	r9,TASKPPC_SIZE(r9)
 		loadreg r7,"FPPC"
 		stw	r7,MN_IDENTIFIER(r9)
@@ -128,24 +128,24 @@ ExitCode:	li	r8,SonnetBase			#Exit code of processes (in development)
 		la	r4,pr_MsgPort(r8)
 		mr	r5,r9
 
+		LIBCALLPOWERPC PutXMsgPPC
+
+		loadreg	r1,0x7ffe0			#Userstack in unused mem (See sonnet.s)
+		BUILDSTACKPPC
+		
+		mr	r4,r21
+		lwz	r21,SonnetBase(r0)
+		or	r4,r4,r21
+		
+		LIBCALLPOWERPC FreeVecPPC
+		
+		LIBCALLPOWERPC FlushL1DCache
+		
+		sync
+		isync
+		
 		li	r3,0
 		stw	r3,RunningTask(r3)
-	
-		LIBCALLPOWERPC PutXMsgPPC
-	
-		lwz	r9,0(r13)
-		lwzu	r8,4(r13)
-		lwzu	r7,4(r13)
-		lwzu	r6,4(r13)
-		lwzu	r5,4(r13)
-		lwzu	r4,4(r13)
-		lwzu	r3,4(r13)
-		addi	r13,r13,4
-	
-		DSTRYSTACKPPC
-
-	
-		LIBCALLPOWERPC FlushL1DCache
 
 Pause:		nop
 		nop
@@ -161,9 +161,8 @@ End:		mflr	r4
 		lis	r14,0				#Reset
 		mtspr	285,r14				#Time Base Upper,
 		mtspr	284,r14				#Time Base Lower and
-		subi	r28,r14,2
+		loadreg r8,0x7fffffff
 		mtdec	r28				#Decrementer.
-		sync
 
 		lwz	r28,0(r14)
 		stw	r14,Atomic(r14)
@@ -173,13 +172,12 @@ End:		mflr	r4
 WInit:		lwz	r28,Init(r14)
 		cmplw	r28,r6
 		bne	WInit				#Wait for 68k to set up library
+		isync
 
-		loadreg	r3,1000000			#BUG! Not sure why this delay is needed
-		mtctr	r3
+		loadreg	r4,1000000			#BUG! Not sure why this delay is needed
+		mtctr	r4
+.BugLoop:	bdnz+	.BugLoop
 
-Delay2:		bdnz	Delay2
-
-		lwz	r14,0(r14)
 		la	r4,ReadyTasks(r14)
 		LIBCALLPOWERPC NewListPPC
 
@@ -198,12 +196,12 @@ Delay2:		bdnz	Delay2
 		la	r4,SnoopList(r14)
 		LIBCALLPOWERPC NewListPPC
 
-		la	r4,NewTasks(r14)
-		LIBCALLPOWERPC NewListPPC
-
 		li	r4,SSPPC_SIZE*5			#Memory for 5 Semaphores
 		LIBCALLPOWERPC AllocVecPPC
-
+		
+		lwz	r4,SonnetBase(r0)
+		xor	r3,r3,r4		
+		
 		mr	r30,r3
 		mr	r4,r3
 		stw 	r4,TaskListSem(r14)
@@ -225,24 +223,26 @@ Delay2:		bdnz	Delay2
 		stw	r4,MemSem(r14)
 		LIBCALLPOWERPC InitSemaphorePPC	
 
+		lwz	r14,0(r14)
+		la	r4,NewTasks(r14)
+		LIBCALLPOWERPC NewListPPC
+
 		LIBCALLPOWERPC FlushL1DCache
 
 		mtsrr0	r31
 		mfmsr	r14
-		isync
 		ori	r14,r14,PSL_EE|PSL_PR			#Set privilege mode to User
 		mtsrr1	r14
-		isync
-		sync
+
 		rfi					#To user code
 
 #********************************************************************************************
 
 							#Clear MSR to diable interrupts and checks
 Reset:		mflr	r15
+
 		mfmsr	r1
 		andi.	r1,r1,PSL_IP
-		sync
 		mtmsr	r1				#Clear MSR, keep Interrupt Prefix for now 
 		isync
 							#Zero-out registers
@@ -257,11 +257,9 @@ Reset:		mflr	r15
 		and	r3,r4, r3			#Clear other bits
 		mtspr	HID0,r3
 		sync
-							#Set MPU/MSR to a known state. Turn on FP 
-	 	lis	r3,PSL_FP@h
-		ori	r3,r3,PSL_FP@l
+		
+		loadreg	r3,PSL_FP					#Set MPU/MSR to a known state. Turn on FP
 		or	r3,r1,r3
-		sync
 		mtmsr 	r3
 		isync
 							#Init the floating point control/status register 
@@ -364,10 +362,9 @@ Epic:		lis	r26,EUMB
 		li	r28,0xa0
 		stw	r28,0(r27)			#Reset EPIC
 
-ResLoop:
-		lwz	r28,0(r27)
+.ResLoop:	lwz	r28,0(r27)
 		andi.	r28,r28,0x80
-		bne	ResLoop				#Wait for reset
+		bne	.ResLoop				#Wait for reset
 
 		li	r28,0x20
 		stw	r28,0(r27)			#Set Mixed Mode
@@ -376,40 +373,34 @@ ResLoop:
 		loadreg	r27,EPIC_IIVPR3
 		add	r27,r26,r27
 		stwbrx	r28,0,r27			#Set MU interrupt, Pri = 5, Vector = 0x42
-		sync
 
 		loadreg r28,Quantum			#Set Slice/Quantum
 		loadreg r27,EPIC_GTBCR0
 		add	r27,r26,r27
 		stwbrx	r28,0,r27
-		sync
 	
 		loadreg r28,0x80040043
 		loadreg r27,EPIC_GTVPR0
 		add	r27,r26,r27
 		stwbrx	r28,0,r27
-		sync
 
 		loadreg	r27,EPIC_EICR
 		add	r27,r26,r27
 		lwz	r28,0(r27)
 		rlwinm	r28,r28,0,21,19			#Doc says Set SIE = 0
 		stw	r28,0(r27)
-		sync
 
 		loadreg	r27,EPIC_IIVPR3
 		add 	r27,r26,r27
 		lwz	r28,0(r27)
 		rlwinm	r28,r28,0,25,23			#Doc says Mask M bit now. Can maybe already at
 		stw	r28,0(r27)			#while setting the interrupt above?
-		sync
 
 		loadreg	r27,EPIC_GTVPR0
 		add 	r27,r26,r27
 		lwz	r28,0(r27)
 		rlwinm	r28,r28,0,25,23			#Doc says Mask M bit now. Can maybe already at
 		stw	r28,0(r27)			#while setting the interrupt above?
-		sync
 
 		loadreg	r27,EPIC_PCTPR
 		add	r27,r26,r27
@@ -441,14 +432,12 @@ Caches:		mfspr	r4,HID0
 		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE@l
 		isync
 		mtspr	HID0,r4				#Enable D-cache
-		isync
-							# Set up on chip L2 cache controller.
-
-		lis	r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST@h
-		ori	r4,r4,0
-
+		isync		
+		 					# Set up on chip L2 cache controller.
+		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_L2WT
 		mtl2cr	r4
 		sync
+		
 		mfl2cr	r5
 		oris	r5,r5,L2CR_L2I@h
 		mtl2cr	r5
@@ -463,6 +452,7 @@ Wait2:		mfl2cr	r3
 		mtl2cr	r4				#Enable L2 cache
 		sync
 		isync
+		
 		blr
 
 #********************************************************************************************
@@ -475,6 +465,7 @@ mmuSetup:	loadreg	r4,IBAT0L_VAL			#Could be simpler. To be converted to tables
 
 		loadreg	r4,DBAT0L_VAL
 		loadreg	r3,DBAT0U_VAL
+		isync
 		mtspr dbat0l,r4
 		mtspr dbat0u,r3
 		isync
@@ -487,6 +478,7 @@ mmuSetup:	loadreg	r4,IBAT0L_VAL			#Could be simpler. To be converted to tables
 
 		loadreg r4,DBAT1L_VAL
 		loadreg r3,DBAT1U_VAL
+		isync
 		mtspr dbat1l,r4
 		mtspr dbat1u,r3
 		isync
@@ -501,6 +493,7 @@ mmuSetup:	loadreg	r4,IBAT0L_VAL			#Could be simpler. To be converted to tables
 		loadreg r4,DBAT2L_VAL
 		loadreg	r3,DBAT2U_VAL
 		or r3,r3,r27
+		isync
 		mtspr dbat2l,r4
 		mtspr dbat2u,r3
 		isync
@@ -513,6 +506,7 @@ mmuSetup:	loadreg	r4,IBAT0L_VAL			#Could be simpler. To be converted to tables
 
 		loadreg	r4,DBAT3L_VAL
 		loadreg	r3,DBAT3U_VAL
+		isync
 		mtspr dbat3l,r4
 		mtspr dbat3u,r3
 		isync
@@ -539,26 +533,23 @@ mmuSetup:	loadreg	r4,IBAT0L_VAL			#Could be simpler. To be converted to tables
 ConfigWrite32:	lis	r20,CONFIG_ADDR			#Various PCI command routines
 		lis 	r21,CONFIG_DAT
 		stwbrx	r23,0,r20
-		sync
+		isync
 		stwbrx	r25,0,r21
-		sync
 		blr
 
 ConfigWrite16:	lis	r20,CONFIG_ADDR
 		lis 	r21,CONFIG_DAT
 		stwbrx	r23,0,r20
-		sync
+		isync
 		sthbrx	r25,0,r21
-		sync
 		blr
 
 ConfigWrite8:	lis	r20,CONFIG_ADDR
 		stwbrx	r23,0,r20
-		sync
+		isync
 		andi.	r19,r23,3
 		oris	r21,r19,CONFIG_DAT
 		stb	r25,0(r21)
-		sync
 		blr
 
 #********************************************************************************************
@@ -1159,6 +1150,12 @@ FillEm:		addi	r17,r17,0x100
 
 EInt:		b	.DecInt
 
+		mtsprg2	r0
+		mfsrr0	r0
+		mtsprg0	r0
+		mfsrr1	r0
+		mtsprg1	r0
+		
 		BUILDSTACKPPC
 
 		stwu	r3,-4(r13)
@@ -1169,9 +1166,6 @@ EInt:		b	.DecInt
 		stwu	r8,-4(r13)
 		stwu	r9,-4(r13)
 
-		mfsrr0	r6
-		mfsrr1	r7
-
 		mfmsr	r5
 		ori	r5,r5,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r5				#Reenable MMU (can affect srr0/srr1 acc Docs)
@@ -1180,7 +1174,6 @@ EInt:		b	.DecInt
 
 		lis	r3,EUMBEPICPROC
 		lwz	r5,0xa0(r3)			#Read IACKR to acknowledge it
-		sync
 
 		rlwinm	r5,r5,8,0,31
 		cmpwi	r5,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
@@ -1199,10 +1192,10 @@ EInt:		b	.DecInt
 		eieio
 		clearreg r5
 		lis	r3,EUMBEPICPROC
-		sync
 		stw	r5,0xb0(r3)			#Write 0 to EOI to End Interrupt
 
 .RDecInt:	li	r3,SonnetBase
+		stb	r3,Interrupt(r3)
 
 		lwz	r9,TaskException(r3)
 		mr.	r9,r9
@@ -1223,11 +1216,31 @@ EInt:		b	.DecInt
 
 .Dispatch:	li	r3,SonnetBase
 		stw	r9,RunningTask(r3)
+		
+		loadreg	r4,0x10000			#fixed stack len (for now)
+		
+		LIBCALLPOWERPC AllocVecPPC
+		
+		mr.	r4,r3
+		beq	.ReturnToUser	
+		
 		loadreg	r6,0x8000
 		addi	r6,r6,ExitCode-Start	
 		mtlr	r6
 
+		li	r3,SonnetBase
 		lwz	r8,RunningTask(r3)
+		lwz	r6,SonnetBase(r3)
+		xor	r4,r4,r6		
+		stw	r4,TC_SPLOWER(r8)
+		loadreg	r5,0x10000-32
+		add	r4,r4,r5
+		stw	r4,TC_SPUPPER(r8)
+		stw	r4,TC_SPREG(r8)
+		mr	r1,r4
+		
+		BUILDSTACKPPC		
+		
 		la	r8,TASKPPC_SIZE(r8)
 		lwz	r2,PP_REGS+12*4(r8)
 		lwz	r3,PP_REGS+0*4(r8)
@@ -1256,14 +1269,11 @@ EInt:		b	.DecInt
 		lwz	r8,PP_CODE(r8)
 		add	r8,r8,r9
 		sync
+		isync
 
-		mtsrr0	r8
-		mtsrr1	r7
-		sync
+		mtsprg0	r8
 
-		li	r8,SonnetBase
-		stb	r8,Interrupt(r8)
-		sync
+		li	r8,0
 		
 		mr	r7,r8
 		mr	r9,r8
@@ -1278,20 +1288,19 @@ EInt:		b	.DecInt
 		mr	r19,r8
 		mr	r20,r8
 		mr	r21,r8
-				
+		
+		mfsprg1	r0
+		mtsrr1	r0
+		mfsprg0	r0
+		mtsrr0	r0
+		
+		li	r0,0
+		
 		rfi
 		
 #********************************************************************************************
 
-.ReturnToUser:	mtsrr0	r6
-		mtsrr1	r7
-
-		sync
-		
-		li	r9,SonnetBase			#Only works when SonnetBase = 0
-		stb	r9,Interrupt(r9)
-		sync
-
+.ReturnToUser:
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
 		lwzu	r7,4(r13)
@@ -1303,6 +1312,12 @@ EInt:		b	.DecInt
 	
 		DSTRYSTACKPPC
 	
+		mfsprg1 r0
+		mtsrr1	r0
+		mfsprg0	r0
+		mtsrr0	r0
+		mfsprg2	r0
+
 		rfi
 		
 #********************************************************************************************
@@ -1511,7 +1526,13 @@ TestRoutine:	b	.IntReturn
 
 #********************************************************************************************
 		
-.DecInt:	BUILDSTACKPPC
+.DecInt:	mtsprg2	r0
+		mfsrr0	r0
+		mtsprg0	r0
+		mfsrr1	r0
+		mtsprg1	r0
+
+		BUILDSTACKPPC
 
 		stwu	r3,-4(r13)
 		stwu	r4,-4(r13)
@@ -1520,9 +1541,6 @@ TestRoutine:	b	.IntReturn
 		stwu	r7,-4(r13)
 		stwu	r8,-4(r13)
 		stwu	r9,-4(r13)
-
-		mfsrr0	r6
-		mfsrr1	r7
 
 		mfmsr	r5
 		ori	r5,r5,(PSL_IR|PSL_DR|PSL_FP)
@@ -1578,13 +1596,11 @@ PrInt:							#Privilege Exception
 		li	r0,0				#SuperKey
 		rfi
 .HaltErr:
-		stw	r3,0xe0(r0)			#DEBUG
-		stw	r11,0xe4(r0)
-		stw	r7,0xe8(r0)
+		loadreg r3,"HALT"			#DEBUG
+		stw	r3,0xf0(r0)
 		mfsrr1	r3
-		stw	r3,0xec(r0)
-.xxHaltErr2:	
-		b .xxHaltErr2
+		stw	r3,0xf4(r0)
+.xxHaltErr2:	b .xxHaltErr2
 
 #********************************************************************************************
 

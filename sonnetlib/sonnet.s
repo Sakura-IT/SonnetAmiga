@@ -478,13 +478,12 @@ MasterControl:
 	move.l 4.w,a6
 	move.l ThisTask(a6),d0
 	move.l d0,MCTask(a4)
-	move.l PowerPCBase(a4),a6
-	move.l _LVOWarpSuper+2(a6),d0
+	move.l PowerPCBase(a4),a0
+	move.l _LVOWarpSuper+2(a0),d0
 	addq.l #4,d0
 	move.l d0,ViolationAddress(a4)
 	move.l d6,Init(a4)
 	lea Buffer(pc),a4
-	move.l 4.w,a6
 	
 NextMsg	jsr _LVOCacheClearU(a6)
 	move.l ThisTask(a6),a0
