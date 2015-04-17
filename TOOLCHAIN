@@ -12,11 +12,12 @@ prepared development environment.
   GitHub and below for further instructions. 
 * WarpOS 5.1 include files (WarpUP_V51Upd.lha on AmiNet). 
 * patch - if you want to automatically fix the NDK (available on AmiNet).
+* lha - for automatically packaging the build results.
 
 Additionally, sonnetpatch utility needs:
-* vbcc 0.9d or newer
-* vbcc Posixlib - 2.5 or newer
-* vbcc AmigaOS 3.x target
+* vbcc 0.9d or newer.
+* vbcc Posixlib - 2.5 or newer.
+* vbcc AmigaOS 3.x target.
 
 Note that latest stable version of vasm and vlink do not have the necessary
 features, you need to build them from the current source (the author of
@@ -39,11 +40,24 @@ when running make, i.e.:
 $ make HOST=unix
 
 Path to NDK and WarpOS includes should be provided, on AmigaOS with incluide_i:
-assign, on UNIX-like OSes with INCLUDE_I environment variable. For example:
+assign, on UNIX-like OSes with INCLUDE_I environment variable. 
+
+Path to vbcc PosixLib should be provided with posixlib: on AmigaOS and 
+POSIXLIB environment variable on UNIX.
+
+For example (on UNIX):
 
 $ INCLUDE_I=/opt/amiga-cross/NDK_3.9/Include/include_i/
-$ export INCLUDE_I
+$ POSIXLIB=/opt/amiga-cross/posixlib/
+$ export INCLUDE_I POSIXLIB
 
 Obviously, when building on UNIX, WarpOS includes must also be installed below
 $INCLUDE_I path.
+
+# Packaging
+
+To make a lha archive of the built binaries use "distribution" target in
+Makefile:
+
+$ make HOST=unix distribution
 
