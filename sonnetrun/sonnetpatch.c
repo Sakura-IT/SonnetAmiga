@@ -32,7 +32,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <stdbool.h>
 #include <unistd.h>
 #include <err.h>
 #include <fcntl.h>
@@ -40,7 +39,15 @@
 #include <ctype.h>
 #include <assert.h>
 
+#ifdef __VBCC__
+#include "queue.h"
+typedef uint8_t bool;
+#define true 1
+#define false 0
+#else
+#include <stdbool.h>
 #include <sys/queue.h>
+#endif
 
 #define HUNK_UNIT	0x3E7
 #define HUNK_NAME	0x3E8
@@ -122,19 +129,21 @@ void snprintf_memf(char *, size_t, uint8_t);
 bool file_close(int *);
 bool file_open(int *, char *);
 bool file_create(int *, char *);
-
+#if 0 
+char * strsep(char **, const char *);
+#endif
 
 const struct hunkdef hunkdefs[] = {
-	{	.id = HUNK_UNIT, .name = "HUNK_UNIT", .reloc = false	},
-	{	.id = HUNK_NAME, .name = "HUNK_NAME", .reloc = false	},
-	{	.id = HUNK_CODE, .name = "HUNK_CODE", .reloc = false	},
-	{	.id = HUNK_DATA, .name = "HUNK_DATA", .reloc = false	},
-	{	.id = HUNK_BSS, .name = "HUNK_BSS", .reloc = false	},
-	{	.id = HUNK_RELOC32, .name = "HUNK_RELOC32", .reloc = true },
-	{	.id = HUNK_RELOC32SHORT, .name = "HUNK_RELOC32SHORT", .reloc = true },
+		/* id */	/* name */	/* relocation? */
+	{	HUNK_UNIT,	"HUNK_UNIT",	false	},
+	{	HUNK_NAME,	"HUNK_NAME",	false	},
+	{	HUNK_CODE,	"HUNK_CODE",	false	},
+	{	HUNK_DATA,	"HUNK_DATA",	false	},
+	{	HUNK_BSS,	"HUNK_BSS",	false	},
+	{	HUNK_RELOC32,	"HUNK_RELOC32",	true },
+	{	HUNK_RELOC32SHORT, "HUNK_RELOC32SHORT", true },
 
-	{	.id = 0, .name = NULL, .reloc = false			}
-	/* XXX: add all */
+	{	0, NULL, false			}
 }; 
 
 struct hunkheader hh;
@@ -209,7 +218,7 @@ main(int argc, char *argv[])
 			return 4;
 
 
-	// XXX: TAILQ cleanup here and above in case of errors
+	/* XXX: TAILQ cleanup here and above in case of errors */
 	file_close(&ifd);
 	return EXIT_SUCCESS;
 }
@@ -303,7 +312,7 @@ hunk_to_patch_tokenize(char **hunklist)
 	err = false;
 	TAILQ_INIT(&hpq_head);
 
-	while ((patchtok = strsep(hunklist, ",")) != NULL) {
+	while ((patchtok = strsep(hunklist, ",")) != 0) { /* NULL */
 		printf("%s\n", patchtok); 
 		hpp = (struct hunkpatch *) malloc(sizeof(struct hunkpatch));
 		memset(hpp, 0, sizeof(struct hunkpatch));
@@ -314,7 +323,7 @@ hunk_to_patch_tokenize(char **hunklist)
 	}
 
 	if (err) {
-		// XXX: clean up TAILQ 
+		/* XXX: clean up TAILQ  */
 		return false;
 	}
 
@@ -347,7 +356,11 @@ file_open(int *fd, char *path)
 bool
 file_create(int *fd, char *path) 
 {
+#ifdef __VBCC__
+	*fd = open(path, O_RDWR | O_CREAT | O_TRUNC);
+#else
 	*fd = open(path, O_RDWR | O_CREAT | O_TRUNC, S_IRWXU);
+#endif
 	if (*fd < 0) { 
 		perror("Unable to open file");
 		return false;
@@ -498,7 +511,7 @@ read32be(int fd, uint32_t *buf)
 	return true;
 }
 
-inline uint32_t
+uint32_t
 as32be(const uint8_t* in)
 {
     return (in[0] << 24) | (in[1] << 16) | (in[2] << 8) | in[3];
@@ -584,4 +597,22 @@ hunk_get_type(uint32_t id, const struct hunkdef **ret_hd)
 
 	return false;
 }
+
+#if 0
+char *
+strsep(char **str, const char *delim)
+{
+	char *save = *str;
+	if(*str == NULL)
+		return NULL;
+	*str = *str + strcspn(*str, delim);
+	if(**str == 0)
+		*str = NULL;
+	else {
+		**str = 0;
+		(*str)++;
+	}
+	return save;
+}
+#endif
 

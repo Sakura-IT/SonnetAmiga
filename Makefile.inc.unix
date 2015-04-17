@@ -1,7 +1,13 @@
 ASM68KPARAM+=-I$(INCLUDE_I) 
+POSIXLIB_CCPARAM=-I$(POSIXLIB)/include
+POSIXLIB_LDPARAM=$(POSIXLIB)/amigaos3/posix.lib
 RM=rm -f                                                                        
 
 ifndef INCLUDE_I
-    $(error INCLUDE_I is undefined, read the TOOLCHAIN file)
+	$(error INCLUDE_I is undefined, read the TOOLCHAIN file)
+endif
+
+ifndef POSIXLIB
+	$(error POSIXLIB is undefined, read the TOOLCHAIN file)
 endif
 
