@@ -13,6 +13,11 @@ prepared development environment.
 * WarpOS 5.1 include files (WarpUP_V51Upd.lha on AmiNet). 
 * patch - if you want to automatically fix the NDK (available on AmiNet).
 
+Additionally, sonnetpatch utility needs:
+* vbcc 0.9d or newer
+* vbcc Posixlib - 2.5 or newer
+* vbcc AmigaOS 3.x target
+
 Note that latest stable version of vasm and vlink do not have the necessary
 features, you need to build them from the current source (the author of
 vasm/vlink does not provide daily binary builds).
