@@ -1,3 +1,4 @@
 ASM68KPARAM+=-Iinclude_i:
+POSTIXLIB=posixlib:
 RM=delete force 
 
