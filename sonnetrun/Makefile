@@ -5,6 +5,7 @@ CCPARAM=$(POSIXLIB_CCPARAM)
 LDPARAM=$(POSIXLIB_LDPARAM) -lamiga
 
 ASMPPCPARAM+=-I../sonnetlib
+INCLUDES=queue.h
 
 all: $(SONNETPATCH_EXE) 
 
@@ -20,6 +21,7 @@ $(SONNETPATCH_EXE) : $(OBJ_SONNETPATCH)
 	$(ASM68K) $(ASM68KPARAM) -o $@ $<
 
 %.o : %.c $(INCLUDES)
+	echo $(CCPARAM)
 	$(CC) $(CCPARAM) -c $< -o $@ 
 
 %.rs : %
