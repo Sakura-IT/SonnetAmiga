@@ -484,7 +484,6 @@ hunk_info_print(void)
 
 		assert(hip->hd != NULL);
 		assert(hip->type != 0);
-		assert(hip->num != 0);
 		assert(hip->offset != 0);
 
 		printf("%s (%#x) hunk number %d at offset %#llx\n", 
