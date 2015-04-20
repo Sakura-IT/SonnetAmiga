@@ -140,9 +140,16 @@ const struct hunkdef hunkdefs[] = {
 	{	HUNK_CODE,	"HUNK_CODE",	false	},
 	{	HUNK_DATA,	"HUNK_DATA",	false	},
 	{	HUNK_BSS,	"HUNK_BSS",	false	},
-	{	HUNK_RELOC32,	"HUNK_RELOC32",	true },
+	{	HUNK_RELOC32,	"HUNK_RELOC32",	true	},
 	{	HUNK_RELOC32SHORT, "HUNK_RELOC32SHORT", true },
-
+	{	HUNK_RELOC16,	"HUNK_RELOC16",	true	},
+	{	HUNK_RELOC8,	"HUNK_RELOC8",	true	},
+	{	HUNK_DRELOC32,	"HUNK_DRELOC32", true	},
+	{	HUNK_DRELOC16,	"HUNK_DRELOC16", true	},
+	{	HUNK_DRELOC8,	"HUNK_DRELOC8",	true	},
+	{	HUNK_EXT,	"HUNK_EXT",	false	},
+	{	HUNK_SYMBOL,	"HUNK_SYMBOL",	false	},
+	{	HUNK_DEBUG,	"HUNK_DEBUG",	false	},
 	{	0, NULL, false			}
 }; 
 
@@ -403,7 +410,7 @@ hunk_all_parse(int ifd)
 			hip->relocs = subhunkid;
 
 			if (!hunk_get_type(hip->relocs, &hip->reloc_hd)) 
-				fprintf(stderr, "Couldn't get description for %x\n", 
+				fprintf(stderr, "Couldn't get description for %x (sub)\n", 
 			    hip->type);
 
 			read32be(ifd, &tmp);	
