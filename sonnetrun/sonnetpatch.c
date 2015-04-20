@@ -481,6 +481,12 @@ hunk_info_print(void)
 	memf_str = malloc(sizeof(char) * memf_bufsize);
 
 	TAILQ_FOREACH(hip, &hiq_head, tqe) {
+
+		assert(hip->hd != NULL);
+		assert(hip->type != 0);
+		assert(hip->num != 0);
+		assert(hip->offset != 0);
+
 		printf("%s (%#x) hunk number %d at offset %#llx\n", 
 		    hip->hd->name, hip->type, hip->num, hip->offset);
 		printf("\tSize: %d Amiga longwords (%ld bytes)\n",
