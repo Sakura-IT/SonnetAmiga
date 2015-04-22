@@ -14,7 +14,7 @@ WP_TRIG01		EQU 	$c0000000
 MEMF_PPC		EQU 	$1000
 StackSize		EQU 	$80000
 TASKPPC_CTMEM		EQU 	248
-TASKPPC_SIZE		EQU 	640
+TASKPPC_SIZE		EQU 	652
 TASKPPC_CONTEXTMEM	EQU	100
 NT_PPCTASK		EQU 	100
 
@@ -501,7 +501,7 @@ GetLoop	move.l d6,a0
 	cmp.l #"T68K",d0
 	beq.s MsgT68k
 	cmp.l #"FPPC",d0
-	beq.s MsgFPPC
+	beq MsgFPPC
 	cmp.l #"F68k",d0
 	beq.s MsgF68k
 	bra.s GetLoop
@@ -511,8 +511,13 @@ MsgT68k	move.b LN_TYPE(a1),d7
 	beq.s Sig68k
 	cmp.b #NT_REPLYMSG,d7				;signal PPC that 68k is done (HACK)
 	bne.s NextMsg
+;	ILLEGAL
+;	NOP
 	move.l #"DONE",d6
 	move.l d6,MN_IDENTIFIER(a1)
+	move.l MN_PPC(a1),a1
+	moveq.l #TS_READY,d6
+	move.b d6,TC_STATE(a1)	
 	bra.s NextMsg
 
 Sig68k	move.l ThisTask(a6),a0
@@ -520,7 +525,7 @@ Sig68k	move.l ThisTask(a6),a0
 	move.l a0,MN_REPLYPORT(a1)
 	move.l MN_MIRROR(a1),a0
 	jsr _LVOPutMsg(a6)				;move message to waiting 68k task
-	bra.s NextMsg
+	bra NextMsg
 
 MsgTPPC	move.l SonnetBase(pc),a0
 	lea NewTasks(a0),a0
@@ -717,14 +722,15 @@ ExCPU	movem.l (a7)+,d1-a6
 
 MN_IDENTIFIER	EQU MN_SIZE
 MN_MIRROR	EQU MN_IDENTIFIER+4
-MN_PPSTRUCT	EQU MN_MIRROR+4
+MN_PPC		EQU MN_MIRROR+4
+MN_PPSTRUCT	EQU MN_PPC+4
 
 Task	EQU -16
 PStruct	EQU -12
 Msg	EQU -8
 Port	EQU -4
 
-RunPPC:
+RunPPC:	
 	link a5,#-16
 	movem.l d1-a6,-(a7)
 	moveq.l #0,d0
@@ -744,7 +750,7 @@ xTask	jsr _LVOCreateMsgPort(a6)			;Not done yet. How to find this Port?
 	tst.l d0
 	beq Cannot
 xProces	move.l d0,Port(a5)
-	move.l #TASKPPC_SIZE+MN_SIZE+PP_SIZE+76,d0
+	move.l #TASKPPC_SIZE+MN_SIZE+PP_SIZE+80,d0
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1
 	move.l _PowerPCBase(pc),a6
 	jsr _LVOAllocVec32(a6)
@@ -762,7 +768,7 @@ xProces	move.l d0,Port(a5)
 	move.l d0,Msg(a5)
 	move.l Port(a5),d1
 	move.l d0,a1
-	move.w #MN_SIZE+PP_SIZE+76,MN_LENGTH(a1)
+	move.w #MN_SIZE+PP_SIZE+80,MN_LENGTH(a1)
 	move.l d1,MN_REPLYPORT(a1)
 	move.l d1,MN_MIRROR(a1)
 	lea MN_PPSTRUCT(a1),a2

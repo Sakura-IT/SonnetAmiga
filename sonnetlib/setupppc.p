@@ -6,14 +6,6 @@
 .global MCTask,SysBase,PowerPCBase
 
 .set	PPCLen,(PPCEnd-PPCCode)
-.set	MN_IDENTIFIER,20
-.set	MN_MIRROR,24
-.set	PP_CODE,28
-.set	PP_OFFSET,32
-.set	PP_REGS,48
-.set	PP_FREGS,108
-.set	SSPPC_SIZE,52
-.set	pr_MsgPort,92
 
 #********************************************************************************************
 
@@ -79,7 +71,7 @@ SetLen:		mr	r30,r28
 
 		bl	mmuSetup			#Setup BATs. Needs to be changed to tables
 		bl	Epic				#Setup the EPIC controller
-		bl	Caches				#Setup the L1 and L2 cache
+#		bl	Caches				#Setup the L1 and L2 cache
 
 		loadreg	r3,0x8000			#Start hardcoded at 0x8000
 		mr	r31,r3
@@ -95,8 +87,7 @@ Start:		nop					#Dummy entry at absolute 0x8000
 		nop
 		b	.StartX
 	
-ExitCode:	li	r8,SonnetBase			#Exit code of processes (in development)
-		lwz	r9,RunningTask(r8)
+ExitCode:	lwz	r9,RunningTask(r0)
 		lwz	r21,TC_SPLOWER(r9)
 		la	r9,TASKPPC_SIZE(r9)
 		loadreg r7,"FPPC"
@@ -124,7 +115,7 @@ ExitCode:	li	r8,SonnetBase			#Exit code of processes (in development)
 		stfd	f5,PP_FREGS+5*8(r9)
 		stfd	f6,PP_FREGS+6*8(r9)
 		stfd	f7,PP_FREGS+7*8(r9)
-		lwz	r8,MCTask(r8)
+		lwz	r8,MCTask(r0)
 		la	r4,pr_MsgPort(r8)
 		mr	r5,r9
 
@@ -138,15 +129,15 @@ ExitCode:	li	r8,SonnetBase			#Exit code of processes (in development)
 		or	r4,r4,r21
 		
 		LIBCALLPOWERPC FreeVecPPC
-		
+
 		LIBCALLPOWERPC FlushL1DCache
 		
 		sync
 		isync
 		
-		li	r3,0
-		stw	r3,RunningTask(r3)
-
+		li	r0,0
+		stw	r0,RunningTask(r0)
+		
 Pause:		nop
 		nop
 		b	Pause
@@ -174,7 +165,7 @@ WInit:		lwz	r28,Init(r14)
 		bne	WInit				#Wait for 68k to set up library
 		isync
 
-		loadreg	r4,1000000			#BUG! Not sure why this delay is needed
+		loadreg	r4,2000000			#BUG! Not sure why this delay is needed
 		mtctr	r4
 .BugLoop:	bdnz+	.BugLoop
 
@@ -432,9 +423,10 @@ Caches:		mfspr	r4,HID0
 		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE@l
 		isync
 		mtspr	HID0,r4				#Enable D-cache
-		isync		
+		isync
 		 					# Set up on chip L2 cache controller.
 		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_L2WT
+#		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST
 		mtl2cr	r4
 		sync
 		
@@ -1194,19 +1186,40 @@ EInt:		b	.DecInt
 		lis	r3,EUMBEPICPROC
 		stw	r5,0xb0(r3)			#Write 0 to EOI to End Interrupt
 
-.RDecInt:	li	r3,SonnetBase
-		stb	r3,Interrupt(r3)
+.RDecInt:	li	r3,0
+		stb	r3,Interrupt(r0)
 
-		lwz	r9,TaskException(r3)
+		lwz	r9,TaskException(r0)
 		mr.	r9,r9
 		bne	.TaskException
 
-		lwz	r9,RunningTask(r3)
-		mr.	r9,r9
-#		bne	.TrySwitch
-		bne	.ReturnToUser			#-> To be removed
+		li	r9,TS_READY
+		la	r4,WaitingTasks(r0)
+		lwz	r4,MLH_HEAD(r4)
+.NextOnList:	lwz	r5,LN_SUCC(r4)
+		mr.	r5,r5
+		beq	.EndOfWaitList
+		lbz	r6,TC_STATE(r4)
+		cmpw	r9,r6
+		beq	.GotOneWait
+		
+		mr	r4,r5		
+		b	.NextOnList
+		
+.GotOneWait:	mr	r6,r4
+		
+		LIBCALLPOWERPC	RemovePPC
+		
+		mr	r5,r6
+		la	r4,ReadyTasks(r0)
+		
+		LIBCALLPOWERPC AddTailPPC		
 
-		lwz	r3,0(r3)
+.EndOfWaitList:	lwz	r9,RunningTask(r0)
+
+		b	.TrySwitch
+
+.NewTask:	lwz	r3,SonnetBase(r0)
 		la	r4,NewTasks(r3)
 
 		LIBCALLPOWERPC RemHeadPPC
@@ -1214,10 +1227,13 @@ EInt:		b	.DecInt
 		mr.	r9,r3
 		beq	.ReturnToUser
 
-.Dispatch:	li	r3,SonnetBase
-		stw	r9,RunningTask(r3)
+.Dispatch:	LIBCALLPOWERPC FlushL1DCache
 		
-		loadreg	r4,0x10000			#fixed stack len (for now)
+		li	r4,TS_RUN
+		stb	r4,TC_STATE(r9)
+		stw	r9,RunningTask(r0)
+		
+		loadreg	r4,500000			#fixed stack len (for now)
 		
 		LIBCALLPOWERPC AllocVecPPC
 		
@@ -1228,12 +1244,11 @@ EInt:		b	.DecInt
 		addi	r6,r6,ExitCode-Start	
 		mtlr	r6
 
-		li	r3,SonnetBase
-		lwz	r8,RunningTask(r3)
-		lwz	r6,SonnetBase(r3)
+		lwz	r8,RunningTask(r0)
+		lwz	r6,SonnetBase(r0)
 		xor	r4,r4,r6		
 		stw	r4,TC_SPLOWER(r8)
-		loadreg	r5,0x10000-32
+		loadreg	r5,500000-32
 		add	r4,r4,r5
 		stw	r4,TC_SPUPPER(r8)
 		stw	r4,TC_SPREG(r8)
@@ -1268,6 +1283,7 @@ EInt:		b	.DecInt
 		lwz	r9,PP_OFFSET(r8)
 		lwz	r8,PP_CODE(r8)
 		add	r8,r8,r9
+		
 		sync
 		isync
 
@@ -1293,7 +1309,7 @@ EInt:		b	.DecInt
 		mtsrr1	r0
 		mfsprg0	r0
 		mtsrr0	r0
-		
+
 		li	r0,0
 		
 		rfi
@@ -1301,6 +1317,10 @@ EInt:		b	.DecInt
 #********************************************************************************************
 
 .ReturnToUser:
+		lwz	r9,0xf0(r0)
+		addi	r9,r9,1
+		stw	r9,0xf0(r0)
+		
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
 		lwzu	r7,4(r13)
@@ -1327,13 +1347,35 @@ TestRoutine:	b	.IntReturn
 #********************************************************************************************
 
 .TaskException:	li	r9,0				#Will be starting point for TC_EXCEPTCODE
-		stw	r9,TaskException(r3)
+		stw	r9,TaskException(r0)
 		b	.ReturnToUser
 		
 #********************************************************************************************
 
-.TrySwitch:	lwz	r3,0(r3)
-		mr	r8,r3
+.TrySwitch:	mr.	r9,r9
+		bne	.CheckWait
+		
+		la	r4,ReadyTasks(r0)
+		
+		LIBCALLPOWERPC RemHeadPPC
+		
+		mr.	r9,r3
+		
+		beq	.NewTask
+
+		li	r6,TS_RUN
+		stb	r6,TC_STATE(r9)
+		stw	r9,RunningTask(r0)
+		
+		b	.LoadContext
+		
+
+.CheckWait:	li	r4,TS_WAIT
+		lbz	r3,TC_STATE(r9)
+		cmpw	r3,r4
+		beq	.GoToWait
+
+		lwz	r3,0(r3)
 		la	r4,NewTasks(r3)
 	
 		LIBCALLPOWERPC RemHeadPPC
@@ -1341,19 +1383,22 @@ TestRoutine:	b	.IntReturn
 		mr.	r9,r3
 		bne	.SwitchNew
 	
-		mr	r3,r8
-		la	r4,ReadyTasks(r3)
+		la	r4,ReadyTasks(r0)
 	
 		LIBCALLPOWERPC RemHeadPPC
 	
-		mr.	r9,r3
-	
+		mr.	r9,r3	
 		bne	.SwitchOld
 		b	.ReturnToUser
 	
-.SwitchOld:	mr	r3,r8				#Old = Context, New = PPStruct
-		la	r4,ReadyTasks(r3)
-		lwz	r5,RunningTask(r3)
+.SwitchOld:	la	r4,ReadyTasks(r0)		#Old = Context, New = PPStruct		
+		lwz	r5,RunningTask(r0)
+		stw	r9,RunningTask(r0)
+		
+		li	r6,TS_READY
+		stb	r6,TC_STATE(r5)
+		li	r6,TS_RUN
+		stb	r6,TC_STATE(r9)
 		
 		bl	.StoreContext
 		
@@ -1361,9 +1406,12 @@ TestRoutine:	b	.IntReturn
 		
 		b	.LoadContext
 	
-.SwitchNew:	mr	r3,r8
-		la	r4,ReadyTasks(r3)
-		lwz	r5,RunningTask(r3)
+.SwitchNew:	la	r4,ReadyTasks(r0)
+		lwz	r5,RunningTask(r0)
+		stw	r9,RunningTask(r0)
+		
+		li	r6,TS_READY
+		stb	r6,TC_STATE(r5)
 		
 		bl	.StoreContext
 		
@@ -1371,13 +1419,21 @@ TestRoutine:	b	.IntReturn
 	
 		b	.Dispatch
 		
-.StoreContext:	mr	r3,r6
-		lwz	r6,TASKPPC_CONTEXTMEM(r5)
+.StoreContext:	lwz	r6,TASKPPC_CONTEXTMEM(r5)
+		mfsprg0	r3
 		stw	r3,0(r6)
-		stwu	r7,4(r6)
+		mfsprg1 r3
+		stwu	r3,4(r6)
+		lwz	r3,0(r1)
+		lwz	r0,8(r3)			#lr
 		stwu	r0,4(r6)
-		lwz	r0,0(r1)
+		lwz	r0,4(r3)			#cr
 		stwu	r0,4(r6)
+		mfctr	r0
+		stwu	r0,4(r6)
+		mfsprg2	r0
+		stwu	r0,4(r6)
+		stwu	r3,4(r6)
 		stwu	r2,4(r6)
 		lwz	r0,24(r13)
 		stwu	r0,4(r6)
@@ -1396,8 +1452,7 @@ TestRoutine:	b	.IntReturn
 		stwu	r10,4(r6)
 		stwu	r11,4(r6)
 		stwu	r12,4(r6)
-		lwz	r3,0(r1)
-		lwz	r3,-4(r1)
+		lwz	r3,-4(r3)
 		stwu	r3,4(r6)
 		stwu	r14,4(r6)
 		stwu	r15,4(r6)
@@ -1417,7 +1472,7 @@ TestRoutine:	b	.IntReturn
 		stwu	r29,4(r6)
 		stwu	r30,4(r6)
 		stwu	r31,4(r6)
-		stfdu	f0,4(r6)
+		stfdu	f0,8(r6)			#Pad to make align on 8
 		stfdu	f1,8(r6)
 		stfdu	f2,8(r6)
 		stfdu	f3,8(r6)
@@ -1457,6 +1512,12 @@ TestRoutine:	b	.IntReturn
 		lwzu	r0,4(r9)
 		mtsrr1	r0
 		lwzu	r0,4(r9)
+		mtlr	r0
+		lwzu	r0,4(r9)
+		mtcr	r0
+		lwzu	r0,4(r9)
+		mtctr	r0
+		lwzu	r0,4(r9)
 		lwzu	r1,4(r9)
 		lwzu	r2,4(r9)
 		lwzu	r3,4(r9)
@@ -1489,7 +1550,7 @@ TestRoutine:	b	.IntReturn
 		lwzu	r29,4(r9)
 		lwzu	r30,4(r9)
 		lwzu	r31,4(r9)
-		lfdu	f0,4(r9)
+		lfdu	f0,8(r9)			#Pad to make align on 8
 		lfdu	f1,8(r9)
 		lfdu	f2,8(r9)
 		lfdu	f3,8(r9)
@@ -1524,6 +1585,40 @@ TestRoutine:	b	.IntReturn
 		mfsprg3	r9
 		rfi
 
+.GoToWait:	la	r4,WaitingTasks(r0)
+		mr	r5,r9
+		
+		bl	.StoreContext
+		
+		LIBCALLPOWERPC AddTailPPC
+		
+		li	r4,0
+		stw	r4,RunningTask(r0)
+
+		la	r4,ReadyTasks(r0)
+	
+		LIBCALLPOWERPC RemHeadPPC
+	
+		mr.	r9,r3
+		beq	.DoIdle
+		
+		li	r0,TS_RUN
+		stb	r0,TC_STATE(r9)
+		stw	r9,RunningTask(r0)
+		
+		b	.LoadContext
+
+.DoIdle:	loadreg	r19,0x8000			#Start hardcoded at 0x8000
+
+		loadreg	r1,0x7ffe0			#Userstack in unused mem (See sonnet.s)
+		BUILDSTACKPPC
+		
+		mfsrr1	r18
+		ori	r18,r18,PSL_PR|PSL_EE
+		mtsrr1 	r18		
+		mtsrr0	r19
+		rfi
+
 #********************************************************************************************
 		
 .DecInt:	mtsprg2	r0
@@ -1554,11 +1649,10 @@ TestRoutine:	b	.IntReturn
 	
 EIntEnd:
 		mflr	r4
-		li	r3,SonnetBase
 		loadreg	r5,0x48002b04
-		stw	r5,0x500(r3)
+		stw	r5,0x500(r0)
 		loadreg r5,0x48002700
-		stw	r5,0x900(r3)	
+		stw	r5,0x900(r0)	
 	
 		li	r3,0x3000			#Jump from Exception (0x500) immediatly to 0x3000
 		li	r5,EIntEnd-EInt
@@ -1571,15 +1665,14 @@ EIntEnd:
 PrInt:							#Privilege Exception
 		mtsprg	1,r3
 		mfspr	r3,HID0
-		ori	r3,r3,0xc00
-		xori	r3,r3,0xc00
+		ori	r3,r3,HID0_ICFI|HID0_DCFI
+		xori	r3,r3,HID0_ICFI|HID0_DCFI
 		mtspr	HID0,r3
 		mfcr	r3
 		mtsprg	2,r3
 		mtsprg	3,r0
 		mfsrr0	r3
 
-		li	r0,SonnetBase
 		lwz	r0,ViolationAddress(r0)
 
 		cmplw	r0,r3
@@ -1587,8 +1680,8 @@ PrInt:							#Privilege Exception
 		addi	r3,r3,4				#Next instruction
 		mtsrr0	r3
 		mfsrr1	r3
-		ori	r3,r3,0x4000			#Set to Super
-		xori	r3,r3,0x4000
+		ori	r3,r3,PSL_PR			#Set to Super
+		xori	r3,r3,PSL_PR
 		mtsrr1	r3
 		mfsprg	r3,2
 		mtcr	r3

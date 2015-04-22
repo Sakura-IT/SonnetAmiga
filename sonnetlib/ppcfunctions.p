@@ -2243,13 +2243,18 @@ WaitFor68K:
 
 		mr	r31,r4
 		
-.Check68K:	LIBCALLPOWERPC FlushL1DCache
+.Check68K:	
+#		LIBCALLPOWERPC FlushL1DCache
 		
 		loadreg r30,"DONE"
 		lwz	r6,MN_IDENTIFIER(r31)
 		cmpw	r6,r30
 		beq- 	.Done68K
 		isync
+		
+		lwz	r3,RunningTask(r0)
+		li	r4,TS_WAIT
+		stb	r4,TC_STATE(r3)		
 		
 		LIBCALLPOWERPC CauseInterrupt
 		
@@ -2278,7 +2283,7 @@ Run68K:
 		stwu	r29,-4(r13)
 		mr	r31,r4
 		
-		li	r4,MN_SIZE+PP_SIZE+76
+		li	r4,MN_SIZE+PP_SIZE+80
 		li	r5,0
 		
 		LIBCALLPOWERPC AllocXMsgPPC
@@ -2298,6 +2303,7 @@ Run68K:
 		stw	r5,MN_IDENTIFIER(r30)
 		li	r4,SonnetBase
 		lwz	r5,RunningTask(r4)
+		stw	r5,MN_PPC(r30)
 		la	r5,TASKPPC_SIZE(r5)
 		lwz	r5,MN_MIRROR(r5)
 		stw	r5,MN_MIRROR(r30)
@@ -2349,7 +2355,7 @@ Signal68K:
 		sync
 		stw	r4,0x58(r3)
 		sync
-
+		
 		DSTRYSTACKPPC
 		
 		blr	
