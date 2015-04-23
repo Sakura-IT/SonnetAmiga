@@ -69,6 +69,13 @@ SetLen:		mr	r30,r28
 		stw	r27,8(r29)			#MemStart
 		stw	r8,12(r29)			#MemLen
 
+		li	r3,0
+		li	r4,63
+		mtctr	r4
+		li	r0,0
+.Clear0:	stwu	r0,4(r3)
+		bdnz+	.Clear0				#Clear first part of zero page
+
 		bl	mmuSetup			#Setup BATs. Needs to be changed to tables
 		bl	Epic				#Setup the EPIC controller
 #		bl	Caches				#Setup the L1 and L2 cache
@@ -81,7 +88,8 @@ SetLen:		mr	r30,r28
 
 		bl	End
 
-Start:		nop					#Dummy entry at absolute 0x8000
+Start:		
+		nop					#Dummy entry at absolute 0x8000
 .StartX:	nop
 		nop
 		nop
@@ -143,50 +151,47 @@ Pause:		nop
 		b	Pause
 
 End:		mflr	r4
-
+		
 		addi	r5,r4,End-Start
 		subf	r5,r4,r5
 		li	r6,0
 		bl	copy_and_flush			#Put program in Sonnet Mem instead of PCI Mem
 
-		lis	r14,0				#Reset
+		li	r14,0				#Reset
 		mtspr	285,r14				#Time Base Upper,
 		mtspr	284,r14				#Time Base Lower and
-		loadreg r8,0x7fffffff
+		loadreg r28,0x7fffffff
 		mtdec	r28				#Decrementer.
 
 		lwz	r28,0(r14)
-		stw	r14,Atomic(r14)
+		stw	r14,Atomic(r0)
 		stw	r28,4(r29)			#Signal 68k that PPC is initialized
 
-		loadreg r6,"INIT"
-WInit:		lwz	r28,Init(r14)
+.WInit:		loadreg r6,"INIT"
+		lwz	r28,Init(r0)
 		cmplw	r28,r6
-		bne	WInit				#Wait for 68k to set up library
-		isync
+		bne	.WInit
+		
+		isync					#Wait for 68k to set up library
 
-		loadreg	r4,2000000			#BUG! Not sure why this delay is needed
-		mtctr	r4
-.BugLoop:	bdnz+	.BugLoop
-
-		la	r4,ReadyTasks(r14)
+		la	r4,ReadyTasks(r0)				
 		LIBCALLPOWERPC NewListPPC
 
-		la	r4,WaitingTasks(r14)
+		la	r4,WaitingTasks(r0)
 		LIBCALLPOWERPC NewListPPC
 
-		la	r4,Semaphores(r14)
+		la	r4,Semaphores(r0)
 		LIBCALLPOWERPC NewListPPC
 
-		la	r4,Ports(r14)
+		la	r4,Ports(r0)
 		LIBCALLPOWERPC NewListPPC
 
-		la	r4,AllTasks(r14)
+		la	r4,AllTasks(r0)
 		LIBCALLPOWERPC NewListPPC
 
-		la	r4,SnoopList(r14)
+		la	r4,SnoopList(r0)
 		LIBCALLPOWERPC NewListPPC
-
+		
 		li	r4,SSPPC_SIZE*5			#Memory for 5 Semaphores
 		LIBCALLPOWERPC AllocVecPPC
 		
@@ -212,17 +217,20 @@ WInit:		lwz	r28,Init(r14)
 	
 		addi	r4,r30,SSPPC_SIZE*4
 		stw	r4,MemSem(r14)
-		LIBCALLPOWERPC InitSemaphorePPC	
+		LIBCALLPOWERPC InitSemaphorePPC
 
-		lwz	r14,0(r14)
+		lwz	r14,0(r0)
 		la	r4,NewTasks(r14)
 		LIBCALLPOWERPC NewListPPC
 
 		LIBCALLPOWERPC FlushL1DCache
+		
+		li	r14,-1
+		stw	r14,CanFlush(r0)
 
 		mtsrr0	r31
 		mfmsr	r14
-		ori	r14,r14,PSL_EE|PSL_PR			#Set privilege mode to User
+		ori	r14,r14,PSL_EE|PSL_PR		#Set privilege mode to User
 		mtsrr1	r14
 
 		rfi					#To user code
@@ -418,12 +426,20 @@ ClearInts:	lwz	r27,0xa0(r26)			#IACKR
 
 #********************************************************************************************
 
-							#Enable L1 data cache 
-Caches:		mfspr	r4,HID0	
-		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE@l
-		isync
-		mtspr	HID0,r4				#Enable D-cache
-		isync
+							#Invalidatem then enable L1 caches
+Caches:		mfspr	r4,HID0
+		ori	r4,r4,HID0_ICFI|HID0_DCFI
+		xori	r4,r4,HID0_ICFI|HID0_DCFI
+		mtspr	HID0,r4
+		sync
+
+		mfspr	r4,HID0	
+		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
+		mtspr	HID0,r4
+		sync
+		 	
+		blr					#REMOVE ME FOR L2 CACHE
+		
 		 					# Set up on chip L2 cache controller.
 		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_L2WT
 #		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST
@@ -1227,7 +1243,10 @@ EInt:		b	.DecInt
 		mr.	r9,r3
 		beq	.ReturnToUser
 
-.Dispatch:	LIBCALLPOWERPC FlushL1DCache
+.Dispatch:	li	r4,0
+		stw	r4,CanFlush(r0)
+		LIBCALLPOWERPC FlushL1DCache
+
 		
 		li	r4,TS_RUN
 		stb	r4,TC_STATE(r9)
@@ -1237,6 +1256,8 @@ EInt:		b	.DecInt
 		
 		LIBCALLPOWERPC AllocVecPPC
 		
+		li	r4,-1
+		stw	r4,CanFlush(r0)
 		mr.	r4,r3
 		beq	.ReturnToUser	
 		
@@ -1663,36 +1684,64 @@ EIntEnd:
 #********************************************************************************************
 
 PrInt:							#Privilege Exception
-		mtsprg	1,r3
+		mtsprg1	r4
+		mtsprg2	r5
+		mtsprg3	r6
+		
+		li	r4,0x7000
+
+		li	r6,0x400
+		mr	r5,r6
+		mtctr	r6
+	
+.Fl1:		lwz	r6,0(r4)
+		addi	r4,r4,L1_CACHE_LINE_SIZE
+		bdnz+	.Fl1
+	
+		li	r4,0x7000
+		mtctr	r5
+		
+.Fl2:		dcbf	r0,r4
+		addi	r4,r4,L1_CACHE_LINE_SIZE
+		bdnz+	.Fl2	
+		
+		isync
+		sync
+		
+		mfsprg1	r4
+		mfsprg2	r5
+		mfsprg3	r6
+		
+		mtsprg1	r3
 		mfspr	r3,HID0
 		ori	r3,r3,HID0_ICFI|HID0_DCFI
 		xori	r3,r3,HID0_ICFI|HID0_DCFI
 		mtspr	HID0,r3
 		mfcr	r3
-		mtsprg	2,r3
-		mtsprg	3,r0
+		mtsprg2	r3
+		mtsprg3	r0
 		mfsrr0	r3
-
 		lwz	r0,ViolationAddress(r0)
-
 		cmplw	r0,r3
 		bne-	.HaltErr
+		
 		addi	r3,r3,4				#Next instruction
 		mtsrr0	r3
 		mfsrr1	r3
 		ori	r3,r3,PSL_PR			#Set to Super
 		xori	r3,r3,PSL_PR
 		mtsrr1	r3
-		mfsprg	r3,2
+		mfsprg2	r3
 		mtcr	r3
-		mfsprg	r3,1
+		mfsprg1	r3
 		li	r0,0				#SuperKey
 		rfi
 .HaltErr:
 		loadreg r3,"HALT"			#DEBUG
 		stw	r3,0xf0(r0)
-		mfsrr1	r3
+		mfsrr0	r3
 		stw	r3,0xf4(r0)
+		stw	r0,0xf8(r0)
 .xxHaltErr2:	b .xxHaltErr2
 
 #********************************************************************************************

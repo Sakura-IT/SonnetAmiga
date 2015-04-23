@@ -460,7 +460,7 @@ AllocVecPPC:
 
 .error:		mr	r31,r3
 
-		LIBCALLPOWERPC FlushL1DCache
+		bl FlushL1DCache
 		
 		mr.	r3,r31
 		beq	.SkipAlign
@@ -567,7 +567,7 @@ FreeVecPPC:
 		subf.	r3,r29,r3
 
 .error2:	mr	r31,r3
-		LIBCALLPOWERPC FlushL1DCache
+		bl FlushL1DCache
 		mr	r3,r31
 		
 		lwz	r6,0(r13)
@@ -602,7 +602,7 @@ GetInfo:
 		stwu	r4,-4(r13)
 		li	r6,1
 		
-		LIBCALLPOWERPC WarpSuper
+		bl WarpSuper
 		
 		li	r5,SonnetBase
 		mfspr	r3,PVR
@@ -614,9 +614,9 @@ GetInfo:
 		mfspr	r3,SDR1
 		stw	r3,CPUSDR1(r5)
 		
-		LIBCALLPOWERPC WarpUser	
+		bl WarpUser	
 		
-.TagLoop:	LIBCALLPOWERPC NextTagItemPPC
+.TagLoop:	bl NextTagItemPPC
 
 		mr.	r3,r3
 		beq	.NoTags		
@@ -860,7 +860,7 @@ GetTagDataPPC:
 		
 		mflr	r7
 		
-		LIBCALLPOWERPC FindTagItemPPC
+		bl FindTagItemPPC
 
 		mtlr	r7
 		mr.	r3,r3
@@ -896,7 +896,7 @@ FindTagItemPPC:
 		
 .TagLoop2:	mflr	r7
 
-		LIBCALLPOWERPC NextTagItemPPC
+		bl NextTagItemPPC
 
 		mtlr	r7
 		mr.	r3,r3
@@ -919,6 +919,12 @@ FindTagItemPPC:
 FlushL1DCache:
 		BUILDSTACKPPC
 		
+		stwu	r31,-4(r13)
+		
+		lwz	r31,CanFlush(r0)
+		mr.	r31,r31
+		bne	.AtomFlush
+		
 		li	r4,0x7000
 
 		li	r6,0x400
@@ -927,14 +933,25 @@ FlushL1DCache:
 	
 .Fl1:		lwz	r6,0(r4)
 		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz	.Fl1
+		bdnz+	.Fl1
 	
 		li	r4,0x7000
 		mtctr	r5
 		
 .Fl2:		dcbf	r0,r4
 		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz	.Fl2		
+		bdnz+	.Fl2
+		
+		b	.EndFlush
+		
+.AtomFlush:	bl WarpSuper
+		
+		isync
+		
+		bl WarpUser
+
+.EndFlush:	lwz	r31,0(r13)
+		addi	r13,r13,4
 
 		DSTRYSTACKPPC
 
@@ -957,7 +974,7 @@ AllocXMsgPPC:
 		mr	r30,r5
 		mr	r4,r31
 		
-		LIBCALLPOWERPC AllocVecPPC
+		bl AllocVecPPC
 		
 		mr.	r3,r3
 		beq-	.NoMaam
@@ -981,7 +998,7 @@ AllocXMsgPPC:
 FreeXMsgPPC:
 		BUILDSTACKPPC
 		
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
 		
 		DSTRYSTACKPPC
 		
@@ -1004,7 +1021,7 @@ CreateMsgPortPPC:
 		ori	r5,r5,1
 		li	r6,32
 		
-		LIBCALLPOWERPC AllocVecPPC
+		bl AllocVecPPC
 	
 		mr.	r3,r3
 		beq-	.NoMsgMem
@@ -1021,14 +1038,14 @@ CreateMsgPortPPC:
 		stwu	r4,-4(r4)
 		li	r4,-1
 		
-		LIBCALLPOWERPC AllocSignalPPC
+		bl AllocSignalPPC
 	
 		cmpwi	r3,-1
 		beq-	.NoSigFree
 		stb	r3,15(r30)
 		addi	r4,r30,48
 		
-		LIBCALLPOWERPC InitSemaphorePPC
+		bl InitSemaphorePPC
 
 		cmpwi	r3,-1
 		bne-	.NoSemMem
@@ -1043,11 +1060,11 @@ CreateMsgPortPPC:
 
 .NoSemMem:	lbz	r4,15(r30)
 
-		LIBCALLPOWERPC FreeSignalPPC
+		bl FreeSignalPPC
 
 .NoSigFree:	mr	r4,r30
 
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
 	
 .NoMsgMem:  	li	r4,0
 .HaveAll:	mr	r3,r4
@@ -1074,15 +1091,15 @@ DeleteMsgPortPPC:
 
 		addi	r4,r31,48
 
-		LIBCALLPOWERPC FreeSemaphorePPC
+		bl FreeSemaphorePPC
 
 		lbz	r4,15(r31)
 		
-		LIBCALLPOWERPC FreeSignalPPC
+		bl FreeSignalPPC
 
 		mr	r4,r31
 		
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
 
 .NoPortDef:	lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -1158,7 +1175,7 @@ AllocSignalPPC:
 		stwu	r4,-4(r13)
 		
 .WaitingLine:	li	r4,Atomic
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.WaitingLine
@@ -1171,7 +1188,7 @@ AllocSignalPPC:
 		stw	r7,TC_SIGWAIT(r5)
 
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 		
 		lwz	r4,0(r13)
 		addi	r13,r13,4
@@ -1234,7 +1251,7 @@ SetSignalPPC:
 		mr	r30,r4
 		
 .WaitingLine2:	li	r4,Atomic
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 		
 		mr.	r3,r3
 		beq+	.WaitingLine2
@@ -1246,7 +1263,7 @@ SetSignalPPC:
 		stw	r30,TC_SIGRECVD(r6)
 		
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		mr	r3,r6
 		li	r4,0
@@ -1275,7 +1292,7 @@ LockTaskList:
 		li	r4,SonnetBase
 		lwz	r4,TaskListSem(r4)
 
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		li	r3,AllTasks
 		
@@ -1298,7 +1315,7 @@ UnLockTaskList:
 		li	r4,SonnetBase
 		lwz	r4,TaskListSem(r4)
 
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		DSTRYSTACKPPC
 		
@@ -1331,7 +1348,7 @@ InitSemaphorePPC:
 		ori	r5,r5,1
 		li	r6,32
 
-		LIBCALLPOWERPC AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.SemDone
@@ -1360,7 +1377,7 @@ FreeSemaphorePPC:
 
 		lwz	r4,SSPPC_RESERVE(r4)
 
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
 
 .NoSemDef:	
 		DSTRYSTACKPPC
@@ -1396,7 +1413,7 @@ ObtainSemaphorePPC:
 		mr	r30,r4
 
 .WaitRes:	li	r4,Atomic
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.WaitRes
@@ -1410,7 +1427,7 @@ ObtainSemaphorePPC:
 		stw	r3,SS_OWNER(r30)
 		
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		b	.Obtained
 
@@ -1420,7 +1437,7 @@ ObtainSemaphorePPC:
 		bne-	.SemNotFree
 
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		b	.Obtained
 
@@ -1442,12 +1459,12 @@ ObtainSemaphorePPC:
 		stw	r5,0(r3)
 
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		lis	r4,0
 		ori	r4,r4,16
 		
-		LIBCALLPOWERPC WaitPPC
+		bl WaitPPC
 
 		mr	r13,r29
 		lwz	r29,0(r13)
@@ -1506,7 +1523,7 @@ AttemptSemaphorePPC:
 		mr	r30,r4
 
 .WaitRes2:	li	r4,Atomic
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.WaitRes2
@@ -1530,7 +1547,7 @@ AttemptSemaphorePPC:
 		li	r6,-1
 
 .Occupied:	li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		mr	r3,r6
 		lwz	r4,0(r13)
@@ -1581,7 +1598,7 @@ ReleaseSemaphorePPC:
 		mr	r31,r4
 
 .WaitRes3:	li	r4,Atomic
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.WaitRes3
@@ -1599,7 +1616,7 @@ ReleaseSemaphorePPC:
 		sth	r5,SS_QUEUECOUNT(r31)
 
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		b	.Released
 
@@ -1613,7 +1630,7 @@ ReleaseSemaphorePPC:
 		bge-	.NotLast
 
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		b	.Released
 
@@ -1621,7 +1638,7 @@ ReleaseSemaphorePPC:
 		sth	r0,SSPPC_LOCK(r31)
 		
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		addi	r4,r31,SS_WAITQUEUE
 		lwz	r5,0(r4)
@@ -1648,7 +1665,7 @@ ReleaseSemaphorePPC:
 		lis	r5,0
 		ori	r5,r5,16
 
-		LIBCALLPOWERPC SignalPPC
+		bl SignalPPC
 
 		b	.link23
 		
@@ -1661,7 +1678,7 @@ ReleaseSemaphorePPC:
 		sth	r5,SS_NESTCOUNT(r31)
 		mr	r4,r30
 
-		LIBCALLPOWERPC ReplyMsgPPC
+		bl ReplyMsgPPC
 
 		lwz	r3,SS_OWNER(r31)
 .link27:	lwz	r4,0(r29)
@@ -1698,7 +1715,7 @@ ReleaseSemaphorePPC:
 		lis	r5,0
 		ori	r5,r5,16
 
-		LIBCALLPOWERPC SignalPPC
+		bl SignalPPC
 
 		b	.link31
 		
@@ -1706,7 +1723,7 @@ ReleaseSemaphorePPC:
 		stw	r4,8(r30)
 		mr	r4,r30
 
-		LIBCALLPOWERPC ReplyMsgPPC
+		bl ReplyMsgPPC
 
 .link31:	lwz	r3,0(r29)
 		mr.	r3,r3
@@ -1750,7 +1767,7 @@ ReleaseSemaphorePPC:
 		blr	
 
 .Error68k:	li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 .DeadEnd:	nop					#Not Yet Implemented
 		b .DeadEnd
 
@@ -1768,7 +1785,7 @@ AddSemaphorePPC:
 
 		mr	r30,r4
 		
-		LIBCALLPOWERPC InitSemaphorePPC
+		bl InitSemaphorePPC
 
 		mr.	r3,r3
 		beq-	.NoInitSem
@@ -1776,18 +1793,18 @@ AddSemaphorePPC:
 		li	r4,SonnetBase
 		lwz	r4,SemListSem(r4)
 		
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 		
 		li	r4,SonnetBase
 		lwz	r4,Semaphores(r4)
 		mr	r5,r30
 		
-		LIBCALLPOWERPC EnqueuePPC
+		bl EnqueuePPC
 		
 		li	r4,SonnetBase
 		lwz	r4,SemListSem(r4)
 		
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		li	r3,-1
 
@@ -1812,21 +1829,21 @@ RemSemaphorePPC:
 
 		mr	r31,r4
 
-		LIBCALLPOWERPC FreeSemaphorePPC
+		bl FreeSemaphorePPC
 
 		li	r4,SonnetBase
 		lwz	r4,SemListSem(r4)
 		
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		mr	r4,r31
 
-		LIBCALLPOWERPC RemovePPC
+		bl RemovePPC
 
 		li	r4,SonnetBase
 		lwz	r4,SemListSem(r4)
 
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -1852,20 +1869,20 @@ FindSemaphorePPC:
 		li	r4,SonnetBase
 		lwz	r4,SemListSem(r4)
 
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		li	r4,SonnetBase
 		lwz	r4,Semaphores(r4)
 		mr	r5,r30
 
-		LIBCALLPOWERPC FindNamePPC
+		bl FindNamePPC
 
 		mr	r30,r3
 
 		li	r4,SonnetBase
 		lwz	r4,SemListSem(r4)
 		
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		mr	r3,r30
 		lwz	r30,0(r13)
@@ -1898,18 +1915,18 @@ AddPortPPC:
 		li	r4,SonnetBase
 		lwz	r4,PortListSem(r4)
 
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		li	r4,SonnetBase
 		lwz	r4,Ports(r4)
 		mr	r5,r30
 
-		LIBCALLPOWERPC EnqueuePPC
+		bl EnqueuePPC
 
 		li	r4,SonnetBase
 		lwz	r4,PortListSem(r4)
 		
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		lwz	r30,0(r13)
 		lwz	r31,4(r13)
@@ -1934,7 +1951,7 @@ RemPortPPC:
 		li	r4,SonnetBase
 		lwz	r4,PortListSem(r4)
 
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		mr	r4,r31
 		lwz	r3,0(r4)
@@ -1945,7 +1962,7 @@ RemPortPPC:
 		li	r4,SonnetBase
 		lwz	r4,PortListSem(r4)
 		
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -1970,18 +1987,18 @@ FindPortPPC:
 		li	r4,SonnetBase
 		lwz	r4,PortListSem(r4)
 
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		li	r4,SonnetBase
 		lwz	r4,Ports(r4)		
 
-		LIBCALLPOWERPC FindNamePPC
+		bl FindNamePPC
 
 		mr	r31,r3
 		li	r4,SonnetBase
 		lwz	r4,PortListSem(r4)
 
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		mr	r3,r31
 		lwz	r31,0(r13)
@@ -2011,7 +2028,7 @@ WaitPortPPC:
 
 		addi	r4,r31,MP_PPC_SEM
 
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		addi	r5,r31,MP_PPC_INTMSG
 		lwz	r4,MP_PPC_INTMSG+LH_TAILPRED(r31)
@@ -2019,7 +2036,7 @@ WaitPortPPC:
 		beq-	.Link33
 
 .WaitInLine:	li	r4,Atomic
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.WaitInLine
@@ -2029,7 +2046,7 @@ WaitPortPPC:
 		beq-	.Link34
 
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 .Link35:	lbz	r3,628(r28)
 		mr.	r3,r3
@@ -2041,9 +2058,9 @@ WaitPortPPC:
 		stb	r0,628(r28)
 
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
-		LIBCALLPOWERPC CauseInterrupt
+		bl CauseInterrupt
 
 .Link36:	lbz	r3,628(r28)
 		mr.	r3,r3
@@ -2060,16 +2077,16 @@ WaitPortPPC:
 		slw	r29,r4,r5
 .Link42:	addi	r4,r31,MP_PPC_SEM
 
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		mr	r4,r29
 
-		LIBCALLPOWERPC WaitPPC
+		bl WaitPPC
 
 		mr	r27,r3
 		addi	r4,r31,MP_PPC_SEM
 
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		addi	r5,r31,MP_PPC_INTMSG
 		lwz	r4,MP_PPC_INTMSG+LH_TAILPRED(r31)
@@ -2077,7 +2094,7 @@ WaitPortPPC:
 		beq-	.Link38
 
 .WaitInLine2:	li	r4,Atomic
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.WaitInLine2
@@ -2087,7 +2104,7 @@ WaitPortPPC:
 		beq-	.Link39
 
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 .Link40:	lbz	r3,628(r28)
 		mr.	r3,r3
@@ -2099,9 +2116,9 @@ WaitPortPPC:
 		stb	r0,628(r28)
 
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
-		LIBCALLPOWERPC CauseInterrupt
+		bl CauseInterrupt
 
 .Link41:	lbz	r3,628(r28)
 		mr.	r3,r3
@@ -2116,7 +2133,7 @@ WaitPortPPC:
 .Link37:	mr	r5,r3
 		addi	r4,r31,MP_PPC_SEM
 
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		mr	r3,r5
 		lwz	r27,0(r13)
@@ -2139,7 +2156,7 @@ WaitPortPPC:
 Super:
 		BUILDSTACKPPC
 		
-		LIBCALLPOWERPC WarpSuper
+		bl WarpSuper
 		
 		DSTRYSTACKPPC
 
@@ -2157,7 +2174,7 @@ User:
 		mr.	r4,r4
 		bne-	.WrongKey
 
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 
 .WrongKey:	
 		DSTRYSTACKPPC
@@ -2206,9 +2223,9 @@ PutXMsgPPC:
 		mr	r31,r4
 		la	r4,MP_MSGLIST(r4)
 
-		LIBCALLPOWERPC AddTailPPC
+		bl AddTailPPC
 		
-		LIBCALLPOWERPC FlushL1DCache
+		bl FlushL1DCache
 		
 		mr 	r4,r31
 		
@@ -2218,7 +2235,7 @@ PutXMsgPPC:
 		li	r5,0x100		#Fixed at the moment
 		isync
 		
-		LIBCALLPOWERPC Signal68K
+		bl Signal68K
 
 .NoSigTask:	lwz	r30,0(r13)
 		lwz	r31,4(r13)
@@ -2244,7 +2261,7 @@ WaitFor68K:
 		mr	r31,r4
 		
 .Check68K:	
-#		LIBCALLPOWERPC FlushL1DCache
+#		bl FlushL1DCache
 		
 		loadreg r30,"DONE"
 		lwz	r6,MN_IDENTIFIER(r31)
@@ -2256,7 +2273,7 @@ WaitFor68K:
 		li	r4,TS_WAIT
 		stb	r4,TC_STATE(r3)		
 		
-		LIBCALLPOWERPC CauseInterrupt
+		bl CauseInterrupt
 		
 		b	.Check68K				
 
@@ -2286,7 +2303,7 @@ Run68K:
 		li	r4,MN_SIZE+PP_SIZE+80
 		li	r5,0
 		
-		LIBCALLPOWERPC AllocXMsgPPC
+		bl AllocXMsgPPC
 		
 		mr.	r30,r3
 		beq-	.MsgError
@@ -2312,11 +2329,11 @@ Run68K:
 		mr	r5,r30
 		sync
 				
-		LIBCALLPOWERPC PutXMsgPPC
+		bl PutXMsgPPC
 		
 		mr	r4,r30
 		
-		LIBCALLPOWERPC WaitFor68K
+		bl WaitFor68K
 		
 		subi	r4,r31,4
 		addi	r29,r30,MN_PPSTRUCT-4		
@@ -2328,7 +2345,7 @@ Run68K:
 
 		mr	r4,r30
 		
-		LIBCALLPOWERPC FreeXMsgPPC
+		bl FreeXMsgPPC
 		
 		li	r3,0
 		
@@ -2495,12 +2512,12 @@ TrySemaphorePPC:
 		mr	r28,r5
 		
 .WaitAt1:	li	r4,Atomic
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 		mr.	r3,r3
 		beq+	.WaitAt1
 		
 		lwz	r4,SSPPC_RESERVE(r30)
-.WaitAt2:	LIBCALLPOWERPC AtomicTest
+.WaitAt2:	bl AtomicTest
 		mr.	r3,r3
 		beq+	.WaitAt2
 		
@@ -2513,10 +2530,10 @@ TrySemaphorePPC:
 		stw	r3,SS_OWNER(r30)
 		
 		lwz	r4,SSPPC_RESERVE(r30)		
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 		
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		b	.Jump1
 		
@@ -2526,10 +2543,10 @@ TrySemaphorePPC:
 		bne-	.Diff1
 		
 		lwz	r4,SSPPC_RESERVE(r30)		
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 		
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		b	.Jump1
 		
@@ -2551,16 +2568,16 @@ TrySemaphorePPC:
 		stw	r5,0(r3)
 		
 		lwz	r4,SSPPC_RESERVE(r30)		
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 		
 		lis	r4,0
 		ori	r4,r4,16
 		mr	r5,r28
 		
-		LIBCALLPOWERPC WaitTime
+		bl WaitTime
 		
 		mr	r28,r3
 .WeirdWait:	lhz	r3,SSPPC_LOCK(r30)
@@ -2568,7 +2585,7 @@ TrySemaphorePPC:
 		bne+	.WeirdWait
 		
 .WaitAt3:	li	r4,Atomic
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 		mr.	r3,r3
 		beq+	.WaitAt3
 		lhz	r3,SSPPC_LOCK(r30)
@@ -2576,7 +2593,7 @@ TrySemaphorePPC:
 		beq-	.Jump3
 		
 		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		b	.WeirdWait
 		
@@ -2596,7 +2613,7 @@ TrySemaphorePPC:
 		stw	r3,0(r4)
 		
 .Jump2:		li	r4,Atomic
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		mr	r13,r29
 		lwz	r29,0(r13)
@@ -2682,7 +2699,7 @@ SetCache:
 		mr	r4,r5
 		mr	r5,r6
 
-		LIBCALLPOWERPC WarpSuper
+		bl WarpSuper
 
 		add	r5,r5,r4
 		lis	r0,-1
@@ -2698,7 +2715,7 @@ SetCache:
 		bdnz+	.DInvalidate
 		sync
 		
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 		
 		b	.DoneCache
 
@@ -2714,7 +2731,7 @@ SetCache:
 		mr	r29,r5
 		mr	r31,r6
 		
-		LIBCALLPOWERPC FlushL1DCache
+		bl FlushL1DCache
 		
 		mr	r4,r29
 		mr	r5,r31
@@ -2732,7 +2749,7 @@ SetCache:
 		addi	r4,r4,32
 		bdnz+	.FillLoop
 		
-		LIBCALLPOWERPC WarpSuper
+		bl WarpSuper
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_DLOCK
@@ -2741,7 +2758,7 @@ SetCache:
 		sync	
 		isync		
 
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 		
 		li	r0,-1
 		stb	r0,DLockState(r30)
@@ -2752,8 +2769,8 @@ SetCache:
 		mr.	r29,r29
 		bne	.DoneCache
 		
-		LIBCALLPOWERPC FlushL1DCache
-		LIBCALLPOWERPC WarpSuper
+		bl FlushL1DCache
+		bl WarpSuper
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_DCE
@@ -2761,28 +2778,28 @@ SetCache:
 		sync	
 		mtspr	HID0,r0
 		
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 		
 		li	r0,-1
 		stb	r0,DState(r30)
 		
 		b	.DoneCache
 
-.ICACHELOCK:	LIBCALLPOWERPC WarpSuper
+.ICACHELOCK:	bl WarpSuper
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ILOCK
 		isync	
 		mtspr	HID0,r0
 
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 
 		b	.DoneCache
 
 .DCACHEUNLOCK:	li	r0,0
 		stb	r0,DLockState(r30)
 		
-		LIBCALLPOWERPC WarpSuper
+		bl WarpSuper
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_DLOCK
@@ -2791,25 +2808,25 @@ SetCache:
 		sync	
 		isync		
 
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 		
 		b	.DoneCache
 
 .DCACHEON:	li	r0,0
 		stb	r0,DState(r30)		
 		
-		LIBCALLPOWERPC WarpSuper
+		bl WarpSuper
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_DCE
 		mtspr	HID0,r0
 		isync
 		
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 		
 		b	.DoneCache
 
-.ICACHEUNLOCK:	LIBCALLPOWERPC WarpSuper
+.ICACHEUNLOCK:	bl WarpSuper
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ILOCK
@@ -2817,22 +2834,22 @@ SetCache:
 		mtspr	HID0,r0
 		isync
 		
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 
 		b	.DoneCache
 
-.ICACHEON:	LIBCALLPOWERPC WarpSuper
+.ICACHEON:	bl WarpSuper
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICE
 		mtspr	HID0,r0
 		isync
 
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 		
 		b	.DoneCache
 
-.ICACHEOFF:	LIBCALLPOWERPC WarpSuper
+.ICACHEOFF:	bl WarpSuper
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICE
@@ -2840,7 +2857,7 @@ SetCache:
 		isync	
 		mtspr	HID0,r0
 
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 
 		b	.DoneCache
 
@@ -2867,7 +2884,7 @@ SetCache:
 		b	.DoneCache
 
 .ICACHEINVALL:  
-		LIBCALLPOWERPC WarpSuper
+		bl WarpSuper
 		
 		b	.Mojo1
 .Mojo2:		mfspr	r0,HID0
@@ -2879,7 +2896,7 @@ SetCache:
 		b 	.Mojo3
 .Mojo1:		b 	.Mojo2
 		
-.Mojo3:		LIBCALLPOWERPC WarpUser
+.Mojo3:		bl WarpUser
 		
 		b	.DoneCache
 
@@ -2920,7 +2937,7 @@ SetCache:
 		mr.	r29,r29
 		bne	.DoneCache
 
-		LIBCALLPOWERPC FlushL1DCache
+		bl FlushL1DCache
 
 .DoneCache:	lwz	r29,0(r13)
 		lwz	r30,4(r13)
@@ -3132,22 +3149,22 @@ AddUniquePortPPC:
 
 		li	r4,SonnetBase
 		lwz	r4,PortListSem(r4)
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		lwz	r4,10(r30)
-		LIBCALLPOWERPC FindPortPPC
+		bl FindPortPPC
 
 		mr.	r3,r3
 		bne-	.Duplicate
 		
 		mr	r4,r30
-		LIBCALLPOWERPC AddPortPPC
+		bl AddPortPPC
 		b	.SkipDup
 
 .Duplicate:	li	r29,0
 .SkipDup:	li	r4,SonnetBase
 		lwz	r4,PortListSem(r4)
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		mr	r3,r29
 
@@ -3178,16 +3195,16 @@ AddUniqueSemaphorePPC:
 
 		li	r4,SonnetBase
 		lwz	r4,SemListSem(r4)
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		lwz	r4,10(r30)
-		LIBCALLPOWERPC FindSemaphorePPC
+		bl FindSemaphorePPC
 
 		mr.	r3,r3
 		bne-	.Duplicate2
 
 		mr	r4,r30
-		LIBCALLPOWERPC AddSemaphorePPC
+		bl AddSemaphorePPC
 		
 		b	.SkipDup2
 
@@ -3195,7 +3212,7 @@ AddUniqueSemaphorePPC:
 .SkipDup2:	li	r4,SonnetBase
 		lwz	r4,SemListSem(r4)
 
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		mr	r3,r29
 
@@ -3227,24 +3244,24 @@ PutPublicMsgPPC:
 
 		li	r4,SonnetBase
 		lwz	r4,PortListSem(r4)
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		mr	r4,r31
-		LIBCALLPOWERPC FindPortPPC
+		bl FindPortPPC
 
 		mr.	r3,r3
 		beq-	.PortNotFound
 
 		mr	r4,r3
 		mr	r5,r30
-		LIBCALLPOWERPC PutMsgPPC
+		bl PutMsgPPC
 
 		b	.SkipStatus
 
 .PortNotFound:	li	r29,0
 .SkipStatus:	li	r4,SonnetBase
 		lwz	r4,PortListSem(r4)
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		mr	r3,r29
 		lwz	r29,0(r13)
@@ -3313,7 +3330,7 @@ FindTaskByID:
 		li	r29,0
 		mr	r31,r4
 
-		LIBCALLPOWERPC LockTaskList
+		bl LockTaskList
 
 		mr	r30,r3
 .NextNode:	lwz	r4,0(r3)
@@ -3333,7 +3350,7 @@ FindTaskByID:
 
 .EndSearch:	mr	r4,r30
 
-		LIBCALLPOWERPC UnLockTaskList
+		bl UnLockTaskList
 
 		mr	r3,r29
 
@@ -3375,13 +3392,13 @@ SetNiceValue:
 		li	r5,20
 .SetMax:	mr	r30,r5
 
-		LIBCALLPOWERPC LockTaskList
+		bl LockTaskList
 
 		lwz	r29,TASKPPC_NICE(r31)
 		stw	r30,TASKPPC_NICE(r31)
 		mr	r4,r3
 
-		LIBCALLPOWERPC UnLockTaskList
+		bl UnLockTaskList
 
 		mr	r3,r29
 
@@ -3542,7 +3559,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
 	 
 		mr.	r3,r3 
 		beq-	.Error01			#Error NoCode 
@@ -3552,7 +3569,7 @@ CreateTaskPPC:
 		loadreg	r5,0x10001			#attr = $10001
 		li	r6,0				#default alignment 
  
- 		LIBCALLPOWERPC AllocVecPPC
+ 		bl AllocVecPPC
  
 		mr.	r3,r3 
 		beq-	.Error01			#Error NoMem 
@@ -3574,7 +3591,7 @@ CreateTaskPPC:
 		loadreg	r5,0x10001
 		li	r6,0 
  
- 		LIBCALLPOWERPC AllocVecPPC
+ 		bl AllocVecPPC
  
 		mr.	r3,r3 
 		beq-	.Error02			#Error NoMem 
@@ -3586,7 +3603,7 @@ CreateTaskPPC:
 		loadreg	r5,0x10001
 		li	r6,0 
  
- 		LIBCALLPOWERPC AllocVecPPC
+ 		bl AllocVecPPC
  
 		mr.	r3,r3	 
 		beq-	.Error03			#Error NoMem 
@@ -3610,7 +3627,7 @@ CreateTaskPPC:
 		li	r5,0				#defaultVal 
 		mr	r6,r30				#TagList 
  
-		LIBCALLPOWERPC GetTagDataPPC
+		bl GetTagDataPPC
  
 		mr.	r3,r3 
 		beq-	.Error04			#Error NoName 
@@ -3624,7 +3641,7 @@ CreateTaskPPC:
 		loadreg	r5,0x10001
 		li	r6,0 
  
- 		LIBCALLPOWERPC AllocVecPPC
+ 		bl AllocVecPPC
  
 		mr.	r3,r3 
 		beq-	.Error04			#Error NoMem 
@@ -3634,7 +3651,7 @@ CreateTaskPPC:
 		loadreg	r5,0x10001
 		li	r6,0 
  
- 		LIBCALLPOWERPC AllocVecPPC
+ 		bl AllocVecPPC
  
 		mr.	r3,r3 
 		beq-	.Error05			#Error NoMem 
@@ -3661,7 +3678,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
-		LIBCALLPOWERPC GetTagDataPPC
+		bl GetTagDataPPC
  
 		mr.	r3,r3 
 		beq-	.NotSystemTask
@@ -3674,7 +3691,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
  
 		mr.	r3,r3 
 		beq-	.NotAtomicTask
@@ -3694,7 +3711,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
  
 		stb	r3,LN_PRI(r31)
  
@@ -3702,7 +3719,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
  
 		cmpwi	r3,-20				#Min/Max check -20 - 20 
 		bge-	.AboveMin 
@@ -3718,7 +3735,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
  
 		mr.	r3,r3 
 		beq-	.NoMotherPri
@@ -3735,7 +3752,7 @@ CreateTaskPPC:
 		li	r5,0x4000
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
  
 		addi	r4,r3,0x1000			#Default = 0x4000 or asked+0x1000 
 		stw	r4,TASKPPC_STACKSIZE(r31)
@@ -3744,7 +3761,7 @@ CreateTaskPPC:
 		ori	r5,r5,1 
 		li	r6,0 
  
- 		LIBCALLPOWERPC AllocVecPPC
+ 		bl AllocVecPPC
  
 		mr.	r3,r3 
 		beq-	.Error06			#Error NoMem 
@@ -3764,7 +3781,7 @@ CreateTaskPPC:
 		loadreg	r5,0x10001
 		li	r6,0 
  
- 		LIBCALLPOWERPC AllocVecPPC
+ 		bl AllocVecPPC
  
 		mr.	r3,r3 
 		beq-	.Error07			#Error NoMem 
@@ -3788,7 +3805,7 @@ CreateTaskPPC:
 		loadreg r5,0x10001 
 		li	r6,0 
  
- 		LIBCALLPOWERPC AllocVecPPC
+ 		bl AllocVecPPC
  
 		mr.	r3,r3 
 		beq-	.Error08			#Error NoMem 
@@ -3802,7 +3819,7 @@ CreateTaskPPC:
 		loadreg r5,0x10001
 		li	r6,0 
  
- 		LIBCALLPOWERPC AllocVecPPC
+ 		bl AllocVecPPC
  
 		mr.	r3,r3 
 		beq-	.Error09			#Error NoMem 
@@ -3836,7 +3853,7 @@ CreateTaskPPC:
 		ori	r5,r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
  
 		addi	r4,r26,412 
 		li	r0,16 
@@ -3879,7 +3896,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
  
 		stw	r3,152(r26)			#152 in ContextMem; Default=0 
  
@@ -3887,7 +3904,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
  
 		mr.	r3,r3 
 		beq-	.NotPrivate			#Not Private 
@@ -3897,7 +3914,7 @@ CreateTaskPPC:
  
 .NotPrivate:	li	r4,0 
 
-		LIBCALLPOWERPC FindTaskPPC
+		bl FindTaskPPC
  
 .DoPrivate:	stw	r3,76(r26)			#Store MotherTask or 1 (prv) 
  
@@ -3905,7 +3922,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
-		LIBCALLPOWERPC GetTagDataPPC
+		bl GetTagDataPPC
  
 		mr.	r3,r3 
 		beq-	.NoInherit			#No Inherit 
@@ -3917,7 +3934,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
  
 		stw	r3,156(r26)			#r2 to ContextMem 156 
  
@@ -3925,7 +3942,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
  
 		stw	r3,44(r26)			#r3 to ContextMem 44 
  
@@ -3933,7 +3950,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
  
 		stw	r3,48(r26)			#r4 to ContextMem 48 
  		
@@ -3941,7 +3958,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
  
 		stw	r3,52(r26)			#r5 to ContextMem 52 
   
@@ -3949,7 +3966,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
  
 		stw	r3,56(r26)			#r6 to ContextMem 56 
  
@@ -3957,7 +3974,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
  
 		stw	r3,60(r26)			#r7 to ContextMem 60 
  
@@ -3965,7 +3982,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
 		
-		LIBCALLPOWERPC GetTagDataPPC
+		bl GetTagDataPPC
  
 		stw	r3,64(r26)			#r8 to ContextMem 64 
  
@@ -3973,7 +3990,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
-		LIBCALLPOWERPC GetTagDataPPC
+		bl GetTagDataPPC
 	 
 		stw	r3,68(r26)			#r9 to ContextMem 68 
  
@@ -3981,7 +3998,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
-		LIBCALLPOWERPC GetTagDataPPC 
+		bl GetTagDataPPC 
  
 		stw	r3,72(r26)			#r10 to ContextMem 72 
  
@@ -3989,7 +4006,7 @@ CreateTaskPPC:
 		loadreg	r5,0x10001
 		li	r6,32 
  
- 		LIBCALLPOWERPC AllocVecPPC
+ 		bl AllocVecPPC
  
 		mr.	r3,r3 
 		beq-	.Error10			#Error NoMem 
@@ -4014,7 +4031,7 @@ CreateTaskPPC:
 		stb	r0,MP_SIGBIT(r18)			 
 		addi	r4,r18,MP_PPC_SEM
  
- 		LIBCALLPOWERPC InitSemaphorePPC
+ 		bl InitSemaphorePPC
 	 
 		cmpwi	r3,-1				#Error 
 		bne-	.Error11 
@@ -4030,7 +4047,7 @@ CreateTaskPPC:
 		li	r5,0 
 		mr	r6,r30 
  
- 		LIBCALLPOWERPC GetTagDataPPC
+ 		bl GetTagDataPPC
 	 
 		stw	r3,238(r31)			#Undocumented in docs?? 
 							#Stops at 234?? 
@@ -4039,7 +4056,7 @@ CreateTaskPPC:
 		ori	r5,r5,1 
 		li	r6,0 
  
- 		LIBCALLPOWERPC AllocVecPPC
+ 		bl AllocVecPPC
  
 		mr.	r3,r3 
 		beq-	.Error12			#Error NoMem 
@@ -4052,7 +4069,7 @@ CreateTaskPPC:
 		loadreg	r5,0x10001
 		li	r6,0 
  
- 		LIBCALLPOWERPC AllocVecPPC
+ 		bl AllocVecPPC
  
 		mr.	r3,r3 
 		beq-	.Error13			#Error NoMem 
@@ -4066,7 +4083,7 @@ CreateTaskPPC:
 		li	r4,SonnetBase
 		lwz	r4,TaskListSem(r4)
  
- 		LIBCALLPOWERPC ObtainSemaphorePPC
+ 		bl ObtainSemaphorePPC
 	 
 		li	r4,AllTasks
 		addi	r4,r4,4
@@ -4087,7 +4104,7 @@ CreateTaskPPC:
  		li	r4,SonnetBase
  		lwz	r4,TaskListSem(r4)
 		
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
  
 		lwz	r3,17652(r2)			#WARP! ICACHEINVALL 
 		lwz	r0,-100(r3) 
@@ -4101,7 +4118,7 @@ CreateTaskPPC:
  
 .WaitAtomic01:	li	r4,Atomic
 		
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
  
 		mr.	r3,r3 
 		beq+	.WaitAtomic01			#Wait for Atomic 
@@ -4146,60 +4163,60 @@ CreateTaskPPC:
  
  		li	r4,Atomic
  		
- 		LIBCALLPOWERPC AtomicDone
+ 		bl AtomicDone
  
-		LIBCALLPOWERPC CauseInterrupt
+		bl CauseInterrupt
  
 		mr	r3,r31 
 		b	.SkipToEnd			#All good, go to exit 
 							#Error handling: 
 .Error13:	mr	r4,r16
 
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
  
 .Error12:	addi	r4,r18,48
 
-		LIBCALLPOWERPC FreeSemaphorePPC
+		bl FreeSemaphorePPC
  
 .Error11:	mr	r4,r18
 
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
  
 .Error10:	mr	r4,r24
 
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
  
 .Error09:	mr	r4,r26
 
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
  
 .Error08:	mr	r4,r27
 
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
  
 .Error07:	mr	r4,r28
 
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
  
 .Error06:	mr	r4,r21
 
-		LIBCALLPOWERPC FreeVecPPC 
+		bl FreeVecPPC 
  
 .Error05:	mr	r4,r22
 
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
  
 .Error04:	mr	r4,r19
 
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
  
 .Error03:	mr	r4,r20
 
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
  
 .Error02:	mr	r4,r31
 
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
  
 .Error01:	mr	r0,r3 
 		lbz	r3,18737(r2) 
@@ -4275,12 +4292,12 @@ SetDecInterrupt:
 .NotZ:		stwu	r31,-4(r13)
 		mr	r31,r3
 
-		LIBCALLPOWERPC WarpSuper
+		bl WarpSuper
 		
 		mr	r3,r31
 		mtdec	r3
 		
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 
 		lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -4336,7 +4353,7 @@ ChangeStack:
 		loadreg	r5,0x10001
 		li	r6,0
 
-		LIBCALLPOWERPC AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.SomeError
@@ -4347,7 +4364,7 @@ ChangeStack:
 		loadreg	r5,0x10001
 		li	r6,0
 
-		LIBCALLPOWERPC AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.SomeError2
@@ -4397,7 +4414,7 @@ ChangeStack:
 
 .SomeError2:	mr	r4,r30
 
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
 
 .SomeError:	li	r3,0
 
@@ -4435,11 +4452,11 @@ FindTaskPPC:
 		li	r4,SonnetBase
 		lwz	r4,TaskListSem(r4)
 
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		li	r4,AllTasks
 		
-		LIBCALLPOWERPC FindNamePPC
+		bl FindNamePPC
 
 		mr.	r3,r3
 		beq-	.NameNotFound
@@ -4450,7 +4467,7 @@ FindTaskPPC:
 		li	r4,SonnetBase
 		lwz	r4,TaskListSem(r4)
 		
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		mr	r3,r31
 
@@ -4502,7 +4519,7 @@ ProcurePPC:
 
 .ExcLock:	li	r4,Atomic
 
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.ExcLock
@@ -4522,11 +4539,11 @@ ProcurePPC:
 
 		li	r4,Atomic
 		
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		mr	r4,r29
 		
-		LIBCALLPOWERPC ReplyMsgPPC
+		bl ReplyMsgPPC
 
 		b	.ProcureExit
 
@@ -4545,7 +4562,7 @@ ProcurePPC:
 
 		li	r4,Atomic
 
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 .ProcureExit:	lwz	r28,0(r13)
 		lwz	r29,4(r13)
@@ -4580,7 +4597,7 @@ VacatePPC:
 
 .AtomicVacate:	li	r4,Atomic
 
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.AtomicVacate
@@ -4597,11 +4614,11 @@ VacatePPC:
 
 		li	r4,Atomic
 		
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		mr	r4,r30
 		
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		b	.VacateExit
 
@@ -4616,11 +4633,11 @@ VacatePPC:
 
 		li	r4,Atomic
 		
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		mr	r4,r5
 
-		LIBCALLPOWERPC ReplyMsgPPC
+		bl ReplyMsgPPC
 
 .VacateExit:	lwz	r29,0(r13)
 		lwz	r30,4(r13)
@@ -4652,7 +4669,7 @@ SnoopTask:
 		loadreg	r5,0x10001
 		li	r6,0
 
-		LIBCALLPOWERPC AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.NoSnoop
@@ -4662,7 +4679,7 @@ SnoopTask:
 		li	r5,0
 		mr	r6,r30
 
-		LIBCALLPOWERPC GetTagDataPPC
+		bl GetTagDataPPC
 
 		mr.	r3,r3
 		beq-	.NoSnoop
@@ -4673,7 +4690,7 @@ SnoopTask:
 		li	r5,0
 		mr	r6,r30
 		
-		LIBCALLPOWERPC GetTagDataPPC
+		bl GetTagDataPPC
 
 		stw	r3,18(r31)
 
@@ -4681,7 +4698,7 @@ SnoopTask:
 		li	r5,0
 		mr	r6,r30
 
-		LIBCALLPOWERPC GetTagDataPPC
+		bl GetTagDataPPC
 
 		mr.	r3,r3
 		beq-	.NoSnoop
@@ -4697,18 +4714,18 @@ SnoopTask:
 		li	r4,SonnetBase
 		lwz	r4,SnoopSem(r4)
 		
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		li	r4,SonnetBase
 		lwz	r4,SonnetBase(r4)
 		mr	r5,r31
 
-		LIBCALLPOWERPC AddHeadPPC
+		bl AddHeadPPC
 
 		li	r4,SonnetBase
 		lwz	r4,SnoopSem(r4)
 		
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		mr	r30,r31
 		b	.Snooping
@@ -4719,7 +4736,7 @@ SnoopTask:
 		
 		mr	r4,r31
 		
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
 
 .Snooping:	mr	r3,r30
 		lwz	r29,0(r13)
@@ -4751,20 +4768,20 @@ EndSnoopTask:
 		li	r4,SonnetBase
 		lwz	r4,SnoopSem(r4)
 		
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		mr	r4,r31
 		
-		LIBCALLPOWERPC RemovePPC
+		bl RemovePPC
 
 		li	r4,SonnetBase
 		lwz	r4,SnoopSem(r4)
 		
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		mr	r4,r31
 		
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
 
 .NoEndSnoop:	lwz	r30,0(r13)
 		lwz	r31,4(r13)
@@ -4806,7 +4823,7 @@ ObtainSemaphoreSharedPPC:
 		
 .SharedAtomic:	li	r4,Atomic
 		
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.SharedAtomic
@@ -4819,7 +4836,7 @@ ObtainSemaphoreSharedPPC:
 
 		li	r4,Atomic
 		
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		b	.ExitShared
 
@@ -4828,7 +4845,7 @@ ObtainSemaphoreSharedPPC:
 		mr.	r4,r4
 		bne-	.HasOwner
 
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		b	.ExitShared
 
@@ -4837,7 +4854,7 @@ ObtainSemaphoreSharedPPC:
 
 		li	r4,Atomic
 		
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		b	.ExitShared
 
@@ -4862,12 +4879,12 @@ ObtainSemaphoreSharedPPC:
 
 		li	r4,Atomic
 		
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		lis	r4,0
 		ori	r4,r4,16
 		
-		LIBCALLPOWERPC WaitPPC
+		bl WaitPPC
 
 		mr	r13,r29
 		lwz	r29,0(r13)
@@ -4930,7 +4947,7 @@ AttemptSemaphoreSharedPPC:
 
 .SharedAttempt:	li	r4,Atomic
 
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.SharedAttempt
@@ -4959,7 +4976,7 @@ AttemptSemaphoreSharedPPC:
 
 .ItFailed:	li	r4,Atomic
 
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		mr	r3,r6
 		lwz	r4,0(r13)
@@ -5028,7 +5045,7 @@ CheckExcSignal:
 
 .DoAtomic:	li	r4,Atomic
 
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.DoAtomic
@@ -5046,7 +5063,7 @@ CheckExcSignal:
 		li	r10,SonnetBase
 		stw	r7,TaskException(r10)
 
-		LIBCALLPOWERPC CauseInterrupt
+		bl CauseInterrupt
 
 		li	r10,SonnetBase
 .IntWait2:	lwz	r0,TaskException(r10)
@@ -5055,7 +5072,7 @@ CheckExcSignal:
 
 .NonePending:	li	r4,Atomic
 
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 	
 		mr	r3,r8
 		
@@ -5086,7 +5103,7 @@ SetExceptPPC:
 
 .DoAtomic2:	li	r4,Atomic
 
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.DoAtomic2
@@ -5103,7 +5120,7 @@ SetExceptPPC:
 
 .NoPassR2:	li	r4,Atomic
 
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		mr	r3,r6
 		li	r4,0
@@ -5152,7 +5169,7 @@ DeleteTaskPPC:
 		li	r4,SonnetBase
 		lwz	r4,SnoopSem(r4)
 		
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		la	r28,SnoopList(r30)
 .Loop100:	lwz	r27,0(r28)
@@ -5176,7 +5193,7 @@ DeleteTaskPPC:
 .EmptySnoopLst:	li	r4,SonnetBase
 		lwz	r4,SnoopSem(r4)
 		
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 		mr	r3,r31
 		bl	0x13354				#?
@@ -5198,16 +5215,16 @@ DeleteTaskPPC:
 		li	r5,0
 		li	r6,0
 
-		LIBCALLPOWERPC SetCache
+		bl SetCache
 
 		lwz	r4,22(r27)			#Task
 		lwz	r5,26(r27)			#Signals
 
-		LIBCALLPOWERPC Signal68K
+		bl Signal68K
 
 		addi	r4,r2,18202			#?
 		
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		mr	r4,r27
 		lwz	r3,0(r4)
@@ -5217,7 +5234,7 @@ DeleteTaskPPC:
 
 		addi	r4,r2,18202
 		
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 
 .NotTwo:	lwz	r4,TASKPPC_MSGPORT(r31)
 		mr.	r27,r4
@@ -5225,16 +5242,16 @@ DeleteTaskPPC:
 
 		addi	r4,r27,MP_PPC_SEM
 		
-		LIBCALLPOWERPC FreeSemaphorePPC
+		bl FreeSemaphorePPC
 
 		mr	r4,r27
 		
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
 
 .NoMsgPort:	li	r4,SonnetBase
 		lwz	r4,TaskListSem(r4)
 		
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 
 		lwz	r4,TASKPPC_TASKPTR(r31)
 		lwz	r3,0(r4)
@@ -5251,12 +5268,12 @@ DeleteTaskPPC:
 		li	r4,SonnetBase
 		lwz	r4,TaskListSem(r4)
 		
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 	
 		lwz	r4,17740(r2)			#Task	(Voyager or Babylon 5?)
 		lwz	r5,17736(r2)			#Signal
 		
-		LIBCALLPOWERPC SignalPPC
+		bl SignalPPC
 
 		mr.	r29,r29				#This task?
 		beq-	.NotOwnTask2			#no? Skip next
@@ -5265,13 +5282,13 @@ DeleteTaskPPC:
 		li	r0,-1
 		stb	r0,626(r30)			#Some Flag?
 		
-		LIBCALLPOWERPC CauseInterrupt
+		bl CauseInterrupt
 		
 .EndTask:	b	.EndTask			#Halt this Task
 
 .NotOwnTask2:	li	r4,Atomic
 
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3			
 		beq+	.NotOwnTask2			#Wait Atomic
@@ -5296,7 +5313,7 @@ DeleteTaskPPC:
 
 		li	r4,Atomic
 		
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		lwz	r26,0(r13)
 		lwz	r27,4(r13)
@@ -5341,7 +5358,7 @@ SetHardware:
 		beq-	.ClearDBreak
 		b	.HWEnd
 
-.TraceOn:	LIBCALLPOWERPC WarpSuper
+.TraceOn:	bl WarpSuper
 
 		mfmsr	r0
 		ori	r0,r0,PSL_SE
@@ -5349,11 +5366,11 @@ SetHardware:
 		isync	
 		sync
 		
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 
 		b	.HWEnd
 		
-.TraceOff:	LIBCALLPOWERPC WarpSuper
+.TraceOff:	bl WarpSuper
 
 		mfmsr	r0
 		ori	r0,r0,PSL_SE
@@ -5362,11 +5379,11 @@ SetHardware:
 		isync	
 		sync	
 		
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 
 		b	.HWEnd
 
-.BranchOn:	LIBCALLPOWERPC WarpSuper
+.BranchOn:	bl WarpSuper
 
 		mfmsr	r0
 		ori	r0,r0,PSL_BE
@@ -5374,11 +5391,11 @@ SetHardware:
 		isync	
 		sync	
 		
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 
 		b	.HWEnd
 
-.BranchOff:	LIBCALLPOWERPC WarpSuper
+.BranchOff:	bl WarpSuper
 
 		mfmsr	r0
 		ori	r0,r0,PSL_BE
@@ -5387,11 +5404,11 @@ SetHardware:
 		isync	
 		sync	
 		
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 
 		b	.HWEnd
 
-.FPExcOn:	LIBCALLPOWERPC WarpSuper
+.FPExcOn:	bl WarpSuper
 
 		mtfsfi	1,0
 		mtfsfi	2,0
@@ -5406,11 +5423,11 @@ SetHardware:
 		isync	
 		sync	
 		
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 
 		b	.HWEnd
 
-.FPExcOff:	LIBCALLPOWERPC WarpSuper
+.FPExcOff:	bl WarpSuper
 
 		mfmsr	r0
 		ori	r0,r0,PSL_FE0|PSL_FE1
@@ -5419,11 +5436,11 @@ SetHardware:
 		isync	
 		sync	
 
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 
 		b	.HWEnd
 		
-.SetIBreak:	LIBCALLPOWERPC WarpSuper
+.SetIBreak:	bl WarpSuper
 		
 		mr	r4,r5
 		loadreg	r0,0xfffffffc
@@ -5431,20 +5448,20 @@ SetHardware:
 		ori	r4,r4,3
 		mtspr	IABR,r4
 
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 
 		b	.HWEnd
 
-.ClearIBreak:	LIBCALLPOWERPC WarpSuper
+.ClearIBreak:	bl WarpSuper
 
 		li	r0,0
 		mtspr	IABR,r0
 		
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 
 		b	.HWEnd
 
-.SetDBreak:	LIBCALLPOWERPC WarpSuper
+.SetDBreak:	bl WarpSuper
 		
 		mr	r4,r5
 		loadreg	r0,0xfffffff8
@@ -5452,16 +5469,16 @@ SetHardware:
 		ori	r4,r4,7
 		mtspr	DABR,r4
 		
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 		
 		b	.HWEnd
 
-.ClearDBreak:	LIBCALLPOWERPC WarpSuper
+.ClearDBreak:	bl WarpSuper
 
 		li	r0,0
 		mtspr	DABR,r0
 		
-		LIBCALLPOWERPC WarpUser
+		bl WarpUser
 		
 .HWEnd:		li	r4,HW_AVAILABLE
 
@@ -5501,18 +5518,18 @@ CreatePoolPPC:
 		mr	r5,r29
 		li	r6,32
 		
-		LIBCALLPOWERPC AllocVecPPC
+		bl AllocVecPPC
 		
 		mr.	r31,r3
 		beq-	.TooSmall
 		
 		la	r4,POOL_PUDDLELIST(r31)
 		
-		LIBCALLPOWERPC NewListPPC
+		bl NewListPPC
 		
 		la	r4,POOL_BLOCKLIST(r31)
 		
-		LIBCALLPOWERPC NewListPPC
+		bl NewListPPC
 		
 		stw	r29,POOL_REQUIREMENTS(r31)
 		stw	r30,POOL_PUDDLESIZE(r31)
@@ -5546,27 +5563,27 @@ DeletePoolPPC:
 		
 .NextPuddle:	la	r4,POOL_PUDDLELIST(r31)
 		
-		LIBCALLPOWERPC RemHeadPPC
+		bl RemHeadPPC
 		
 		mr.	r4,r3
 		beq	.NextBlock	
 		
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
 		
 		b	.NextPuddle
 	
 .NextBlock:	la	r4,POOL_BLOCKLIST(r31)
 
-		LIBCALLPOWERPC RemHeadPPC
+		bl RemHeadPPC
 		
 		mr.	r4,r3
 		beq	.AllFreed		
 		
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
 		
 .AllFreed:	mr	r4,r31
 		
-		LIBCALLPOWERPC FreeVecPPC
+		bl FreeVecPPC
 		
 .NoHeader:	lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -5594,7 +5611,7 @@ AllocPooledPPC:
 		li	r4,SonnetBase
 		lwz	r4,MemSem(r4)
 		
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 		
 		
 		lwz	r29,POOL_TRESHSIZE(r31)
@@ -5606,7 +5623,7 @@ AllocPooledPPC:
 		lwz	r5,POOL_REQUIREMENTS(r31)
 		li	r6,32
 		
-		LIBCALLPOWERPC AllocVecPPC
+		bl AllocVecPPC
 		
 		mr.	r5,r3
 		
@@ -5619,7 +5636,7 @@ AllocPooledPPC:
 		la	r4,POOL_BLOCKLIST(r31)
 		
 		
-		LIBCALLPOWERPC AddHeadPPC
+		bl AddHeadPPC
 		
 		
 		la	r3,8(r29)			#Point beyond Minimal List Node
@@ -5631,7 +5648,7 @@ AllocPooledPPC:
 		lwz	r5,POOL_REQUIREMENTS(r31)
 		li	r6,32
 		
-		LIBCALLPOWERPC AllocVecPPC
+		bl AllocVecPPC
 		
 		mr.	r5,r3
 		beq-	.NoPooledMem
@@ -5641,14 +5658,14 @@ AllocPooledPPC:
 		mr	r29,r5
 		la	r4,POOL_PUDDLELIST(r31)
 		
-		LIBCALLPOWERPC AddHeadPPC
+		bl AddHeadPPC
 		
 		la	r3,8(r29)
 		
 .NoPooledMem:	li	r4,SonnetBase
 		lwz	r4,MemSem(r4)
 		
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 		
 		lwz	r29,0(r13)
 		lwz	r30,4(r13)
@@ -5678,7 +5695,7 @@ FreePooledPPC:
 		li	r4,SonnetBase
 		lwz	r4,MemSem(r4)
 		
-		LIBCALLPOWERPC ObtainSemaphorePPC
+		bl ObtainSemaphorePPC
 		
 		
 		lwz	r29,POOL_TRESHSIZE(r31)
@@ -5688,18 +5705,18 @@ FreePooledPPC:
 		
 		subi	r4,r30,8
 		
-		LIBCALLPOWERPC RemovePPC
+		bl RemovePPC
 
 		b	.FrPooledMem
 		
 .DoFrPuddle:	subi	r4,r30,8			#STUB (same as block at the moment)
 
-		LIBCALLPOWERPC RemovePPC				
+		bl RemovePPC				
 		
 .FrPooledMem:	li	r4,SonnetBase
 		lwz	r4,MemSem(r4)
 		
-		LIBCALLPOWERPC ReleaseSemaphorePPC
+		bl ReleaseSemaphorePPC
 		
 		lwz	r29,0(r13)
 		lwz	r30,4(r13)
@@ -5734,7 +5751,7 @@ WaitPPC:
 		
 .WaitPPCAtom:	li	r4,Atomic
 
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.WaitPPCAtom
@@ -5750,9 +5767,9 @@ WaitPPC:
 
 		li	r4,Atomic
 		
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 		
-		LIBCALLPOWERPC CauseInterrupt
+		bl CauseInterrupt
 
 .WaitForRun:	lbz	r0,TC_STATE(r31)
 		cmplwi	r0,TS_RUN
@@ -5760,7 +5777,7 @@ WaitPPC:
 
 .WaitPPCAtom2:	li	r4,Atomic
 
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.WaitPPCAtom2
@@ -5773,7 +5790,7 @@ WaitPPC:
 
 		li	r4,Atomic
 		
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 		mr	r3,r5
 
@@ -5805,7 +5822,7 @@ SetTaskPriPPC:
 
 .PriAtomic:	li	r4,Atomic
 
-		LIBCALLPOWERPC AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.PriAtomic
@@ -5849,15 +5866,15 @@ SetTaskPriPPC:
 
 .NoSelf:	li	r4,Atomic
 		
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
-		LIBCALLPOWERPC CauseInterrupt
+		bl CauseInterrupt
 
 		b	.ExitPri
 
 .DonePriChange:	li	r4,Atomic
 
-		LIBCALLPOWERPC AtomicDone
+		bl AtomicDone
 
 .ExitPri:	mr	r3,r29
 		lwz	r29,0(r13)

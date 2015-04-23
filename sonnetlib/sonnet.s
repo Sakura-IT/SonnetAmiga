@@ -324,10 +324,6 @@ RLoc	add.l d2,(a2)+
 	beq.s NoLib
 
 	move.l SonnetBase(pc),a1
-	move.l a1,a2
-	moveq.l #$3f,d1
-ClearB	clr.l (a2)+
-	dbf d1,ClearB
 	move.l d0,PowerPCBase(a1)
 	move.l a5,8(a1)					;Memheader at $8
 	move.l a1,(a1)					;Sonnet relocated mem at $0

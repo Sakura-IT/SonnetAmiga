@@ -34,7 +34,7 @@
 .set IdDefTasks,168				#666
 .set MemSem,172
 .set PowerPCBase,176
-.set UNUSED,180
+.set CanFlush,180
 .set UNUSED,188
 
 .set SonnetBusClock,66666666			#66.6 MHz
