@@ -78,7 +78,7 @@ SetLen:		mr	r30,r28
 
 		bl	mmuSetup			#Setup BATs. Needs to be changed to tables
 		bl	Epic				#Setup the EPIC controller
-#		bl	Caches				#Setup the L1 and L2 cache
+		bl	Caches				#Setup the L1 and L2 cache
 
 		loadreg	r3,0x8000			#Start hardcoded at 0x8000
 		mr	r31,r3
@@ -224,9 +224,6 @@ End:		mflr	r4
 		LIBCALLPOWERPC NewListPPC
 
 		LIBCALLPOWERPC FlushL1DCache
-		
-		li	r14,-1
-		stw	r14,CanFlush(r0)
 
 		mtsrr0	r31
 		mfmsr	r14
@@ -432,6 +429,8 @@ Caches:		mfspr	r4,HID0
 		xori	r4,r4,HID0_ICFI|HID0_DCFI
 		mtspr	HID0,r4
 		sync
+		
+		blr					#REMOVE ME FOR L1 CACHE
 
 		mfspr	r4,HID0	
 		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
@@ -1243,11 +1242,8 @@ EInt:		b	.DecInt
 		mr.	r9,r3
 		beq	.ReturnToUser
 
-.Dispatch:	li	r4,0
-		stw	r4,CanFlush(r0)
-		LIBCALLPOWERPC FlushL1DCache
-
-		
+.Dispatch:	LIBCALLPOWERPC FlushL1DCache
+						
 		li	r4,TS_RUN
 		stb	r4,TC_STATE(r9)
 		stw	r9,RunningTask(r0)
@@ -1255,9 +1251,7 @@ EInt:		b	.DecInt
 		loadreg	r4,500000			#fixed stack len (for now)
 		
 		LIBCALLPOWERPC AllocVecPPC
-		
-		li	r4,-1
-		stw	r4,CanFlush(r0)
+
 		mr.	r4,r3
 		beq	.ReturnToUser	
 		
@@ -1396,7 +1390,7 @@ TestRoutine:	b	.IntReturn
 		cmpw	r3,r4
 		beq	.GoToWait
 
-		lwz	r3,0(r3)
+		lwz	r3,SonnetBase(r0)
 		la	r4,NewTasks(r3)
 	
 		LIBCALLPOWERPC RemHeadPPC
@@ -1683,35 +1677,7 @@ EIntEnd:
 
 #********************************************************************************************
 
-PrInt:							#Privilege Exception
-		mtsprg1	r4
-		mtsprg2	r5
-		mtsprg3	r6
-		
-		li	r4,0x7000
-
-		li	r6,0x400
-		mr	r5,r6
-		mtctr	r6
-	
-.Fl1:		lwz	r6,0(r4)
-		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz+	.Fl1
-	
-		li	r4,0x7000
-		mtctr	r5
-		
-.Fl2:		dcbf	r0,r4
-		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz+	.Fl2	
-		
-		isync
-		sync
-		
-		mfsprg1	r4
-		mfsprg2	r5
-		mfsprg3	r6
-		
+PrInt:							#Privilege Exception		
 		mtsprg1	r3
 		mfspr	r3,HID0
 		ori	r3,r3,HID0_ICFI|HID0_DCFI

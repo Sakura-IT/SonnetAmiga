@@ -25,16 +25,16 @@
 .set ExceptionMode,114
 .set Interrupt,115
 .set AllTasks,116				#MLH
-.set SnoopSem,128				#Pointer
-.set SnoopList,132				#MLH (424)
-.set NewTasks,144				#MLH
+.set NewTasks,128				#MLH, Shared, 32 aligned
+.set SnoopSem,1140				#Pointer
+.set SnoopList,144				#MLH (424)
 .set CurrentPort,156
 .set NumAllTasks,160				#630
 .set IdSysTasks,164				#662
 .set IdDefTasks,168				#666
 .set MemSem,172
 .set PowerPCBase,176
-.set CanFlush,180
+.set UNUSED,180
 .set UNUSED,188
 
 .set SonnetBusClock,66666666			#66.6 MHz

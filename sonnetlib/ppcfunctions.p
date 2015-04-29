@@ -919,12 +919,6 @@ FindTagItemPPC:
 FlushL1DCache:
 		BUILDSTACKPPC
 		
-		stwu	r31,-4(r13)
-		
-		lwz	r31,CanFlush(r0)
-		mr.	r31,r31
-		bne	.AtomFlush
-		
 		li	r4,0x7000
 
 		li	r6,0x400
@@ -941,17 +935,6 @@ FlushL1DCache:
 .Fl2:		dcbf	r0,r4
 		addi	r4,r4,L1_CACHE_LINE_SIZE
 		bdnz+	.Fl2
-		
-		b	.EndFlush
-		
-.AtomFlush:	bl WarpSuper
-		
-		isync
-		
-		bl WarpUser
-
-.EndFlush:	lwz	r31,0(r13)
-		addi	r13,r13,4
 
 		DSTRYSTACKPPC
 
@@ -2261,7 +2244,7 @@ WaitFor68K:
 		mr	r31,r4
 		
 .Check68K:	
-#		bl FlushL1DCache
+		bl FlushL1DCache
 		
 		loadreg r30,"DONE"
 		lwz	r6,MN_IDENTIFIER(r31)
