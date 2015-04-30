@@ -1316,35 +1316,35 @@ EInt:		b	.DecInt
 		sync
 		isync
 
-		mr	r11,r4
-		mr	r12,r5
-		mr	r14,r6
-
-		li	r4,0x7000
-		li	r6,0x400
-		mr	r5,r6
-		mtctr	r6
-	
-.Fl1:		lwz	r6,0(r4)
-		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz+	.Fl1
-	
-		li	r4,0x7000
-		mtctr	r5
-		
-.Fl2:		dcbf	r0,r4
-		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz+	.Fl2
-		
-		mfspr	r4,HID0
-		ori	r4,r4,HID0_DCFI|HID0_ICFI
-		xori	r4,r4,HID0_DCFI|HID0_ICFI
-		mtspr	HID0,r4
-		sync
-
-		mr	r4,r11
-		mr	r5,r12
-		mr	r6,r14
+#		mr	r11,r4
+#		mr	r12,r5
+#		mr	r14,r6
+#
+#		li	r4,0x7000
+#		li	r6,0x400
+#		mr	r5,r6
+#		mtctr	r6
+#	
+#.Fl1:		lwz	r6,0(r4)
+#		addi	r4,r4,L1_CACHE_LINE_SIZE
+#		bdnz+	.Fl1
+#	
+#		li	r4,0x7000
+#		mtctr	r5
+#		
+#.Fl2:		dcbf	r0,r4
+#		addi	r4,r4,L1_CACHE_LINE_SIZE
+#		bdnz+	.Fl2
+#		
+#		mfspr	r4,HID0
+#		ori	r4,r4,HID0_DCFI|HID0_ICFI
+#		xori	r4,r4,HID0_DCFI|HID0_ICFI
+#		mtspr	HID0,r4
+#		sync
+#
+#		mr	r4,r11
+#		mr	r5,r12
+#		mr	r6,r14
 
 		mtsprg0	r8
 
