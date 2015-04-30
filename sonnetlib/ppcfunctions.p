@@ -364,6 +364,29 @@ AllocVecPPC:
 		stwu	r7,-4(r13)
 		stwu	r6,-4(r13)
 
+		mr	r31,r4
+		mr	r30,r5
+		mr	r29,r6
+
+		bl	FlushL1DCache
+		
+		bl 	WarpSuper
+		
+		mfspr	r4,HID0
+		ori	r4,r4,HID0_DCFI|HID0_ICFI
+		xori	r4,r4,HID0_DCFI|HID0_ICFI
+		mtspr	HID0,r4
+		sync
+		
+		mr.	r3,r3
+		bne	.InException
+		
+		bl	WarpUser
+
+.InException:	mr	r4,r31
+		mr	r5,r30
+		mr	r6,r29
+
 		li	r3,0
 		mr.	r4,r4
 		beq	.error
@@ -462,7 +485,20 @@ AllocVecPPC:
 
 		bl FlushL1DCache
 		
-		mr.	r3,r31
+		bl 	WarpSuper
+		
+		mfspr	r4,HID0
+		ori	r4,r4,HID0_DCFI|HID0_ICFI
+		xori	r4,r4,HID0_DCFI|HID0_ICFI
+		mtspr	HID0,r4
+		sync
+		
+		mr.	r3,r3
+		bne	.InException2
+		
+		bl	WarpUser
+		
+.InException2:	mr.	r3,r31
 		beq	.SkipAlign
 		
 		addi	r3,r3,39
@@ -504,6 +540,21 @@ FreeVecPPC:
 		stwu	r20,-4(r13)
 		stwu	r7,-4(r13)
 		stwu	r6,-4(r13)
+		
+		mr	r31,r4
+		bl	FlushL1DCache
+		
+		bl 	WarpSuper
+		
+		mfspr	r3,HID0
+		ori	r3,r3,HID0_DCFI|HID0_ICFI
+		xori	r3,r3,HID0_DCFI|HID0_ICFI
+		mtspr	HID0,r3
+		sync
+		
+		bl	WarpUser
+		
+		mr	r4,r31
 		
 		li	r3,1
 		lwz	r4,-4(r4)
@@ -567,7 +618,18 @@ FreeVecPPC:
 		subf.	r3,r29,r3
 
 .error2:	mr	r31,r3
-		bl FlushL1DCache
+		bl	FlushL1DCache
+		
+		bl 	WarpSuper
+		
+		mfspr	r3,HID0
+		ori	r3,r3,HID0_DCFI|HID0_ICFI
+		xori	r3,r3,HID0_DCFI|HID0_ICFI
+		mtspr	HID0,r3
+		sync
+		
+		bl	WarpUser
+		
 		mr	r3,r31
 		
 		lwz	r6,0(r13)
@@ -939,7 +1001,7 @@ FlushL1DCache:
 		DSTRYSTACKPPC
 
 		blr
-								
+				
 #********************************************************************************************
 #
 #	message = AllocXMsgPPC(bodysize, replyport) // r3=r4,r5
@@ -2208,8 +2270,18 @@ PutXMsgPPC:
 
 		bl AddTailPPC
 		
-		bl FlushL1DCache
+		bl	FlushL1DCache
 		
+		bl 	WarpSuper
+		
+		mfspr	r4,HID0
+		ori	r4,r4,HID0_DCFI|HID0_ICFI
+		xori	r4,r4,HID0_DCFI|HID0_ICFI
+		mtspr	HID0,r4
+		sync
+		
+		bl	WarpUser
+				
 		mr 	r4,r31
 		
 		lwz	r4,MP_SIGTASK(r4)	#Port flags to be implemented (PA_SIGNAL etc)
@@ -2243,8 +2315,13 @@ WaitFor68K:
 
 		mr	r31,r4
 		
-.Check68K:	
-		bl FlushL1DCache
+.Check68K:
+		bl WarpSuper
+		
+		la	r6,MN_IDENTIFIER(r31)
+		dcbi	r0,r6
+		
+		bl WarpUser
 		
 		loadreg r30,"DONE"
 		lwz	r6,MN_IDENTIFIER(r31)

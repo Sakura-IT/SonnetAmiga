@@ -216,11 +216,12 @@ EndDrty	move.l #$48003f00,(a5)
 
 loop2	move.l (a2)+,(a5)+
 	dbf d6,loop2
-	jsr _LVOCacheClearU(a6)
 
 	move.l #$abcdabcd,$6004(a1)		;Code Word
 	move.l #$abcdabcd,$6008(a1)		;Sonnet Mem Start (Translated to PCI)
 	move.l #$abcdabcd,$600c(a1)		;Sonnet Mem Len
+
+	jsr _LVOCacheClearU(a6)
 
 	tst.l d4
 	bne.s NoCmm
@@ -353,15 +354,14 @@ RLoc	add.l d2,(a2)+
 	jsr _LVOCreateNewProc(a6)
 	move.l 4.w,a6
 
-NoLib	jsr _LVOCacheClearU(a6)
-	move.l a5,a1
+NoLib	move.l a5,a1
 	jsr _LVORemove(a6)
 	move.w #$0a01,8(a5)
 	move.l a5,a1
 	lea MemList(a6),a0
 	jsr _LVOEnqueue(a6)
 	jsr _LVOEnable(a6)
-
+	jsr _LVOCacheClearU(a6)
 	bra Clean
 
 ;********************************************************************************************
@@ -507,13 +507,9 @@ MsgT68k	move.b LN_TYPE(a1),d7
 	beq.s Sig68k
 	cmp.b #NT_REPLYMSG,d7				;signal PPC that 68k is done (HACK)
 	bne.s NextMsg
-;	ILLEGAL
-;	NOP
-	move.l #"DONE",d6
-	move.l d6,MN_IDENTIFIER(a1)
-	move.l MN_PPC(a1),a1
-	moveq.l #TS_READY,d6
-	move.b d6,TC_STATE(a1)	
+	move.l _PowerPCBase(pc),a6
+	jsr _LVOPutXMsg(a6)				;message the PPC
+	move.l 4.w,a6
 	bra.s NextMsg
 
 Sig68k	move.l ThisTask(a6),a0
@@ -1146,6 +1142,13 @@ SPrintF68K:
 ;********************************************************************************************
 
 PutXMsg:
+	movem.l d0-a6,-(a7)			#STUB
+	move.l #"DONE",d6
+	move.l d6,MN_IDENTIFIER(a1)
+	move.l MN_PPC(a1),a1
+	moveq.l #TS_READY,d6
+	move.b d6,TC_STATE(a1)
+	movem.l (a7)+,d0-a6
 	rts
 
 ;********************************************************************************************
