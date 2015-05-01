@@ -435,7 +435,7 @@ Caches:		mfspr	r4,HID0
 		mtspr	HID0,r4
 		sync
 		
-		blr					#REMOVE ME FOR L1 CACHE
+#		blr					#REMOVE ME FOR L1 CACHE
 
 		mfspr	r4,HID0	
 #		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
@@ -1162,7 +1162,9 @@ FillEm:		addi	r17,r17,0x100
 
 #********************************************************************************************
 
-EInt:		b	.DecInt
+EInt:		b	.Trace
+		b	.BreakPoint
+		b	.DecInt
 
 		mtsprg2	r0
 		mfsrr0	r0
@@ -1313,40 +1315,16 @@ EInt:		b	.DecInt
 		lwz	r8,PP_CODE(r8)
 		add	r8,r8,r9
 		
-		sync
+		lwz	r11,Break(r0)
+		mr.	r11,r11
+		beq	.NoBreak				#Should be beq
+		
+		mr	r11,r8
+		ori	r11,r11,3
+		mtspr	IABR,r11				#Set breakpoint
 		isync
 
-#		mr	r11,r4
-#		mr	r12,r5
-#		mr	r14,r6
-#
-#		li	r4,0x7000
-#		li	r6,0x400
-#		mr	r5,r6
-#		mtctr	r6
-#	
-#.Fl1:		lwz	r6,0(r4)
-#		addi	r4,r4,L1_CACHE_LINE_SIZE
-#		bdnz+	.Fl1
-#	
-#		li	r4,0x7000
-#		mtctr	r5
-#		
-#.Fl2:		dcbf	r0,r4
-#		addi	r4,r4,L1_CACHE_LINE_SIZE
-#		bdnz+	.Fl2
-#		
-#		mfspr	r4,HID0
-#		ori	r4,r4,HID0_DCFI|HID0_ICFI
-#		xori	r4,r4,HID0_DCFI|HID0_ICFI
-#		mtspr	HID0,r4
-#		sync
-#
-#		mr	r4,r11
-#		mr	r5,r12
-#		mr	r6,r14
-
-		mtsprg0	r8
+.NoBreak:	mtsprg0	r8
 
 		li	r8,0
 		
@@ -1704,17 +1682,48 @@ TestRoutine:	b	.IntReturn
 		sync
 
 		b	.RDecInt
+		
+#********************************************************************************************
+
+.BreakPoint:	
+		mfmsr	r15
+		ori	r15,r15,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r15				#Reenable MMU (can affect srr0/srr1 acc Docs)
+		isync					#Also reenable FPU
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		xori	r0,r0,HID0_DCE
+		sync	
+		mtspr	HID0,r0
+		isync
+		
+		loadreg	r3,"WARP"
+		stw	r3,0xf4(r0)
+		mfsrr0	r3
+		stw	r3,0xf8(r0)
+.BrkPnt:	b	.BrkPnt
+
+#********************************************************************************************
+
+.Trace:		lwz	r0,0xfc(r0)
+		addi	r0,r0,1
+		stw	r0,0xfc(r0)
+		rfi
 
 #********************************************************************************************
 	
 EIntEnd:
 		mflr	r4
-		loadreg	r5,0x48002b04
-		stw	r5,0x500(r0)
-		loadreg r5,0x48002700
-		stw	r5,0x900(r0)	
+		loadreg	r5,0x48002b0c
+		stw	r5,0x500(r0)			#External Interrupt
+		loadreg r5,0x48002708
+		stw	r5,0x900(r0)			#Decrementer
+		loadreg	r5,0x48001d04
+		stw	r5,0x1300(r0)			#Instruction Address Breakpoint
+		loadreg	r5,0x48002300
+		stw	r5,0xd00(r0)			#Trace
 	
-		li	r3,0x3000			#Jump from Exception (0x500) immediatly to 0x3000
+		li	r3,0x3000			#Jump from Exception immediatly to 0x3000
 		li	r5,EIntEnd-EInt
 		li	r6,0
 		bl	copy_and_flush
@@ -1743,12 +1752,11 @@ PrInt:							#Privilege Exception
 		mfsprg1	r3
 		li	r0,0				#SuperKey
 		rfi
-.HaltErr:
-		loadreg r3,"HALT"			#DEBUG
-		stw	r3,0xf0(r0)
-		mfsrr0	r3
+
+.HaltErr:	loadreg r3,"HALT"			#DEBUG
 		stw	r3,0xf4(r0)
-		stw	r0,0xf8(r0)
+		mfsrr0	r3
+		stw	r3,0xf8(r0)
 .xxHaltErr2:	b .xxHaltErr2
 
 #********************************************************************************************
@@ -1764,4 +1772,5 @@ PrIntEnd:
 		blr
 
 #********************************************************************************************
+
 PPCEnd:

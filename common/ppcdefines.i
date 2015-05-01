@@ -34,7 +34,7 @@
 .set IdDefTasks,168				#666
 .set MemSem,172
 .set PowerPCBase,176
-.set UNUSED,180
+.set Break,180
 .set UNUSED,188
 
 .set SonnetBusClock,66666666			#66.6 MHz
@@ -54,7 +54,7 @@
 .set PPCINFO_SYSTEMLOAD,      	0x80102009		#Total system load *100 [%]
 
 .set SDR1,25
-
+.set IABR,1010
 .set CPUF_G3,			0x00200000
 .set CPUF_G4,			0x00400000
 .set CPUF_750,			0x00200000
