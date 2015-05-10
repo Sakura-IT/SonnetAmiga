@@ -370,8 +370,7 @@ AllocVecPPC:
 		addi	r4,r4,32
 		rlwinm	r4,r4,0,0,26		#Align LEN to 32
 		
-		li 	r20,SonnetBase
-		lwz	r20,PPCMemHeader(r20)		
+		lwz	r20,PPCMemHeader(r0)		
 		lwz	r5,MH_FREE(r20)
 		stw	r5,0xf8(r0)
 		subfco	r31,r5,r4
@@ -513,8 +512,7 @@ FreeVecPPC:
 		
 		li	r3,1
 		lwz	r4,-4(r4)
-		li	r20,SonnetBase
-		lwz	r20,PPCMemHeader(r20)
+		lwz	r20,PPCMemHeader(r0)
 		addi	r23,r20,MH_FIRST
 		lwz	r5,0(r23)
 		cmpwi	r5,0
@@ -611,15 +609,14 @@ GetInfo:
 		
 		bl WarpSuper
 		
-		li	r5,SonnetBase
 		mfspr	r3,PVR
-		stw	r3,CPUInfo(r5)
+		stw	r3,CPUInfo(r0)
 		mfspr	r3,HID1
-		stw	r3,CPUHID1(r5)
+		stw	r3,CPUHID1(r0)
 		mfspr	r3,HID0
-		stw	r3,CPUHID0(r5)
+		stw	r3,CPUHID0(r0)
 		mfspr	r3,SDR1
-		stw	r3,CPUSDR1(r5)
+		stw	r3,CPUSDR1(r0)
 		
 		bl WarpUser	
 		
@@ -664,8 +661,7 @@ GetInfo:
 		b	.NextInList
 		
 
-.INFO_CPU:	li	r7,SonnetBase
-		lwz	r7,CPUInfo(r7)
+.INFO_CPU:	lwz	r7,CPUInfo(r0)
 		rlwinm	r7,r7,16,28,31
 		andi.	r7,r7,4
 		beq+	.G3
@@ -674,13 +670,11 @@ GetInfo:
 .G3:		loadreg	r7,CPUF_G3
 		b	.GotCPU
 		
-.INFO_PVR:	li	r7,SonnetBase
-		lwz	r7,CPUInfo(r7)
+.INFO_PVR:	lwz	r7,CPUInfo(r0)
 .GotCPU:	stw	r7,4(r4)
 		b	.NextInList
 		
-.INFO_ICACHE:	li	r8,SonnetBase
-		lwz	r8,CPUHID0(r8)
+.INFO_ICACHE:	lwz	r8,CPUHID0(r0)
 		rlwinm	r8,r8,19,29,31
 .ReUse:		andi.	r8,r8,5
 		li	r7,1
@@ -695,20 +689,17 @@ GetInfo:
 		addi	r7,r7,4
 		b	.StoreTag
 
-.INFO_DCACHE:	li	r8,SonnetBase
-		lwz	r8,CPUHID0(r8)
+.INFO_DCACHE:	lwz	r8,CPUHID0(r0)
 		rlwinm	r8,r8,20,29,31
 		b	.ReUse
 		
-.INFO_PAGETABLE:	
-		li	r7,SonnetBase
-		lwz	r7,CPUSDR1(r7)
+.INFO_PAGETABLE:
+		lwz	r7,CPUSDR1(r0)
 		rlwinm	r7,r7,0,0,15
 		b 	.StoreTag
 		
 .INFO_TABLESIZE:
-		li	r8,SonnetBase
-		lwz	r8,CPUSDR1(r8)
+		lwz	r8,CPUSDR1(r0)
 		li	r7,0
 		rlwinm.	r8,r8,0,23,31
 		beq	.NoShift
@@ -725,8 +716,7 @@ GetInfo:
 .StoreTag:	stw	r7,4(r4)
 		b	.NextInList
 		
-.INFO_CPUCLOCK:	li	r7,SonnetBase
-		lwz	r7,CPUHID1(r7)
+.INFO_CPUCLOCK:	lwz	r7,CPUHID1(r0)
 		rlwinm	r7,r7,4,28,31
 		cmpwi	r7,1
 		beq	.MHz500
@@ -1111,8 +1101,7 @@ FreeSignalPPC:
 		cmpwi	r4,-1
 		beq-	.NoSigDef
 
-		li	r5,SonnetBase
-		lwz	r5,RunningTask(r5)		
+		lwz	r5,RunningTask(r0)		
 
 		lwz	r3,TC_SIGALLOC(r5)
 		li	r6,1
@@ -1136,8 +1125,7 @@ AllocSignalPPC:
 		
 		extsb	r4,r4
 
-		li	r5,SonnetBase
-		lwz	r5,RunningTask(r5)
+		lwz	r5,RunningTask(r0)
 
 		lwz	r3,TC_SIGALLOC(r5)
 		cmpwi	r4,-1
@@ -1235,8 +1223,7 @@ SetSignalPPC:
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 
-		li	r6,SonnetBase
-		lwz	r6,RunningTask(r6)
+		lwz	r6,RunningTask(r0)
 
 		mr	r30,r4
 		
@@ -1279,8 +1266,7 @@ LockTaskList:
 		
 		stwu	r31,-4(r13)
 
-		li	r4,SonnetBase
-		lwz	r4,TaskListSem(r4)
+		lwz	r4,TaskListSem(r0)
 
 		bl ObtainSemaphorePPC
 
@@ -1302,8 +1288,7 @@ LockTaskList:
 UnLockTaskList:
 		BUILDSTACKPPC
 		
-		li	r4,SonnetBase
-		lwz	r4,TaskListSem(r4)
+		lwz	r4,TaskListSem(r0)
 
 		bl ReleaseSemaphorePPC
 
@@ -1399,7 +1384,6 @@ ObtainSemaphorePPC:
 		stwu	r4,-4(r13)
 		stwu	r3,-4(r13)
 
-		li	r31,SonnetBase
 		mr	r30,r4
 
 .WaitRes:	li	r4,Atomic
@@ -1413,7 +1397,7 @@ ObtainSemaphorePPC:
 		extsh.	r0,r5
 		bne-	.link21
 
-		lwz	r3,RunningTask(r31)
+		lwz	r3,RunningTask(r0)
 		stw	r3,SS_OWNER(r30)
 		
 		li	r4,Atomic
@@ -1421,7 +1405,7 @@ ObtainSemaphorePPC:
 
 		b	.Obtained
 
-.link21:	lwz	r3,RunningTask(r31)
+.link21:	lwz	r3,RunningTask(r0)
 		lwz	r4,SS_OWNER(r30)
 		cmplw	r3,r4
 		bne-	.SemNotFree
@@ -1509,7 +1493,6 @@ AttemptSemaphorePPC:
 		stwu	r5,-4(r13)
 		stwu	r4,-4(r13)
 
-		li	r31,SonnetBase
 		mr	r30,r4
 
 .WaitRes2:	li	r4,Atomic
@@ -1520,7 +1503,7 @@ AttemptSemaphorePPC:
 		
 		lha	r5,SS_QUEUECOUNT(r30)
 		addi	r5,r5,1
-		lwz	r3,RunningTask(r31)
+		lwz	r3,RunningTask(r0)
 		mr.	r5,r5
 		beq-	.NoQueue
 		lwz	r4,SS_OWNER(r30)
@@ -1780,19 +1763,16 @@ AddSemaphorePPC:
 		mr.	r3,r3
 		beq-	.NoInitSem
 
-		li	r4,SonnetBase
-		lwz	r4,SemListSem(r4)
+		lwz	r4,SemListSem(r0)
 		
 		bl ObtainSemaphorePPC
 		
-		li	r4,SonnetBase
-		lwz	r4,Semaphores(r4)
+		lwz	r4,Semaphores(r0)
 		mr	r5,r30
 		
 		bl EnqueuePPC
 		
-		li	r4,SonnetBase
-		lwz	r4,SemListSem(r4)
+		lwz	r4,SemListSem(r0)
 		
 		bl ReleaseSemaphorePPC
 
@@ -1821,8 +1801,7 @@ RemSemaphorePPC:
 
 		bl FreeSemaphorePPC
 
-		li	r4,SonnetBase
-		lwz	r4,SemListSem(r4)
+		lwz	r4,SemListSem(r0)
 		
 		bl ObtainSemaphorePPC
 
@@ -1830,8 +1809,7 @@ RemSemaphorePPC:
 
 		bl RemovePPC
 
-		li	r4,SonnetBase
-		lwz	r4,SemListSem(r4)
+		lwz	r4,SemListSem(r0)
 
 		bl ReleaseSemaphorePPC
 
@@ -1856,21 +1834,18 @@ FindSemaphorePPC:
 
 		mr	r30,r4
 
-		li	r4,SonnetBase
-		lwz	r4,SemListSem(r4)
+		lwz	r4,SemListSem(r0)
 
 		bl ObtainSemaphorePPC
 
-		li	r4,SonnetBase
-		lwz	r4,Semaphores(r4)
+		lwz	r4,Semaphores(r0)
 		mr	r5,r30
 
 		bl FindNamePPC
 
 		mr	r30,r3
 
-		li	r4,SonnetBase
-		lwz	r4,SemListSem(r4)
+		lwz	r4,SemListSem(r0)
 		
 		bl ReleaseSemaphorePPC
 
@@ -1902,19 +1877,16 @@ AddPortPPC:
 		stwu	r0,4(r3)
 		stwu	r3,-4(r3)
 
-		li	r4,SonnetBase
-		lwz	r4,PortListSem(r4)
+		lwz	r4,PortListSem(r0)
 
 		bl ObtainSemaphorePPC
 
-		li	r4,SonnetBase
-		lwz	r4,Ports(r4)
+		lwz	r4,Ports(r0)
 		mr	r5,r30
 
 		bl EnqueuePPC
 
-		li	r4,SonnetBase
-		lwz	r4,PortListSem(r4)
+		lwz	r4,PortListSem(r0)
 		
 		bl ReleaseSemaphorePPC
 
@@ -1938,8 +1910,7 @@ RemPortPPC:
 		stwu	r31,-4(r13)
 		mr	r31,r4
 
-		li	r4,SonnetBase
-		lwz	r4,PortListSem(r4)
+		lwz	r4,PortListSem(r0)
 
 		bl ObtainSemaphorePPC
 
@@ -1949,8 +1920,7 @@ RemPortPPC:
 		stw	r4,4(r3)
 		stw	r3,0(r4)
 		
-		li	r4,SonnetBase
-		lwz	r4,PortListSem(r4)
+		lwz	r4,PortListSem(r0)
 		
 		bl ReleaseSemaphorePPC
 
@@ -1974,19 +1944,16 @@ FindPortPPC:
 		mr	r31,r3
 		mr	r5,r4
 
-		li	r4,SonnetBase
-		lwz	r4,PortListSem(r4)
+		lwz	r4,PortListSem(r0)
 
 		bl ObtainSemaphorePPC
 
-		li	r4,SonnetBase
-		lwz	r4,Ports(r4)		
+		lwz	r4,Ports(r0)		
 
 		bl FindNamePPC
 
 		mr	r31,r3
-		li	r4,SonnetBase
-		lwz	r4,PortListSem(r4)
+		lwz	r4,PortListSem(r0)
 
 		bl ReleaseSemaphorePPC
 
@@ -2211,29 +2178,12 @@ PutXMsgPPC:
 		stb	r31,LN_TYPE(r5)
 				
 		mr	r31,r4
-		la	r4,MP_MSGLIST(r4)
-
-		bl AddTailPPC
+		mr	r30,r5
 		
 		bl	FlushL1DCache
-		
-		bl 	WarpSuper
-		
-		mfspr	r4,HID0
-		ori	r4,r4,HID0_DCFI|HID0_ICFI
-		xori	r4,r4,HID0_DCFI|HID0_ICFI
-		mtspr	HID0,r4
-		sync
-		
-		bl	WarpUser
 				
 		mr 	r4,r31
-		
-		lwz	r4,MP_SIGTASK(r4)	#Port flags to be implemented (PA_SIGNAL etc)
-		mr.	r4,r4
-		beq-	.NoSigTask
-		li	r5,0x100		#Fixed at the moment
-		isync
+		mr	r5,r30
 		
 		bl Signal68K
 
@@ -2323,13 +2273,12 @@ Run68K:
 		
 		loadreg	r5,"T68K"
 		stw	r5,MN_IDENTIFIER(r30)
-		li	r4,SonnetBase
-		lwz	r5,RunningTask(r4)
+		lwz	r5,RunningTask(r0)
 		stw	r5,MN_PPC(r30)
 		la	r5,TASKPPC_SIZE(r5)
 		lwz	r5,MN_MIRROR(r5)
 		stw	r5,MN_MIRROR(r30)
-		lwz	r4,MCTask(r4)
+		lwz	r4,MCTask(r0)
 		la	r4,pr_MsgPort(r4)		
 		mr	r5,r30
 		sync
@@ -2510,8 +2459,6 @@ TrySemaphorePPC:
 		stwu	r6,-4(r13)
 		stwu	r5,-4(r13)
 		stwu	r4,-4(r13)
-
-		li	r31,SonnetBase
 	
 		mr	r30,r4
 		mr	r28,r5
@@ -2531,7 +2478,7 @@ TrySemaphorePPC:
 		sth	r5,SS_QUEUECOUNT(r30)
 		extsh.	r0,r5
 		bne-	.NoTimer
-		lwz	r3,RunningTask(r31)
+		lwz	r3,RunningTask(r0)
 		stw	r3,SS_OWNER(r30)
 		
 		lwz	r4,SSPPC_RESERVE(r30)		
@@ -2542,7 +2489,7 @@ TrySemaphorePPC:
 
 		b	.Jump1
 		
-.NoTimer:	lwz	r3,RunningTask(r31)
+.NoTimer:	lwz	r3,RunningTask(r0)
 		lwz	r4,SS_OWNER(r30)
 		cmplw	r3,r4
 		bne-	.Diff1
@@ -2602,7 +2549,7 @@ TrySemaphorePPC:
 
 		b	.WeirdWait
 		
-.Jump3:		lwz	r3,RunningTask(r31)
+.Jump3:		lwz	r3,RunningTask(r0)
 		lwz	r4,TC_SIGRECVD(r3)
 		or	r4,r28,r4
 		mr	r27,r4
@@ -2671,8 +2618,6 @@ SetCache:
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
 
-		li	r30,SonnetBase
-
 		cmplwi	r4,CACHE_DCACHEFLUSH
 		beq-	.DCACHEFLUSH
 		cmplwi	r4,CACHE_ICACHEINV
@@ -2729,7 +2674,7 @@ SetCache:
 		mr.	r6,r6
 		beq-	.DoneCache
 
-		lbz	r29,DLockState(r30)
+		lbz	r29,DLockState(r0)
 		mr.	r29,r29
 		bne	.DoneCache
 
@@ -2766,11 +2711,11 @@ SetCache:
 		bl WarpUser
 		
 		li	r0,-1
-		stb	r0,DLockState(r30)
+		stb	r0,DLockState(r0)
 
 		b	.DoneCache
 				
-.DCACHEOFF:	lbz	r29,DState(r30)			#ExceptionMode should be Neg?
+.DCACHEOFF:	lbz	r29,DState(r0)			#ExceptionMode should be Neg?
 		mr.	r29,r29
 		bne	.DoneCache
 		
@@ -2786,7 +2731,7 @@ SetCache:
 		bl WarpUser
 		
 		li	r0,-1
-		stb	r0,DState(r30)
+		stb	r0,DState(r0)
 		
 		b	.DoneCache
 
@@ -2802,7 +2747,7 @@ SetCache:
 		b	.DoneCache
 
 .DCACHEUNLOCK:	li	r0,0
-		stb	r0,DLockState(r30)
+		stb	r0,DLockState(r0)
 		
 		bl WarpSuper
 
@@ -2818,7 +2763,7 @@ SetCache:
 		b	.DoneCache
 
 .DCACHEON:	li	r0,0
-		stb	r0,DState(r30)		
+		stb	r0,DState(r0)		
 		
 		bl WarpSuper
 
@@ -2909,10 +2854,10 @@ SetCache:
 		beq-	.DCACHEFLUSHALL
 		mr.	r6,r6
 		beq-	.DCACHEFLUSHALL
-		lbz	r29,DState(r30)
+		lbz	r29,DState(r0)
 		mr.	r29,r29
 		bne	.DoneCache
-		lbz	r29,DLockState(r30)
+		lbz	r29,DLockState(r0)
 		mr.	r29,r29
 		bne	.DoneCache
 		
@@ -2935,10 +2880,10 @@ SetCache:
 		b	.DoneCache
 
 .DCACHEFLUSHALL:
-		lbz	r29,DState(r30)
+		lbz	r29,DState(r0)
 		mr.	r29,r29
 		bne	.DoneCache
-		lbz	r29,DLockState(r30)
+		lbz	r29,DLockState(r0)
 		mr.	r29,r29
 		bne	.DoneCache
 
@@ -3152,8 +3097,7 @@ AddUniquePortPPC:
 		mr	r30,r4
 		li	r29,-1
 
-		li	r4,SonnetBase
-		lwz	r4,PortListSem(r4)
+		lwz	r4,PortListSem(r0)
 		bl ObtainSemaphorePPC
 
 		lwz	r4,10(r30)
@@ -3167,8 +3111,7 @@ AddUniquePortPPC:
 		b	.SkipDup
 
 .Duplicate:	li	r29,0
-.SkipDup:	li	r4,SonnetBase
-		lwz	r4,PortListSem(r4)
+.SkipDup:	lwz	r4,PortListSem(r0)
 		bl ReleaseSemaphorePPC
 
 		mr	r3,r29
@@ -3198,8 +3141,7 @@ AddUniqueSemaphorePPC:
 		mr	r30,r4
 		li	r29,-1
 
-		li	r4,SonnetBase
-		lwz	r4,SemListSem(r4)
+		lwz	r4,SemListSem(r0)
 		bl ObtainSemaphorePPC
 
 		lwz	r4,10(r30)
@@ -3214,8 +3156,7 @@ AddUniqueSemaphorePPC:
 		b	.SkipDup2
 
 .Duplicate2:	li	r29,0
-.SkipDup2:	li	r4,SonnetBase
-		lwz	r4,SemListSem(r4)
+.SkipDup2:	lwz	r4,SemListSem(r0)
 
 		bl ReleaseSemaphorePPC
 
@@ -3247,8 +3188,7 @@ PutPublicMsgPPC:
 		mr	r30,r5
 		li	r29,-1
 
-		li	r4,SonnetBase
-		lwz	r4,PortListSem(r4)
+		lwz	r4,PortListSem(r0)
 		bl ObtainSemaphorePPC
 
 		mr	r4,r31
@@ -3264,8 +3204,7 @@ PutPublicMsgPPC:
 		b	.SkipStatus
 
 .PortNotFound:	li	r29,0
-.SkipStatus:	li	r4,SonnetBase
-		lwz	r4,PortListSem(r4)
+.SkipStatus:	lwz	r4,PortListSem(r0)
 		bl ReleaseSemaphorePPC
 
 		mr	r3,r29
@@ -3553,9 +3492,9 @@ CreateTaskPPC:
  
 		mr	r17,r2 
 		mr	r30,r4 
- 		li	r23,SonnetBase 		
-		lwz	r3,RunningTask(r23)
-		lwz	r23,PowerPCBase(r23)
+		
+		lwz	r3,RunningTask(r0)
+		lwz	r23,PowerPCBase(r0)
 		lwz	r4,TASKPPC_FLAGS(r3)
 		ori	r4,r4,TASKPPC_CHOWN 
 		stw	r4,TASKPPC_FLAGS(r3) 
@@ -3745,8 +3684,7 @@ CreateTaskPPC:
 		mr.	r3,r3 
 		beq-	.NoMotherPri
  
- 		li	r3,SonnetBase			#Mother task
- 		lwz	r3,RunningTask(r3)
+ 		lwz	r3,RunningTask(r0)		#Mother task
 		lbz	r0,LN_PRI(r3) 
 		extsb	r0,r0 
 		stb	r0,LN_PRI(r31) 
@@ -4085,8 +4023,7 @@ CreateTaskPPC:
 		lwz	r3,LN_NAME(r31)			#Copy Name pointer 
 		stw	r3,LN_NAME(r5) 
  
-		li	r4,SonnetBase
-		lwz	r4,TaskListSem(r4)
+		lwz	r4,TaskListSem(r0)
  
  		bl ObtainSemaphorePPC
 	 
@@ -4098,16 +4035,14 @@ CreateTaskPPC:
 		stw	r3,4(r5) 
 		stw	r5,0(r3) 
  
- 		li	r4,SonnetBase
- 		la	r4,NumAllTasks(r4)
+ 		la	r4,NumAllTasks(r0)
 		lwz	r3,0(r4) 
 		addi	r3,r3,1				#Set number of tasks
 		stw	r3,0(r4) 
  
 		dcbst	r0,r4				#Cache 
  
- 		li	r4,SonnetBase
- 		lwz	r4,TaskListSem(r4)
+ 		lwz	r4,TaskListSem(r0)
 		
 		bl ReleaseSemaphorePPC
  
@@ -4132,16 +4067,14 @@ CreateTaskPPC:
 		andi.	r0,r3,TASKPPC_SYSTEM
 		bne-	.SystemTask			#Yes -> c684 
  
-		li	r4,SonnetBase			#Normal Tasks +1
-		lwz	r5,IdDefTasks(r4)
+		lwz	r5,IdDefTasks(r0)		#Normal Tasks +1
 		addi	r5,r5,1 
-		stw	r5,IdDefTasks(r4) 
+		stw	r5,IdDefTasks(r0) 
 		b	.SkipSystem 
  
-.SystemTask:	li	r4,SonnetBase			#System Tasls +1
-		lwz	r5,IdSysTasks(r4)
+.SystemTask:	lwz	r5,IdSysTasks(r0)		#System Tasks +1
 		addi	r5,r5,1
-		stw	r5,IdSysTasks(r4)
+		stw	r5,IdSysTasks(r0)
  
 .SkipSystem:	stw	r5,TASKPPC_ID(r31)
 		li	r0,TS_READY
@@ -4243,8 +4176,7 @@ CreateTaskPPC:
 .SetTask0:	li	r3,0				#Error flag in r3 
  
 .SkipToEnd:	mr	r5,r3
-		li	r3,SonnetBase 
-		lwz	r3,RunningTask(r3)
+		lwz	r3,RunningTask(r0)
  
 		lwz	r4,TASKPPC_FLAGS(r3)
 		ori	r4,r4,TASKPPC_CHOWN 
@@ -4348,8 +4280,8 @@ ChangeStack:
 		stwu	r27,-4(r13)
 
 		mr	r29,r4	
-		li	r3,SonnetBase
-		lwz	r3,RunningTask(r3)		
+
+		lwz	r3,RunningTask(r0)		
 		mr	r28,r3
 		lwz	r5,TASKPPC_STACKSIZE(r3)
 		cmplw	r4,r5
@@ -4446,16 +4378,14 @@ FindTaskPPC:
 		mr.	r4,r4
 		bne-	.NotOwnTask
 
-		li	r3,SonnetBase
-		lwz	r3,RunningTask(r3)
+		lwz	r3,RunningTask(r0)
 		b	.ExitFind
 
 .NotOwnTask:	stwu	r31,-4(r13)
 		mr	r31,r3
 		mr	r5,r4
 
-		li	r4,SonnetBase
-		lwz	r4,TaskListSem(r4)
+		lwz	r4,TaskListSem(r0)
 
 		bl ObtainSemaphorePPC
 
@@ -4469,8 +4399,7 @@ FindTaskPPC:
 		lwz	r3,14(r3)			#Pointer to PPCTask in AllTasks list
 .NameNotFound:	mr	r31,r3
 
-		li	r4,SonnetBase
-		lwz	r4,TaskListSem(r4)
+		lwz	r4,TaskListSem(r0)
 		
 		bl ReleaseSemaphorePPC
 
@@ -4489,8 +4418,7 @@ FindTaskPPC:
 #********************************************************************************************
 
 IsExceptionMode:
-		li	r3,SonnetBase
-		lbz	r3,ExceptionMode(r3)
+		lbz	r3,ExceptionMode(r0)
 		blr
 		
 #********************************************************************************************
@@ -4507,8 +4435,7 @@ ProcurePPC:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 
-		li	r3,SonnetBase
-		lwz	r3,RunningTask(r3)
+		lwz	r3,RunningTask(r0)
 
 		mr	r31,r3
 		mr	r30,r4
@@ -4716,19 +4643,16 @@ SnoopTask:
 
 .SnoopStart:	stw	r3,22(r31)
 
-		li	r4,SonnetBase
-		lwz	r4,SnoopSem(r4)
+		lwz	r4,SnoopSem(r0)
 		
 		bl ObtainSemaphorePPC
 
-		li	r4,SonnetBase
-		lwz	r4,SonnetBase(r4)
+		lwz	r4,SnoopList(r0)
 		mr	r5,r31
 
 		bl AddHeadPPC
 
-		li	r4,SonnetBase
-		lwz	r4,SnoopSem(r4)
+		lwz	r4,SnoopSem(r0)
 		
 		bl ReleaseSemaphorePPC
 
@@ -4770,8 +4694,7 @@ EndSnoopTask:
 		mr.	r31,r31
 		beq-	.NoEndSnoop
 
-		li	r4,SonnetBase
-		lwz	r4,SnoopSem(r4)
+		lwz	r4,SnoopSem(r0)
 		
 		bl ObtainSemaphorePPC
 
@@ -4779,8 +4702,7 @@ EndSnoopTask:
 		
 		bl RemovePPC
 
-		li	r4,SonnetBase
-		lwz	r4,SnoopSem(r4)
+		lwz	r4,SnoopSem(r0)
 		
 		bl ReleaseSemaphorePPC
 
@@ -4822,8 +4744,7 @@ ObtainSemaphoreSharedPPC:
 		stwu	r4,-4(r13)
 		stwu	r3,-4(r13)
 
-		li	r31,SonnetBase
-		lwz	r31,RunningTask(r31)
+		lwz	r31,RunningTask(r0)
 		mr	r30,r4
 		
 .SharedAtomic:	li	r4,Atomic
@@ -4946,8 +4867,7 @@ AttemptSemaphoreSharedPPC:
 		stwu	r5,-4(r13)
 		stwu	r4,-4(r13)
 
-		li	r31,SonnetBase
-		lwz	r31,RunningTask(r31)
+		lwz	r31,RunningTask(r0)
 		mr	r30,r4
 
 .SharedAttempt:	li	r4,Atomic
@@ -5015,16 +4935,15 @@ CauseInterrupt:
 		BUILDSTACKPPC
 
 		stwu	r31,-4(r13)
-		li	r31,SonnetBase
 
 		li	r0,-1
-		stb	r0,Interrupt(r31)
+		stb	r0,Interrupt(r0)
 
 		li	r4,0
 		
 		bl SetDecInterrupt
 
-.IntWait:	lbz	r0,Interrupt(r31)
+.IntWait:	lbz	r0,Interrupt(r0)
 		mr.	r0,r0
 		bne+	.IntWait
 		isync
@@ -5065,13 +4984,11 @@ CheckExcSignal:
 		or	r5,r5,r4
 		stw	r5,TC_SIGRECVD(r7)
 		
-		li	r10,SonnetBase
-		stw	r7,TaskException(r10)
+		stw	r7,TaskException(r0)
 
 		bl CauseInterrupt
 
-		li	r10,SonnetBase
-.IntWait2:	lwz	r0,TaskException(r10)
+.IntWait2:	lwz	r0,TaskException(r0)
 		mr.	r0,r0
 		bne+	.IntWait2
 
@@ -5102,8 +5019,7 @@ SetExceptPPC:
 		mr	r29,r6
 		mr	r28,r2
 
-		li	r6,SonnetBase
-		lwz	r6,RunningTask(r6)
+		lwz	r6,RunningTask(r0)
 		mr	r30,r4
 
 .DoAtomic2:	li	r4,Atomic
@@ -5159,8 +5075,7 @@ DeleteTaskPPC:
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
 
-		li	r5,SonnetBase
-		lwz	r5,RunningTask(r5)		#ThisTask
+		lwz	r5,RunningTask(r0)		#ThisTask
 		li	r29,0
 		cmpw	r4,r5				#To be deleted?
 		beq-	.DelOwnTask			#Yes: then r29=-1
@@ -5169,14 +5084,12 @@ DeleteTaskPPC:
 .DelOwnTask:	li	r29,-1				#0 then r29=0 (owntask)
 		mr	r4,r5
 .DelOtherTask:	mr	r31,r4				#task to r31
-		li	r30,SonnetBase
 
-		li	r4,SonnetBase
-		lwz	r4,SnoopSem(r4)
+		lwz	r4,SnoopSem(r0)
 		
 		bl ObtainSemaphorePPC
 
-		la	r28,SnoopList(r30)
+		la	r28,SnoopList(r0)
 .Loop100:	lwz	r27,0(r28)
 		mr.	r27,r27
 		beq-	.EmptySnoopLst
@@ -5195,8 +5108,7 @@ DeleteTaskPPC:
 .Link100:	mr	r28,r27
 		b	.Loop100
 
-.EmptySnoopLst:	li	r4,SonnetBase
-		lwz	r4,SnoopSem(r4)
+.EmptySnoopLst:	lwz	r4,SnoopSem(r0)
 		
 		bl ReleaseSemaphorePPC
 
@@ -5253,8 +5165,7 @@ DeleteTaskPPC:
 		
 		bl FreeVecPPC
 
-.NoMsgPort:	li	r4,SonnetBase
-		lwz	r4,TaskListSem(r4)
+.NoMsgPort:	lwz	r4,TaskListSem(r0)
 		
 		bl ObtainSemaphorePPC
 
@@ -5263,15 +5174,13 @@ DeleteTaskPPC:
 		lwz	r4,4(r4)
 		stw	r4,4(r3)
 		stw	r3,0(r4)
-		li	r4,SonnetBase
-		la	r4,NumAllTasks(r4)		#Tasks -1
+		la	r4,NumAllTasks(r0)		#Tasks -1
 		lwz	r3,0(r4)
 		subi	r3,r3,1
 		stw	r3,0(r4)
 		dcbst	r0,r4
 
-		li	r4,SonnetBase
-		lwz	r4,TaskListSem(r4)
+		lwz	r4,TaskListSem(r0)
 		
 		bl ReleaseSemaphorePPC
 	
@@ -5285,7 +5194,7 @@ DeleteTaskPPC:
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r31)
 		li	r0,-1
-		stb	r0,626(r30)			#Some Flag?
+		stb	r0,626(r0)			#Some Flag?
 		
 		bl CauseInterrupt
 		
@@ -5305,7 +5214,7 @@ DeleteTaskPPC:
 		stw	r3,0(r4)
 		mr	r5,r31
 		
-		addi	r4,r30,130			#??
+		la	r4,130(r0)			#??
 		addi	r4,r4,4
 		lwz	r3,4(r4)
 		stw	r5,4(r4)
@@ -5613,8 +5522,7 @@ AllocPooledPPC:
 		mr	r31,r4
 		mr	r30,r5
 		
-		li	r4,SonnetBase
-		lwz	r4,MemSem(r4)
+		lwz	r4,MemSem(r0)
 		
 		bl ObtainSemaphorePPC
 		
@@ -5667,8 +5575,7 @@ AllocPooledPPC:
 		
 		la	r3,8(r29)
 		
-.NoPooledMem:	li	r4,SonnetBase
-		lwz	r4,MemSem(r4)
+.NoPooledMem:	lwz	r4,MemSem(r0)
 		
 		bl ReleaseSemaphorePPC
 		
@@ -5697,12 +5604,10 @@ FreePooledPPC:
 		mr	r31,r4
 		mr	r30,r5
 		
-		li	r4,SonnetBase
-		lwz	r4,MemSem(r4)
+		lwz	r4,MemSem(r0)
 		
 		bl ObtainSemaphorePPC
-		
-		
+
 		lwz	r29,POOL_TRESHSIZE(r31)
 		
 		cmpw	r29,r30
@@ -5718,8 +5623,7 @@ FreePooledPPC:
 
 		bl RemovePPC				
 		
-.FrPooledMem:	li	r4,SonnetBase
-		lwz	r4,MemSem(r4)
+.FrPooledMem:	lwz	r4,MemSem(r0)
 		
 		bl ReleaseSemaphorePPC
 		
@@ -5749,8 +5653,7 @@ WaitPPC:
 		lwz	r3,52(r3)
 		lwz	r2,46(r3)
 
-		li	r31,SonnetBase
-		lwz	r31,RunningTask(r31)
+		lwz	r31,RunningTask(r0)
 
 		mr	r28,r4
 		
@@ -5822,7 +5725,6 @@ SetTaskPriPPC:
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
 
-		li	r31,SonnetBase
 		mr	r30,r4
 
 .PriAtomic:	li	r4,Atomic
@@ -5835,7 +5737,10 @@ SetTaskPriPPC:
 		lbz	r29,LN_PRI(r30)
 		extsb	r29,r29
 		stb	r5,LN_PRI(r30)
-		lwz	r3,88(r31)
+		lwz	r3,RunningTask(r0)
+		
+#		lwz	r3,88(r0)			#??
+
 		cmpw	r3,r30
 		beq-	.NoSelf
 
@@ -5862,10 +5767,10 @@ SetTaskPriPPC:
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r30)
 
-		addi	r4,r31,102			#sonnetbase +102 (some tasklist)
+		la	r4,102(r0)			#sonnetbase +102 (some tasklist)
 		bl	InsertOnPri
 
-		lwz	r4,102(r31)
+		lwz	r4,102(r0)			#??
 		cmplw	r4,r30
 		bne-	.DonePriChange
 

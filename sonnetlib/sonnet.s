@@ -555,9 +555,9 @@ SonInt:
 	and.l d2,d3
 	beq.s NoInt	
 	move.l 4.w,a6
-	move.l OMR0(a2),a1
-	move.l OMR1(a2),d0
-	jsr _LVOSignal(a6)
+	move.l OMR0(a2),a0
+	move.l OMR1(a2),a1
+	jsr _LVOPutMsg(a6)
 	move.l d2,OMISR(a2)
 NoInt	movem.l (a7)+,d1-a6
 	moveq.l #0,d0
