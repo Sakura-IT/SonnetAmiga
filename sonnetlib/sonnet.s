@@ -1148,6 +1148,8 @@ PutXMsg:
 	move.l MN_PPC(a1),a1
 	moveq.l #TS_READY,d6
 	move.b d6,TC_STATE(a1)
+	move.l 4.w,a6
+	jsr _LVOCacheClearU(a6)
 	movem.l (a7)+,d0-a6
 	rts
 

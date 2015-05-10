@@ -364,29 +364,6 @@ AllocVecPPC:
 		stwu	r7,-4(r13)
 		stwu	r6,-4(r13)
 
-		mr	r31,r4
-		mr	r30,r5
-		mr	r29,r6
-
-		bl	FlushL1DCache
-		
-		bl 	WarpSuper
-		
-		mfspr	r4,HID0
-		ori	r4,r4,HID0_DCFI|HID0_ICFI
-		xori	r4,r4,HID0_DCFI|HID0_ICFI
-		mtspr	HID0,r4
-		sync
-		
-		mr.	r3,r3
-		bne	.InException
-		
-		bl	WarpUser
-
-.InException:	mr	r4,r31
-		mr	r5,r30
-		mr	r6,r29
-
 		li	r3,0
 		mr.	r4,r4
 		beq	.error
@@ -394,8 +371,9 @@ AllocVecPPC:
 		rlwinm	r4,r4,0,0,26		#Align LEN to 32
 		
 		li 	r20,SonnetBase
-		lwz	r20,PPCMemHeader(r20)
+		lwz	r20,PPCMemHeader(r20)		
 		lwz	r5,MH_FREE(r20)
+		stw	r5,0xf8(r0)
 		subfco	r31,r5,r4
 		cmpw	r5,r4
 		bge+	.Link6
@@ -403,6 +381,7 @@ AllocVecPPC:
 .Link6:
 		lwz	r21,MH_FIRST(r20)
 		addi	r23,r20,MH_FIRST
+		
 .MemLoop:	lwz	r5,MC_BYTES(r21)
 		subfco	r31,r5,r4
 		cmpw	r5,r4
@@ -482,30 +461,19 @@ AllocVecPPC:
 		rlwimi	r4,r29,0,16,31
 
 .error:		mr	r31,r3
-
-		bl FlushL1DCache
 		
-		bl 	WarpSuper
-		
-		mfspr	r4,HID0
-		ori	r4,r4,HID0_DCFI|HID0_ICFI
-		xori	r4,r4,HID0_DCFI|HID0_ICFI
-		mtspr	HID0,r4
-		sync
-		
-		mr.	r3,r3
-		bne	.InException2
-		
-		bl	WarpUser
-		
-.InException2:	mr.	r3,r31
+		mr.	r3,r31
 		beq	.SkipAlign
 		
 		addi	r3,r3,39
 		rlwinm	r3,r3,0,0,26		#Align memblock to 32		
 		stw	r31,-4(r3)
 		
-.SkipAlign:	lwz	r6,0(r13)
+.SkipAlign:	mr	r31,r3
+		bl 	FlushL1DCache
+		mr	r3,r31
+
+		lwz	r6,0(r13)
 		lwzu	r7,4(r13)
 		lwzu	r20,4(r13)
 		lwzu	r21,4(r13)
@@ -542,19 +510,6 @@ FreeVecPPC:
 		stwu	r6,-4(r13)
 		
 		mr	r31,r4
-		bl	FlushL1DCache
-		
-		bl 	WarpSuper
-		
-		mfspr	r3,HID0
-		ori	r3,r3,HID0_DCFI|HID0_ICFI
-		xori	r3,r3,HID0_DCFI|HID0_ICFI
-		mtspr	HID0,r3
-		sync
-		
-		bl	WarpUser
-		
-		mr	r4,r31
 		
 		li	r3,1
 		lwz	r4,-4(r4)
@@ -619,16 +574,6 @@ FreeVecPPC:
 
 .error2:	mr	r31,r3
 		bl	FlushL1DCache
-		
-		bl 	WarpSuper
-		
-		mfspr	r3,HID0
-		ori	r3,r3,HID0_DCFI|HID0_ICFI
-		xori	r3,r3,HID0_DCFI|HID0_ICFI
-		mtspr	HID0,r3
-		sync
-		
-		bl	WarpUser
 		
 		mr	r3,r31
 		

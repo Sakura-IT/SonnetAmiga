@@ -190,11 +190,7 @@ End:		mflr	r4
 		la	r4,SnoopList(r0)
 		LIBCALLPOWERPC NewListPPC
 		
-		li	r4,SSPPC_SIZE*5			#Memory for 5 Semaphores
-		LIBCALLPOWERPC AllocVecPPC
-		
-		lwz	r4,SonnetBase(r0)
-		xor	r3,r3,r4		
+		li	r3,0x7000			#Put at 0x7000
 		
 		mr	r30,r3
 		mr	r4,r3
@@ -438,9 +434,9 @@ Caches:		mfspr	r4,HID0
 #		blr					#REMOVE ME FOR L1 CACHE
 
 		mfspr	r4,HID0	
-#		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
+		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
 #		ori	r4,r4,HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
-		ori	r4,r4,HID0_ICE|HID0_DCE
+#		ori	r4,r4,HID0_ICE|HID0_DCE
 		mtspr	HID0,r4
 		sync
 		 	
@@ -1162,7 +1158,11 @@ FillEm:		addi	r17,r17,0x100
 
 #********************************************************************************************
 
-EInt:		b	.Trace
+EInt:		b	.FPUnav
+		b	.Alignment
+		b	.ISI
+		b	.DSI
+		b	.Trace
 		b	.BreakPoint
 		b	.DecInt
 
@@ -1265,6 +1265,7 @@ EInt:		b	.Trace
 		stw	r9,RunningTask(r0)
 		
 		loadreg	r4,500000			#fixed stack len (for now)
+		mr	r31,r4
 		
 		LIBCALLPOWERPC AllocVecPPC
 
@@ -1279,7 +1280,7 @@ EInt:		b	.Trace
 		lwz	r6,SonnetBase(r0)
 		xor	r4,r4,r6		
 		stw	r4,TC_SPLOWER(r8)
-		loadreg	r5,500000-32
+		subi	r5,r31,32
 		add	r4,r4,r5
 		stw	r4,TC_SPUPPER(r8)
 		stw	r4,TC_SPREG(r8)
@@ -1402,10 +1403,8 @@ TestRoutine:	b	.IntReturn
 
 		li	r6,TS_RUN
 		stb	r6,TC_STATE(r9)
-		stw	r9,RunningTask(r0)
-		
+		stw	r9,RunningTask(r0)		
 		b	.LoadContext
-		
 
 .CheckWait:	li	r4,TS_WAIT
 		lbz	r3,TC_STATE(r9)
@@ -1642,8 +1641,7 @@ TestRoutine:	b	.IntReturn
 		
 		li	r0,TS_RUN
 		stb	r0,TC_STATE(r9)
-		stw	r9,RunningTask(r0)
-		
+		stw	r9,RunningTask(r0)		
 		b	.LoadContext
 
 .DoIdle:	loadreg	r19,0x8000			#Start hardcoded at 0x8000
@@ -1680,7 +1678,6 @@ TestRoutine:	b	.IntReturn
 		mtmsr	r5				#Reenable MMU (can affect srr0/srr1 acc Docs)
 		isync					#Also reenable FPU
 		sync
-
 		b	.RDecInt
 		
 #********************************************************************************************
@@ -1709,19 +1706,87 @@ TestRoutine:	b	.IntReturn
 		addi	r0,r0,1
 		stw	r0,0xfc(r0)
 		rfi
+		
+#********************************************************************************************
+
+.FPUnav:	mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		xori	r0,r0,HID0_DCE
+		sync	
+		mtspr	HID0,r0
+		isync
+		
+		loadreg	r3,"NOFP"
+		stw	r3,0xf4(r0)
+		mfsrr0	r3
+		stw	r3,0xf8(r0)
+.HaltFP:	b	.HaltFP
+
+#********************************************************************************************
+
+.Alignment:	mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		xori	r0,r0,HID0_DCE
+		sync	
+		mtspr	HID0,r0
+		isync
+		
+		loadreg	r3,"ALIG"
+		stw	r3,0xf4(r0)
+		mfsrr0	r3
+		stw	r3,0xf8(r0)
+.HaltAlign:	b	.HaltAlign
+
+#********************************************************************************************
+
+.ISI:		mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		xori	r0,r0,HID0_DCE
+		sync	
+		mtspr	HID0,r0
+		isync
+		
+		loadreg	r3,"ISI!"
+		stw	r3,0xf4(r0)
+		mfsrr0	r3
+		stw	r3,0xf8(r0)
+.HaltISI:	b	.HaltISI
+
+#********************************************************************************************
+
+.DSI:		mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		xori	r0,r0,HID0_DCE
+		sync	
+		mtspr	HID0,r0
+		isync
+		
+		loadreg	r3,"DSI!"
+		stw	r3,0xf4(r0)
+		mfsrr0	r3
+		stw	r3,0xf8(r0)
+.HaltDSI:	b	.HaltDSI
 
 #********************************************************************************************
 	
 EIntEnd:
-		mflr	r4
-		loadreg	r5,0x48002b0c
+		mflr	r4				#Setup a small jumptable for exceptions
+		loadreg	r5,0x48002b1c
 		stw	r5,0x500(r0)			#External Interrupt
-		loadreg r5,0x48002708
+		loadreg r5,0x48002718
 		stw	r5,0x900(r0)			#Decrementer
-		loadreg	r5,0x48001d04
+		loadreg	r5,0x48001d14
 		stw	r5,0x1300(r0)			#Instruction Address Breakpoint
-		loadreg	r5,0x48002300
+		loadreg	r5,0x48002310
 		stw	r5,0xd00(r0)			#Trace
+		loadreg	r5,0x48002d0c
+		stw	r5,0x300(r0)			#DSI
+		loadreg	r5,0x48002c08
+		stw	r5,0x400(r0)			#ISI
+		loadreg	r5,0x48002a04
+		stw	r5,0x600(r0)			#Alignment
+		loadreg	r5,0x48002800
+		stw	r5,0x800(r0)			#FP Unavailable
 	
 		li	r3,0x3000			#Jump from Exception immediatly to 0x3000
 		li	r5,EIntEnd-EInt
