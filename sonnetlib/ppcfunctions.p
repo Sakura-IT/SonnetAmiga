@@ -5795,11 +5795,91 @@ SetTaskPriPPC:
 		DSTRYSTACKPPC
 
 		blr
+		
+#********************************************************************************************
+#
+#	d0 = Run68KLowLevel(Code, Offset, a0, a1, d0, d1) // r3=r4,r5,r6,r7,r8,r9
+#
+#********************************************************************************************
+
+Run68KLowLevel:
+		BUILDSTACKPPC
+		
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
+		stwu	r25,-4(r13)
+		
+		mr	r31,r4
+		mr	r29,r5
+		mr	r28,r6
+		mr	r27,r7
+		mr	r26,r8
+		mr	r25,r9
+		
+.RunAtomic:	li	r4,Atomic
+		bl	AtomicTest
+	
+		mr.	r3,r3
+		beq+	.RunAtomic
+	
+		li	r5,0x6000-4
+		lwz	r6,SonnetBase(r0)
+		or	r5,r5,r6
+		
+		la	r30,4(r5)
+		li	r6,16
+		li	r7,0
+		mtctr	r6
+.ClearLLMsg:	stwu	r7,4(r5)
+		bdnz	.ClearLLMsg
+		
+		
+		stw	r31,MN_PPSTRUCT+0*4(r30)		# Code	/ 	Base
+		stw	r29,MN_PPSTRUCT+1*4(r30)		# 0	/	Offset
+		stw	r28,MN_PPSTRUCT+2*4(r30)		# a0
+		stw	r27,MN_PPSTRUCT+3*4(r30)		# a1
+		stw	r26,MN_PPSTRUCT+4*4(r30)		# d0
+		stw	r25,MN_PPSTRUCT+5*4(r30)		# d1
+		loadreg	r5,"LL68"
+		stw	r5,MN_IDENTIFIER(r30)
+		lwz	r5,RunningTask(r0)
+		stw	r5,MN_PPC(r30)
+		lwz	r4,MCTask(r0)
+		la	r4,pr_MsgPort(r4)		
+		mr	r5,r30
+		sync
+				
+		bl PutXMsgPPC
+		
+		mr	r4,r30
+		
+		bl WaitFor68K
+		
+		lwz	r3,MN_PPSTRUCT+6*4(r30)			# return d0
+		
+		li	r4,Atomic
+		bl	AtomicDone
+		
+		lwz	r25,0(r13)
+		lwz	r26,4(r13)
+		lwz	r27,8(r13)
+		lwz	r28,12(r13)
+		lwz	r29,16(r13)
+		lwz	r30,20(r13)
+		lwz	r31,24(r13)
+		addi	r13,r13,28
+		
+		DSTRYSTACKPPC
+		
+		blr
 
 #********************************************************************************************
 
 SPrintF:			blr
-Run68KLowLevel:			blr
 SignalPPC:			blr
 SetExcHandler:			li	r3,0
 				blr

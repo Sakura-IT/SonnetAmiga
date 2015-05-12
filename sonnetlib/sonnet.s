@@ -500,12 +500,14 @@ GetLoop	move.l d6,a0
 	beq MsgFPPC
 	cmp.l #"F68k",d0
 	beq.s MsgF68k
+	cmp.l #"LL68",d0
+	beq.s MsgLL68
 	bra.s GetLoop
 
 MsgT68k	move.b LN_TYPE(a1),d7
 	cmp.b #NT_MESSAGE,d7
 	beq.s Sig68k
-	cmp.b #NT_REPLYMSG,d7				;signal PPC that 68k is done (HACK)
+	cmp.b #NT_REPLYMSG,d7				;signal PPC that 68k is done
 	bne.s NextMsg
 	move.l _PowerPCBase(pc),a6
 	jsr _LVOPutXMsg(a6)				;message the PPC
@@ -536,6 +538,25 @@ MsgF68k	move.l d7,a1
 
 MsgFPPC	move.l d7,a1
 	jsr _LVOReplyMsg(a6)
+	bra NextMsg
+
+MsgLL68	move.l MN_PPSTRUCT+0*4(a1),a6
+	move.l MN_PPSTRUCT+1*4(a1),a0
+	add.l a6,a0
+	move.l a1,-(a7)
+	pea RtnLL(pc)
+	move.l a0,-(a7)
+	move.l MN_PPSTRUCT+2*4(a1),a0
+	move.l MN_PPSTRUCT+4*4(a1),d0
+	move.l MN_PPSTRUCT+5*4(a1),d1
+	move.l MN_PPSTRUCT+3*4(a1),a1
+	rts
+	
+RtnLL	move.l (a7)+,a1
+	move.l d0,MN_PPSTRUCT+6*4(a1)
+	move.l _PowerPCBase(pc),a6
+	jsr _LVOPutXMsg(a6)
+	move.l 4.w,a6
 	bra NextMsg
 
 	cnop 0,4
