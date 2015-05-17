@@ -221,9 +221,7 @@ EnqueuePPC:
 #
 #********************************************************************************************
 
-
 FindNamePPC:
-
 		lwz	r3,0(r4)
 		mr.	r3,r3
 		beq-	.E4
@@ -350,246 +348,69 @@ CmpTimePPC:
 #
 #********************************************************************************************
 
-AllocVecPPC:
-		BUILDSTACKPPC
+AllocVecPPC:	BUILDSTACKPPC
 
 		stwu	r31,-4(r13)
-		stwu	r30,-4(r13)
-		stwu	r29,-4(r13)
-		stwu	r28,-4(r13)
-		stwu	r23,-4(r13)
-		stwu	r22,-4(r13)
-		stwu	r21,-4(r13)
-		stwu	r20,-4(r13)
-		stwu	r7,-4(r13)
-		stwu	r6,-4(r13)
+		stwu	r9,-4(r13)
+		stwu	r8,-4(r13)
 
-		li	r3,0
-		mr.	r4,r4
-		beq	.error
-		addi	r4,r4,32
-		rlwinm	r4,r4,0,0,26		#Align LEN to 32
+		mr.	r3,r4
+		beq	.AllocErr
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC		#Fixed for now
 		
-		lwz	r20,PPCMemHeader(r0)		
-		lwz	r5,MH_FREE(r20)
-		stw	r5,0xf8(r0)
-		subfco	r31,r5,r4
-		cmpw	r5,r4
-		bge+	.Link6
-		b	.error
-.Link6:
-		lwz	r21,MH_FIRST(r20)
-		addi	r23,r20,MH_FIRST
+		addi	r8,r4,0x38					#d0
+		mr	r31,r8
+		mr	r9,r5						#d1
+		lwz	r4,SysBase(r0)
+		li	r5,_LVOAllocMem
+			
+		bl 	Run68KLowLevel
 		
-.MemLoop:	lwz	r5,MC_BYTES(r21)
-		subfco	r31,r5,r4
-		cmpw	r5,r4
-		blt	.Link7
-		b	.FoundMem
-.Link7:
-		lwz	r30,MC_NEXT(r21)
-		cmpwi	r30,0
-		bne+	.Link8
-		b	.error
-.Link8:
-		mr	r23,r21
-		lwz	r21,MC_NEXT(r21)
-		b	.MemLoop
+		mr.	r4,r3
+		beq	.AllocErr
 		
-.FoundMem:	mr	r22,r21
-		addco.	r22,r22,r4
-		mr	r3,r21
-		li	r29,4
-		addco.	r3,r3,r29
-		lwz	r5,MC_BYTES(r21)
-		subfco	r31,r5,r4
-		cmpw	r5,r4
-		beq-	.Yep
-		b	.MaybePerfect
+		addi	r3,r3,0x27
+		loadreg	r5,-32
+		and.	r3,r3,r5
 		
-.Yep:		lwz	r22,MC_NEXT(r21)
-		b	.JmpPerfect
-
-.MaybePerfect:	li	r29,4
-		addco.	r4,r4,r29
-		subfco	r31,r5,r4
-		cmpw	r5,r4
-		bne	.Link9
-		b	.Yep
-.Link9:
-		li	r29,4
-		addco.	r4,r4,r29
-		subfco	r31,r5,r4
-		cmpw	r5,r4
-		bne	.Link10
-		b	.Yep
-.Link10:
-		li	r29,8
-		subfco	r28,r4,r29
-		subf.	r4,r29,r4
-		lwz	r29,MC_NEXT(r21)
-		stw	r29,0(r22)
-		lwz	r29,MC_BYTES(r21)
-		stw	r29,4(r22)
-		lwz	r30,MC_BYTES(r22)
-		subfco	r28,r30,r4
-		subf.	r30,r4,r30
-		stw	r30,MC_BYTES(r22)
-.JmpPerfect:	lwz	r30,MH_FREE(r20)
-		subfco	r28,r30,r4
-		subf.	r30,r4,r30
-		stw	r30,MH_FREE(r20)
-		stw	r22,MC_NEXT(r23)
-		stw	r4,MC_NEXT(r21)
-		li	r29,5
-		subfco	r28,r4,r29
-		subf.	r4,r29,r4
-		li	r29,4
-		addco.	r21,r21,r29
-.ClrMem:	andi.	r30,r30,0
-		stb	r30,0(r21)
-		addi	r21,r21,1
-		extsh	r29,r4
-		cmpi	2,0,r29,0
-		beq-	cr2,.Link11
-		subi	r29,r29,1
-		rlwimi	r4,r29,0,16,31
-		b	.ClrMem
-.Link11:
-		subi	r29,r29,1
-		rlwimi	r4,r29,0,16,31
-
-.error:		mr	r31,r3
+		stw	r4,-4(r3)
+		stw	r31,-8(r3)
 		
-		mr.	r3,r31
-		beq	.SkipAlign
-		
-		addi	r3,r3,39
-		rlwinm	r3,r3,0,0,26		#Align memblock to 32		
-		stw	r31,-4(r3)
-		
-.SkipAlign:	mr	r31,r3
-		bl 	FlushL1DCache
-		mr	r3,r31
-
-		lwz	r6,0(r13)
-		lwzu	r7,4(r13)
-		lwzu	r20,4(r13)
-		lwzu	r21,4(r13)
-		lwzu	r22,4(r13)
-		lwzu	r23,4(r13)
-		lwzu	r28,4(r13)
-		lwzu	r29,4(r13)
-		lwzu	r30,4(r13)
-		lwzu	r31,4(r13)
-		addi	r13,r13,4
+.AllocErr:	lwz	r8,0(r13)
+		lwz	r9,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
 		
 		DSTRYSTACKPPC
 		
 		blr
-		
+	
 #********************************************************************************************
 #
 #	Result = FreeVecPPC(MemBlock)	// r3=r4 r3 should be MEMERR_SUCCESS on success
 #
 #********************************************************************************************		
-		
-FreeVecPPC:	
+
+FreeVecPPC:
 		BUILDSTACKPPC
-				
-		stwu	r31,-4(r13)
-		stwu	r30,-4(r13)
-		stwu	r29,-4(r13)
-		stwu	r28,-4(r13)
-		stwu	r23,-4(r13)
-		stwu	r22,-4(r13)
-		stwu	r21,-4(r13)
-		stwu	r20,-4(r13)
+		
+		stwu	r8,-4(r13)
 		stwu	r7,-4(r13)
-		stwu	r6,-4(r13)
 		
-		mr	r31,r4
+		lwz	r7,-4(r4)					#a1
+		lwz	r8,-8(r4)					#d0
+		lwz	r4,SysBase(r0)
+		li	r5,_LVOFreeMem
+			
+		bl 	Run68KLowLevel
 		
-		li	r3,1
-		lwz	r4,-4(r4)
-		lwz	r20,PPCMemHeader(r0)
-		addi	r23,r20,MH_FIRST
-		lwz	r5,0(r23)
-		cmpwi	r5,0
-		bne+	.Link12
-		b	.error2
-.Link12:
-		mr	r21,r5
-.MHLoop:	subfco	r31,r5,r4
-		cmpw	r5,r4
-		ble	.Link13
-		b	.FoundMH
-.Link13:
-		lwz	r5,MC_NEXT(r21)
-		cmpwi	r5,0
-		bne+	.Link14
-		b	.error2
-.Link14:
-		addi	r23,r21,MC_NEXT
-		b	.MHLoop
-
-.FoundMH:	mr	r21,r4
-		lwz	r6,-4(r21)
-		cmpwi	r6,0
-		bne+	.Link15
-		b	.error2
-.Link15:
-		mr	r7,r6
-		addi	r29,r0,4
-		subfco	r28,r4,r29
-		subf.	r4,r29,r4
-		addco.	r6,r6,r4
-		subfco	r31,r6,r5
-		cmpw	r6,r5
-		bne	.Link16
-		b	.OnlyChunk
-.Link16:
-		stw	r5,-4(r21)
-		stw	r7,0(r21)
-		b	.MoreChunks
-
-.OnlyChunk:	mr	r22,r5
-		lwz	r29,MC_NEXT(r22)
-		stw	r29,-4(r21)
-		lwz	r29,MC_BYTES(r22)
-		stw	r29,0(r21)
-		lwz	r30,0(r21)
-		addco.	r30,r30,r7
-		stw	r30,0(r21)
-
-.MoreChunks:	stw	r4,0(r23)
-		lwz	r30,MH_FREE(r20)
-		addco.	r30,r30,r7
-		stw	r30,MH_FREE(r20)
-		addi	r29,r0,1
-		subfco	r28,r3,r29
-		subf.	r3,r29,r3
-
-.error2:	mr	r31,r3
-		bl	FlushL1DCache
-		
-		mr	r3,r31
-		
-		lwz	r6,0(r13)
-		lwzu	r7,4(r13)
-		lwzu	r20,4(r13)
-		lwzu	r21,4(r13)
-		lwzu	r22,4(r13)
-		lwzu	r23,4(r13)
-		lwzu	r28,4(r13)
-		lwzu	r29,4(r13)
-		lwzu	r30,4(r13)
-		lwzu	r31,4(r13)
-		addi	r13,r13,4
+		lwz	r7,0(r13)
+		lwz	r8,4(r13)
+		addi	r13,r13,8
 		
 		DSTRYSTACKPPC
 		
-		blr	
+		blr		
 
 #********************************************************************************************
 #
@@ -958,8 +779,8 @@ AllocXMsgPPC:
 		
 		mr.	r3,r3
 		beq-	.NoMaam
-		stw	r30,14(r3)
-		sth	r31,18(r3)
+		stw	r30,MN_REPLYPORT(r3)
+		sth	r31,MN_LENGTH(r3)
 		
 .NoMaam:	lwz	r30,0(r13)
 		lwz	r31,4(r13)
@@ -1329,7 +1150,6 @@ InitSemaphorePPC:
 		beq-	.SemDone
 		stw	r3,SSPPC_RESERVE(r31)
 		li	r3,-1
-		b	.SemDone
 
 .SemDone:	lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -2157,11 +1977,14 @@ WarpSuper:
 #********************************************************************************************
 
 WarpUser:
+		lbz	r0,ExceptionMode(r0)
+		mr.	r0,r0
+		bne	.InException
 		mfmsr	r0			
 		ori	r0,r0,PSL_PR		#SET Bit 17 (PR) To User
 		mtmsr	r0
 		isync	
-		blr
+.InException:	blr
 
 #********************************************************************************************
 #
@@ -2211,12 +2034,12 @@ WaitFor68K:
 		mr	r31,r4
 		
 .Check68K:
-		bl WarpSuper
+		bl 	WarpSuper
 		
 		la	r6,MN_IDENTIFIER(r31)
 		dcbi	r0,r6
 		
-		bl WarpUser
+		bl 	WarpUser
 		
 		loadreg r30,"DONE"
 		lwz	r6,MN_IDENTIFIER(r31)
@@ -2228,11 +2051,21 @@ WaitFor68K:
 		li	r4,TS_WAIT
 		stb	r4,TC_STATE(r3)		
 		
-		bl CauseInterrupt
+		bl 	CauseInterrupt
 		
 		b	.Check68K				
 
-.Done68K:	lwz	r29,0(r13)
+.Done68K:	bl	WarpSuper
+		
+		li	r30,8
+		mtctr	r30
+.PPInvalid:	dcbi	r0,r31
+		addi	r31,r31,4
+		bdnz	.PPInvalid
+		
+		bl	WarpUser
+
+		lwz	r29,0(r13)
 		lwz	r30,4(r13)
 		lwz	r31,8(r13)
 		addi	r13,r13,12
@@ -2255,7 +2088,7 @@ Run68K:
 		stwu	r29,-4(r13)
 		mr	r31,r4
 		
-		li	r4,MN_SIZE+PP_SIZE+80
+		li	r4,MN_SIZE+PP_SIZE+92
 		li	r5,0
 		
 		bl AllocXMsgPPC
@@ -2314,18 +2147,24 @@ Run68K:
 		
 #********************************************************************************************
 #
-#	void Signal68K(task, signals) // r4,r5
+#	void Signal68K(Port, Message) // r4,r5
 #
 #********************************************************************************************
 
 Signal68K:	
 		BUILDSTACKPPC
 		
+		stwu	r31,-4(r13)
+		
 		lis	r3,EUMB
+		
 		stw	r5,0x5c(r3)
 		sync
 		stw	r4,0x58(r3)
 		sync
+		
+		lwz	r31,0(r13)
+		addi	r13,r13,4
 		
 		DSTRYSTACKPPC
 		
@@ -4300,9 +4139,9 @@ ChangeStack:
 		li	r4,24
 		loadreg	r5,0x10001
 		li	r6,0
-
+		
 		bl AllocVecPPC
-
+		
 		mr.	r3,r3
 		beq-	.SomeError2
 
@@ -4936,16 +4775,16 @@ CauseInterrupt:
 
 		stwu	r31,-4(r13)
 
-		li	r0,-1
-		stb	r0,Interrupt(r0)
+#		li	r0,-1
+#		stb	r0,Interrupt(r0)
 
 		li	r4,0
 		
 		bl SetDecInterrupt
 
-.IntWait:	lbz	r0,Interrupt(r0)
-		mr.	r0,r0
-		bne+	.IntWait
+#.IntWait:	lbz	r0,Interrupt(r0)
+#		mr.	r0,r0
+#		bne+	.IntWait
 		isync
 
 		lwz	r31,0(r13)
@@ -5826,7 +5665,7 @@ Run68KLowLevel:
 		mr.	r3,r3
 		beq+	.RunAtomic
 	
-		li	r5,0x6000-4
+		li	r5,0x6020-4
 		lwz	r6,SonnetBase(r0)
 		or	r5,r5,r6
 		
@@ -5846,8 +5685,8 @@ Run68KLowLevel:
 		stw	r25,MN_PPSTRUCT+5*4(r30)		# d1
 		loadreg	r5,"LL68"
 		stw	r5,MN_IDENTIFIER(r30)
-		lwz	r5,RunningTask(r0)
-		stw	r5,MN_PPC(r30)
+		li	r5,64
+		sth	r5,MN_LENGTH(r30)
 		lwz	r4,MCTask(r0)
 		la	r4,pr_MsgPort(r4)		
 		mr	r5,r30
@@ -5855,11 +5694,23 @@ Run68KLowLevel:
 				
 		bl PutXMsgPPC
 		
-		mr	r4,r30
+		mr	r31,r30		
 		
-		bl WaitFor68K
+		bl 	WarpSuper
+.Wait68KLow:		
+		la	r6,MN_IDENTIFIER(r31)
+		dcbi	r0,r6
 		
-		lwz	r3,MN_PPSTRUCT+6*4(r30)			# return d0
+		loadreg r30,"DONE"
+		lwz	r6,MN_IDENTIFIER(r31)
+		cmpw	r6,r30
+		bne 	.Wait68KLow
+		
+		bl	WarpUser
+		
+		isync
+		
+		lwz	r3,MN_PPSTRUCT+6*4(r31)			# return d0
 		
 		li	r4,Atomic
 		bl	AtomicDone
