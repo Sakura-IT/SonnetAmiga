@@ -37,6 +37,14 @@
 .set Break,180
 .set UNUSED,188
 
+.set _LVOAllocMem,		-198
+.set _LVOFreeMem,		-210
+
+.set MEMF_PUBLIC,		0x00000001
+.set MEMF_FAST,			0x00000004
+.set MEMF_CLEAR,		0x00010000
+.set MEMF_PPC,			0x00001000
+
 .set SonnetBusClock,66666666			#66.6 MHz
 .set SonnetTimerFreq,(SonnetBusClock/8)		#Default when EICR=0x4 at bits 30-28
 .set SwitchFreq,50				#50Hz
@@ -52,9 +60,7 @@
 .set PPCINFO_CPUCLOCK,        	0x80102007		#PPC CPU clock
 .set PPCINFO_CPULOAD,         	0x80102008		#Total CPU usage *100 [%]
 .set PPCINFO_SYSTEMLOAD,      	0x80102009		#Total system load *100 [%]
-
-.set SDR1,25
-.set IABR,1010
+			
 .set CPUF_G3,			0x00200000
 .set CPUF_G4,			0x00400000
 .set CPUF_750,			0x00200000
@@ -74,6 +80,7 @@
 .set FPF_ENABLEALL,		0x0000001f		#enable all FP exceptions
 .set FPF_DISABLEALL,		0x000003e0		#disable all FP exceptions
 
+.set SDR1,25
 .set IABR,1010
 .set DABR,1013
 
@@ -90,7 +97,7 @@
 .set HID0_BHTE,			0x00000004
 .set HID1,1009
 
-.set PICR1,0xA8
+.set PICR1,0xA8			#Processor Interface Configuration Register 1
 .set PICR1_CF_MP_MULTI,		0x00000003
 .set PICR1_SPEC_PCI,		0x00000004
 .set PICR1_CF_APARK,		0x00000008
@@ -105,11 +112,11 @@
 .set PICR1_PROC_TYPE_7XX,	0x00040000
 .set VAL_PICR1,			PICR1_SPEC_PCI|PICR1_CF_APARK|PICR1_CF_LOOP_SNOOP|PICR1_ST_GATH_EN|PICR1_TEA_EN|PICR1_MCP_EN|PICR1_FLASH_WR_EN|PICR1_PROC_TYPE_7XX
 
-.set PICR2,0xAC
+.set PICR2,0xAC			#Processor Interface Configuration Register 2
 .set PICR2_CF_LBCLAIM_WS,	0x00000600
 .set VAL_PICR2,			PICR2_CF_LBCLAIM_WS
 
-.set PMCR1,0x70
+.set PMCR1,0x70			#Peripheral Logic Power Management Configuration Register 1
 .set PMCR1_SLEEP,		0x0008
 .set PMCR1_NAP,			0x0010
 .set PMCR1_DOZE,		0x0020
@@ -133,29 +140,36 @@
 .set CACHE_ICACHEINV,10
 .set CACHE_DCACHEINV,11
 
-.set IMIMR,0x104
+.set IMIMR,0x104		#Inbound Message Interrupt Mask Register
 .set PCI_COMMAND,0x4
-.set OMBAR,0x2300
-.set OTWR,0x2308
-.set ITWR,0x2310
-.set LMBAR,0x10
-.set IMR0,0x50
-.set MSAR1,0x80
-.set MSAR2,0x84
-.set MESAR1,0x88
-.set MESAR2,0x8C
-.set MEAR1,0x90
-.set MEAR2,0x94
-.set MEEAR1,0x98
-.set MEEAR2,0x9C
-.set MBEN,0xA0
+.set OMBAR,0x2300		#Outbound Memory Base Address Register
+.set OTWR,0x2308		#Outbound Translation Window Register
+.set ITWR,0x2310		#Inbound Translation Window Register
+.set LMBAR,0x10			#Local Memory Base Address Register
+.set IMR0,0x50			#Inbound Message Register 0
+.set MSAR1,0x80			#Memory Start Address Register 1
+.set MSAR2,0x84			#Memory Start Address Register 2
+.set MESAR1,0x88		#Memory Extended Start Address Register 1
+.set MESAR2,0x8C		#Memory Extended Start Address Register 2
+.set MEAR1,0x90			#Memory End Address Register 1
+.set MEAR2,0x94			#Memory End Address Register 2
+.set MEEAR1,0x98		#Memory Extended End Address Register 1
+.set MEEAR2,0x9C		#Memory Extended End Address Register 2
+.set MBEN,0xA0			#Memory Bank Enable
 
-.set MCCR1,0xF0
-.set MCCR2,0xF4
-.set MCCR3,0xF8
-.set MCCR4,0xFC
+.set OFHPR,0x140		#Outbound Free_FIFO Head Pointer Register
+.set OFTPR,0x148		#Outbound Free_FIFO Tail Pointer Register
+.set OPHPR,0x150		#Outbound Post_FIFO Head Pointer Register
+.set OPTPR,0x158		#Outbound Post_FIFO Tail Pointer Register
+.set QBAR,0x170			#Queue Base Address Register
+.set MUCR,0x164			#Message Unit Control Register
+
+.set MCCR1,0xF0			#Memory Control Configuration Register 1
+.set MCCR2,0xF4			#Memory Control Configuration Register 2
+.set MCCR3,0xF8			#Memory Control Configuration Register 3
+.set MCCR4,0xFC			#Memory Control Configuration Register 4
+
 .set PVR,287
-
 
 .set srr1,27
 .set srr0,26
@@ -177,16 +191,16 @@
 .set dbat3l,543
 .set l2cr,1017
 
-.set EPIC_GCR,0x41020
-.set EPIC_PCTPR,0x60080
-.set EPIC_FRR,0x41000
-.set EPIC_GTBCR0,0x41110
-.set EPIC_GTVPR0,0x41120
-.set EPIC_EICR,0x41030
-.set EPIC_IVPR0,0x50200
-.set EPIC_IVPR3,0x50260
-.set EPIC_IVPR4,0x50280
-.set EPIC_IIVPR3,0x510c0
+.set EPIC_GCR,0x41020		#Global Configuration Register
+.set EPIC_PCTPR,0x60080		#Processor Current Task Priority Register
+.set EPIC_FRR,0x41000		#Feature Reporting Register
+.set EPIC_GTBCR0,0x41110	#Global Timer Base Count Register 0
+.set EPIC_GTVPR0,0x41120	#Global Timer Vector/Priority Register 0
+.set EPIC_EICR,0x41030		#EPIC interrupt Configuration Register
+.set EPIC_IVPR0,0x50200		#Interrupt Vector/Priority Register 0
+.set EPIC_IVPR3,0x50260		#Interrupt Vector/Priority Register 3
+.set EPIC_IVPR4,0x50280		#Interrupt Vector/Priority Register 4
+.set EPIC_IIVPR3,0x510c0	#I2C Interrupt Vector/Priority Register 3
 
 .set HW_TRACEON,1				#enable singlestep mode
 .set HW_TRACEOFF,2				#disable singlestep mode
@@ -333,10 +347,6 @@
 
 .set L1_CACHE_LINE_SIZE,32
 
-.set MH_FIRST,16
-.set MH_FREE,28
-.set MC_BYTES,4
-.set MC_NEXT,0
 .set LH_HEAD,0
 .set LH_TAILPRED,8
 .set T_PROCTIME,1
@@ -357,6 +367,7 @@
 .set MP_PPC_SEM,48
 .set pr_MsgPort,92
 .set MN_REPLYPORT,14
+.set MN_LENGTH,18
 .set MN_SIZE,20
 .set MN_IDENTIFIER,20
 .set MN_MIRROR,24
