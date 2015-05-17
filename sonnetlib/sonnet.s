@@ -1,29 +1,5 @@
 
-COMMAND			EQU 	$4
-IMR0			EQU 	$50
-OMISR			EQU 	$30
-OMIMR			EQU 	$34
-OMR0			EQU 	$58
-OMR1			EQU 	$5C
-LMBAR			EQU 	$10
-PCSRBAR			EQU 	$14
-OMBAR			EQU 	$300
-OTWR			EQU 	$308
-WP_CONTROL		EQU 	$F48
-WP_TRIG01		EQU 	$c0000000
-MEMF_PPC		EQU 	$1000
-StackSize		EQU 	$80000
-TASKPPC_CTMEM		EQU 	248
-TASKPPC_SIZE		EQU 	652
-TASKPPC_CONTEXTMEM	EQU	100
-NT_PPCTASK		EQU 	100
-
-FUNC_CNT	 EQU	-30		* Skip 4 standard vectors
-FUNCDEF		 MACRO
-_LVO\1		 EQU	FUNC_CNT
-FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
-		 ENDM
-
+	include 68kdefines.i
 	include	exec/exec_lib.i
 	include exec/initializers.i
 	include	exec/nodes.i
@@ -469,6 +445,10 @@ IntName	dc.b "Gort",0
 ;********************************************************************************************
 
 MasterControl:
+	move.l EUMBAddr(pc),a4	
+	moveq.l #0,d0
+	move.l d0,OMR0(a4)
+	move.l d0,OMR1(a4)
 	move.l #"INIT",d6
 	move.l SonnetBase(pc),a4
 	move.l 4.w,a6
@@ -488,6 +468,7 @@ NextMsg	jsr _LVOCacheClearU(a6)
 	jsr _LVOWaitPort(a6)
 GetLoop	move.l d6,a0
 	jsr _LVOGetMsg(a6)
+	
 	move.l d0,d7
 	beq.s NextMsg
 	move.l d0,a1
@@ -554,8 +535,8 @@ MsgLL68	move.l MN_PPSTRUCT+0*4(a1),a6
 	
 RtnLL	move.l (a7)+,a1
 	move.l d0,MN_PPSTRUCT+6*4(a1)
-	move.l _PowerPCBase(pc),a6
-	jsr _LVOPutXMsg(a6)
+	move.l #"DONE",d6
+	move.l d6,MN_IDENTIFIER(a1)
 	move.l 4.w,a6
 	bra NextMsg
 
@@ -578,10 +559,17 @@ SonInt:
 	move.l 4.w,a6
 	move.l OMR0(a2),a0
 	move.l OMR1(a2),a1
+	
+	moveq.l #0,d0
+	move.l d0,OMR0(a2)
+	move.l d0,OMR1(a2)
+	move.l a0,$7d000000
+	move.l a1,$7d000004
+	
 	jsr _LVOPutMsg(a6)
+	
 	move.l d2,OMISR(a2)
 NoInt	movem.l (a7)+,d1-a6
-	moveq.l #0,d0
 	rts
 
 IntData	dc.l 0
@@ -763,7 +751,7 @@ xTask	jsr _LVOCreateMsgPort(a6)			;Not done yet. How to find this Port?
 	tst.l d0
 	beq Cannot
 xProces	move.l d0,Port(a5)
-	move.l #TASKPPC_SIZE+MN_SIZE+PP_SIZE+80,d0
+	move.l #TASKPPC_SIZE+MN_SIZE+PP_SIZE+92,d0
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1
 	move.l _PowerPCBase(pc),a6
 	jsr _LVOAllocVec32(a6)
@@ -781,7 +769,7 @@ xProces	move.l d0,Port(a5)
 	move.l d0,Msg(a5)
 	move.l Port(a5),d1
 	move.l d0,a1
-	move.w #MN_SIZE+PP_SIZE+80,MN_LENGTH(a1)
+	move.w #MN_SIZE+PP_SIZE+92,MN_LENGTH(a1)
 	move.l d1,MN_REPLYPORT(a1)
 	move.l d1,MN_MIRROR(a1)
 	lea MN_PPSTRUCT(a1),a2
@@ -805,7 +793,7 @@ CpName	move.l (a1)+,(a2)+
 Fast	move.l d7,a0
 	lea pr_MsgPort(a0),a0
 	move.l Msg(a5),a1
-	move.l #"TPPC",MN_IDENTIFIER(a1)
+	move.l #"TPPC",MN_IDENTIFIER(a1)	
 	jsr _LVOPutMsg(a6)
 	bra.s Stacker
 
@@ -835,7 +823,7 @@ Stacker	move.l Port(a5),a0
 GtLoop	move.l Port(a5),a0
 	jsr _LVOGetMsg(a6)
 	tst.l d0
-	beq.s Stacker
+	beq.s Stacker	
 	move.l d0,a0
 	move.l MN_IDENTIFIER(a0),d0
 	cmp.l #"FPPC",d0
