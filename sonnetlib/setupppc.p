@@ -132,12 +132,11 @@ ExitCode:	lwz	r9,RunningTask(r0)
 		loadreg	r1,0x7ffe0			#Userstack in unused mem (See sonnet.s)
 		BUILDSTACKPPC
 		
-		mr	r4,r21
-		lwz	r21,SonnetBase(r0)
+		lwz	r4,SonnetBase(r0)
 		or	r4,r4,r21
 		
-		LIBCALLPOWERPC FreeVecPPC
-		
+#		LIBCALLPOWERPC FreeVecPPC		#Not working - rewriting message system
+							#To be FIFO (OFQPR instead of OMR0/1)
 		li	r0,0
 		stw	r0,RunningTask(r0)
 		
@@ -172,52 +171,58 @@ End:		mflr	r4
 		
 		isync					#Wait for 68k to set up library
 
-		la	r4,ReadyTasks(r0)				
-		LIBCALLPOWERPC NewListPPC
+		la	r4,ReadyTasks(r0)
+		bl	.MakeList
 
 		la	r4,WaitingTasks(r0)
-		LIBCALLPOWERPC NewListPPC
+		bl	.MakeList
 
 		la	r4,Semaphores(r0)
-		LIBCALLPOWERPC NewListPPC
+		bl	.MakeList
 
 		la	r4,Ports(r0)
-		LIBCALLPOWERPC NewListPPC
+		bl	.MakeList
 
 		la	r4,AllTasks(r0)
-		LIBCALLPOWERPC NewListPPC
+		bl	.MakeList
 
 		la	r4,SnoopList(r0)
-		LIBCALLPOWERPC NewListPPC
+		bl	.MakeList
 		
-		li	r3,0x7000			#Put at 0x7000
+		li	r3,0x7000			#Put Semaphores at 0x7000
+		li	r6,0x7200			#Put Semaphores memory at 0x7200
 		
 		mr	r30,r3
+		mr	r29,r31
 		mr	r4,r3
 		stw 	r4,TaskListSem(r14)
-		LIBCALLPOWERPC InitSemaphorePPC
+		bl	.InitSem
 
 		addi	r4,r30,SSPPC_SIZE
 		stw	r4,SemListSem(r14)
-		LIBCALLPOWERPC InitSemaphorePPC
+		addi	r6,r6,32
+		bl	.InitSem
 
 		addi	r4,r30,SSPPC_SIZE*2
 		stw	r4,PortListSem(r14)
-		LIBCALLPOWERPC InitSemaphorePPC
+		addi	r6,r6,32
+		bl	.InitSem
 	
 		addi	r4,r30,SSPPC_SIZE*3
 		stw	r4,SnoopSem(r14)
-		LIBCALLPOWERPC InitSemaphorePPC
+		addi	r6,r6,32
+		bl	.InitSem
 	
 		addi	r4,r30,SSPPC_SIZE*4
 		stw	r4,MemSem(r14)
-		LIBCALLPOWERPC InitSemaphorePPC
+		addi	r6,r6,32
+		bl	.InitSem
 
 		lwz	r14,0(r0)
 		la	r4,NewTasks(r14)
 		
-		LIBCALLPOWERPC NewListPPC
-		
+		bl	.MakeList
+				
 		LIBCALLPOWERPC FlushL1DCache
 		
 		mfspr	r4,HID0
@@ -226,7 +231,7 @@ End:		mflr	r4
 		mtspr	HID0,r4
 		sync
 
-		mtsrr0	r31
+		mtsrr0	r29
 		mfmsr	r14
 		ori	r14,r14,PSL_EE|PSL_PR		#Set privilege mode to User
 		mtsrr1	r14
@@ -234,8 +239,32 @@ End:		mflr	r4
 		rfi					#To user code
 
 #********************************************************************************************
+		
+.MakeList:	stw	r4,8(r4)
+		lis	r0,0
+		nop	
+		stwu	r0,4(r4)
+		stw	r4,-4(r4)
 
-							#Clear MSR to diable interrupts and checks
+		blr
+
+.InitSem:	mr	r31,r4
+		addi	r5,r31,SS_WAITQUEUE
+		stw	r5,8(r5)
+		li	r0,0
+		stwu	r0,4(r5)
+		stwu	r5,-4(r5)
+		li	r0,0
+		stw	r0,SS_OWNER(r31)
+		sth	r0,SS_NESTCOUNT(r31)
+		li	r0,-1
+		sth	r0,SS_QUEUECOUNT(r31)
+		stw	r6,SSPPC_RESERVE(r31)
+		
+		blr
+		
+#********************************************************************************************							#Clear MSR to diable interrupts and checks
+
 Reset:		mflr	r15
 
 		mfmsr	r1
@@ -431,17 +460,16 @@ Caches:		mfspr	r4,HID0
 		mtspr	HID0,r4
 		sync
 		
-#		blr					#REMOVE ME FOR L1 CACHE
+		blr					#REMOVE ME FOR L1 CACHE
+							#L1 cache off for now
+							#to fix coherancy problems
 
 		mfspr	r4,HID0	
 		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
-#		ori	r4,r4,HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
-#		ori	r4,r4,HID0_ICE|HID0_DCE
 		mtspr	HID0,r4
 		sync
 		 	
-		blr					#REMOVE ME FOR L2 CACHE
-		
+		blr					#REMOVE ME FOR L2 CACHE		
 		 					# Set up on chip L2 cache controller.
 		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_L2WT
 #		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST
@@ -467,7 +495,7 @@ Wait2:		mfl2cr	r3
 
 #********************************************************************************************
 
-mmuSetup:	loadreg	r4,IBAT0L_VAL			#Could be simpler. To be converted to tables
+mmuSetup:	loadreg	r4,IBAT0L_VAL			#To be converted to tables (PTEGs)
 		loadreg	r3,IBAT0U_VAL
 		mtspr ibat0l,r4
 		mtspr ibat0u,r3
@@ -543,23 +571,26 @@ mmuSetup:	loadreg	r4,IBAT0L_VAL			#Could be simpler. To be converted to tables
 ConfigWrite32:	lis	r20,CONFIG_ADDR			#Various PCI command routines
 		lis 	r21,CONFIG_DAT
 		stwbrx	r23,0,r20
-		isync
+		sync
 		stwbrx	r25,0,r21
+		sync
 		blr
 
 ConfigWrite16:	lis	r20,CONFIG_ADDR
 		lis 	r21,CONFIG_DAT
 		stwbrx	r23,0,r20
-		isync
+		sync
 		sthbrx	r25,0,r21
+		sync
 		blr
 
 ConfigWrite8:	lis	r20,CONFIG_ADDR
 		stwbrx	r23,0,r20
-		isync
-		andi.	r19,r23,3
-		oris	r21,r19,CONFIG_DAT
+		sync
+		andi.	r23,r23,3
+		oris	r21,r23,CONFIG_DAT
 		stb	r25,0(r21)
+		sync
 		blr
 
 #********************************************************************************************
@@ -694,7 +725,7 @@ loc_3BD8:	setpcireg MBEN			#Memory Bank Enable Register
 		stw	r3, 0(r6)		#set 0x8000000 to 0x0
 		eieio
 		stw	r4, 0(r3)		#set 0x0 to "Boon"
-		eieio
+		eieio		
 		lis	r6, 0x40
 		lwz	r7, 0(r6)		#read from 0x400000
 		cmplw	r4, r7			#is it "Boon"
@@ -833,7 +864,7 @@ loc_3E24:					#CODE XREF: findSetMem+1E0
 		or	r16, r16, r7
 		add	r8, r8, r6
 		mr	r7, r8
-		addi	r7, r7, 0xFF
+		addi	r7, r7, -1
 		srwi	r7, r7, 20
 		andi.	r7, r7, 0xFF
 		or	r11, r11, r7
@@ -842,8 +873,8 @@ loc_3E24:					#CODE XREF: findSetMem+1E0
 		srwi	r7, r7, 28
 		andi.	r7, r7, 3
 		or	r18, r18, r7
-		andi.	r2, r2, 3
-		or	r13, r13, r2
+		andi.	r25, r25, 3
+		or	r13, r13, r25
 		b	loc_4184
 
 #********************************************************************************************
@@ -873,8 +904,8 @@ loc_3E84:					#CODE XREF: findSetMem+394
 		andi.	r7, r7, 3
 		slwi	r7, r7, 8
 		or	r18, r18, r7
-		andi.	r2, r2, 0xC
-		or	r13, r13, r2
+		andi.	r25, r25, 0xC
+		or	r13, r13, r25
 		b	loc_4184
 
 #********************************************************************************************
@@ -904,8 +935,8 @@ loc_3EF4:					#CODE XREF: findSetMem+3F4
 		andi.	r7, r7, 3
 		slwi	r7, r7, 16
 		or	r18, r18, r7
-		andi.	r2, r2, 0x30
-		or	r13, r13, r2
+		andi.	r25, r25, 0x30
+		or	r13, r13, r25
 		b	loc_4184
 
 #********************************************************************************************
@@ -935,8 +966,8 @@ loc_3F64:					#CODE XREF: findSetMem+464
 		andi.	r7, r7, 3
 		slwi	r7, r7, 24
 		or	r18, r18, r7
-		andi.	r2, r2, 0xC0
-		or	r13, r13, r2
+		andi.	r25, r25, 0xC0
+		or	r13, r13, r25
 		b	loc_4184
 
 #********************************************************************************************
@@ -964,8 +995,8 @@ loc_4000:
 		srwi	r7, r7, 28
 		andi.	r7, r7, 3
 		or	r19, r19, r7
-		andi.	r2, r2, 0x300
-		or	r13, r13, r2
+		andi.	r25, r25, 0x300
+		or	r13, r13, r25
 		b	loc_4184
 
 #********************************************************************************************
@@ -996,8 +1027,8 @@ loc_4034:
 		andi.	r7, r7, 3
 		slwi	r7, r7, 8
 		or	r19, r19, r7
-		andi.	r2, r2, 0xC00
-		or	r13, r13, r2
+		andi.	r25, r25, 0xC00
+		or	r13, r13, r25
 		b	loc_4184
 
 #********************************************************************************************
@@ -1027,8 +1058,8 @@ loc_40A4:
 		andi.	r7, r7, 3
 		slwi	r7, r7, 16
 		or	r19, r19, r7
-		andi.	r2, r2, 0x3000
-		or	r13, r13, r2
+		andi.	r25, r25, 0x3000
+		or	r13, r13, r25
 		b	loc_4184
 
 #********************************************************************************************
@@ -1058,40 +1089,38 @@ loc_4114:
 		andi.	r7, r7, 3
 		slwi	r7, r7, 24
 		or	r19, r19, r7
-		andi.	r2, r2, 0xc000
-		or	r13, r13, r2
+		andi.	r25, r25, 0xc000
+		or	r13, r13, r25
 		b	loc_4184
 
 loc_4184:
 		slwi	r5, r5, 1
 		cmplwi	r5, 0x100
 		bne	loc_3BD8
+		
+		
 
 		setpcireg MSAR1				#80
-		mr	r25, r9
+		mr	r25, r9		
 		bl	ConfigWrite32			#store found values to registers
 
 		setpcireg MSAR2				#84
 		mr	r25, r10
 		bl	ConfigWrite32
 
-		setpcireg MEAR1				#90
-		mr	r25, r11
+		setpcireg MEAR1				#90		
+		mr	r25, r11		
 		bl	ConfigWrite32
 
 		setpcireg MEAR2				#94
 		mr	r25, r12
 		bl	ConfigWrite32
 
-		setpcireg MCCR1				#F0
+		setpcireg MCCR1				#F0		
 		mr	r25, r13
 		bl	ConfigWrite32
 
-		setpcireg MBEN				#A0
-		mr	r25, r14
-		bl	ConfigWrite8
-
-		setpcireg MESAR1			#88
+		setpcireg MESAR1			#88		
 		mr	r25, r16
 		bl	ConfigWrite32
 
@@ -1107,9 +1136,12 @@ loc_4184:
 		mr	r25, r19
 		bl	ConfigWrite32
 
-		addi	r16, r7, 4
+		setpcireg MBEN				#A0
+		mr	r25, r14
+		bl	ConfigWrite8
 	
 		mtlr	r15
+		
 		blr
 
 #********************************************************************************************
@@ -1210,8 +1242,11 @@ EInt:		b	.FPUnav
 		lis	r3,EUMBEPICPROC
 		stw	r5,0xb0(r3)			#Write 0 to EOI to End Interrupt
 
-.RDecInt:	li	r3,0
-		stb	r3,Interrupt(r0)
+.RDecInt:	loadreg	r3,"EXEX"
+		stw	r3,0xf4(r0)
+
+		li	r3,-1
+		stb	r3,ExceptionMode(r0)
 
 		lwz	r9,TaskException(r0)
 		mr.	r9,r9
@@ -1265,7 +1300,7 @@ EInt:		b	.FPUnav
 		stw	r9,RunningTask(r0)
 		
 		loadreg	r4,500000			#fixed stack len (for now)
-		mr	r31,r4
+		mr	r31,r4				#Will be cloned from mother (68K) task
 		
 		LIBCALLPOWERPC AllocVecPPC
 
@@ -1328,6 +1363,8 @@ EInt:		b	.FPUnav
 .NoBreak:	mtsprg0	r8
 
 		li	r8,0
+		stb	r8,ExceptionMode(r0)
+		stb	r8,Interrupt(r0)
 		
 		mr	r7,r8
 		mr	r9,r8
@@ -1355,9 +1392,12 @@ EInt:		b	.FPUnav
 #********************************************************************************************
 
 .ReturnToUser:
-		lwz	r9,0xf0(r0)
-		addi	r9,r9,1
-		stw	r9,0xf0(r0)
+		lwz	r9,0xf0(r0)				#Debug counter to check
+		addi	r9,r9,1					#Whether exception is still
+		stw	r9,0xf0(r0)				#running
+		li	r9,0
+		stb	r9,ExceptionMode(r0)
+		stb	r9,Interrupt(r0)
 		
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
@@ -1409,6 +1449,7 @@ TestRoutine:	b	.IntReturn
 .CheckWait:	li	r4,TS_WAIT
 		lbz	r3,TC_STATE(r9)
 		cmpw	r3,r4
+		
 		beq	.GoToWait
 
 		lwz	r3,SonnetBase(r0)
@@ -1619,6 +1660,11 @@ TestRoutine:	b	.IntReturn
 		lfdu	f29,8(r9)
 		lfdu	f30,8(r9)
 		lfdu	f31,8(r9)
+		
+		li	r9,0
+		stb	r9,ExceptionMode(r0)
+		stb	r9,Interrupt(r0)
+		
 		mfsprg3	r9
 		rfi
 
@@ -1633,15 +1679,16 @@ TestRoutine:	b	.IntReturn
 		stw	r4,RunningTask(r0)
 
 		la	r4,ReadyTasks(r0)
-	
+
 		LIBCALLPOWERPC RemHeadPPC
-	
+
 		mr.	r9,r3
 		beq	.DoIdle
 		
 		li	r0,TS_RUN
 		stb	r0,TC_STATE(r9)
-		stw	r9,RunningTask(r0)		
+		stw	r9,RunningTask(r0)
+		
 		b	.LoadContext
 
 .DoIdle:	loadreg	r19,0x8000			#Start hardcoded at 0x8000
@@ -1653,6 +1700,11 @@ TestRoutine:	b	.IntReturn
 		ori	r18,r18,PSL_PR|PSL_EE
 		mtsrr1 	r18		
 		mtsrr0	r19
+		
+		li	r19,0
+		stb	r19,ExceptionMode(r0)
+		stb	r19,Interrupt(r0)
+		
 		rfi
 
 #********************************************************************************************
@@ -1819,9 +1871,11 @@ PrInt:							#Privilege Exception
 		rfi
 
 .HaltErr:	loadreg r3,"HALT"			#DEBUG
-		stw	r3,0xf4(r0)
+		stw	r3,0xf4(r0)			#Error
 		mfsrr0	r3
-		stw	r3,0xf8(r0)
+		stw	r3,0xf8(r0)			#Current PC
+		mflr	r3
+		stw	r3,0xfc(r0)			#Original calling function
 .xxHaltErr2:	b .xxHaltErr2
 
 #********************************************************************************************
