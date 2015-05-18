@@ -310,6 +310,11 @@ RLoc	add.l d2,(a2)+
 	move.l d0,a1
 	jsr _LVOAddLibrary(a6)
 
+	move.l SonnetBase(pc),a1
+	add.l #$100000,a1
+	move.l #$190000,d0	
+	jsr _LVOAllocAbs(a6)	
+
 	lea MyInterrupt(pc),a1
 	lea SonInt(pc),a2
 	move.l a2,IS_CODE(a1)

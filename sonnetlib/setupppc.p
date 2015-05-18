@@ -80,16 +80,16 @@ SetLen:		mr	r30,r28
 		bl	Epic				#Setup the EPIC controller
 		bl	Caches				#Setup the L1 and L2 cache
 
-		loadreg	r3,0x8000			#Start hardcoded at 0x8000
+		li	r3,IdleTask			#Start hardcoded at 0x7400
 		mr	r31,r3
 
-		loadreg	r1,0x7ffe0			#Userstack in unused mem (See sonnet.s)
+		loadreg	r1,StackSize-0x20		#System stack in unused mem (See sonnet.s)
 		BUILDSTACKPPC
 
 		bl	End
 
 Start:		
-		nop					#Dummy entry at absolute 0x8000
+		nop					#Dummy entry at absolute 0x7400
 .StartX:	nop
 		nop
 		nop
@@ -129,7 +129,7 @@ ExitCode:	lwz	r9,RunningTask(r0)
 
 		LIBCALLPOWERPC PutXMsgPPC
 
-		loadreg	r1,0x7ffe0			#Userstack in unused mem (See sonnet.s)
+		loadreg	r1,StackSize-0x20		#System stack in unused mem (See sonnet.s)
 		BUILDSTACKPPC
 		
 		lwz	r4,SonnetBase(r0)
@@ -223,6 +223,8 @@ End:		mflr	r4
 		
 		bl	.MakeList
 				
+		bl	.SetupMsgFIFOs
+				
 		LIBCALLPOWERPC FlushL1DCache
 		
 		mfspr	r4,HID0
@@ -262,7 +264,39 @@ End:		mflr	r4
 		stw	r6,SSPPC_RESERVE(r31)
 		
 		blr
+
+#********************************************************************************************		
+
+.SetupMsgFIFOs:	lis	r14,EUMB
 		
+		li	r4,2				#4K entries (16k x 4 FIFOs)
+		stw	r4,MUCR(r14)
+
+		loadreg	r4,0x100000		
+		stw	r4,QBAR(r14)
+		
+		lwz	r14,SonnetBase(r0)
+		or	r5,r4,r14
+		subi	r4,r4,4
+		
+		loadreg	r14,0x10000
+		add	r5,r5,r14
+		
+		li	r6,4096
+		mr	r7,r6
+		mtctr	r6
+.FillIBFL:	stwu	r5,4(r4)
+		addi	r5,r5,192			#Message Frame Length
+		bdnz	.FillIBFL
+
+		loadreg	r4,(0x100000-4)+12*4096
+		mtctr	r7
+.FillOBFL:	stwu	r5,4(r4)
+		addi	r5,r5,192
+		bdnz	.FillOBFL
+
+		blr
+
 #********************************************************************************************							#Clear MSR to diable interrupts and checks
 
 Reset:		mflr	r15
@@ -1307,7 +1341,7 @@ EInt:		b	.FPUnav
 		mr.	r4,r3
 		beq	.ReturnToUser	
 		
-		loadreg	r6,0x8000
+		loadreg	r6,IdleTask
 		addi	r6,r6,ExitCode-Start	
 		mtlr	r6
 
@@ -1691,9 +1725,9 @@ TestRoutine:	b	.IntReturn
 		
 		b	.LoadContext
 
-.DoIdle:	loadreg	r19,0x8000			#Start hardcoded at 0x8000
+.DoIdle:	loadreg	r19,IdleTask			#Start hardcoded at 0x7400
 
-		loadreg	r1,0x7ffe0			#Userstack in unused mem (See sonnet.s)
+		loadreg	r1,StackSize-0x20		#System stack in unused mem (See sonnet.s)
 		BUILDSTACKPPC
 		
 		mfsrr1	r18

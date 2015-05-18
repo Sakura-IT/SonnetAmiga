@@ -1,3 +1,14 @@
+#Sonnet Memory Map
+#0x00000000	Zero Page				0x003000	12288
+#0x00003000	Exceptions/Scheduler			0x004000	16384
+#0x00007000	Semaphores				0x000200	512
+#0x00007200	Semaphore memory			0x000200	512
+#0x00007400	Idle Task				0x000c00	3072
+#0x00008000	System Stack				0x008000	32768
+#0x00010000	Free memory				0x0e0000	917504
+#0x00100000	Message FIFOs				0x010000	65536	Must be 0x100000 aligned
+#0x00110000	Message Frames 2x4096xPP_SIZE+48	0x180000
+#0x00290000	Free memory				Overhead = 	2.5MB
 
 #Sonnet Base:
 .set SonnetBase,0
@@ -39,6 +50,9 @@
 
 .set _LVOAllocMem,		-198
 .set _LVOFreeMem,		-210
+
+.set StackSize,			0x10000
+.set IdleTask,			0x7400
 
 .set MEMF_PUBLIC,		0x00000001
 .set MEMF_FAST,			0x00000004
