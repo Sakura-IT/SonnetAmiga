@@ -135,8 +135,8 @@ ExitCode:	lwz	r9,RunningTask(r0)
 		lwz	r4,SonnetBase(r0)
 		or	r4,r4,r21
 		
-#		LIBCALLPOWERPC FreeVecPPC		#Not working - rewriting message system
-							#To be FIFO (OFQPR instead of OMR0/1)
+		LIBCALLPOWERPC FreeVecPPC
+
 		li	r0,0
 		stw	r0,RunningTask(r0)
 		
