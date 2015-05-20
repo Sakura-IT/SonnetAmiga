@@ -269,11 +269,13 @@ End:		mflr	r4
 
 .SetupMsgFIFOs:	lis	r14,EUMB
 		
-		li	r4,2				#4K entries (16k x 4 FIFOs)
-		stw	r4,MUCR(r14)
+		li	r4,MUCR_CQS_FIFO4K		#4K entries (16k x 4 FIFOs)
+		li	r5,MUCR
+		stwbrx	r4,r5,r14
 
-		loadreg	r4,0x100000		
-		stw	r4,QBAR(r14)
+		loadreg	r4,0x100000
+		li	r5,QBAR
+		stwbrx	r4,r5,r14
 		
 		lwz	r14,SonnetBase(r0)
 		or	r5,r4,r14
@@ -294,6 +296,45 @@ End:		mflr	r4
 .FillOBFL:	stwu	r5,4(r4)
 		addi	r5,r5,192
 		bdnz	.FillOBFL
+
+		lis	r14,EUMB
+		
+		li	r5,IFTPR
+		li	r4,4096*0
+		
+		li	r5,IFHPR
+		li	r4,4096*4-4
+		stwbrx	r4,r5,r14
+		
+		li	r5,IPTPR
+		loadreg	r4,4096*4
+		stwbrx	r4,r5,r14
+		
+		li	r5,IPHPR
+		loadreg	r4,4096*4
+		stwbrx	r4,r5,r14
+		
+		li	r5,OPTPR
+		loadreg	r4,4096*8
+		stwbrx	r4,r5,r14
+		
+		li	r5,OPHPR
+		loadreg	r4,4096*8
+		stwbrx	r4,r5,r14
+		
+		li	r5,OFTPR
+		loadreg	r4,4096*12
+		stwbrx	r4,r5,r14
+		
+		li	r5,OFHPR
+		loadreg	r4,4096*16-4
+		stwbrx	r4,r5,r14
+
+		li	r4,MUCR_CQS_FIFO4K|MUCR_CQE_ENABLE
+		li	r5,MUCR
+		stwbrx	r4,r5,r14
+		
+		sync
 
 		blr
 

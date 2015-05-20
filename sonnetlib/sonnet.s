@@ -342,7 +342,7 @@ NoLib	move.l a5,a1
 	lea MemList(a6),a0
 	jsr _LVOEnqueue(a6)
 	jsr _LVOEnable(a6)
-	jsr _LVOCacheClearU(a6)
+	jsr _LVOCacheClearU(a6)	
 	bra Clean
 
 ;********************************************************************************************
@@ -450,10 +450,6 @@ IntName	dc.b "Gort",0
 ;********************************************************************************************
 
 MasterControl:
-	move.l EUMBAddr(pc),a4	
-	moveq.l #0,d0
-	move.l d0,OMR0(a4)
-	move.l d0,OMR1(a4)
 	move.l #"INIT",d6
 	move.l SonnetBase(pc),a4
 	move.l 4.w,a6
@@ -495,6 +491,10 @@ MsgT68k	move.b LN_TYPE(a1),d7
 	beq.s Sig68k
 	cmp.b #NT_REPLYMSG,d7				;signal PPC that 68k is done
 	bne.s NextMsg
+	
+	move.l EUMBAddr(pc),a2
+	move.l a1,OFQPR(a2)				;Return Message Frame
+	
 	move.l _PowerPCBase(pc),a6
 	jsr _LVOPutXMsg(a6)				;message the PPC
 	move.l 4.w,a6
@@ -542,6 +542,10 @@ RtnLL	move.l (a7)+,a1
 	move.l d0,MN_PPSTRUCT+6*4(a1)
 	move.l #"DONE",d6
 	move.l d6,MN_IDENTIFIER(a1)
+	
+	move.l EUMBAddr(pc),a2
+	move.l a1,OFQPR(a2)				;Return Message Frame
+	
 	move.l 4.w,a6
 	bra NextMsg
 
@@ -556,25 +560,34 @@ PrcName	dc.b "MasterControl",0
 
 SonInt:
 	movem.l d1-a6,-(a7)
+	move.l 4.w,a6
 	move.l EUMBAddr(pc),a2
-	move.l #$03000000,d2
+	move.l #$03000000,d2				;OMISR[OM0I|OM1I]
 	move.l OMISR(a2),d3
 	and.l d2,d3
-	beq.s NoInt	
-	move.l 4.w,a6
+	beq.s NoSingl
+	
 	move.l OMR0(a2),a0
 	move.l OMR1(a2),a1
+	jsr _LVOPutMsg(a6)
+
+NoSingl move.l OMISR(a2),d3
+	move.l d2,OMISR(a2)
+
+	move.l #$20000000,d4				;OMISR[OPQI]
+	and.l d4,d3
+	beq.s NoInt
+	move.l OFQPR(a2),d3				;Get Message Frame
+	move.l d3,$7d000000				;DEBUG
+	bmi.s NoInt
 	
-	moveq.l #0,d0
-	move.l d0,OMR0(a2)
-	move.l d0,OMR1(a2)
-	move.l a0,$7d000000
-	move.l a1,$7d000004
+	move.l d3,a1
+	move.l 188(a1),a0				;MN_MCTASK
 	
 	jsr _LVOPutMsg(a6)
 	
-	move.l d2,OMISR(a2)
 NoInt	movem.l (a7)+,d1-a6
+	moveq.l #0,d0
 	rts
 
 IntData	dc.l 0

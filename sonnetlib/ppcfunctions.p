@@ -2086,16 +2086,18 @@ Run68K:
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
+		stwu	r24,-4(r13)
+		stwu	r23,-4(r13)
+		
 		mr	r31,r4
-		
-		li	r4,MN_SIZE+PP_SIZE+92
-		li	r5,0
-		
-		bl AllocXMsgPPC
-		
-		mr.	r30,r3
-		beq-	.MsgError
-			
+					
+		lis	r3,EUMB
+		li	r24,OFTPR
+		lwbrx	r30,r24,r3			
+		addi	r23,r30,4
+		stwbrx	r23,r24,r3
+		lwz	r30,0(r30)			
+				
 		subi	r4,r31,4			#r29 = PPStruct -4
 		addi	r29,r30,MN_PPSTRUCT-4		#r30 = msg		
 		li	r6,PP_SIZE/4
@@ -2112,11 +2114,21 @@ Run68K:
 		lwz	r5,MN_MIRROR(r5)
 		stw	r5,MN_MIRROR(r30)
 		lwz	r4,MCTask(r0)
-		la	r4,pr_MsgPort(r4)		
-		mr	r5,r30
+		la	r4,pr_MsgPort(r4)
+		stw	r4,188(r30)			#MN_MCTASK
+		li	r5,NT_MESSAGE
+		stb	r5,LN_TYPE(r30)
+		
 		sync
 				
-		bl PutXMsgPPC
+		bl FlushL1DCache
+		
+		lis	r3,EUMB
+		li	r24,OPHPR
+		lwbrx	r31,r24,r3		
+		stw	r30,0(r31)		
+		addi	r23,r31,4
+		stwbrx	r23,r24,r3				#triggers Interrupt
 		
 		mr	r4,r30
 		
@@ -2129,14 +2141,12 @@ Run68K:
 .CopyPPB:	lwzu	r7,4(r29)
 		stwu	r7,4(r4)
 		bdnz+	.CopyPPB
-
-		mr	r4,r30
-		
-		bl FreeXMsgPPC
 		
 		li	r3,0
 		
-.MsgError:	lwz	r29,0(r13)
+		lwz	r23,0(r13)
+		lwzu	r24,4(r13)
+		lwzu	r29,4(r13)
 		lwzu	r30,4(r13)
 		lwzu	r31,4(r13)
 		addi	r13,r13,4
@@ -5651,6 +5661,8 @@ Run68KLowLevel:
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
 		stwu	r25,-4(r13)
+		stwu	r24,-4(r13)
+		stwu	r23,-4(r13)
 		
 		mr	r31,r4
 		mr	r29,r5
@@ -5664,18 +5676,21 @@ Run68KLowLevel:
 	
 		mr.	r3,r3
 		beq+	.RunAtomic
-	
-		li	r5,0x6020-4
-		lwz	r6,SonnetBase(r0)
-		or	r5,r5,r6
+
+		lis	r3,EUMB
+		li	r24,OFTPR
+		lwbrx	r30,r24,r3			
+		addi	r23,r30,4
+		stwbrx	r23,r24,r3
+		lwz	r30,0(r30)
+
+		subi	r5,r30,4
 		
-		la	r30,4(r5)
-		li	r6,16
+		li	r6,48
 		li	r7,0
 		mtctr	r6
 .ClearLLMsg:	stwu	r7,4(r5)
 		bdnz	.ClearLLMsg
-		
 		
 		stw	r31,MN_PPSTRUCT+0*4(r30)		# Code	/ 	Base
 		stw	r29,MN_PPSTRUCT+1*4(r30)		# 0	/	Offset
@@ -5686,13 +5701,23 @@ Run68KLowLevel:
 		loadreg	r5,"LL68"
 		stw	r5,MN_IDENTIFIER(r30)
 		li	r5,64
-		sth	r5,MN_LENGTH(r30)
+		sth	r5,MN_LENGTH(r30)		
+		li	r5,NT_MESSAGE
+		stb	r5,LN_TYPE(r30)		
 		lwz	r4,MCTask(r0)
-		la	r4,pr_MsgPort(r4)		
-		mr	r5,r30
-		sync
+		la	r4,pr_MsgPort(r4)
+		stw	r4,188(r30)				#MN_MCTASK
 				
-		bl PutXMsgPPC
+		sync
+		
+		bl	FlushL1DCache
+		
+		lis	r3,EUMB
+		li	r24,OPHPR
+		lwbrx	r31,r24,r3		
+		stw	r30,0(r31)		
+		addi	r23,r31,4
+		stwbrx	r23,r24,r3				#triggers Interrupt
 		
 		mr	r31,r30		
 		
@@ -5715,14 +5740,16 @@ Run68KLowLevel:
 		li	r4,Atomic
 		bl	AtomicDone
 		
-		lwz	r25,0(r13)
-		lwz	r26,4(r13)
-		lwz	r27,8(r13)
-		lwz	r28,12(r13)
-		lwz	r29,16(r13)
-		lwz	r30,20(r13)
-		lwz	r31,24(r13)
-		addi	r13,r13,28
+		lwz	r23,0(r13)
+		lwz	r24,4(r13)
+		lwz	r25,8(r13)
+		lwz	r26,12(r13)
+		lwz	r27,16(r13)
+		lwz	r28,20(r13)
+		lwz	r29,24(r13)
+		lwz	r30,28(r13)
+		lwz	r31,32(r13)
+		addi	r13,r13,36
 		
 		DSTRYSTACKPPC
 		
