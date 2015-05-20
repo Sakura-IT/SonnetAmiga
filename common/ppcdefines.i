@@ -171,12 +171,19 @@
 .set MEEAR2,0x9C		#Memory Extended End Address Register 2
 .set MBEN,0xA0			#Memory Bank Enable
 
+.set IFHPR,0x120		#Inbound Free_FIFO Head Pointer Register
+.set IFTPR,0x128
+.set IPHPR,0x130
+.set IPTPR,0x138
 .set OFHPR,0x140		#Outbound Free_FIFO Head Pointer Register
 .set OFTPR,0x148		#Outbound Free_FIFO Tail Pointer Register
 .set OPHPR,0x150		#Outbound Post_FIFO Head Pointer Register
 .set OPTPR,0x158		#Outbound Post_FIFO Tail Pointer Register
 .set QBAR,0x170			#Queue Base Address Register
 .set MUCR,0x164			#Message Unit Control Register
+.set MUCR_CQS_FIFO4K,		0x00000002
+.set MUCR_CQE_ENABLE,		0x00000001
+
 
 .set MCCR1,0xF0			#Memory Control Configuration Register 1
 .set MCCR2,0xF4			#Memory Control Configuration Register 2
