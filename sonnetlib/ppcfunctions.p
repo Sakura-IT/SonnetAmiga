@@ -401,7 +401,7 @@ FreeVecPPC:
 		lwz	r8,-8(r4)					#d0
 		lwz	r4,SysBase(r0)
 		li	r5,_LVOFreeMem
-			
+
 		bl 	Run68KLowLevel
 		
 		lwz	r7,0(r13)
@@ -1980,11 +1980,12 @@ WarpUser:
 		lbz	r0,ExceptionMode(r0)
 		mr.	r0,r0
 		bne	.InException
+
 		mfmsr	r0			
 		ori	r0,r0,PSL_PR		#SET Bit 17 (PR) To User
 		mtmsr	r0
-		isync	
-.InException:	blr
+.InException:	isync	
+		blr
 
 #********************************************************************************************
 #
@@ -2038,9 +2039,9 @@ WaitFor68K:
 		
 		la	r6,MN_IDENTIFIER(r31)
 		dcbi	r0,r6
-		
+
 		bl 	WarpUser
-		
+
 		loadreg r30,"DONE"
 		lwz	r6,MN_IDENTIFIER(r31)
 		cmpw	r6,r30
@@ -2057,7 +2058,7 @@ WaitFor68K:
 
 .Done68K:	bl	WarpSuper
 		
-		li	r30,8
+		li	r30,6
 		mtctr	r30
 .PPInvalid:	dcbi	r0,r31
 		addi	r31,r31,4
@@ -2095,8 +2096,19 @@ Run68K:
 		li	r24,OFTPR
 		lwbrx	r30,r24,r3			
 		addi	r23,r30,4
+		loadreg	r4,0xc000
+		or	r23,r23,r4
+		loadreg r4,0xffff
+		and	r23,r23,r4			#Keep it C000-FFFE		
 		stwbrx	r23,r24,r3
 		lwz	r30,0(r30)			
+			
+		subi	r5,r30,4		
+		li	r6,48
+		li	r7,0
+		mtctr	r6
+.ClearMsg:	stwu	r7,4(r5)
+		bdnz	.ClearMsg
 				
 		subi	r4,r31,4			#r29 = PPStruct -4
 		addi	r29,r30,MN_PPSTRUCT-4		#r30 = msg		
@@ -2118,6 +2130,8 @@ Run68K:
 		stw	r4,188(r30)			#MN_MCTASK
 		li	r5,NT_MESSAGE
 		stb	r5,LN_TYPE(r30)
+		li	r5,192
+		sth	r5,MN_LENGTH(r30)
 		
 		sync
 				
@@ -2128,7 +2142,9 @@ Run68K:
 		lwbrx	r31,r24,r3		
 		stw	r30,0(r31)		
 		addi	r23,r31,4
-		stwbrx	r23,r24,r3				#triggers Interrupt
+		loadreg	r4,0xbfff
+		and	r23,r23,r4			#Keep it 8000-BFFE
+		stwbrx	r23,r24,r3			#triggers Interrupt
 		
 		mr	r4,r30
 		
@@ -5670,17 +5686,15 @@ Run68KLowLevel:
 		mr	r27,r7
 		mr	r26,r8
 		mr	r25,r9
-		
-.RunAtomic:	li	r4,Atomic
-		bl	AtomicTest
-	
-		mr.	r3,r3
-		beq+	.RunAtomic
 
 		lis	r3,EUMB
 		li	r24,OFTPR
 		lwbrx	r30,r24,r3			
-		addi	r23,r30,4
+		addi	r23,r30,4		
+		loadreg	r4,0xc000
+		or	r23,r23,r4
+		loadreg r4,0xffff
+		and	r23,r23,r4				#Keep it C000-FFFE		
 		stwbrx	r23,r24,r3
 		lwz	r30,0(r30)
 
@@ -5700,7 +5714,7 @@ Run68KLowLevel:
 		stw	r25,MN_PPSTRUCT+5*4(r30)		# d1
 		loadreg	r5,"LL68"
 		stw	r5,MN_IDENTIFIER(r30)
-		li	r5,64
+		li	r5,192
 		sth	r5,MN_LENGTH(r30)		
 		li	r5,NT_MESSAGE
 		stb	r5,LN_TYPE(r30)		
@@ -5717,12 +5731,15 @@ Run68KLowLevel:
 		lwbrx	r31,r24,r3		
 		stw	r30,0(r31)		
 		addi	r23,r31,4
+		loadreg	r4,0xbfff
+		and	r23,r23,r4				#Keep it 8000-BFFE
 		stwbrx	r23,r24,r3				#triggers Interrupt
 		
 		mr	r31,r30		
-		
+
 		bl 	WarpSuper
-.Wait68KLow:		
+
+.Wait68KLow:
 		la	r6,MN_IDENTIFIER(r31)
 		dcbi	r0,r6
 		
@@ -5730,15 +5747,15 @@ Run68KLowLevel:
 		lwz	r6,MN_IDENTIFIER(r31)
 		cmpw	r6,r30
 		bne 	.Wait68KLow
+
+		isync
+
+		la	r3,MN_PPSTRUCT+6*4(r31)
+		dcbi	r0,r3
 		
 		bl	WarpUser
 		
-		isync
-		
 		lwz	r3,MN_PPSTRUCT+6*4(r31)			# return d0
-		
-		li	r4,Atomic
-		bl	AtomicDone
 		
 		lwz	r23,0(r13)
 		lwz	r24,4(r13)

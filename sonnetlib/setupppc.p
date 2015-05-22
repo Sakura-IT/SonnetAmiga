@@ -84,7 +84,10 @@ SetLen:		mr	r30,r28
 		mr	r31,r3
 
 		loadreg	r1,StackSize-0x20		#System stack in unused mem (See sonnet.s)
-		BUILDSTACKPPC
+		
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
 
 		bl	End
 
@@ -95,11 +98,38 @@ Start:
 		nop
 		b	.StartX
 	
-ExitCode:	lwz	r9,RunningTask(r0)
-		lwz	r21,TC_SPLOWER(r9)
-		la	r9,TASKPPC_SIZE(r9)
+ExitCode:	li	r7,TS_REMOVED
+		lwz	r9,RunningTask(r0)
+		stb	r7,TC_STATE(r9)
+		
+		lis	r7,EUMB
+		li	r8,OFTPR
+		lwbrx	r9,r8,r7			
+		addi	r10,r9,4		
+		loadreg	r11,0xc000
+		or	r10,r10,r11
+		loadreg r11,0xffff
+		and	r10,r10,r11				#Keep it C000-FFFE		
+		stwbrx	r10,r8,r7
+		lwz	r9,0(r9)
+				
+		subi	r10,r9,4		
+		li	r11,48
+		li	r7,0
+		mtctr	r11
+.ClearLLMsg:	stwu	r7,4(r10)
+		bdnz	.ClearLLMsg		
+		
 		loadreg r7,"FPPC"
 		stw	r7,MN_IDENTIFIER(r9)
+		li	r7,192
+		sth	r7,MN_LENGTH(r9)
+		li	r7,NT_MESSAGE
+		stb	r7,LN_TYPE(r9)
+		lwz	r7,RunningTask(r0)
+		la	r7,TASKPPC_SIZE(r7)
+		lwz	r7,MN_REPLYPORT(r7)		
+		stw	r7,MN_REPLYPORT(r9)
 		stw	r2,PP_REGS+12*4(r9)
 		stw	r3,PP_REGS+0*4(r9)
 		stw	r4,PP_REGS+1*4(r9)
@@ -114,7 +144,7 @@ ExitCode:	lwz	r9,RunningTask(r0)
 		stw	r28,PP_REGS+10*4(r9)
 		stw	r29,PP_REGS+11*4(r9)
 		stw	r30,PP_REGS+13*4(r9)
-		stw	r31,PP_REGS+14*4(r9)
+		stw	r31,PP_REGS+14*4(r9)		
 		stfd	f0,PP_FREGS+0*8(r9)
 		stfd	f1,PP_FREGS+1*8(r9)
 		stfd	f2,PP_FREGS+2*8(r9)
@@ -125,24 +155,36 @@ ExitCode:	lwz	r9,RunningTask(r0)
 		stfd	f7,PP_FREGS+7*8(r9)
 		lwz	r8,MCTask(r0)
 		la	r4,pr_MsgPort(r8)
-		mr	r5,r9
-
-		LIBCALLPOWERPC PutXMsgPPC
-
-		loadreg	r1,StackSize-0x20		#System stack in unused mem (See sonnet.s)
-		BUILDSTACKPPC
 		
+		stw	r4,188(r9)
+
+		LIBCALLPOWERPC FlushL1DCache
+		
+		sync
+		
+		lis	r3,EUMB
+		li	r24,OPHPR
+		lwbrx	r31,r24,r3		
+		stw	r9,0(r31)		
+		addi	r23,r31,4
+		loadreg	r4,0xbfff
+		and	r23,r23,r4				#Keep it 8000-BFFE
+		stwbrx	r23,r24,r3				#triggers Interrupt
+
+		loadreg	r1,StackSize-0x20		#System stack in unused mem (See sonnet.s)		
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+		
+		lwz	r9,RunningTask(r0)
+		lwz	r21,TC_SPLOWER(r9)
 		lwz	r4,SonnetBase(r0)
 		or	r4,r4,r21
-		
+
 		LIBCALLPOWERPC FreeVecPPC
 
 		li	r0,0
 		stw	r0,RunningTask(r0)
-		
-		sync
-		isync
-		
+
 Pause:		nop
 		nop
 		b	Pause
@@ -465,7 +507,7 @@ Epic:		lis	r26,EUMB
 
 .ResLoop:	lwz	r28,0(r27)
 		andi.	r28,r28,0x80
-		bne	.ResLoop				#Wait for reset
+		bne	.ResLoop			#Wait for reset
 
 		li	r28,0x20
 		stw	r28,0(r27)			#Set Mixed Mode
@@ -538,7 +580,6 @@ Caches:		mfspr	r4,HID0
 		blr					#REMOVE ME FOR L1 CACHE
 							#L1 cache off for now
 							#to fix coherancy problems
-
 		mfspr	r4,HID0	
 		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
 		mtspr	HID0,r4
@@ -786,44 +827,44 @@ loc_3BD8:	setpcireg MBEN			#Memory Bank Enable Register
 		loadreg r25,0xffeaffff		#-22,65535
 		bl	ConfigWrite32		#set all banks to 12 or 13 row bits
 
-		lis	r6, 0x40
-		stw	r3, 0(r6)		#set 0x400000 to 0x0
-		lis	r6, 0x80
-		stw	r3, 0(r6)		#set 0x800000 to 0x0
-		lis	r6, 0x100
-		stw	r3, 0(r6)		#set 0x1000000 to 0x0
-		lis	r6, 0x200
-		stw	r3, 0(r6)		#set 0x2000000 to 0x0
-		lis	r6, 0x400
-		stw	r3, 0(r6)		#set 0x4000000 to 0x0
-		lis	r6, 0x800
-		stw	r3, 0(r6)		#set 0x8000000 to 0x0
+		lis	r6,0x40
+		stw	r3,0(r6)		#set 0x400000 to 0x0
+		lis	r6,0x80
+		stw	r3,0(r6)		#set 0x800000 to 0x0
+		lis	r6,0x100
+		stw	r3,0(r6)		#set 0x1000000 to 0x0
+		lis	r6,0x200
+		stw	r3,0(r6)		#set 0x2000000 to 0x0
+		lis	r6,0x400
+		stw	r3,0(r6)		#set 0x4000000 to 0x0
+		lis	r6,0x800
+		stw	r3,0(r6)		#set 0x8000000 to 0x0
 		eieio
-		stw	r4, 0(r3)		#set 0x0 to "Boon"
+		stw	r4,0(r3)		#set 0x0 to "Boon"
 		eieio		
-		lis	r6, 0x40
-		lwz	r7, 0(r6)		#read from 0x400000
-		cmplw	r4, r7			#is it "Boon"
+		lis	r6,0x40
+		lwz	r7,0(r6)		#read from 0x400000
+		cmplw	r4,r7			#is it "Boon"
 		beq	loc_3CBC		#if yes goto loc_3CBC
-		lis	r6, 0x80
-		lwz	r7, 0(r6)		#read form 0x800000
-		cmplw	r4, r7			#is it "Boon"
+		lis	r6,0x80
+		lwz	r7,0(r6)		#read form 0x800000
+		cmplw	r4,r7			#is it "Boon"
 		beq	loc_3E24		#if yes goto loc_3E24
-		lis	r6, 0x100
-		lwz	r7, 0(r6)		#read from 0x1000000
-		cmplw	r4, r7			#is it "Boon"
+		lis	r6,0x100
+		lwz	r7,0(r6)		#read from 0x1000000
+		cmplw	r4,r7			#is it "Boon"
 		beq	loc_3E24		#if yes goto loc_3E24
-		lis	r6, 0x200
-		lwz	r7, 0(r6)		#read from 0x2000000
-		cmplw	r4, r7
+		lis	r6,0x200
+		lwz	r7,0(r6)		#read from 0x2000000
+		cmplw	r4,r7
 		beq	loc_3E24		#if its "Boon" goto loc_3E24
-		lis	r6, 0x400
-		lwz	r7, 0(r6)		#read from 0x4000000
-		cmplw	r4, r7
+		lis	r6,0x400
+		lwz	r7,0(r6)		#read from 0x4000000
+		cmplw	r4,r7
 		beq	loc_3E24		#if its "Boon" goto loc_3E24
-		lis	r6, 0x800
-		lwz	r7, 0(r6)		#read from 0x8000000
-		cmplw	r4, r7
+		lis	r6,0x800
+		lwz	r7,0(r6)		#read from 0x8000000
+		cmplw	r4,r7
 		beq	loc_3E24		#if its "Boon" goto loc_3E24
 		b	loc_4184		#goto loc_4184
 
@@ -831,38 +872,38 @@ loc_3BD8:	setpcireg MBEN			#Memory Bank Enable Register
 loc_3CBC:					#CODE XREF: findSetMem+1D0
 		loadreg r25,0xFFEAAAAA		#set row bits to 11 row bits
 		bl	ConfigWrite32
-		lis	r6, 0x20		#continue tests
-		stw	r3, 0(r6)
-		lis	r6, 0x40
-		stw	r3, 0(r6)
-		lis	r6, 0x80
-		stw	r3, 0(r6)
-		lis	r6, 0x100
-		stw	r3, 0(r6)
-		lis	r6, 0x200
-		stw	r3, 0(r6)
+		lis	r6,0x20			#continue tests
+		stw	r3,0(r6)
+		lis	r6,0x40
+		stw	r3,0(r6)
+		lis	r6,0x80
+		stw	r3,0(r6)
+		lis	r6,0x100
+		stw	r3,0(r6)
+		lis	r6,0x200
+		stw	r3,0(r6)
 		eieio
-		stw	r4, 0(r3)
+		stw	r4,0(r3)
 		eieio
-		lis	r6, 0x20
-		lwz	r7, 0(r6)
-		cmplw	r4, r7
+		lis	r6,0x20
+		lwz	r7,0(r6)
+		cmplw	r4,r7
 		beq	loc_3D50
-		lis	r6, 0x40
-		lwz	r7, 0(r6)
-		cmplw	r4, r7
+		lis	r6,0x40
+		lwz	r7,0(r6)
+		cmplw	r4,r7
 		beq	loc_3E24
-		lis	r6, 0x80
-		lwz	r7, 0(r6)
-		cmplw	r4, r7
+		lis	r6,0x80
+		lwz	r7,0(r6)
+		cmplw	r4,r7
 		beq	loc_3E24
-		lis	r6, 0x100
-		lwz	r7, 0(r6)
-		cmplw	r4, r7
+		lis	r6,0x100
+		lwz	r7,0(r6)
+		cmplw	r4,r7
 		beq	loc_3E24
-		lis	r6, 0x200
-		lwz	r7, 0(r6)
-		cmplw	r4, r7
+		lis	r6,0x200
+		lwz	r7,0(r6)
+		cmplw	r4,r7
 		beq	loc_3E24
 		b	loc_4184
 
@@ -870,349 +911,349 @@ loc_3CBC:					#CODE XREF: findSetMem+1D0
 loc_3D50:					#CODE XREF: findSetMem+274
 		loadreg r25,0xFFEA5555		#set row bits to 10 row bits
 		bl	ConfigWrite32
-		lis	r6, 0x10		#continue tests
-		stw	r3, 0(r6)
-		lis	r6, 0x20
-		stw	r3, 0(r6)
-		lis	r6, 0x40
-		stw	r3, 0(r6)
-		lis	r6, 0x80
-		stw	r3, 0(r6)
+		lis	r6,0x10			#continue tests
+		stw	r3,0(r6)
+		lis	r6,0x20
+		stw	r3,0(r6)
+		lis	r6,0x40
+		stw	r3,0(r6)
+		lis	r6,0x80
+		stw	r3,0(r6)
 		eieio
-		stw	r4, 0(r3)
+		stw	r4,0(r3)
 		eieio
-		lis	r6, 0x10
-		lwz	r7, 0(r6)
-		cmplw	r4, r7
+		lis	r6,0x10
+		lwz	r7,0(r6)
+		cmplw	r4,r7
 		beq	loc_3DCC
-		lis	r6, 0x20
-		lwz	r7, 0(r6)
-		cmplw	r4, r7
+		lis	r6,0x20
+		lwz	r7,0(r6)
+		cmplw	r4,r7
 		beq	loc_3E24
-		lis	r6, 0x40
-		lwz	r7, 0(r6)
-		cmplw	r4, r7
+		lis	r6,0x40
+		lwz	r7,0(r6)
+		cmplw	r4,r7
 		beq	loc_3E24
-		lis	r6, 0x80
-		lwz	r7, 0(r6)
-		cmplw	r4, r7
+		lis	r6,0x80
+		lwz	r7,0(r6)
+		cmplw	r4,r7
 		beq	loc_3E24
 		b	loc_4184
 
 #********************************************************************************************
 loc_3DCC:					#CODE XREF: findSetMem+300
-		lis	r6, 8
-		stw	r3, 0(r6)
-		lis	r6, 0x10
-		stw	r3, 0(r6)
-		lis	r6, 0x20
-		stw	r3, 0(r6)
+		lis	r6,8
+		stw	r3,0(r6)
+		lis	r6,0x10
+		stw	r3,0(r6)
+		lis	r6,0x20
+		stw	r3,0(r6)
 		eieio
-		stw	r4, 0(r3)
+		stw	r4,0(r3)
 		eieio
-		lis	r6, 8
-		lwz	r7, 0(r6)
-		cmplw	r4, r7
+		lis	r6,8
+		lwz	r7,0(r6)
+		cmplw	r4,r7
 		beq	loc_4184
-		lis	r6, 0x10
-		lwz	r7, 0(r6)
-		cmplw	r4, r7
+		lis	r6,0x10
+		lwz	r7,0(r6)
+		cmplw	r4,r7
 		beq	loc_3E24
-		lis	r6, 0x20
-		lwz	r7, 0(r6)
-		cmplw	r4, r7
+		lis	r6,0x20
+		lwz	r7,0(r6)
+		cmplw	r4,r7
 		beq	loc_3E24
 		b	loc_4184
 
 #********************************************************************************************
 loc_3E24:					#CODE XREF: findSetMem+1E0
 						#findSetMem+1F0 ...
-		cmplwi	r5, 1
+		cmplwi	r5,1
 		bne	loc_3E84
-		mr	r7, r8
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		or	r9, r9, r7
-		mr	r7, r8
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		or	r16, r16, r7
-		add	r8, r8, r6
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		or	r11, r11, r7
-		mr	r7, r8
-		addi	r7, r7, 0xFF
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		or	r18, r18, r7
-		andi.	r25, r25, 3
-		or	r13, r13, r25
+		mr	r7,r8
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		or	r9,r9,r7
+		mr	r7,r8
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		or	r16,r16,r7
+		add	r8,r8,r6
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		or	r11,r11,r7
+		mr	r7,r8
+		addi	r7,r7,0xFF
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		or	r18,r18,r7
+		andi.	r25,r25,3
+		or	r13,r13,r25
 		b	loc_4184
 
 #********************************************************************************************
 loc_3E84:					#CODE XREF: findSetMem+394
-		cmplwi	r5, 2
+		cmplwi	r5,2
 		bne	loc_3EF4
-		mr	r7, r8
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		slwi	r7, r7, 8
-		or	r9, r9, r7
-		mr	r7, r8
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		slwi	r7, r7, 8
-		or	r16, r16, r7
-		add	r8, r8, r6
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		slwi	r7, r7, 8
-		or	r11, r11, r7
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		slwi	r7, r7, 8
-		or	r18, r18, r7
-		andi.	r25, r25, 0xC
-		or	r13, r13, r25
+		mr	r7,r8
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		slwi	r7,r7,8
+		or	r9,r9,r7
+		mr	r7,r8
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		slwi	r7,r7,8
+		or	r16,r16,r7
+		add	r8,r8,r6
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		slwi	r7,r7,8
+		or	r11,r11,r7
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		slwi	r7,r7,8
+		or	r18,r18,r7
+		andi.	r25,r25,0xC
+		or	r13,r13,r25
 		b	loc_4184
 
 #********************************************************************************************
 loc_3EF4:					#CODE XREF: findSetMem+3F4
-		cmplwi	r5, 4
+		cmplwi	r5,4
 		bne	loc_3F64
-		mr	r7, r8
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		slwi	r7, r7, 16
-		or	r9, r9, r7
-		mr	r7, r8
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		slwi	r7, r7, 16
-		or	r16, r16, r7
-		add	r8, r8, r6
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		slwi	r7, r7, 16
-		or	r11, r11, r7
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		slwi	r7, r7, 16
-		or	r18, r18, r7
-		andi.	r25, r25, 0x30
-		or	r13, r13, r25
+		mr	r7,r8
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		slwi	r7,r7,16
+		or	r9,r9,r7
+		mr	r7,r8
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		slwi	r7,r7,16
+		or	r16,r16,r7
+		add	r8,r8,r6
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		slwi	r7,r7,16
+		or	r11,r11,r7
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		slwi	r7,r7,16
+		or	r18,r18,r7
+		andi.	r25,r25,0x30
+		or	r13,r13,r25
 		b	loc_4184
 
 #********************************************************************************************
 loc_3F64:					#CODE XREF: findSetMem+464
-		cmplwi	r5, 8
+		cmplwi	r5,8
 		bne	loc_3FD4
-		mr	r7, r8
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		slwi	r7, r7, 24
-		or	r9, r9, r7
-		mr	r7, r8
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		slwi	r7, r7, 24
-		or	r16, r16, r7
-		add	r8, r8, r6
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		slwi	r7, r7, 24
-		or	r11, r11, r7
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		slwi	r7, r7, 24
-		or	r18, r18, r7
-		andi.	r25, r25, 0xC0
-		or	r13, r13, r25
+		mr	r7,r8
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		slwi	r7,r7,24
+		or	r9,r9,r7
+		mr	r7,r8
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		slwi	r7,r7,24
+		or	r16,r16,r7
+		add	r8,r8,r6
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		slwi	r7,r7,24
+		or	r11,r11,r7
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		slwi	r7,r7,24
+		or	r18,r18,r7
+		andi.	r25,r25,0xC0
+		or	r13,r13,r25
 		b	loc_4184
 
 #********************************************************************************************
 loc_3FD4:					#CODE XREF: findSetMem+4D4
-		cmplwi	r5, 0x10
+		cmplwi	r5,0x10
 		bne	loc_4034
-		mr	r7, r8
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		or	r10, r10, r7
-		mr	r7, r8
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		or	r17, r17, r7
-		add	r8, r8, r6
+		mr	r7,r8
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		or	r10,r10,r7
+		mr	r7,r8
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		or	r17,r17,r7
+		add	r8,r8,r6
 
 loc_4000:
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		or	r12, r12, r7
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		or	r19, r19, r7
-		andi.	r25, r25, 0x300
-		or	r13, r13, r25
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		or	r12,r12,r7
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		or	r19,r19,r7
+		andi.	r25,r25,0x300
+		or	r13,r13,r25
 		b	loc_4184
 
 #********************************************************************************************
 loc_4034:
-		cmplwi	r5, 0x20
+		cmplwi	r5,0x20
 
 		bne	loc_40A4
-		mr	r7, r8
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		slwi	r7, r7, 8
-		or	r10, r10, r7
-		mr	r7, r8
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		slwi	r7, r7, 8
-		or	r17, r17, r7
-		add	r8, r8, r6
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		slwi	r7, r7, 8
-		or	r12, r12, r7
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		slwi	r7, r7, 8
-		or	r19, r19, r7
-		andi.	r25, r25, 0xC00
-		or	r13, r13, r25
+		mr	r7,r8
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		slwi	r7,r7,8
+		or	r10,r10,r7
+		mr	r7,r8
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		slwi	r7,r7,8
+		or	r17,r17,r7
+		add	r8,r8,r6
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		slwi	r7,r7,8
+		or	r12,r12,r7
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		slwi	r7,r7,8
+		or	r19,r19,r7
+		andi.	r25,r25,0xC00
+		or	r13,r13,r25
 		b	loc_4184
 
 #********************************************************************************************
 loc_40A4:
-		cmplwi	r5, 0x40
+		cmplwi	r5,0x40
 		bne	loc_4114
-		mr	r7, r8
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		slwi	r7, r7, 16
-		or	r10, r10, r7
-		mr	r7, r8
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		slwi	r7, r7, 16
-		or	r17, r17, r7
-		add	r8, r8, r6
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		slwi	r7, r7, 16
-		or	r12, r12, r7
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		slwi	r7, r7, 16
-		or	r19, r19, r7
-		andi.	r25, r25, 0x3000
-		or	r13, r13, r25
+		mr	r7,r8
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		slwi	r7,r7,16
+		or	r10,r10,r7
+		mr	r7,r8
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		slwi	r7,r7,16
+		or	r17,r17,r7
+		add	r8,r8,r6
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		slwi	r7,r7,16
+		or	r12,r12,r7
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		slwi	r7,r7,16
+		or	r19,r19,r7
+		andi.	r25,r25,0x3000
+		or	r13,r13,r25
 		b	loc_4184
 
 #********************************************************************************************
 loc_4114:
-		cmplwi	r5, 0x80
+		cmplwi	r5,0x80
 		bne	loc_4184
-		mr	r7, r8
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		slwi	r7, r7, 24
-		or	r10, r10, r7
-		mr	r7, r8
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		slwi	r7, r7, 24
-		or	r17, r17, r7
-		add	r8, r8, r6
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 20
-		andi.	r7, r7, 0xFF
-		slwi	r7, r7, 24
-		or	r12, r12, r7
-		mr	r7, r8
-		addi	r7, r7, -1
-		srwi	r7, r7, 28
-		andi.	r7, r7, 3
-		slwi	r7, r7, 24
-		or	r19, r19, r7
-		andi.	r25, r25, 0xc000
-		or	r13, r13, r25
+		mr	r7,r8
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		slwi	r7,r7,24
+		or	r10,r10,r7
+		mr	r7,r8
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		slwi	r7,r7,24
+		or	r17,r17,r7
+		add	r8,r8,r6
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,20
+		andi.	r7,r7,0xFF
+		slwi	r7,r7,24
+		or	r12,r12,r7
+		mr	r7,r8
+		addi	r7,r7,-1
+		srwi	r7,r7,28
+		andi.	r7,r7,3
+		slwi	r7,r7,24
+		or	r19,r19,r7
+		andi.	r25,r25,0xc000
+		or	r13,r13,r25
 		b	loc_4184
 
 loc_4184:
-		slwi	r5, r5, 1
-		cmplwi	r5, 0x100
+		slwi	r5,r5,1
+		cmplwi	r5,0x100
 		bne	loc_3BD8
 		
 		
 
 		setpcireg MSAR1				#80
-		mr	r25, r9		
+		mr	r25,r9		
 		bl	ConfigWrite32			#store found values to registers
 
 		setpcireg MSAR2				#84
-		mr	r25, r10
+		mr	r25,r10
 		bl	ConfigWrite32
 
 		setpcireg MEAR1				#90		
-		mr	r25, r11		
+		mr	r25,r11		
 		bl	ConfigWrite32
 
 		setpcireg MEAR2				#94
-		mr	r25, r12
+		mr	r25,r12
 		bl	ConfigWrite32
 
 		setpcireg MCCR1				#F0		
-		mr	r25, r13
+		mr	r25,r13
 		bl	ConfigWrite32
 
 		setpcireg MESAR1			#88		
-		mr	r25, r16
+		mr	r25,r16
 		bl	ConfigWrite32
 
 		setpcireg MESAR2			#8c
-		mr	r25, r17
+		mr	r25,r17
 		bl	ConfigWrite32
 
 		setpcireg MEEAR1			#98
-		mr	r25, r18
+		mr	r25,r18
 		bl	ConfigWrite32
 
 		setpcireg MEEAR2			#9C
-		mr	r25, r19
+		mr	r25,r19
 		bl	ConfigWrite32
 
 		setpcireg MBEN				#A0
-		mr	r25, r14
+		mr	r25,r14
 		bl	ConfigWrite8
 	
 		mtlr	r15
@@ -1339,17 +1380,19 @@ EInt:		b	.FPUnav
 		
 		mr	r4,r5		
 		b	.NextOnList
-		
-.GotOneWait:	mr	r6,r4
+
+.GotOneWait:			
+		mr	r6,r4
 		
 		LIBCALLPOWERPC	RemovePPC
 		
 		mr	r5,r6
 		la	r4,ReadyTasks(r0)
 		
-		LIBCALLPOWERPC AddTailPPC		
+		LIBCALLPOWERPC AddTailPPC
 
-.EndOfWaitList:	lwz	r9,RunningTask(r0)
+.EndOfWaitList:	
+		lwz	r9,RunningTask(r0)
 
 		b	.TrySwitch
 
@@ -1376,7 +1419,7 @@ EInt:		b	.FPUnav
 		
 		loadreg	r4,500000			#fixed stack len (for now)
 		mr	r31,r4				#Will be cloned from mother (68K) task
-		
+
 		LIBCALLPOWERPC AllocVecPPC
 
 		mr.	r4,r3
@@ -1396,7 +1439,9 @@ EInt:		b	.FPUnav
 		stw	r4,TC_SPREG(r8)
 		mr	r1,r4
 		
-		BUILDSTACKPPC		
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
 		
 		la	r8,TASKPPC_SIZE(r8)
 		lwz	r2,PP_REGS+12*4(r8)
@@ -1465,8 +1510,8 @@ EInt:		b	.FPUnav
 		rfi
 		
 #********************************************************************************************
-
-.ReturnToUser:
+		
+.ReturnToUser:		
 		lwz	r9,0xf0(r0)				#Debug counter to check
 		addi	r9,r9,1					#Whether exception is still
 		stw	r9,0xf0(r0)				#running
@@ -1521,12 +1566,19 @@ TestRoutine:	b	.IntReturn
 		stw	r9,RunningTask(r0)		
 		b	.LoadContext
 
-.CheckWait:	li	r4,TS_WAIT
+.CheckWait:	
+		li	r4,TS_REMOVED
+		lbz	r3,TC_STATE(r9)
+		cmpw	r3,r4
+		
+		beq	.ReturnToUser
+
+		li	r4,TS_WAIT
 		lbz	r3,TC_STATE(r9)
 		cmpw	r3,r4
 		
 		beq	.GoToWait
-
+		
 		lwz	r3,SonnetBase(r0)
 		la	r4,NewTasks(r3)
 		mr	r6,r4
@@ -1534,14 +1586,15 @@ TestRoutine:	b	.IntReturn
 		LIBCALLPOWERPC RemHeadPPC
 	
 		mr.	r9,r3
-		bne	.SwitchNew
-	
+		bne	.Dispatch
+
 		la	r4,ReadyTasks(r0)
 	
 		LIBCALLPOWERPC RemHeadPPC
 	
 		mr.	r9,r3	
 		bne	.SwitchOld
+		
 		b	.ReturnToUser
 	
 .SwitchOld:	la	r4,ReadyTasks(r0)		#Old = Context, New = PPStruct		
@@ -1559,7 +1612,8 @@ TestRoutine:	b	.IntReturn
 		
 		b	.LoadContext
 	
-.SwitchNew:	la	r4,ReadyTasks(r0)
+.SwitchNew:	
+		la	r4,ReadyTasks(r0)
 		lwz	r5,RunningTask(r0)
 		stw	r9,RunningTask(r0)
 		
@@ -1569,7 +1623,7 @@ TestRoutine:	b	.IntReturn
 		bl	.StoreContext
 		
 		LIBCALLPOWERPC AddTailPPC
-	
+
 		b	.Dispatch
 		
 .StoreContext:	lwz	r6,TASKPPC_CONTEXTMEM(r5)
@@ -1743,7 +1797,8 @@ TestRoutine:	b	.IntReturn
 		mfsprg3	r9
 		rfi
 
-.GoToWait:	la	r4,WaitingTasks(r0)
+.GoToWait:			
+		la	r4,WaitingTasks(r0)
 		mr	r5,r9
 		
 		bl	.StoreContext
@@ -1769,7 +1824,10 @@ TestRoutine:	b	.IntReturn
 .DoIdle:	loadreg	r19,IdleTask			#Start hardcoded at 0x7400
 
 		loadreg	r1,StackSize-0x20		#System stack in unused mem (See sonnet.s)
-		BUILDSTACKPPC
+		
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
 		
 		mfsrr1	r18
 		ori	r18,r18,PSL_PR|PSL_EE
@@ -1800,6 +1858,9 @@ TestRoutine:	b	.IntReturn
 		stwu	r8,-4(r13)
 		stwu	r9,-4(r13)
 
+		loadreg r5,"DECI"
+		stw	r5,0xd0(r0)
+		
 		mfmsr	r5
 		ori	r5,r5,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r5				#Reenable MMU (can affect srr0/srr1 acc Docs)
