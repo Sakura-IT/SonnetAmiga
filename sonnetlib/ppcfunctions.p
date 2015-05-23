@@ -2061,7 +2061,7 @@ WaitFor68K:
 		li	r30,6
 		mtctr	r30
 .PPInvalid:	dcbi	r0,r31
-		addi	r31,r31,4
+		addi	r31,r31,L1_CACHE_LINE_SIZE
 		bdnz	.PPInvalid
 		
 		bl	WarpUser
@@ -2127,15 +2127,20 @@ Run68K:
 		stw	r5,MN_MIRROR(r30)
 		lwz	r4,MCTask(r0)
 		la	r4,pr_MsgPort(r4)
-		stw	r4,188(r30)			#MN_MCTASK
+		stw	r4,MN_MCTASK(r30)
 		li	r5,NT_MESSAGE
 		stb	r5,LN_TYPE(r30)
 		li	r5,192
 		sth	r5,MN_LENGTH(r30)
 		
 		sync
-				
-		bl FlushL1DCache
+		
+		mr	r24,r30
+		li	r31,6				#MsgLen/Cache_Line
+		mtctr	r31
+.FlushMsg:	dcbf	r0,r24
+		addi	r24,r24,L1_CACHE_LINE_SIZE
+		bdnz	.FlushMsg
 		
 		lis	r3,EUMB
 		li	r24,OPHPR
@@ -5720,11 +5725,16 @@ Run68KLowLevel:
 		stb	r5,LN_TYPE(r30)		
 		lwz	r4,MCTask(r0)
 		la	r4,pr_MsgPort(r4)
-		stw	r4,188(r30)				#MN_MCTASK
+		stw	r4,MN_MCTASK(r30)
 				
 		sync
 		
-		bl	FlushL1DCache
+		mr	r24,r30
+		li	r31,6					#MsgLen/Cache_Line
+		mtctr	r31
+.FlushMsg2:	dcbf	r0,r24
+		addi	r24,r24,L1_CACHE_LINE_SIZE
+		bdnz	.FlushMsg2
 		
 		lis	r3,EUMB
 		li	r24,OPHPR

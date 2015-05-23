@@ -154,11 +154,16 @@ ExitCode:	li	r7,TS_REMOVED
 		stfd	f6,PP_FREGS+6*8(r9)
 		stfd	f7,PP_FREGS+7*8(r9)
 		lwz	r8,MCTask(r0)
-		la	r4,pr_MsgPort(r8)
+		la	r4,pr_MsgPort(r8)		
+		stw	r4,MN_MCTASK(r9)
 		
-		stw	r4,188(r9)
-
-		LIBCALLPOWERPC FlushL1DCache
+		mr	r24,r9
+		
+		li	r31,6					#MsgLen/Cache_Line
+		mtctr	r31
+.FlushMsg:	dcbf	r0,r24
+		addi	r24,r24,L1_CACHE_LINE_SIZE
+		bdnz	.FlushMsg
 		
 		sync
 		
@@ -585,7 +590,7 @@ Caches:		mfspr	r4,HID0
 		mtspr	HID0,r4
 		sync
 		 	
-		blr					#REMOVE ME FOR L2 CACHE		
+#		blr					#REMOVE ME FOR L2 CACHE		
 		 					# Set up on chip L2 cache controller.
 		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_L2WT
 #		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST
