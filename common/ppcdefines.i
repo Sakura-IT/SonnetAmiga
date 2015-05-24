@@ -155,6 +155,11 @@
 .set CACHE_DCACHEINV,11
 
 .set IMIMR,0x104		#Inbound Message Interrupt Mask Register
+.set IMISR,0x100		#Inbound Message Interrupt Status Register
+
+.set IMISR_IM0I,		0x00000001		#Inbound Message 0 Interrupt
+.set IMISR_IPQI,		0x00000020		#Inbound Post Queue Interrupt
+
 .set PCI_COMMAND,0x4
 .set OMBAR,0x2300		#Outbound Memory Base Address Register
 .set OTWR,0x2308		#Outbound Translation Window Register
@@ -172,9 +177,9 @@
 .set MBEN,0xA0			#Memory Bank Enable
 
 .set IFHPR,0x120		#Inbound Free_FIFO Head Pointer Register
-.set IFTPR,0x128
-.set IPHPR,0x130
-.set IPTPR,0x138
+.set IFTPR,0x128		#Inbound Free_FIFO Tail Pointer Register
+.set IPHPR,0x130		#Inbound Post_FIFO Head Pointer Register
+.set IPTPR,0x138		#Inbound Post_FIFO Tail Pointer Register
 .set OFHPR,0x140		#Outbound Free_FIFO Head Pointer Register
 .set OFTPR,0x148		#Outbound Free_FIFO Tail Pointer Register
 .set OPHPR,0x150		#Outbound Post_FIFO Head Pointer Register
@@ -183,7 +188,6 @@
 .set MUCR,0x164			#Message Unit Control Register
 .set MUCR_CQS_FIFO4K,		0x00000002
 .set MUCR_CQE_ENABLE,		0x00000001
-
 
 .set MCCR1,0xF0			#Memory Control Configuration Register 1
 .set MCCR2,0xF4			#Memory Control Configuration Register 2
@@ -255,6 +259,8 @@
 .set EUMBBAR,0x78			#At 0x80000000 (Sonnet side)
 .set EUMB,0x8000
 .set EUMBEPICPROC,0x8006
+.set EPIC_IACK,0xa0
+.set EPIC_EOI,0xb0
 
 .set	PSL_VEC,	0x02000000	#/* ..6. AltiVec vector unit available */
 .set	PSL_SPV,	0x02000000	#/* B... (e500) SPE enable */
