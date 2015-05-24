@@ -1357,13 +1357,43 @@ EInt:		b	.FPUnav
 
 .IntReturn:	lis	r3,EUMB
 		li	r4,IMISR
+		lwbrx	r5,r4,r3
+		andi.	r9,r5,IMISR_IM0I
+		beq	.CheckQueue
+
 		li	r5,IMISR_IM0I
-		stwbrx	r5,r4,r3			#Clear IM0 bit to clear interrupt		
+		stwbrx	r5,r4,r3			#Clear IM0 bit to clear interrupt
+		eieio
+	
+.CheckQueue:	andi.	r9,r5,IMISR_IPQI
+		beq	.NotQueue
+		
 		li	r5,IMISR_IPQI			#Clear IPQI bit to clear interrupt
 		stwbrx	r5,r4,r3		
 		eieio
+
+		li	r4,IPTPR			#Get message from Inbound FIFO
+		lwbrx	r5,r4,r3
+		addi	r9,r5,4				#Increase FIFO pointer
+		loadreg	r4,0x4000
+		or	r9,r9,r4
+		loadreg r4,0x7fff
+		and	r9,r9,r4			#Keep it 4000-7FFE
+		stwbrx	r9,r4,r3
+		lwz	r5,0(r5)
 		
-		clearreg r5
+		loadreg	r4,"TPPC"
+		lwz	r9,MN_IDENTIFIER(r5)
+		cmpw	r4,r9				#The one we want?
+		bne	.NextQueue
+		
+#		la	r4,NewTasks(r0)
+		
+#		LIBCALLPOWERPC AddTailPPC
+		
+.NextQueue:	nop					#INSERT CODE TO CHECK FOR MORE
+		
+.NotQueue:	clearreg r5
 		lis	r3,EUMBEPICPROC
 		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
 
@@ -1868,7 +1898,7 @@ TestRoutine:	b	.IntReturn
 		stwu	r9,-4(r13)
 
 		loadreg r5,"DECI"
-		stw	r5,0xd0(r0)
+		stw	r5,0xf4(r0)
 		
 		mfmsr	r5
 		ori	r5,r5,(PSL_IR|PSL_DR|PSL_FP)

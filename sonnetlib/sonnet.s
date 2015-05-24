@@ -567,8 +567,18 @@ SonInt:
 	and.l d2,d3
 	beq.s NoSingl
 	
-	move.l OMR0(a2),a0
-	move.l OMR1(a2),a1
+	move.l OMR0(a2),a0				;Port
+	move.l OMR1(a2),a1				;Message
+	
+	moveq.l #0,d4
+	move.w MN_LENGTH(a1),d4				;PPC should make it 32 byte aligned
+	beq.s NoSingl
+	lsr.l #4,d4
+	subq.l #1,d4
+	move.l a1,d3
+	bsr.s InvMsg
+	move.l d3,a1
+	
 	jsr _LVOPutMsg(a6)
 
 NoSingl move.l OMISR(a2),d3
@@ -581,12 +591,21 @@ NoSingl move.l OMISR(a2),d3
 	bmi.s NoInt
 	
 	move.l d3,a1
-	move.l 188(a1),a0				;MN_MCTASK
+	
+	moveq.l #11,d4
+	bsr.s InvMsg	
+	move.l d3,a1
+	move.l MN_MCTASK(a1),a0				;MN_MCTASK
 	
 	jsr _LVOPutMsg(a6)
 	
 NoInt	movem.l (a7)+,d1-a6
 	moveq.l #0,d0
+	rts
+
+InvMsg	cinvl dc,(a1)
+	add.l #16,a1					;Cache_Line 040/060 = 16 bytes
+	dbf d4,InvMsg					;12x16 = MsgLen (192 bytes)
 	rts
 
 IntData	dc.l 0
