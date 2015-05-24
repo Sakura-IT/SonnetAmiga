@@ -578,7 +578,6 @@ NoSingl move.l OMISR(a2),d3
 	and.l d4,d3
 	beq.s NoInt
 	move.l OFQPR(a2),d3				;Get Message Frame
-	move.l d3,$7d000000				;DEBUG
 	bmi.s NoInt
 	
 	move.l d3,a1
@@ -813,6 +812,31 @@ Fast	move.l d7,a0
 	move.l Msg(a5),a1
 	move.l #"TPPC",MN_IDENTIFIER(a1)	
 	jsr _LVOPutMsg(a6)
+
+	move.l EUMBAddr(pc),a2
+	move.l IFQPR(a2),a1
+	
+	moveq.l #47,d0
+	move.l a1,a2
+ClrMsg	clr.l (a2)+
+	dbf d0,ClrMsg
+	
+	move.w #192,MN_LENGTH(a1)
+	move.l #"TPPC",MN_IDENTIFIER(a1)
+	move.b #NT_MESSAGE,LN_TYPE(a1)
+	move.l Port(a5),d1
+	move.l d1,MN_REPLYPORT(a1)
+	move.l d1,MN_MIRROR(a1)
+	
+	lea MN_PPSTRUCT(a1),a2
+	moveq.l #PP_SIZE/4-1,d0
+	move.l PStruct(a5),a0
+CpMsg2	move.l (a0)+,(a2)+
+	dbf d0,CpMsg2
+
+	move.l EUMBAddr(pc),a2
+	move.l a1,IFQPR(a2)
+
 	bra.s Stacker
 
 ;********************************************************************************************
@@ -851,11 +875,14 @@ GtLoop	move.l Port(a5),a0
 	bra.s GtLoop
 
 DizDone	move.l PStruct(a5),a1
+	move.l a0,a2
 	lea MN_PPSTRUCT(a0),a0
 	moveq.l #PP_SIZE/4-1,d0
 CpBck	move.l (a0)+,(a1)+
 	dbf d0,CpBck
-	moveq.l #0,d7
+	moveq.l #0,d7	
+	move.l EUMBAddr(pc),a1
+	move.l a2,OFQPR(a1)				;Return Message Frame
 	bra.s Success
 
 Cannot	moveq.l #-1,d7	

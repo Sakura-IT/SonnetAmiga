@@ -1342,7 +1342,7 @@ EInt:		b	.FPUnav
 		sync
 
 		lis	r3,EUMBEPICPROC
-		lwz	r5,0xa0(r3)			#Read IACKR to acknowledge it
+		lwz	r5,EPIC_IACK(r3)		#Read IACKR to acknowledge interrupt
 
 		rlwinm	r5,r5,8,0,31
 		cmpwi	r5,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
@@ -1356,12 +1356,16 @@ EInt:		b	.FPUnav
 #		beq	Timer
 
 .IntReturn:	lis	r3,EUMB
-		lis	r5,0x100			#Clear IM0 bit to clear interrupt
-		stw	r5,0x100(r3)
+		li	r4,IMISR
+		li	r5,IMISR_IM0I
+		stwbrx	r5,r4,r3			#Clear IM0 bit to clear interrupt		
+		li	r5,IMISR_IPQI			#Clear IPQI bit to clear interrupt
+		stwbrx	r5,r4,r3		
 		eieio
+		
 		clearreg r5
 		lis	r3,EUMBEPICPROC
-		stw	r5,0xb0(r3)			#Write 0 to EOI to End Interrupt
+		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
 
 .RDecInt:	loadreg	r3,"EXEX"
 		stw	r3,0xf4(r0)
