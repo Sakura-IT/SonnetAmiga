@@ -2122,9 +2122,11 @@ Run68K:
 		stw	r5,MN_IDENTIFIER(r30)
 		lwz	r5,RunningTask(r0)
 		stw	r5,MN_PPC(r30)
-		la	r5,TASKPPC_SIZE(r5)
+		
+		lwz	r5,TASKPPC_STARTMSG(r5)
 		lwz	r5,MN_MIRROR(r5)
 		stw	r5,MN_MIRROR(r30)
+		
 		lwz	r4,MCTask(r0)
 		la	r4,pr_MsgPort(r4)
 		stw	r4,MN_MCTASK(r30)
@@ -2136,6 +2138,7 @@ Run68K:
 		sync
 		
 		mr	r24,r30
+		mr	r29,r31
 		li	r31,6				#MsgLen/Cache_Line
 		mtctr	r31
 .FlushMsg:	dcbf	r0,r24
@@ -2155,7 +2158,7 @@ Run68K:
 		
 		bl WaitFor68K
 		
-		subi	r4,r31,4
+		subi	r4,r29,4
 		addi	r29,r30,MN_PPSTRUCT-4		
 		li	r6,PP_SIZE/4
 		mtctr	r6
