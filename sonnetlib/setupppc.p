@@ -2,7 +2,7 @@
 .include sonnet_libppc.i
 .include ppcmacros-std.i
 
-.global PPCCode,PPCLen,RunningTask,WaitingTasks,NewTasks,Init,ViolationAddress
+.global PPCCode,PPCLen,RunningTask,WaitingTasks,Init,ViolationAddress
 .global MCTask,SysBase,PowerPCBase
 
 .set	PPCLen,(PPCEnd-PPCCode)
@@ -102,8 +102,8 @@ ExitCode:	li	r7,TS_REMOVED
 		lwz	r9,RunningTask(r0)
 		stb	r7,TC_STATE(r9)
 		
-		lis	r7,EUMB
-		li	r8,OFTPR
+		lis	r7,EUMB					#Get Msg Frame for 
+		li	r8,OFTPR				#communication with 68K
 		lwbrx	r9,r8,r7			
 		addi	r10,r9,4		
 		loadreg	r11,0xc000
@@ -111,6 +111,7 @@ ExitCode:	li	r7,TS_REMOVED
 		loadreg r11,0xffff
 		and	r10,r10,r11				#Keep it C000-FFFE		
 		stwbrx	r10,r8,r7
+		sync
 		lwz	r9,0(r9)
 				
 		subi	r10,r9,4		
@@ -126,8 +127,9 @@ ExitCode:	li	r7,TS_REMOVED
 		sth	r7,MN_LENGTH(r9)
 		li	r7,NT_MESSAGE
 		stb	r7,LN_TYPE(r9)
-		lwz	r7,RunningTask(r0)
-		la	r7,TASKPPC_SIZE(r7)
+		
+		lwz	r7,RunningTask(r0)		
+		lwz	r7,TASKPPC_STARTMSG(r7)						
 		lwz	r7,MN_REPLYPORT(r7)		
 		stw	r7,MN_REPLYPORT(r9)
 		stw	r2,PP_REGS+12*4(r9)
@@ -157,6 +159,13 @@ ExitCode:	li	r7,TS_REMOVED
 		la	r4,pr_MsgPort(r8)		
 		stw	r4,MN_MCTASK(r9)
 		
+		lwz	r4,RunningTask(r0)
+		lwz	r21,TC_SPLOWER(r4)
+		lwz	r4,SonnetBase(r0)
+		or	r4,r4,r21
+		subi	r4,r4,1024
+		stw	r4,MN_ARG0(r9)
+		
 		mr	r24,r9
 		
 		li	r31,6					#MsgLen/Cache_Line
@@ -167,7 +176,7 @@ ExitCode:	li	r7,TS_REMOVED
 		
 		sync
 		
-		lis	r3,EUMB
+		lis	r3,EUMB					#Send Msg to 68K
 		li	r24,OPHPR
 		lwbrx	r31,r24,r3		
 		stw	r9,0(r31)		
@@ -175,17 +184,23 @@ ExitCode:	li	r7,TS_REMOVED
 		loadreg	r4,0xbfff
 		and	r23,r23,r4				#Keep it 8000-BFFE
 		stwbrx	r23,r24,r3				#triggers Interrupt
+		sync
 
-		loadreg	r1,StackSize-0x20		#System stack in unused mem (See sonnet.s)		
+		loadreg	r1,StackSize-0x20			#System stack in unused mem
 		subi	r13,r1,4
 		stwu	r1,-284(r1)
-		
-		lwz	r9,RunningTask(r0)
-		lwz	r21,TC_SPLOWER(r9)
-		lwz	r4,SonnetBase(r0)
-		or	r4,r4,r21
 
-		LIBCALLPOWERPC FreeVecPPC
+		lwz	r9,RunningTask(r0)			#Free original 68K -> PPC
+		lwz	r9,TASKPPC_STARTMSG(r9)			#message
+		lis	r3,EUMB
+		li	r24,IFHPR
+		lwbrx	r31,r24,r3		
+		stw	r9,0(r31)		
+		addi	r23,r31,4
+		loadreg	r4,0x3fff
+		and	r23,r23,r4				#Keep it 0000-3FFE
+		stwbrx	r23,r24,r3
+		sync
 
 		li	r0,0
 		stw	r0,RunningTask(r0)
@@ -236,6 +251,9 @@ End:		mflr	r4
 		la	r4,SnoopList(r0)
 		bl	.MakeList
 		
+		la	r4,NewTasks(r0)
+		bl	.MakeList
+		
 		li	r3,0x7000			#Put Semaphores at 0x7000
 		li	r6,0x7200			#Put Semaphores memory at 0x7200
 		
@@ -264,11 +282,6 @@ End:		mflr	r4
 		stw	r4,MemSem(r14)
 		addi	r6,r6,32
 		bl	.InitSem
-
-		lwz	r14,0(r0)
-		la	r4,NewTasks(r14)
-		
-		bl	.MakeList
 				
 		bl	.SetupMsgFIFOs
 				
@@ -578,22 +591,22 @@ ClearInts:	lwz	r27,0xa0(r26)			#IACKR
 							#Invalidatem then enable L1 caches
 Caches:		mfspr	r4,HID0
 		ori	r4,r4,HID0_ICFI|HID0_DCFI
-		xori	r4,r4,HID0_ICFI|HID0_DCFI
 		mtspr	HID0,r4
 		sync
 		
-		blr					#REMOVE ME FOR L1 CACHE
+#		blr					#REMOVE ME FOR L1 CACHE
 							#L1 cache off for now
 							#to fix coherancy problems
-		mfspr	r4,HID0	
+		mfspr	r4,HID0
+#		ori	r4,r4,HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
 		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
 		mtspr	HID0,r4
 		sync
 		 	
 #		blr					#REMOVE ME FOR L2 CACHE		
 		 					# Set up on chip L2 cache controller.
-		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_L2WT
-#		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST
+#		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_L2WT
+		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST
 		mtl2cr	r4
 		sync
 		
@@ -1324,7 +1337,7 @@ EInt:		b	.FPUnav
 		mtsprg0	r0
 		mfsrr1	r0
 		mtsprg1	r0
-		
+
 		BUILDSTACKPPC
 
 		stwu	r3,-4(r13)
@@ -1366,7 +1379,7 @@ EInt:		b	.FPUnav
 		eieio
 	
 .CheckQueue:	andi.	r9,r5,IMISR_IPQI
-		beq	.NotQueue
+		beq	.EndQueue
 		
 		li	r5,IMISR_IPQI			#Clear IPQI bit to clear interrupt
 		stwbrx	r5,r4,r3		
@@ -1374,26 +1387,41 @@ EInt:		b	.FPUnav
 
 		li	r4,IPTPR			#Get message from Inbound FIFO
 		lwbrx	r5,r4,r3
-		addi	r9,r5,4				#Increase FIFO pointer
+.QNotEmpty:	addi	r9,r5,4				#Increase FIFO pointer
 		loadreg	r4,0x4000
 		or	r9,r9,r4
 		loadreg r4,0x7fff
-		and	r9,r9,r4			#Keep it 4000-7FFE
-		stwbrx	r9,r4,r3
+		and	r9,r9,r4			#Keep it 4000-7FFE		
+		sync
+		
 		lwz	r5,0(r5)
 		
 		loadreg	r4,"TPPC"
-		lwz	r9,MN_IDENTIFIER(r5)
-		cmpw	r4,r9				#The one we want?
-		bne	.NextQueue
+		lwz	r6,MN_IDENTIFIER(r5)
+		cmpw	r4,r6				#The one we want?
+		bne	.NxtInQ
 		
-#		la	r4,NewTasks(r0)
+		la	r4,NewTasks(r0)
 		
-#		LIBCALLPOWERPC AddTailPPC
+		LIBCALLPOWERPC AddTailPPC
 		
-.NextQueue:	nop					#INSERT CODE TO CHECK FOR MORE
+.NxtInQ:	lis	r3,EUMB
+		li	r4,IPHPR
+		lwbrx	r5,r4,r3
+		loadreg	r4,0xffff
+		and	r5,r5,r4
+		cmpw	r5,r9
+
+		beq	.QEmpty
 		
-.NotQueue:	clearreg r5
+		mr	r5,r9
+		b	.QNotEmpty
+		
+.QEmpty:	li	r4,IPTPR
+		stwbrx	r9,r4,r3
+		sync
+		
+.EndQueue:	clearreg r5
 		lis	r3,EUMBEPICPROC
 		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
 
@@ -1435,8 +1463,7 @@ EInt:		b	.FPUnav
 
 		b	.TrySwitch
 
-.NewTask:	lwz	r3,SonnetBase(r0)
-		la	r4,NewTasks(r3)
+.NewTask:	la	r4,NewTasks(r0)
 		mr	r6,r4
 
 		LIBCALLPOWERPC RemHeadPPC
@@ -1444,45 +1471,46 @@ EInt:		b	.FPUnav
 		mr.	r9,r3
 		beq	.ReturnToUser
 
-.Dispatch:	LIBCALLPOWERPC FlushL1DCache
+.Dispatch:	mr	r3,r9
+		li	r4,6				#MsgLen/Cache_Line
+		mtctr	r4
+.InvMsg:	dcbi	r0,r3
+		addi	r3,r24,L1_CACHE_LINE_SIZE
+		bdnz	.InvMsg
 		
-		mfspr	r4,HID0
-		ori	r4,r4,HID0_DCFI|HID0_ICFI
-		xori	r4,r4,HID0_DCFI|HID0_ICFI
-		mtspr	HID0,r4
 		sync
-
+		
+		lwz	r8,MN_ARG0(r9)		
 		li	r4,TS_RUN
-		stb	r4,TC_STATE(r9)
-		stw	r9,RunningTask(r0)
-		
-		loadreg	r4,500000			#fixed stack len (for now)
-		mr	r31,r4				#Will be cloned from mother (68K) task
-
-		LIBCALLPOWERPC AllocVecPPC
-
-		mr.	r4,r3
-		beq	.ReturnToUser	
-		
-		loadreg	r6,IdleTask
-		addi	r6,r6,ExitCode-Start	
-		mtlr	r6
-
-		lwz	r8,RunningTask(r0)
+		stb	r4,TC_STATE(r8)
+		li	r4,NT_PPCTASK
+		stb	r4,LN_TYPE(r8)
+		la	r4,252(r8)
+		stw	r4,TASKPPC_CONTEXTMEM(r8)
+		stw	r9,TASKPPC_STARTMSG(r8)
+		lwz	r31,MN_ARG1(r9)
+		addi	r4,r8,1024
 		lwz	r6,SonnetBase(r0)
 		xor	r4,r4,r6		
 		stw	r4,TC_SPLOWER(r8)
-		subi	r5,r31,32
-		add	r4,r4,r5
+		add	r4,r4,r31
 		stw	r4,TC_SPUPPER(r8)
+		subi	r4,r4,32
 		stw	r4,TC_SPREG(r8)
 		mr	r1,r4
 		
 		stw	r13,-4(r1)
 		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		stwu	r1,-284(r1)		
 		
-		la	r8,TASKPPC_SIZE(r8)
+		loadreg	r6,IdleTask
+		addi	r6,r6,ExitCode-Start	
+		mtlr	r6
+
+		stw	r8,RunningTask(r0)
+
+		mr	r8,r9
+		
 		lwz	r2,PP_REGS+12*4(r8)
 		lwz	r3,PP_REGS+0*4(r8)
 		lwz	r4,PP_REGS+1*4(r8)
@@ -1545,6 +1573,12 @@ EInt:		b	.FPUnav
 		mtsrr0	r0
 
 		li	r0,0
+		
+		mfspr	r7,HID0
+		ori	r7,r7,HID0_ICFI
+		mtspr	HID0,r7
+		
+		mr	r7,r0
 		
 		rfi
 		
@@ -1618,14 +1652,13 @@ TestRoutine:	b	.IntReturn
 		
 		beq	.GoToWait
 		
-		lwz	r3,SonnetBase(r0)
-		la	r4,NewTasks(r3)
+		la	r4,NewTasks(r0)
 		mr	r6,r4
 	
 		LIBCALLPOWERPC RemHeadPPC
 	
 		mr.	r9,r3
-		bne	.Dispatch
+		bne	.SwitchNew			#Dispatch fixed bug
 
 		la	r4,ReadyTasks(r0)
 	

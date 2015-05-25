@@ -17,6 +17,7 @@
 	include dos/dosextens.i
 	include	exec/interrupts.i
 	include hardware/intbits.i
+	include	exec/tasks.i
 	include sonnet_lib.i
 
 	XREF	FunctionsLen
@@ -43,7 +44,7 @@
 	XREF	AddUniqueSemaphorePPC,IsExceptionMode
 
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,MCTask,Init,ViolationAddress
-	XREF	NewTasks,SysBase,PowerPCBase
+	XREF	SysBase,PowerPCBase
 	XDEF	_PowerPCBase
 
 ;********************************************************************************************
@@ -474,8 +475,6 @@ GetLoop	move.l d6,a0
 	beq.s NextMsg
 	move.l d0,a1
 	move.l MN_IDENTIFIER(a1),d0
-	cmp.l #"TPPC",d0
-	beq.s MsgTPPC
 	cmp.l #"T68K",d0
 	beq.s MsgT68k
 	cmp.l #"FPPC",d0
@@ -483,7 +482,7 @@ GetLoop	move.l d6,a0
 	cmp.l #"F68k",d0
 	beq.s MsgF68k
 	cmp.l #"LL68",d0
-	beq.s MsgLL68
+	beq MsgLL68
 	bra.s GetLoop
 
 MsgT68k	move.b LN_TYPE(a1),d7
@@ -507,22 +506,16 @@ Sig68k	move.l ThisTask(a6),a0
 	jsr _LVOPutMsg(a6)				;move message to waiting 68k task
 	bra NextMsg
 
-MsgTPPC	move.l SonnetBase(pc),a0
-	lea NewTasks(a0),a0
-	clr.l (a1)
-	clr.l 4(a1)
-	lea -TASKPPC_SIZE(a1),a1			;Pointer from Message to Task
-	jsr _LVOEnqueue(a6)
-	move.l _PowerPCBase(pc),a6			;Force reschedule
-	jsr _LVOCauseInterruptHW(a6)
-	move.l 4.w,a6
-	bra NextMsg
-
 MsgF68k	move.l d7,a1
 	jsr _LVOReplyMsg(a6)
 	bra NextMsg
 
 MsgFPPC	move.l d7,a1
+	move.l MN_ARG0(a1),a1
+	move.l _PowerPCBase(pc),a6
+	jsr _LVOFreeVec32(a6)
+	move.l 4.w,a6
+	move.l d7,a1
 	jsr _LVOReplyMsg(a6)
 	bra NextMsg
 
@@ -590,8 +583,7 @@ NoSingl move.l OMISR(a2),d3
 	move.l OFQPR(a2),d3				;Get Message Frame
 	bmi.s NoInt
 	
-	move.l d3,a1
-	
+	move.l d3,a1	
 	moveq.l #11,d4
 	bsr.s InvMsg	
 	move.l d3,a1
@@ -604,7 +596,7 @@ NoInt	movem.l (a7)+,d1-a6
 	rts
 
 InvMsg	cinvl dc,(a1)
-	add.l #16,a1					;Cache_Line 040/060 = 16 bytes
+	lea 16(a1),a1					;Cache_Line 040/060 = 16 bytes
 	dbf d4,InvMsg					;12x16 = MsgLen (192 bytes)
 	rts
 
@@ -762,19 +754,16 @@ MN_MIRROR	EQU MN_IDENTIFIER+4
 MN_PPC		EQU MN_MIRROR+4
 MN_PPSTRUCT	EQU MN_PPC+4
 
-Task	EQU -16
-PStruct	EQU -12
-Msg	EQU -8
-Port	EQU -4
+
+PStruct	EQU -4
+Port	EQU -8
 
 RunPPC:	
-	link a5,#-16
+	link a5,#-8
 	movem.l d1-a6,-(a7)
 	moveq.l #0,d0
-	move.l d0,Msg(a5)
 	move.l d0,Port(a5)
 	move.l a0,PStruct(a5)
-	lea Buffer(pc),a4
 	move.l 4.w,a6
 	move.l ThisTask(a6),a1
 	cmp.b #NT_PROCESS,LN_TYPE(a1)
@@ -786,52 +775,36 @@ RunPPC:
 xTask	jsr _LVOCreateMsgPort(a6)			;Not done yet. How to find this Port?
 	tst.l d0
 	beq Cannot
+
 xProces	move.l d0,Port(a5)
-	move.l #TASKPPC_SIZE+MN_SIZE+PP_SIZE+92,d0
-	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1
+	move.l ThisTask(a6),a1	
+	move.l TC_SPUPPER(a1),d0
+	move.l TC_SPLOWER(a1),d1
+	sub.l d1,d0
+	move.l d0,d7
+	add.l #1024,d0
+
 	move.l _PowerPCBase(pc),a6
 	jsr _LVOAllocVec32(a6)
-	move.l 4.w,a6
-	tst.l d0
-	beq Cannot
-	move.l d0,Task(a5)
-	move.l d0,a1
-	move.b #NT_PPCTASK,LN_TYPE(a1)
-	lea TASKPPC_SIZE+MN_SIZE+PP_SIZE(a1),a2
-	move.l a2,LN_NAME(a1)
-	lea TASKPPC_CTMEM(a1),a2
-	move.l a2,TASKPPC_CONTEXTMEM(a1)
-	add.l #TASKPPC_SIZE,d0
-	move.l d0,Msg(a5)
-	move.l Port(a5),d1
-	move.l d0,a1
-	move.w #MN_SIZE+PP_SIZE+92,MN_LENGTH(a1)
-	move.l d1,MN_REPLYPORT(a1)
-	move.l d1,MN_MIRROR(a1)
-	lea MN_PPSTRUCT(a1),a2
-	moveq.l #PP_SIZE/4-1,d0
-	move.l PStruct(a5),a0
-CpMsg	move.l (a0)+,(a2)+
-	dbf d0,CpMsg
-	move.b #NT_MESSAGE,LN_TYPE(a1)
-	move.l ThisTask(a6),a1
-	moveq.l #15,d0
-	move.l LN_NAME(a1),a1
-CpName	move.l (a1)+,(a2)+
-	dbf d0,CpName
-	move.l ComProc(pc),d7
-	bne.s Fast
-	lea PrcName(pc),a1
-	jsr _LVOFindTask(a6)
-	move.l d0,d7
-	beq Cannot
-	move.l d7,ComProc-Buffer(a4)
-Fast	move.l d7,a0
-	lea pr_MsgPort(a0),a0
-	move.l Msg(a5),a1
-	move.l #"TPPC",MN_IDENTIFIER(a1)	
-	jsr _LVOPutMsg(a6)
+	
+	move.l d0,d6
+	beq Stacker
 
+	move.l 4.w,a6
+	move.l ThisTask(a6),a1
+	move.l d6,a2
+	lea 800(a2),a2
+	
+	move.l #219,d0
+	move.l LN_NAME(a1),a1
+CpName	move.b (a1)+,(a2)
+	tst.b (a2)
+	beq.s EndName
+	addq.l #1,a2
+	dbf d0,CpName
+
+EndName	move.l #"_PPC",(a2)				;Check Alignment?
+							;Also push dcache
 	move.l EUMBAddr(pc),a2
 	move.l IFQPR(a2),a1
 	
@@ -846,6 +819,8 @@ ClrMsg	clr.l (a2)+
 	move.l Port(a5),d1
 	move.l d1,MN_REPLYPORT(a1)
 	move.l d1,MN_MIRROR(a1)
+	move.l d6,MN_ARG0(a1)				;Mem
+	move.l d7,MN_ARG1(a1)				;Len
 	
 	lea MN_PPSTRUCT(a1),a2
 	moveq.l #PP_SIZE/4-1,d0
@@ -865,9 +840,8 @@ CpMsg2	move.l (a0)+,(a2)+
 ;********************************************************************************************
 
 WaitForPPC:
-	link a5,#-16
+	link a5,#-8
 	movem.l d1-a6,-(a7)
-	lea Buffer(pc),a4
 	move.l a0,PStruct(a5)
 	move.l 4.w,a6
 	move.l ThisTask(a6),a1
@@ -905,11 +879,8 @@ CpBck	move.l (a0)+,(a1)+
 	bra.s Success
 
 Cannot	moveq.l #-1,d7	
-Success	move.l Task(a5),d0
-	beq.s NoTask
-	bsr.s FreeIt
-	move.l 4.w,a6
-NoTask	move.l ThisTask(a6),a1
+Success	move.l 4.w,a6
+	move.l ThisTask(a6),a1
 	cmp.b #NT_PROCESS,LN_TYPE(a1)
 	beq.s EndIt
 	move.l Port(a5),d0
@@ -920,13 +891,11 @@ EndIt	move.l d7,d0
 	unlk a5
 	rts
 
-FreeIt	move.l d0,a1
-	move.l _PowerPCBase(pc),a6
-	jmp _LVOFreeVec32(a6)
 FreePrt	move.l d0,a0
 	jmp _LVODeleteMsgPort(a6)
 
-Runk86	btst #AFB_FPU40,AttnFlags+1(a6)
+Runk86		
+	btst #AFB_FPU40,AttnFlags+1(a6)
 	beq.s NoFPU
 	fmove.d fp0,-(a7)
 	fmove.d fp1,-(a7)
