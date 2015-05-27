@@ -429,9 +429,7 @@ GetInfo:
 		li	r6,1
 		
 		bl WarpSuper
-		
-		mfspr	r3,PVR
-		stw	r3,CPUInfo(r0)
+
 		mfspr	r3,HID1
 		stw	r3,CPUHID1(r0)
 		mfspr	r3,HID0
@@ -737,6 +735,8 @@ FindTagItemPPC:
 FlushL1DCache:
 		BUILDSTACKPPC
 		
+		mfctr	r3
+		
 		li	r4,0x7000
 
 		li	r6,0x400
@@ -754,6 +754,8 @@ FlushL1DCache:
 		addi	r4,r4,L1_CACHE_LINE_SIZE
 		bdnz+	.Fl2
 
+		mtctr	r3
+		
 		DSTRYSTACKPPC
 
 		blr
@@ -2087,10 +2089,13 @@ Run68K:
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
+		stwu	r25,-4(r13)
 		stwu	r24,-4(r13)
 		stwu	r23,-4(r13)
 		
 		mr	r31,r4
+		
+		mfctr	r25
 					
 		lis	r3,EUMB
 		li	r24,OFTPR
@@ -2166,10 +2171,12 @@ Run68K:
 		stwu	r7,4(r4)
 		bdnz+	.CopyPPB
 		
+		mtctr	r25
 		li	r3,0
 		
 		lwz	r23,0(r13)
 		lwzu	r24,4(r13)
+		lwzu	r25,4(r13)
 		lwzu	r29,4(r13)
 		lwzu	r30,4(r13)
 		lwzu	r31,4(r13)

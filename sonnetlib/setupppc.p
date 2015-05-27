@@ -284,12 +284,15 @@ End:		mflr	r4
 		bl	.InitSem
 				
 		bl	.SetupMsgFIFOs
+		
 				
+		mfspr	r4,PVR
+		stw	r4,CPUInfo(r0)
+		
 		LIBCALLPOWERPC FlushL1DCache
 		
 		mfspr	r4,HID0
 		ori	r4,r4,HID0_DCFI|HID0_ICFI
-		xori	r4,r4,HID0_DCFI|HID0_ICFI
 		mtspr	HID0,r4
 		sync
 

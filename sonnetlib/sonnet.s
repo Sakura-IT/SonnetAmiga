@@ -1,4 +1,6 @@
 
+;MMU	EQU	1
+
 	include 68kdefines.i
 	include	exec/exec_lib.i
 	include exec/initializers.i
@@ -19,6 +21,14 @@
 	include hardware/intbits.i
 	include	exec/tasks.i
 	include sonnet_lib.i
+	
+	IFD	MMU
+	
+	include mmu/mmutags.i
+	include mmu/context.i
+	include	mmu/mmu_lvo.i
+
+	ENDC
 
 	XREF	FunctionsLen
 
@@ -343,6 +353,11 @@ NoLib	move.l a5,a1
 	lea MemList(a6),a0
 	jsr _LVOEnqueue(a6)
 	jsr _LVOEnable(a6)
+	
+	IFD	MMU
+	bsr FunkyMMU
+	ENDC
+	
 	jsr _LVOCacheClearU(a6)	
 	bra Clean
 
@@ -550,7 +565,61 @@ PrcName	dc.b "MasterControl",0
 	cnop 0,4
 
 ;********************************************************************************************
+	IFD MMU
+	
 
+FunkyMMU
+	movem.l d1-a6,-(a7)			;Enable caches for PCI memory
+	move.l ROMMem(pc),a1
+	move.l #$10000,d7
+	move.l $6008(a1),d6			;MemStart
+	add.l d7,d6
+	move.l $600c(a1),d5			;MemLen
+	sub.l d7,d5
+	moveq.l #0,d0
+	lea mmulib(pc),a1
+	jsr _LVOOpenLibrary(a6)
+	move.l d0,d7
+	beq.s NoMMU
+	move.l d0,a6
+	jsr _LVODefaultContext(a6)
+	move.l d0,d4
+	beq.s NoMMU2
+	move.l d0,a0				;Context
+	moveq.l #0,d1
+;	move.l #MAPP_COPYBACK,d1		;flags
+	moveq.l #-1,d2				;Mask
+	move.l d6,a1				;Logical
+	move.l d5,d0				;Size
+	lea MMUTags(pc),a2
+	jsr _LVOSetPropertiesA(a6)
+	tst.l d0
+	beq.s NoMMU2
+	move.l d4,a0
+	jsr _LVORebuildTree(a6)
+	move.l d7,a1
+	move.l 4.w,a6
+	jsr _LVOCloseLibrary(a6)
+	movem.l (a7)+,d1-a6
+	rts	
+	
+NoMMU2	move.l d7,a1
+	move.l 4.w,a6
+	jsr _LVOCloseLibrary(a6)
+NoMMU	movem.l (a7)+,d1-a6
+	rts	
+
+;********************************************************************************************
+
+MMUTags	dc.l TAG_DONE,0
+
+mmulib	dc.b "mmu.library",0
+	cnop	0,2
+	
+	ENDC
+	
+;********************************************************************************************
+	
 SonInt:
 	movem.l d1-a6,-(a7)
 	move.l 4.w,a6
@@ -726,7 +795,7 @@ xSonnet	rts
 ;********************************************************************************************
 
 GetCPU:
-	movem.l d1-a6,-(a7)
+	movem.l d1-a6,-(a7)	
 	move.l SonnetBase(pc),a1
 	move.l 12(a1),d0
 	and.w #$0,d0
@@ -894,7 +963,7 @@ EndIt	move.l d7,d0
 FreePrt	move.l d0,a0
 	jmp _LVODeleteMsgPort(a6)
 
-Runk86		
+Runk86	
 	btst #AFB_FPU40,AttnFlags+1(a6)
 	beq.s NoFPU
 	fmove.d fp0,-(a7)
