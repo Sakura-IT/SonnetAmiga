@@ -32,15 +32,15 @@
 
 	XREF	FunctionsLen
 
-	XREF	SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
+	XREF	SetExcMMU,ClearExcMMU,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
-	XREF	NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache,FreeSignalPPC
+	XREF	NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FreeSignalPPC
 	XREF	AllocXMsgPPC,FreeXMsgPPC,CreateMsgPortPPC,DeleteMsgPortPPC,AllocSignalPPC
-	XREF	AtomicTest,AtomicDone,SetSignalPPC,LockTaskList,UnLockTaskList
+	XREF	SetSignalPPC,LockTaskList,UnLockTaskList
 	XREF	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
 	XREF	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
-	XREF	AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
+	XREF	AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User
 	XREF	PutXMsgPPC,WaitFor68K,Run68K,Signal68K,CopyMemPPC,SetReplyPortPPC
 	XREF	TrySemaphorePPC,CreatePoolPPC
 
@@ -53,7 +53,7 @@
 	XREF	AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
 	XREF	AddUniqueSemaphorePPC,IsExceptionMode
 
-	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,MCTask,Init,ViolationAddress
+	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,MCTask,Init
 	XREF	SysBase,PowerPCBase
 	XDEF	_PowerPCBase
 
@@ -86,6 +86,7 @@ INIT:
 	movem.l d1-a6,-(a7)
 	move.l 4.w,a6
 	lea Buffer(pc),a4
+	move.l a0,(a4)				;SegList
 
 	lea DosLib(pc),a1
 	moveq.l #37,d0
@@ -471,10 +472,6 @@ MasterControl:
 	move.l 4.w,a6
 	move.l ThisTask(a6),d0
 	move.l d0,MCTask(a4)
-	move.l PowerPCBase(a4),a0
-	move.l _LVOWarpSuper+2(a0),d0
-	addq.l #4,d0
-	move.l d0,ViolationAddress(a4)
 	move.l d6,Init(a4)
 	lea Buffer(pc),a4
 	
@@ -649,7 +646,7 @@ NoSingl move.l OMISR(a2),d3
 	move.l #$20000000,d4				;OMISR[OPQI]
 	and.l d4,d3
 	beq.s NoInt
-	move.l OFQPR(a2),d3				;Get Message Frame
+NxtMsg	move.l OFQPR(a2),d3				;Get Message Frame
 	bmi.s NoInt
 	
 	move.l d3,a1	
@@ -659,6 +656,8 @@ NoSingl move.l OMISR(a2),d3
 	move.l MN_MCTASK(a1),a0				;MN_MCTASK
 	
 	jsr _LVOPutMsg(a6)
+	
+	bra.s NxtMsg
 	
 NoInt	movem.l (a7)+,d1-a6
 	moveq.l #0,d0
@@ -674,33 +673,53 @@ IntData	dc.l 0
 ;********************************************************************************************
 
 Open:
-	move.l	a6,d0
-	tst.l	d0
-	beq.s	NoA6
-	move.l	d0,a6
+	move.l a6,d0
+	tst.l d0
+	beq.s NoA6
+	move.l d0,a6
 	move.l a1,-(a7)
 	lea _PowerPCBase(pc),a1
 	move.l a6,(a1)
 	move.l (a7)+,a1
-	addq.w	#1,LIB_OPENCNT(a6)
-	bclr	#3,Buffer
+	addq.w #1,LIB_OPENCNT(a6)
+	bclr #LIBB_DELEXP,LIB_FLAGS(a6)
 NoA6	rts
 
 ;********************************************************************************************
 
 Close:
 	moveq.l #0,d0
-	subq.w	#1,LIB_OPENCNT(a6)
-	bne.s	NoExp
-	btst	#3,Buffer
-	bne.s	Expunge
+	subq.w #1,LIB_OPENCNT(a6)
+	bne.s NoExp
+	btst #LIBB_DELEXP,LIB_FLAGS(a6)
+	bne.s Expunge
 NoExp	rts
 
 ;********************************************************************************************
 
 Expunge:
+	tst.w LIB_OPENCNT(a6)
+	beq.s NotOpen
+	bset #LIBB_DELEXP,LIB_FLAGS(a6)
 	moveq.l #0,d0
 	rts
+	
+NotOpen	movem.l d2/a5/a6,-(a7)
+	move.l a6,a5
+	lea SegList(pc),a6
+	move.l (a6),d2
+	move.l 4.w,a6
+	move.l a5,a1
+	jsr _LVORemove(a6)
+	moveq.l #0,d0
+	move.l a5,a1
+	move.w LIB_NEGSIZE(a5),d0
+	sub.l d0,a1
+	add.w LIB_POSSIZE(a5),d0
+	jsr _LVOFreeMem(a6)
+	move.l d2,d0
+	movem.l (a7)+,d2/a5/a6
+	rts	
 
 ;********************************************************************************************
 
@@ -708,65 +727,6 @@ Reserved:
 	moveq.l #0,d0
 	rts
 
-;********************************************************************************************
-
-GetDriverID:
-	move.l #DriverID,d0
-	rts
-
-;********************************************************************************************
-
-SupportedProtocol:
-	moveq.l #1,d0
-	rts
-
-;********************************************************************************************
-
-InitBootArea:
-	movem.l d1-a6,-(a7)
-	bsr.s FindSonnet
-	addq.l #1,d1
-	beq.s Error
-	move.l LMBAR(a5),d0
-	rol.w #8,d0
-	swap d0
-	rol.w #8,d0
-	and.b #$f0,d0
-	bra.s Error
-
-;********************************************************************************************
-
-BootPowerPC:
-	movem.l d1-a6,-(a7)
-	move.l #"STRT",d5
-	bra.s StrtPPC
-
-;********************************************************************************************
-
-CauseInterruptHW:
-	movem.l d1-a6,-(a7)
-	move.l #"HEAR",d5
-StrtPPC	lea Buffer(pc),a4
-	move.l SonAddr(pc),d0
-	beq.s First
-	move.l d0,a5
-	bra.s NoFirst
-
-First	bsr.s FindSonnet
-	move.l a5,SonAddr-Buffer(a4)
-NoFirst	addq.l #1,d1
-	beq.s Error
-	move.l PCSRBAR(a5),d0
-	rol.w #8,d0
-	swap d0
-	rol.w #8,d0
-	move.l d0,a5
-	move.l 4.w,a6
-	jsr _LVOCacheClearU(a6)
-	move.l d5,IMR0(a5)
-Error	movem.l (a7)+,d1-a6
-	rts
-	
 ;********************************************************************************************
 
 FindSonnet:
@@ -1279,7 +1239,8 @@ DriverID
 	dc.b "WarpUp hardware driver for Sonnet Crescendo 7200 PCI",0
 	cnop	0,4
 
-Buffer		ds.l	1
+Buffer
+SegList		ds.l	1
 _PowerPCBase	ds.l	1
 SonnetBase	ds.l	1
 MediatorBase	ds.l	1
@@ -1323,19 +1284,17 @@ FUNCTABLE:
 	dc.l	CreatePPCTask
 	dc.l	CausePPCInterrupt
 	
-	dc.l	GetDriverID
-	dc.l	SupportedProtocol
-	dc.l	InitBootArea
-	dc.l	BootPowerPC
-	dc.l	CauseInterruptHW
-	dc.l	ConfirmInterrupt
-	
-	dc.l	FlushL1DCache
-	dc.l	AtomicTest
-	dc.l	AtomicDone	
-	dc.l	WarpSuper
-	dc.l	WarpUser
-	
+	dc.l	Reserved
+	dc.l	Reserved
+	dc.l	Reserved
+	dc.l	Reserved
+	dc.l	Reserved
+	dc.l	Reserved
+	dc.l	Reserved
+	dc.l	Reserved
+	dc.l	Reserved
+	dc.l	Reserved
+	dc.l	Reserved	
 	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved

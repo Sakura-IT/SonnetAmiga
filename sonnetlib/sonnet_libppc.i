@@ -1,5 +1,5 @@
 ##
-##      $VER: sonnet_lib.i 1.0 (10.02.15)
+##      $VER: sonnet_lib.i 1.0 (15.05.15)
 ##
 ##      Library offsets for sonnet.library V1
 ##
@@ -20,23 +20,6 @@
 .set _LVOSetCache68K         ,       -96
 .set _LVOCreatePPCTask       ,       -102
 .set _LVOCausePPCInterrupt   ,       -108
-
-#### Old WarpHW offsets
-
-.set _LVOGetDriverID		,	-114
-.set _LVOSupportedProtocol	,	-120
-.set _LVOInitBootArea		,	-126
-.set _LVOBootPowerPC		,	-132
-.set _LVOCauseInterruptHW	,	-138
-.set _LVOConfirmInterrupt	,	-144
-
-####  Custom offsets
-
-.set _LVOFlushL1DCache		,	-150
-.set _LVOAtomicTest		,	-156
-.set _LVOAtomicDone		,	-162
-.set _LVOWarpSuper		,	-168
-.set _LVOWarpUser		,	-174
 
 ####  PPC Library offsets
 

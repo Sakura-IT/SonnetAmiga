@@ -285,11 +285,15 @@ End:		mflr	r4
 				
 		bl	.SetupMsgFIFOs
 		
-				
 		mfspr	r4,PVR
 		stw	r4,CPUInfo(r0)
 		
-		LIBCALLPOWERPC FlushL1DCache
+		lwz	r4,PowerPCBase(r0)
+		lwz	r4,_LVOSetExcMMU+2(r4)
+		addi	r4,r4,ViolationOS		
+		stw	r4,ViolationAddress(r0)
+		
+		bl	.FlushL1DCache
 		
 		mfspr	r4,HID0
 		ori	r4,r4,HID0_DCFI|HID0_ICFI
@@ -304,7 +308,37 @@ End:		mflr	r4
 		rfi					#To user code
 
 #********************************************************************************************
+
+.FlushL1DCache:	
+		BUILDSTACKPPC
 		
+		mfctr	r3
+		
+		li	r4,0x7000
+
+		li	r6,0x400
+		mr	r5,r6
+		mtctr	r6
+	
+.Fl1:		lwz	r6,0(r4)
+		addi	r4,r4,L1_CACHE_LINE_SIZE
+		bdnz+	.Fl1
+	
+		li	r4,0x7000
+		mtctr	r5
+		
+.Fl2:		dcbf	r0,r4
+		addi	r4,r4,L1_CACHE_LINE_SIZE
+		bdnz+	.Fl2
+
+		mtctr	r3
+		
+		DSTRYSTACKPPC
+
+		blr
+		
+#********************************************************************************************		
+
 .MakeList:	stw	r4,8(r4)
 		lis	r0,0
 		nop	

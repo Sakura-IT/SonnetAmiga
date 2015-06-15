@@ -3,18 +3,20 @@
 .include ppcmacros-std.i
 
 .set FunctionsLen,(EndFunctions-SetExcMMU)
+.set ViolationOS,(Violation-SetExcMMU)
 
 .global FunctionsLen
+.global ViolationOS
 
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 .global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
 .global NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache,FreeSignalPPC
 .global	AllocXMsgPPC,FreeXMsgPPC,CreateMsgPortPPC,DeleteMsgPortPPC,AllocSignalPPC
-.global AtomicTest,AtomicDone,SetSignalPPC,LockTaskList,UnLockTaskList
+.global SetSignalPPC,LockTaskList,UnLockTaskList
 .global	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
 .global	ReleaseSemaphorePPC,AddSemaphorePPC,RemSemaphorePPC,FindSemaphorePPC
-.global AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User,WarpSuper,WarpUser
+.global AddPortPPC,RemPortPPC,FindPortPPC,WaitPortPPC,Super,User
 .global PutXMsgPPC,WaitFor68K,Run68K,Signal68K,CopyMemPPC,SetReplyPortPPC
 .global	TrySemaphorePPC,CreatePoolPPC
 
@@ -1968,7 +1970,7 @@ User:
 
 WarpSuper:
 		li	r0,-1			#READ PVR (warp funcion -130)
-.Violation:	mfspr	r3,PVR			#IF user then exception; r0/r3=0
+Violation:	mfspr	r3,PVR			#IF user then exception; r0/r3=0
 		mr	r3,r0			#IF super then r0/r3=-1
 		blr				#See Program Exception ($700)
 
@@ -2058,7 +2060,8 @@ WaitFor68K:
 		
 		b	.Check68K				
 
-.Done68K:	bl	WarpSuper
+.Done68K:	mfctr	r29
+		bl	WarpSuper
 		
 		li	r30,6
 		mtctr	r30
@@ -2067,6 +2070,8 @@ WaitFor68K:
 		bdnz	.PPInvalid
 		
 		bl	WarpUser
+
+		mtctr	r29
 
 		lwz	r29,0(r13)
 		lwz	r30,4(r13)

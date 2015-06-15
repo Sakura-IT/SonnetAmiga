@@ -1,5 +1,5 @@
 **
-**      $VER: sonnet_lib.i 1.0 (10.02.15)
+**      $VER: sonnet_lib.i 1.0 (15.05.15)
 **
 **      Library offsets for sonnet.library V1
 **
@@ -20,23 +20,6 @@ _LVOGetPPCState         =       -90
 _LVOSetCache68K         =       -96
 _LVOCreatePPCTask       =       -102
 _LVOCausePPCInterrupt   =       -108
-
-**** Old WarpHW offsets
-
-_LVOGetDriverID		=	-114
-_LVOSupportedProtocol	=	-120
-_LVOInitBootArea	=	-126
-_LVOBootPowerPC		=	-132
-_LVOCauseInterruptHW	=	-138
-_LVOConfirmInterrupt	=	-144
-
-****  Custom offsets
-
-_LVOFlushL1DCache	=	-150
-_LVOAtomicTest		=	-156
-_LVOAtomicDone		=	-162
-_LVOWarpSuper		=	-168
-_LVOWarpUser		=	-174
 
 ****  PPC Library offsets
 
