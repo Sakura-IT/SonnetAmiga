@@ -246,7 +246,7 @@ Wait	move.l $6004(a1),d5
 
 	move.l a0,a1
 	move.l d5,a0
-	move.w #$0a32,LN_TYPE(a0)
+	move.w #$0a01,LN_TYPE(a0)		;TYPE and PRI
 	move.l a1,LN_NAME(a0)
 	move.w #MEMF_PUBLIC|MEMF_FAST|MEMF_PPC,14(a0)
 	lea MH_SIZE(a0),a1
@@ -301,14 +301,9 @@ MoveSon	move.l (a0)+,(a1)+
 
 	add.l d2,(X1-FUNCTABLE)-4(a2)
 	add.l d2,(X2-FUNCTABLE)-4(a2)
-	move.l #(EndFlag-FUNCTABLE)/4-1,d0
-RLoc	add.l d2,(a2)+
-	dbf d0,RLoc
-
-	sub.l	a2,a2
-	moveq.l #124,d0
-	moveq.l #0,d1
-	jsr _LVOMakeLibrary(a6)
+	
+	bsr MakeLibrary
+	
 	tst.l d0
 	beq.s NoLib
 
@@ -347,13 +342,7 @@ RLoc	add.l d2,(a2)+
 	jsr _LVOCreateNewProc(a6)
 	move.l 4.w,a6
 
-NoLib	move.l a5,a1
-	jsr _LVORemove(a6)
-	move.w #$0a01,8(a5)
-	move.l a5,a1
-	lea MemList(a6),a0
-	jsr _LVOEnqueue(a6)
-	jsr _LVOEnable(a6)
+NoLib	jsr _LVOEnable(a6)
 	
 	IFD	MMU
 	bsr FunkyMMU
@@ -363,6 +352,60 @@ NoLib	move.l a5,a1
 	bra Clean
 
 ;********************************************************************************************
+
+MakeLibrary
+	movem.l d1-a6,-(a7)
+	move.l d2,d6
+	move.l a0,d4
+	move.l a1,d5
+	moveq.l #-1,d3
+	move.l d3,d0
+	move.l a0,a3
+NumFunc	cmp.l (a3)+,d0
+	dbeq d3,NumFunc
+	not.w d3
+	lsl #1,d3
+	move.l d3,d0
+	lsl #1,d3
+	add.l d0,d3
+	addq.l #3,d3
+	andi.w #-4,d3
+	moveq.l #124,d0				;PosSize
+	move.l d0,d2
+	add.w d3,d0
+	move.l #MEMF_PUBLIC|MEMF_FAST|MEMF_PPC,d1
+	jsr _LVOAllocMem(a6)
+	tst.l d0
+	beq.s NoFun
+	move.l d0,a3				;Base
+	add.w d3,a3
+	move.w d3,LIB_NEGSIZE(a3)
+	move.w d2,LIB_POSSIZE(a3)
+	move.l a3,a0
+	move.l d4,a1
+	moveq.l #0,d0
+	move.l d0,d1
+	
+LoopFun	move.l (a1)+,d1
+	cmp.l #-1,d1
+	beq.s DoneFun
+	
+	add.l d6,d1
+	move.l d1,-(a0)
+	move.w #$4ef9,-(a0)
+	bra.s LoopFun
+
+DoneFun	jsr _LVOCacheClearU(a6)	
+	move.l a3,a2
+	move.l d5,a1
+	moveq.l #0,d0
+	jsr _LVOInitStruct(a6)
+	move.l a3,d0
+NoFun	movem.l (a7)+,d1-a6
+	rts
+	
+;********************************************************************************************	
+	
 
 Dirty	move.l MediatorBase(pc),a0		;WARNING!!!! : EUMB register gets redefined
 	moveq.l #0,d2				;after pci.library initiation!!!
@@ -563,7 +606,6 @@ PrcName	dc.b "MasterControl",0
 
 ;********************************************************************************************
 	IFD MMU
-	
 
 FunkyMMU
 	movem.l d1-a6,-(a7)			;Enable caches for PCI memory
@@ -1412,10 +1454,10 @@ FUNCTABLE:
 	dc.l	AddUniqueSemaphorePPC
 	dc.l	IsExceptionMode
 
-EndFlag	dc.l	$ffffffff
+EndFlag	dc.l	-1
 LibName
 	dc.b	"sonnet.library",0,0
 IDString
-	DC.B	"$VER: sonnet.library 1.0 (01-Apr-15)",0
+	dc.b	"$VER: sonnet.library 1.0 (01-Apr-15)",0
 	cnop	0,4
 EndCP	end
