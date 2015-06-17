@@ -275,32 +275,19 @@ Wait	move.l $6004(a1),d5
 	move.l d6,PCI_SPACELEN0(a2)
 NoPCILb	jsr _LVOEnqueue(a6)
 
-	move.l #(EndCP-MasterControl)+FunctionsLen,d0
+	move.l #FunctionsLen,d0
 	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1
 	jsr _LVOAllocVec(a6)
 	tst.l d0
 	beq Clean
+	move.l d0,PPCCodeMem-Buffer(a4)
 	move.l d0,a1
-	lea PrcName-MasterControl(a1),a2
-	lea MasterControl(pc),a0
-	move.l a2,PrcTags+12-MasterControl(a0)
-	move.l a1,PrcTags+4-MasterControl(a0)
-	move.l #(EndCP-MasterControl)+FunctionsLen,d1
+	lea EndCP(pc),a0
+	move.l #FunctionsLen,d1
 	lsr.l #2,d1
 	subq.l #1,d1
 MoveSon	move.l (a0)+,(a1)+
 	dbf d1,MoveSon
-
-	sub.l a0,a1
-	move.l a1,d2
-	move.l d0,a1
-	add.l #DATATABLE-MasterControl,a1
-	move.l a1,a0
-	add.l #FUNCTABLE-DATATABLE,a0
-	move.l a0,a2
-
-	add.l d2,(X1-FUNCTABLE)-4(a2)
-	add.l d2,(X2-FUNCTABLE)-4(a2)
 	
 	bsr MakeLibrary
 	
@@ -309,7 +296,7 @@ MoveSon	move.l (a0)+,(a1)+
 
 	move.l SonnetBase(pc),a1
 	move.l d0,PowerPCBase(a1)
-	move.l a5,8(a1)					;Memheader at $8
+	move.l a5,PPCMemHeader(a1)			;Memheader at $8
 	move.l a1,(a1)					;Sonnet relocated mem at $0
 	move.l d0,_PowerPCBase-Buffer(a4)
 	move.l a6,SysBase(a1)
@@ -355,7 +342,10 @@ NoLib	jsr _LVOEnable(a6)
 
 MakeLibrary
 	movem.l d1-a6,-(a7)
-	move.l d2,d6
+	sub.l a0,a1
+	move.l a1,d6
+	lea FUNCTABLE(pc),a0
+	lea DATATABLE(pc),a1
 	move.l a0,d4
 	move.l a1,d5
 	moveq.l #-1,d3
@@ -385,12 +375,17 @@ NumFunc	cmp.l (a3)+,d0
 	move.l d4,a1
 	moveq.l #0,d0
 	move.l d0,d1
+	moveq.l #49,d2				;Number of 68K functions
 	
 LoopFun	move.l (a1)+,d1
 	cmp.l #-1,d1
 	beq.s DoneFun
 	
+	tst.l d2
+	bgt.s Fun68K
+	
 	add.l d6,d1
+Fun68K	subq.l #1,d2
 	move.l d1,-(a0)
 	move.w #$4ef9,-(a0)
 	bra.s LoopFun
@@ -406,7 +401,6 @@ NoFun	movem.l (a7)+,d1-a6
 	
 ;********************************************************************************************	
 	
-
 Dirty	move.l MediatorBase(pc),a0		;WARNING!!!! : EUMB register gets redefined
 	moveq.l #0,d2				;after pci.library initiation!!!
 	moveq.l #$3f,d1				;This affects the INT2 interrupt!!
@@ -599,7 +593,7 @@ RtnLL	move.l (a7)+,a1
 
 	cnop 0,4
 
-PrcTags	dc.l NP_Entry,0,NP_Name,0,NP_Priority,125,0,0
+PrcTags	dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,125,0,0
 PrcName	dc.b "MasterControl",0
 
 	cnop 0,4
@@ -706,7 +700,7 @@ NoInt	movem.l (a7)+,d1-a6
 	rts
 
 InvMsg	cinvl dc,(a1)
-	lea 16(a1),a1					;Cache_Line 040/060 = 16 bytes
+	lea L1_CACHE_LINE_SIZE_040(a1),a1		;Cache_Line 040/060 = 16 bytes
 	dbf d4,InvMsg					;12x16 = MsgLen (192 bytes)
 	rts
 
@@ -748,8 +742,6 @@ Expunge:
 	
 NotOpen	movem.l d2/a5/a6,-(a7)
 	move.l a6,a5
-	lea SegList(pc),a6
-	move.l (a6),d2
 	move.l 4.w,a6
 	move.l a5,a1
 	jsr _LVORemove(a6)
@@ -759,7 +751,9 @@ NotOpen	movem.l d2/a5/a6,-(a7)
 	sub.l d0,a1
 	add.w LIB_POSSIZE(a5),d0
 	jsr _LVOFreeMem(a6)
-	move.l d2,d0
+	move.l PPCCodeMem(pc),a1
+	jsr _LVOFreeVec(a6)
+	move.l SegList(pc),d0
 	movem.l (a7)+,d2/a5/a6
 	rts	
 
@@ -879,7 +873,7 @@ EndName	move.l #"_PPC",(a2)				;Check Alignment?
 	move.l EUMBAddr(pc),a2
 	move.l IFQPR(a2),a1
 	
-	moveq.l #47,d0
+	moveq.l #47,d0					;MsgLen/4-1
 	move.l a1,a2
 ClrMsg	clr.l (a2)+
 	dbf d0,ClrMsg
@@ -1283,6 +1277,7 @@ DriverID
 
 Buffer
 SegList		ds.l	1
+PPCCodeMem	ds.l	1
 _PowerPCBase	ds.l	1
 SonnetBase	ds.l	1
 MediatorBase	ds.l	1
@@ -1300,14 +1295,14 @@ MyInterrupt	ds.b	IS_SIZE
 DATATABLE:
 	INITBYTE	LN_TYPE,NT_LIBRARY
 	INITLONG	LN_NAME,LibName
-X1	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
+	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITWORD	LIB_VERSION,1
 	INITWORD	LIB_REVISION,0
 	INITLONG	LIB_IDSTRING,IDString
-X2	ds.l	1
+	ds.l	1
 	
 FUNCTABLE:
-	dc.l	Open
+	dc.l	Open					;68K
 	dc.l	Close
 	dc.l	Expunge
 	dc.l	Reserved
@@ -1356,9 +1351,9 @@ FUNCTABLE:
 	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved
-	dc.l	Reserved
+	dc.l	Reserved				;49 68K Functions
 
-	dc.l	Run68K
+	dc.l	Run68K					;PPC
 	dc.l	WaitFor68K
 	dc.l	SPrintF
 	dc.l	Run68KLowLevel
