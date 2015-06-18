@@ -540,14 +540,15 @@ MsgT68k	move.b LN_TYPE(a1),d7
 	cmp.b #NT_REPLYMSG,d7				;signal PPC that 68k is done
 	bne.s NextMsg
 	
+	move.l #"DONE",MN_IDENTIFIER(a1)
+	move.l MN_PPC(a1),a2
+	moveq.l #TS_READY,d6
+	move.b d6,TC_STATE(a2)	
 	move.l EUMBAddr(pc),a2
 	move.l a1,OFQPR(a2)				;Return Message Frame
+	bsr DoPPCInterrupt				;Data is still used by PPC
+	bra.s NextMsg					;after freeing the msg.....
 	
-	move.l _PowerPCBase(pc),a6
-	jsr _LVOPutXMsg(a6)				;message the PPC
-	move.l 4.w,a6
-	bra.s NextMsg
-
 Sig68k	move.l ThisTask(a6),a0
 	lea pr_MsgPort(a0),a0
 	move.l a0,MN_REPLYPORT(a1)
@@ -582,13 +583,11 @@ MsgLL68	move.l MN_PPSTRUCT+0*4(a1),a6
 	
 RtnLL	move.l (a7)+,a1
 	move.l d0,MN_PPSTRUCT+6*4(a1)
-	move.l #"DONE",d6
-	move.l d6,MN_IDENTIFIER(a1)
-	
+	move.l #"DONE",MN_IDENTIFIER(a1)	
 	move.l EUMBAddr(pc),a2
-	move.l a1,OFQPR(a2)				;Return Message Frame
-	
+	move.l a1,OFQPR(a2)				;Return Message Frame	
 	move.l 4.w,a6
+	bsr DoPPCInterrupt
 	bra NextMsg
 
 	cnop 0,4
@@ -763,6 +762,31 @@ Reserved:
 	moveq.l #0,d0
 	rts
 
+;********************************************************************************************
+
+DoPPCInterrupt:
+	movem.l d1-a6,-(a7)
+	jsr _LVOCacheClearU(a6)
+	move.l #"HEAR",d5
+StrtPPC	lea Buffer(pc),a4
+	move.l SonAddr(pc),d0
+	beq.s First
+	move.l d0,a5
+	bra.s NoFirst
+
+First	bsr.s FindSonnet
+	move.l a5,SonAddr-Buffer(a4)
+NoFirst	addq.l #1,d1
+	beq.s Error
+	move.l PCSRBAR(a5),d0
+	rol.w #8,d0
+	swap d0
+	rol.w #8,d0
+	move.l d0,a5
+	move.l d5,IMR0(a5)
+Error	movem.l (a7)+,d1-a6
+	rts
+	
 ;********************************************************************************************
 
 FindSonnet:
