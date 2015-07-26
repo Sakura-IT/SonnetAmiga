@@ -19,8 +19,8 @@
 .set CPUHID1,20
 .set CPUSDR1,24
 .set RunningTask,28				#Pointer
-.set ReadyTasks,32				#MLH
-.set WaitingTasks,44				#MLH
+.set ReadyTasks,32				#MLH	; 102(Base)
+.set WaitingTasks,44				#MLH	; 116(Base)
 .set Init,56
 .set Atomic,60
 .set TaskListSem,64				#Pointer
@@ -34,19 +34,24 @@
 .set DState,112
 .set DLockState,113
 .set ExceptionMode,114
-.set Interrupt,115
+.set RescheduleFlag,115				#626
 .set AllTasks,116				#MLH
 .set NewTasks,128				#MLH, Shared, 32 aligned
 .set SnoopSem,1140				#Pointer
 .set SnoopList,144				#MLH (424)
-.set CurrentPort,156
+.set CurrentPort,156				#610
 .set NumAllTasks,160				#630
 .set IdSysTasks,164				#662
 .set IdDefTasks,168				#666
 .set MemSem,172
 .set PowerPCBase,176
 .set Break,180
-.set UNUSED,188
+.set CurrentPrio,184				#658
+.set CurrentPrioOffset,188			#670
+.set PortInUse,192				#628	; See CurrentPort
+.set UNUSED,193
+.set UNUSED,194
+.set UNUSED,195
 
 .set _LVOAllocMem,		-198
 .set _LVOFreeMem,		-210
@@ -382,10 +387,23 @@
 .set SS_WAITQUEUE,16
 .set SS_OWNER,40
 .set SS_QUEUECOUNT,44
+.set SSPPC_SUCCESS,-1
+.set SSPPC_NOMEM,0
 .set SSPPC_RESERVE,46
 .set SSPPC_LOCK,50
 .set SSPPC_SIZE,52
 .set PA_SIGNAL,0
+.set PF_ACTION,3
+.set UNIPORT_SUCCESS,-1
+.set UNIPORT_NOTUNIQUE,0
+.set UNISEM_SUCCESS,-1
+.set UNISEM_NOTUNIQUE,0
+.set PUBMSG_SUCCESS,-1
+.set PUBMSG_NOPORT,0
+.set SIGB_SINGLE,4
+.set SIGF_SINGLE,16
+.set SIGB_DOS,8
+.set SIGF_DOS,256
 .set MP_FLAGS,14
 .set MP_SIGBIT,15
 .set MP_SIGTASK,16
@@ -410,6 +428,8 @@
 .set PP_FREGS,PP_CODE+80
 .set PP_SIZE,144
 .set NT_MESSAGE,5
+.set NT_FREEMSG,6
+.set NT_REPLYMSG,7
 .set LN_SUCC,0
 .set LN_PRED,4
 .set LN_TYPE,8
@@ -417,12 +437,17 @@
 .set LN_NAME,10
 .set ATTEMPT_SUCCESS,-1
 .set ATTEMPT_FAILURE,0
+.set CMP_EQUAL,0
+.set CMP_DESTGREATER,-1
+.set CMP_DESTLESS,1
 .set TC_MEMENTRY,74
 .set LH_TAILPRED,8
 .set LH_HEAD,0
 .set LH_TAIL,4
 .set NT_PPCTASK,100
-.set NT_PPCMSGPORT,101
+.set NT_MSGPORTPPC,101
+.set NT_MIRRORMSG,102
+.set NT_XMSGPPC,103
 .set TASKATTR_EXITCODE,0x80100001
 .set TASKATTR_NAME,0x80100002
 .set TASKATTR_PRI,0x80100003
@@ -458,6 +483,9 @@
 .set TASKPPC_CONTEXTMEM,100
 .set TASKPPC_TASKPTR,104
 .set TASKPPC_FLAGS,108
+.set TASKPPC_LINK,112
+.set TASKLINK_SIG,12
+.set TASKLINK_USED,16
 .set TASKPPC_BATSTORAGE,130
 .set TASKPPC_TIMESTAMP2,160
 .set TASKPPC_ELAPSED2,168
@@ -473,7 +501,11 @@
 .set TASKPPC_ID,208
 .set TASKPPC_MSGPORT,216
 .set TASKPPC_TASKPOOLS,220
+.set TASKPPC_POOLMEM,238
+.set TASKPPC_MESSAGERIP,242
 .set TASKPPC_STARTMSG,248
+.set TASKPPC_PORT,656
+.set TASKPPC_NAME,800
 .set SYS_SIGALLOC,0xFFFF
 .set TC_FLAGS,14
 .set TC_STATE,15
@@ -481,8 +513,8 @@
 .set TC_SIGWAIT,22
 .set TC_SIGRECVD,26
 .set TC_SIGEXCEPT,30
-.set TC_EXCEPTCODE,42
 .set TC_EXCEPTDATA,38
+.set TC_EXCEPTCODE,42
 .set TC_SPREG,54
 .set TC_SPLOWER,58
 .set TC_SPUPPER,62
