@@ -1798,7 +1798,7 @@ FindPortPPC:
 
 #********************************************************************************************
 #
-#	message = WaitPortPPC(MsgPortPPC) // r4 (UNDER DEVELOPMENT)
+#	message = WaitPortPPC(MsgPortPPC) // r3=r4
 #
 #********************************************************************************************
 
@@ -1829,19 +1829,19 @@ WaitPortPPC:
 		mr.	r3,r3
 		beq+	.WaitInLine
 		
-		lbz	r3,ExceptionMode(r0)
+		lbz	r3,PortInUse(r0)
 		mr.	r3,r3
-		beq-	.NotExc
+		beq-	.PortGood
 
 		li	r4,Atomic
 		bl AtomicDone
 
-.InExc:		lbz	r3,ExceptionMode(r0)
+.PortUseWait:	lbz	r3,PortInUse(r0)
 		mr.	r3,r3
-		bne+	.InExc
+		bne+	.PortUseWait
 		b	.WaitInLine
 		
-.NotExc:	stw	r31,CurrentPort(r0)
+.PortGood:	stw	r31,CurrentPort(r0)
 		li	r0,-1
 		stb	r0,PortInUse(r0)
 
@@ -1850,9 +1850,9 @@ WaitPortPPC:
 
 		bl CauseInterrupt
 
-.InExc2:	lbz	r3,ExceptionMode(r0)
+.PortUseWait2:	lbz	r3,PortInUse(r0)
 		mr.	r3,r3
-		bne+	.InExc2
+		bne+	.PortUseWait2
 
 .Link33:	lwz	r3,MP_MSGLIST(r31)
 		lwz	r4,LH_HEAD(r3)
@@ -1887,31 +1887,31 @@ WaitPortPPC:
 		mr.	r3,r3
 		beq+	.WaitInLine2
 		
-		lbz	r3,ExceptionMode(r0)
+		lbz	r3,PortInUse(r0)
 		mr.	r3,r3
-		beq-	.NotExc2
+		beq-	.PortGood2
 
 		li	r4,Atomic
 		bl AtomicDone
 
-.InExc3:	lbz	r3,ExceptionMode(r0)
+.PortUseWait3:	lbz	r3,PortInUse(r0)
 		mr.	r3,r3
-		bne+	.InExc3
+		bne+	.PortUseWait3
 		
 		b	.WaitInLine2
 
-.NotExc2:	stw	r31,CurrentPort(r0)
+.PortGood2:	stw	r31,CurrentPort(r0)
 		li	r0,-1
-		stb	r0,ExceptionMode(r0)
+		stb	r0,PortInUse(r0)
 
 		li	r4,Atomic
 		bl AtomicDone
 
 		bl CauseInterrupt
 
-.Wait4Port:	lbz	r3,PortInUse(r0)
+.PortUseWait4:	lbz	r3,PortInUse(r0)
 		mr.	r3,r3
-		bne+	.Wait4Port
+		bne+	.PortUseWait4
 		
 .Link38:	mr	r3,r27
 		lwz	r5,MP_MSGLIST(r31)
