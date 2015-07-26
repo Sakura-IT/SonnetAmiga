@@ -201,7 +201,6 @@ ExitCode:	li	r7,TS_REMOVED
 		and	r23,r23,r4				#Keep it 0000-3FFE
 		stwbrx	r23,r24,r3
 		sync
-
 		li	r0,0
 		stw	r0,RunningTask(r0)
 
@@ -435,7 +434,7 @@ End:		mflr	r4
 
 		blr
 
-#********************************************************************************************							#Clear MSR to diable interrupts and checks
+#********************************************************************************************
 
 Reset:		mflr	r15
 
@@ -1432,13 +1431,32 @@ EInt:		b	.FPUnav
 		sync
 		
 		lwz	r5,0(r5)
+		mr	r6,r5
 		
+		li	r4,6				#MsgLen/Cache_Line
+		mtctr	r4
+.InvMsg:	dcbi	r0,r6
+		addi	r6,r24,L1_CACHE_LINE_SIZE
+		bdnz	.InvMsg
+		
+		sync
+				
 		loadreg	r4,"TPPC"
 		lwz	r6,MN_IDENTIFIER(r5)
 		cmpw	r4,r6				#The one we want?
+		beq	.MsgTPPC
+		
+		loadreg	r4,"DONE"
+		cmpw	r4,r6
 		bne	.NxtInQ
 		
-		la	r4,NewTasks(r0)
+		lwz	r4,MN_PPC(r5)
+		li	r3,TS_READY
+		stb	r3,TC_STATE(r4)
+							#PutMsgPPC r5 to currenttask
+		b	.NxtInQ
+		
+.MsgTPPC:	la	r4,NewTasks(r0)
 		
 		LIBCALLPOWERPC AddTailPPC
 		
@@ -1508,16 +1526,9 @@ EInt:		b	.FPUnav
 		mr.	r9,r3
 		beq	.ReturnToUser
 
-.Dispatch:	mr	r3,r9
-		li	r4,6				#MsgLen/Cache_Line
-		mtctr	r4
-.InvMsg:	dcbi	r0,r3
-		addi	r3,r24,L1_CACHE_LINE_SIZE
-		bdnz	.InvMsg
+		mr	r3,r9
 		
-		sync
-		
-		lwz	r8,MN_ARG0(r9)		
+.Dispatch:	lwz	r8,MN_ARG0(r9)		
 		li	r4,TS_RUN
 		stb	r4,TC_STATE(r8)
 		li	r4,NT_PPCTASK
@@ -1588,7 +1599,6 @@ EInt:		b	.FPUnav
 
 		li	r8,0
 		stb	r8,ExceptionMode(r0)
-		stb	r8,Interrupt(r0)
 		
 		mr	r7,r8
 		mr	r9,r8
@@ -1627,7 +1637,6 @@ EInt:		b	.FPUnav
 		stw	r9,0xf0(r0)				#running
 		li	r9,0
 		stb	r9,ExceptionMode(r0)
-		stb	r9,Interrupt(r0)
 		
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
@@ -1901,7 +1910,6 @@ TestRoutine:	b	.IntReturn
 		
 		li	r9,0
 		stb	r9,ExceptionMode(r0)
-		stb	r9,Interrupt(r0)
 		
 		mfsprg3	r9
 		rfi
@@ -1945,7 +1953,6 @@ TestRoutine:	b	.IntReturn
 		
 		li	r19,0
 		stb	r19,ExceptionMode(r0)
-		stb	r19,Interrupt(r0)
 		
 		rfi
 
