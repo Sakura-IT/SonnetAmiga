@@ -510,10 +510,10 @@ MasterControl:
 	move.l ThisTask(a6),d0
 	move.l d0,MCTask(a4)
 	move.l d6,Init(a4)
-	lea Buffer(pc),a4
+	lea Buffer(pc),a4	
+	jsr _LVOCacheClearU(a6)
 	
-NextMsg	jsr _LVOCacheClearU(a6)
-	move.l ThisTask(a6),a0
+NextMsg	move.l ThisTask(a6),a0
 	lea pr_MsgPort(a0),a0
 	move.l a0,d6
 	jsr _LVOWaitPort(a6)
@@ -539,15 +539,16 @@ MsgT68k	move.b LN_TYPE(a1),d7
 	beq.s Sig68k
 	cmp.b #NT_REPLYMSG,d7				;signal PPC that 68k is done
 	bne.s NextMsg
-	
-	move.l #"DONE",MN_IDENTIFIER(a1)
-	move.l MN_PPC(a1),a2
-	moveq.l #TS_READY,d6
-	move.b d6,TC_STATE(a2)	
+
+	move.l MN_ARG2(a1),a2
+	move.l #"DONE",MN_IDENTIFIER(a2)
+ReUse	move.l a2,d7
+	lea PushMsg(pc),a5
+	jsr _LVOSupervisor(a6)
 	move.l EUMBAddr(pc),a2
 	move.l a1,OFQPR(a2)				;Return Message Frame
-	bsr DoPPCInterrupt				;Data is still used by PPC
-	bra.s NextMsg					;after freeing the msg.....
+	move.l d7,IFQPR(a2)				;Message the PPC
+	bra.s NextMsg
 	
 Sig68k	move.l ThisTask(a6),a0
 	lea pr_MsgPort(a0),a0
@@ -582,13 +583,18 @@ MsgLL68	move.l MN_PPSTRUCT+0*4(a1),a6
 	rts
 	
 RtnLL	move.l (a7)+,a1
-	move.l d0,MN_PPSTRUCT+6*4(a1)
-	move.l #"DONE",MN_IDENTIFIER(a1)	
 	move.l EUMBAddr(pc),a2
-	move.l a1,OFQPR(a2)				;Return Message Frame	
-	move.l 4.w,a6
-	bsr DoPPCInterrupt
-	bra NextMsg
+	move.l IFQPR(a2),a2
+	move.l d0,MN_PPSTRUCT+6*4(a2)
+	move.l #"DONE",MN_IDENTIFIER(a2)
+	bra ReUse
+	
+PushMsg	moveq.l #11,d4
+	move.l a1,a2
+PshMsg	cpushl dc,(a2)
+	lea L1_CACHE_LINE_SIZE_040(a2),a2		;Cache_Line 040/060 = 16 bytes
+	dbf d4,PshMsg
+	rte
 
 	cnop 0,4
 
@@ -882,7 +888,7 @@ xProces	move.l d0,Port(a5)
 	move.l 4.w,a6
 	move.l ThisTask(a6),a1
 	move.l d6,a2
-	lea 800(a2),a2
+	lea TASKPPC_NAME(a2),a2
 	
 	move.l #219,d0
 	move.l LN_NAME(a1),a1
@@ -1052,7 +1058,15 @@ xBack	move.l a6,-(a7)
 	fmove.d fp6,(a6)+
 	fmove.d fp7,(a6)+
 	
-NoFPU4	move.l (a7)+,a6
+NoFPU4	move.l (a7),a1
+	move.l EUMBAddr(pc),a2
+	move.l IFQPR(a2),a2	
+	move.l a2,MN_ARG2(a1)
+	moveq.l #47,d1
+DoReslt	move.l (a1)+,(a2)+
+	dbf d1,DoReslt
+	
+	move.l (a7)+,a6
 	movem.l (a7)+,d0-a5
 	move.l a6,a1
 	move.l (a7)+,a6
