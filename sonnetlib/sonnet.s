@@ -867,9 +867,17 @@ RunPPC:
 	move.l a1,d0
 	bra.s xProces
 
-xTask	jsr _LVOCreateMsgPort(a6)			;Not done yet. How to find this Port?
+xTask	move.l LN_NAME(a1),a1
+	jsr _LVOFindPort(a6)
+	tst.l d0
+	bne.s xProces
+	
+	jsr _LVOCreateMsgPort(a6)
 	tst.l d0
 	beq Cannot
+	move.l ThisTask(a6),a1
+	move.l d0,a2
+	move.l LN_NAME(a1),LN_NAME(a2)
 
 xProces	move.l d0,Port(a5)
 	move.l ThisTask(a6),a1	
@@ -937,13 +945,23 @@ CpMsg2	move.l (a0)+,(a2)+
 WaitForPPC:
 	link a5,#-8
 	movem.l d1-a6,-(a7)
+	moveq.l #0,d0
+	move.l d0,Port(a5)
 	move.l a0,PStruct(a5)
-	move.l 4.w,a6
-	move.l ThisTask(a6),a1
+	move.l 4.w,a6	
 	cmp.b #NT_PROCESS,LN_TYPE(a1)
-	beq.s yProces
-
-	ILLEGAL						;Not done yet. How to create this port?
+	beq.s yProces	
+	
+	move.l ThisTask(a6),a1
+	move.l LN_NAME(a1),a1
+	jsr _LVOFindPort(a6)
+	tst.l d0
+	bne.s FndPort
+	
+	ILLEGAL						;Shouldn't happen
+	
+FndPort	move.l d0,Port(a5)	
+	bra.s Stacker
 
 yProces	lea pr_MsgPort(a1),a1
 	move.l a1,Port(a5)
@@ -1273,7 +1291,7 @@ PowerDebugMode:
 	
 ;********************************************************************************************
 ;
-;	void SPrintF68K(Formatstring, values) // a0,a1 -> NO DEBUGLEVEL IN SONNETLIB
+;	void SPrintF68K(Formatstring, values) // a0,a1
 ;
 ;********************************************************************************************	
 
