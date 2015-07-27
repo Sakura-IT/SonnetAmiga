@@ -52,6 +52,8 @@
 .set UNUSED,193
 .set UNUSED,194
 .set UNUSED,195
+.set AlignmentExcHigh,196
+.set AlignmentExcLow,200
 
 .set _LVOAllocMem,		-198
 .set _LVOFreeMem,		-210
@@ -79,6 +81,9 @@
 .set PPCINFO_CPUCLOCK,        	0x80102007		#PPC CPU clock
 .set PPCINFO_CPULOAD,         	0x80102008		#Total CPU usage *100 [%]
 .set PPCINFO_SYSTEMLOAD,      	0x80102009		#Total system load *100 [%]
+
+.set HINFO_ALEXC_HIGH,		0x80103000		#For GetHALInfo
+.set HINFO_ALEXC_LOW,		0x80103001
 
 .set SCHED_REACTION,		0x80104000		#Reaction time of low-activity tasks
 			

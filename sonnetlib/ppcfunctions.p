@@ -6358,6 +6358,50 @@ SPrintF:
 		DSTRYSTACKPPC
 
 		blr
+		
+#********************************************************************************************
+#
+#	void GetHALInfo(HALInfoTagList) // r4
+#
+#********************************************************************************************
+
+GetHALInfo:
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+
+		mr	r31,r4
+
+		loadreg	r4,HINFO_ALEXC_HIGH
+		mr	r5,r31
+
+		bl FindTagItemPPC
+
+		mr.	r3,r3
+		beq-	.NoHALTag1
+
+		lwz	r4,AlignmentExcHigh(r0)
+		stw	r4,4(r3)
+		
+.NoHALTag1:	loadreg	r4,HINFO_ALEXC_LOW
+		mr	r5,r31
+
+		bl FindTagItemPPC
+
+		mr.	r3,r3
+		beq-	.NoHALTag2
+
+		lwz	r4,AlignmentExcLow(r0)
+		stw	r4,4(r3)
+
+.NoHALTag2:	lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
+
+		DSTRYSTACKPPC
+
+		blr
 
 #********************************************************************************************
 
@@ -6369,7 +6413,6 @@ WaitTime:			li	r3,0
 ChangeMMU:			blr
 				blr
 FreeAllMem:			blr
-GetHALInfo:			blr
 RawDoFmtPPC:			li	r3,0
 				blr
 
