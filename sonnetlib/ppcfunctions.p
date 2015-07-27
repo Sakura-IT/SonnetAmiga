@@ -6331,10 +6331,36 @@ SetScheduling:
 		DSTRYSTACKPPC
 		
 		blr
-		
+
+#********************************************************************************************
+#
+#	void SPrintF(Formatstring, values) // r4,r5
+#
 #********************************************************************************************
 
-SPrintF:			blr
+SPrintF:
+		BUILDSTACKPPC
+
+		stwu	r7,-4(r13)
+		stwu	r6,-4(r13)
+
+		mr	r6,r4						#a0
+		mr	r7,r5						#a1
+		lwz	r4,PowerPCBase(r0)
+		li	r5,_LVOSPrintF68K
+
+		bl 	Run68KLowLevel
+		
+		lwz	r6,0(r13)
+		lwz	r7,4(r13)
+		addi	r13,r13,8
+
+		DSTRYSTACKPPC
+
+		blr
+
+#********************************************************************************************
+
 SetExcHandler:			li	r3,0
 				blr
 RemExcHandler:			blr
