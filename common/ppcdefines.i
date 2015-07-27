@@ -46,8 +46,8 @@
 .set MemSem,172
 .set PowerPCBase,176
 .set Break,180
-.set CurrentPrio,184				#658
-.set CurrentPrioOffset,188			#670
+.set LowActivityPrio,184			#658
+.set LowActivityPrioOffset,188			#670
 .set PortInUse,192				#628	; See CurrentPort
 .set UNUSED,193
 .set UNUSED,194
@@ -79,6 +79,8 @@
 .set PPCINFO_CPUCLOCK,        	0x80102007		#PPC CPU clock
 .set PPCINFO_CPULOAD,         	0x80102008		#Total CPU usage *100 [%]
 .set PPCINFO_SYSTEMLOAD,      	0x80102009		#Total system load *100 [%]
+
+.set SCHED_REACTION,		0x80104000		#Reaction time of low-activity tasks
 			
 .set CPUF_G3,			0x00200000
 .set CPUF_G4,			0x00400000

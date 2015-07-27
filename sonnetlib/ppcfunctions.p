@@ -33,7 +33,7 @@
 
 #********************************************************************************************
 #
-#	void SetExcMMU(void) // Only from within Exception Handler
+#	void SetExcMMU(void) // Only from within Exception Handler (STUB)
 #
 #********************************************************************************************
 
@@ -48,7 +48,7 @@ SetExcMMU:
 	
 #********************************************************************************************
 #
-#	void ClearExcMMU(void) // Only from within Exception Handler
+#	void ClearExcMMU(void) // Only from within Exception Handler (STUB)
 #
 #********************************************************************************************
 
@@ -778,6 +778,8 @@ AllocXMsgPPC:
 		addi	r31,r4,20
 		mr	r30,r5
 		mr	r4,r31
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
+		li	r6,32
 		
 		bl AllocVecPPC				#Check for r4 =< 192
 		
@@ -822,7 +824,7 @@ CreateMsgPortPPC:
 		stwu	r30,-4(r13)
 
 		li	r4,100
-		loadreg r5,0x11001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,32
 		
 		bl AllocVecPPC
@@ -1143,7 +1145,7 @@ InitSemaphorePPC:
 		li	r0,-1
 		sth	r0,SS_QUEUECOUNT(r31)
 		li	r4,32
-		loadreg r5,0x10001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,32
 
 		bl AllocVecPPC
@@ -3303,8 +3305,8 @@ InsertOnPri:
 		lwz	r3,TASKPPC_PRIORITY(r5)
 		lwz	r6,TASKPPC_PRIOFFSET(r5)
 		add	r3,r3,r6
-		lwz	r7,CurrentPrio(r0)
-		lwz	r6,CurrentPrioOffset(r0)
+		lwz	r7,LowActivityPrio(r0)
+		lwz	r6,LowActivityPrioOffset(r0)
 		add	r6,r6,r7
 		cmpw	r3,r6
 		blt-	.LowerPri
@@ -3395,7 +3397,7 @@ CreateTaskPPC:
  
 		mr	r25,r3 
 		li	r4,246				#246 bytes
-		loadreg	r5,0x11001			#attr = $11001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0				#default alignment 
  
  		bl AllocVecPPC
@@ -3417,7 +3419,7 @@ CreateTaskPPC:
 		stw	r23,TASKPPC_POWERPCBASE(r31)
  
 		li	r4,84
-		loadreg	r5,0x11001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
  		bl AllocVecPPC
@@ -3429,7 +3431,7 @@ CreateTaskPPC:
 		stw	r3,TASKPPC_BATSTORAGE(r31)
  
 		li	r4,24 
-		loadreg	r5,0x11001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
  		bl AllocVecPPC
@@ -3467,7 +3469,7 @@ CreateTaskPPC:
 		addi	r3,r3,1 
 		mr	r4,r3 
 		mr	r28,r3
-		loadreg	r5,0x11001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
  		bl AllocVecPPC
@@ -3477,7 +3479,7 @@ CreateTaskPPC:
  
 		mr	r22,r3 
 		li	r4,24
-		loadreg	r5,0x11001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
  		bl AllocVecPPC
@@ -3585,8 +3587,7 @@ CreateTaskPPC:
 		addi	r4,r3,0x1000			#Default = 0x4000 or asked+0x1000 
 		stw	r4,TASKPPC_STACKSIZE(r31)
 		mr	r29,r4 
-		lis	r5,1 
-		ori	r5,r5,1 
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
  		bl AllocVecPPC
@@ -3606,7 +3607,7 @@ CreateTaskPPC:
 		stw	r4,TC_SPREG(r31)
  
 		li	r4,24 
-		loadreg	r5,0x11001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
  		bl AllocVecPPC
@@ -3630,7 +3631,7 @@ CreateTaskPPC:
 		stw	r5,LH_TAIL(r3) 
  
 		li	r4,544
-		loadreg r5,0x11001 
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
  		bl AllocVecPPC
@@ -3644,7 +3645,7 @@ CreateTaskPPC:
 		stw	r0,36(r26)			#To location 9 of ContextMem??
  
 		li	r4,24
-		loadreg r5,0x11001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
  		bl AllocVecPPC
@@ -3831,7 +3832,7 @@ CreateTaskPPC:
 		stw	r3,72(r26)			#r10 to ContextMem 72 
  
 		li	r4,100
-		loadreg	r5,0x11001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,32 
  
  		bl AllocVecPPC
@@ -3880,7 +3881,7 @@ CreateTaskPPC:
 		stw	r3,TASKPPC_POOLMEM(r31)
 
 		li	r4,928
-		loadreg	r5,0x10001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
  		bl AllocVecPPC
@@ -3893,7 +3894,7 @@ CreateTaskPPC:
 		mr	r16,r3 
  
 		li	r4,18				#Dummy MirrorTask?
-		loadreg	r5,0x11001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
  		bl AllocVecPPC
@@ -4170,7 +4171,7 @@ ChangeStack:
 		cmplw	r4,r5
 		blt-	.SomeError
 
-		loadreg	r5,0x11001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0
 
 		bl AllocVecPPC
@@ -4181,7 +4182,7 @@ ChangeStack:
 		mr	r30,r3
 
 		li	r4,24
-		loadreg	r5,0x11001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0
 		
 		bl AllocVecPPC
@@ -4482,7 +4483,7 @@ SnoopTask:
 		mr	r30,r4
 
 		li	r4,26
-		loadreg	r5,0x11001
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0
 
 		bl AllocVecPPC
@@ -5313,7 +5314,8 @@ CreatePoolPPC:
 		mr	r28,r6
 		
 		li	r4,POOL_SIZE			#struct Pool
-		mr	r5,r29
+#		mr	r5,r29
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,32
 		
 		bl AllocVecPPC
@@ -6287,7 +6289,49 @@ PutMsgPPC:
 		DSTRYSTACKPPC
 
 		blr
+		
+#********************************************************************************************
+#
+#	void SetScheduling(SchedTagList) // r4 - Not working with current scheduler
+#
+#********************************************************************************************
 
+SetScheduling:
+		BUILDSTACKPPC
+		
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+
+		mr	r31,r4
+
+		loadreg	r4,SCHED_REACTION
+		mr	r5,r31
+
+		bl FindTagItemPPC
+
+		mr.	r3,r3
+		beq-	.SchedNotFound
+
+		lwz	r4,4(r3)
+		cmpwi	r4,1
+		bge-	.InRange1
+
+		li	r4,1
+.InRange1:	cmpwi	r4,20
+		ble-	.InRange2
+
+		li	r4,20
+.InRange2:	mulli	r4,r4,1000
+		stw	r4,LowActivityPrio(r0)
+
+.SchedNotFound:	lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
+		
+		DSTRYSTACKPPC
+		
+		blr
+		
 #********************************************************************************************
 
 SPrintF:			blr
@@ -6300,7 +6344,6 @@ ChangeMMU:			blr
 				blr
 FreeAllMem:			blr
 GetHALInfo:			blr
-SetScheduling:			blr
 RawDoFmtPPC:			li	r3,0
 				blr
 
