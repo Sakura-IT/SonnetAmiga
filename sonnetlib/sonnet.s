@@ -898,7 +898,7 @@ xProces	move.l d0,Port(a5)
 	move.l d6,a2
 	lea TASKPPC_NAME(a2),a2
 	
-	move.l #219,d0
+	move.l #1019-TASKPPC_NAME,d0			;Name len limit
 	move.l LN_NAME(a1),a1
 CpName	move.b (a1)+,(a2)
 	tst.b (a2)

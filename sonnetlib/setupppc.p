@@ -1528,12 +1528,22 @@ EInt:		b	.FPUnav
 
 		mr	r3,r9
 		
-.Dispatch:	lwz	r8,MN_ARG0(r9)		
+.Dispatch:	lwz	r8,MN_ARG0(r9)
+		
+		mr	r6,r8
+		li	r4,32				#TaskLen/Cache_Line
+		mtctr	r4
+.InvTask:	dcbi	r0,r6
+		addi	r6,r24,L1_CACHE_LINE_SIZE
+		bdnz	.InvTask
+		
+		isync		
+		
 		li	r4,TS_RUN
 		stb	r4,TC_STATE(r8)
 		li	r4,NT_PPCTASK
 		stb	r4,LN_TYPE(r8)
-		la	r4,252(r8)
+		la	r4,TASKPPC_CTMEM(r8)
 		stw	r4,TASKPPC_CONTEXTMEM(r8)
 		stw	r9,TASKPPC_STARTMSG(r8)
 		lwz	r31,MN_ARG1(r9)
@@ -1554,6 +1564,47 @@ EInt:		b	.FPUnav
 		loadreg	r6,IdleTask
 		addi	r6,r6,ExitCode-Start	
 		mtlr	r6
+
+		la	r6,TASKPPC_PORT(r8)		#Setup a Semaphore & MsgPort
+		addi	r4,r6,MP_PPC_INTMSG
+		stw	r4,LH_TAILPRED(r4) 
+		li	r0,0 
+		stwu	r0,LH_TAIL(r4) 
+		stwu	r4,LH_HEAD-4(r4) 
+ 
+		addi	r4,r6,MP_MSGLIST
+		stw	r4,LH_TAILPRED(r4) 
+		li	r0,0 
+		stwu	r0,LH_TAIL(r4) 
+		stwu	r4,LH_HEAD-4(r4) 
+ 
+ 		loadreg	r0,SYS_SIGALLOC
+		stw	r0,TC_SIGALLOC(r8)
+ 
+		li	r0,SIGB_DOS 			#SIGBIT = DOS
+		stb	r0,MP_SIGBIT(r6)			 
+		addi	r4,r6,MP_PPC_SEM
+
+		addi	r5,r4,SS_WAITQUEUE
+		stw	r5,8(r5)
+		li	r0,0
+		stwu	r0,4(r5)
+		stwu	r5,-4(r5)
+		li	r0,0
+		stw	r0,SS_OWNER(r4)
+		sth	r0,SS_NESTCOUNT(r4)
+		li	r0,-1
+		sth	r0,SS_QUEUECOUNT(r4)	 
+ 
+ 		la	r3,TASKPPC_SSPPC_RESERVE(r8)
+ 		stw	r3,SSPPC_RESERVE(r4)
+ 
+		stw	r8,MP_SIGTASK(r6)
+		li	r0,PA_SIGNAL 
+		stb	r0,MP_FLAGS(r6)
+		li	r0,NT_MSGPORTPPC 
+		stb	r0,LN_TYPE(r6)
+		stw	r6,TASKPPC_MSGPORT(r8)
 
 		stw	r8,RunningTask(r0)
 
