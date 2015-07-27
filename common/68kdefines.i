@@ -25,6 +25,7 @@ MN_ARG0			EQU	184
 MN_ARG1			EQU	180
 MN_ARG2			EQU	176
 MN_MCTASK		EQU	188
+_LVORawPutChar		EQU	-516	* Private function in Exec
 
 FUNC_CNT	 EQU	-30		* Skip 4 standard vectors
 FUNCDEF		 MACRO

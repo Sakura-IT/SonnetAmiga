@@ -1278,6 +1278,20 @@ PowerDebugMode:
 ;********************************************************************************************	
 
 SPrintF68K:
+	movem.l a2,-(a7)
+	lea PutChProc(pc),a2
+	move.l a6,-(a7)
+	move.l 4.w,a6
+	jsr _LVORawDoFmt(a6)
+	move.l (a7)+,a6
+	move.l (a7)+,a2
+	rts
+	
+PutChProc:	
+	move.l a6,-(a7)
+	move.l 4.w,a6
+	jsr _LVORawPutChar(a6)
+	move.l (a7)+,a6
 	rts
 	
 ;********************************************************************************************
