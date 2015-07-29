@@ -1743,7 +1743,7 @@ TestRoutine:	b	.IntReturn
 		
 		beq	.ReturnToUser
 
-		li	r4,TS_WAIT
+		li	r4,TS_CHANGING
 		lbz	r3,TC_STATE(r9)
 		cmpw	r3,r4
 		
@@ -1965,7 +1965,8 @@ TestRoutine:	b	.IntReturn
 		mfsprg3	r9
 		rfi
 
-.GoToWait:			
+.GoToWait:	li	r4,TS_WAIT
+		stb	r4,TC_STATE(r9)
 		la	r4,WaitingTasks(r0)
 		mr	r5,r9
 		

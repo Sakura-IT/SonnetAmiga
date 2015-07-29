@@ -870,9 +870,12 @@ RunPPC:
 xTask	move.l LN_NAME(a1),a1
 	jsr _LVOFindPort(a6)
 	tst.l d0
-	bne.s xProces
+	beq.s NewP
+
+	moveq.l #PPERR_ASYNCERR,d7
+	bra EndIt
 	
-	jsr _LVOCreateMsgPort(a6)
+NewP	jsr _LVOCreateMsgPort(a6)
 	tst.l d0
 	beq Cannot
 	move.l ThisTask(a6),a1
@@ -958,7 +961,8 @@ WaitForPPC:
 	tst.l d0
 	bne.s FndPort
 	
-	ILLEGAL						;Shouldn't happen
+	moveq.l #PPERR_WAITERR,d7
+	bra.s EndIt
 	
 FndPort	move.l d0,Port(a5)	
 	bra.s Stacker
@@ -986,7 +990,7 @@ DizDone	move.l PStruct(a5),a1
 	moveq.l #PP_SIZE/4-1,d0
 CpBck	move.l (a0)+,(a1)+
 	dbf d0,CpBck
-	moveq.l #0,d7	
+	moveq.l #PPERR_SUCCESS,d7	
 	move.l EUMBAddr(pc),a1
 	move.l a2,OFQPR(a1)				;Return Message Frame
 	bra.s Success

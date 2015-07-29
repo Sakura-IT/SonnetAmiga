@@ -1455,7 +1455,7 @@ ReleaseSemaphorePPC:
 		xori	r4,r4,1
 		bne-	.SharedSem
 		mr.	r4,r4
-		beq-	.NoOwner
+		beq-	.NoOwner				#0 = Procure / ObtainSemShared
 		stw	r4,SS_OWNER(r31)
 .UpNestCount:	lha	r3,SS_NESTCOUNT(r31)
 		addi	r3,r3,1
@@ -1575,7 +1575,7 @@ ReleaseSemaphorePPC:
 .Error68k:	li	r4,Atomic
 		bl AtomicDone
 .DeadEnd:	nop					#Not Yet Implemented
-		b .DeadEnd
+		b 	.DeadEnd
 
 #********************************************************************************************
 #
@@ -2051,7 +2051,7 @@ WaitFor68K:
 		mr	r31,r4
 				
 		lwz	r3,RunningTask(r0)
-		li	r4,TS_WAIT
+		li	r4,TS_CHANGING
 		stb	r4,TC_STATE(r3)		
 		
 		bl 	CauseInterrupt			#Set task in wait status
@@ -3116,6 +3116,7 @@ PutPublicMsgPPC:
 		DSTRYSTACKPPC
 
 		blr
+		
 #********************************************************************************************
 #
 #	void AllocPrivateMem(void)	// Dummy (as in powerpc.library)
@@ -3310,6 +3311,7 @@ InsertOnPri:
 		add	r6,r6,r7
 		cmpw	r3,r6
 		blt-	.LowerPri
+		
 		mr	r3,r6
 		lwz	r0,TASKPPC_PRIORITY(r5)
 		sub	r0,r3,r0
@@ -3319,17 +3321,20 @@ InsertOnPri:
 		lwz	r6,0(r4)
 		mr.	r6,r6
 		beq-	.GoExit
+		
 		lwz	r0,TASKPPC_FLAGS(r4)
 		rlwinm.	r0,r0,(31-TASKPPC_EMULATOR),31,31
 		beq-	.NoEmul
 		mr	r4,r6
 		b	.GoExit
+		
 .NoEmul:	lwz	r7,TASKPPC_PRIORITY(r4)
 		lwz	r0,TASKPPC_PRIOFFSET(r4)
 		add	r7,r7,r0
 		cmpw	r3,r7
 		ble+	.Huh
-.GoExit:	lwz	r3,4(r4)
+		
+.GoExit:	lwz	r3,4(r4)				#AddHeadPPC
 		stw	r5,4(r4)
 		stw	r4,0(r5)
 		stw	r3,4(r5)
@@ -4693,7 +4698,7 @@ ObtainSemaphoreSharedPPC:
 		bl AtomicDone
 
 		lis	r4,0
-		ori	r4,r4,16
+		ori	r4,r4,SIGF_SINGLE
 		
 		bl WaitPPC
 
@@ -5313,7 +5318,7 @@ CreatePoolPPC:
 		mr	r29,r4
 		mr	r28,r6
 		
-		li	r4,POOL_SIZE			#struct Pool
+		li	r4,POOL_SIZE				#struct Pool
 #		mr	r5,r29
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,32
@@ -5553,7 +5558,7 @@ WaitPPC:
 		mr.	r5,r5
 		bne-	.GotSignals
 
-		li	r0,TS_CHANGING			#Put in TS_WAIT?
+		li	r0,TS_CHANGING
 		stb	r0,TC_STATE(r31)
 
 		li	r4,Atomic
@@ -5808,51 +5813,8 @@ SignalPPC:
 .PPCTask:	mr	r4,r31
 		mr	r5,r30
 		mr	r3,r29
-		lbz	r6,18740(r2)
-		mr.	r6,r6
-		beq-	.SomeFlag
-
-		mr	r3,r4
-		mr	r4,r5
-#		bl	0x77c0				#?
-
-		mr	r30,r3
-		lbz	r0,TC_STATE(r31)
-		cmplwi	r0,TS_WAIT
-		bne-	.NotWaiting
-
-		li	r0,-1
-		stb	r0,RescheduleFlag(r0)		#Do a Reschedule during interrupt
 		
-		bl CauseInterrupt
-
-.NotWaiting:	mr	r4,r31
-		mr	r5,r30
-		mr	r3,r29
-		addi	r6,r4,TASKPPC_LINK
-		lhz	r0,TASKLINK_USED(r6)
-		mr.	r0,r0
-		bne-	.NoTaskLink
-
-		li	r0,-1
-		sth	r0,TASKLINK_USED(r6)
-		stw	r5,TASKLINK_SIG(r6)
-		mr	r5,r6
-		addi	r4,r3,186			#Some list
-		addi	r4,r4,4				#AddTailPPC
-		lwz	r3,4(r4)
-		stw	r5,4(r4)
-		stw	r4,0(r5)
-		stw	r3,4(r5)
-		stw	r5,0(r3)
-		b	.SigExit
-
-.NoTaskLink:	lwz	r0,TASKLINK_SIG(r6)
-		or	r0,r0,r5
-		stw	r5,TASKLINK_SIG(r6)
-		b	.SigExit
-
-.SomeFlag:  	mr	r31,r3
+		mr	r31,r3
 		mr	r30,r4
 		mr	r3,r30
 		mr	r4,r5
@@ -5864,7 +5826,8 @@ SignalPPC:
 
 		lwz	r3,LN_NAME(r30)
 		mr	r0,r3
-		lbz	r3,18737(r2)
+		
+		lbz	r3,18737(r2)			#??
 		cmpwi	r3,2
 		mr	r3,r0
 		blt-	.SigAtom
@@ -5876,7 +5839,7 @@ SignalPPC:
 		stwu	r3,-4(r13)
 		addi	r3,r2,6264
 		stwu	r3,-4(r13)
-#		bl	0x14058
+#		bl	0x14058				#Make mirror task?
 
 		addi	r13,r13,16
 		lwz	r3,0(r13)
@@ -6063,10 +6026,6 @@ ReplyMsgPPC:
 		li	r0,NT_REPLYMSG
 		stb	r0,LN_TYPE(r30)
 		addi	r4,r31,MP_PPC_INTMSG
-		
-#		lbz	r6,18740(r2)				#??
-#		mr.	r6,r6
-#		bne-	.SmFlg
 
 		cmpwi	r28,NT_MIRRORMSG
 		bne-	.DoSem
@@ -6076,20 +6035,13 @@ ReplyMsgPPC:
 
 		bl SetCache
 
-		stwu	r28,-4(r13)
-		mr	r28,r13
-		subi	r13,r13,152
-		subi	r28,r28,152
-		stw	r31,52(r28)
-		stw	r30,56(r28)
-		mr	r3,r28
-		li	r4,2
-#		bl	0x5d20					#Run69KLowLevel
+		mr	r6,r31						#a0
+		mr	r7,r30						#a1
+		lwz	r4,SysBase(r0)
+		li	r5,_LVOPutMsg
+			
+		bl 	Run68KLowLevel
 
-		addi	r28,r28,152
-		mr	r13,r28
-		lwz	r28,0(r13)
-		addi	r13,r13,4
 		b	.ExitReply
 
 .DoSem:		addi	r4,r31,MP_PPC_SEM
@@ -6137,7 +6089,7 @@ ReplyMsgPPC:
 		bne+	.WaitForPort2
 
 .DoReply:	addi	r4,r31,MP_MSGLIST
-.SmFlg:		mr	r5,r30
+		mr	r5,r30
 		addi	r4,r4,4				#AddTailPPC
 		lwz	r3,4(r4)
 		stw	r5,4(r4)
@@ -6158,12 +6110,7 @@ ReplyMsgPPC:
 
 		bl SignalPPC
 
-.NoSig:		
-#		lbz	r6,18740(r2)			#??
-#		mr.	r6,r6
-#		bne-	.ExitReply
-
-		addi	r4,r31,MP_PPC_SEM
+.NoSig:		addi	r4,r31,MP_PPC_SEM
 		
 		bl ReleaseSemaphorePPC
 
@@ -6195,12 +6142,7 @@ PutMsgPPC:
 		mr	r31,r4
 		mr	r30,r5
 
-		addi	r4,r31,MP_PPC_INTMSG
-#		lbz	r6,18740(r2)				#probably startup flag
-#		mr.	r6,r6					#No semaphores available
-#		bne-	.AgainSomeFlag
-
-		addi	r4,r31,48
+		addi	r4,r31,MP_PPC_SEM
 
 		bl ObtainSemaphorePPC
 
@@ -6243,7 +6185,7 @@ PutMsgPPC:
 		bne+	.W8ForPort2
 
 .IntMsg:	addi	r4,r31,MP_MSGLIST
-.AgainSomeFlag:	
+
 #		lbz	r3,686(r29)				#??
 #		mr.	r3,r3
 #		bne-	.NotNormalMsg
@@ -6271,16 +6213,11 @@ PutMsgPPC:
 
 		bl SignalPPC
 
-.NoPutSig:	
-#		lbz	r6,18740(r2)				#??
-#		mr.	r6,r6
-#		bne-	.ExitPut
-
-		addi	r4,r31,MP_PPC_SEM
+.NoPutSig:	addi	r4,r31,MP_PPC_SEM
 		
 		bl ReleaseSemaphorePPC
 
-.ExitPut:	lwz	r28,0(r13)
+		lwz	r28,0(r13)
 		lwz	r29,4(r13)
 		lwz	r30,8(r13)
 		lwz	r31,12(r13)

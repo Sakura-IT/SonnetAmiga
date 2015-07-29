@@ -57,6 +57,7 @@
 
 .set _LVOAllocMem,		-198
 .set _LVOFreeMem,		-210
+.set _LVOPutMsg,		-366
 
 .set StackSize,			0x10000
 .set IdleTask,			0x7400
