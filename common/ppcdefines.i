@@ -49,7 +49,7 @@
 .set LowActivityPrio,184			#658
 .set LowActivityPrioOffset,188			#670
 .set PortInUse,192				#628	; See CurrentPort
-.set UNUSED,193
+.set PowerDebugMode,193				#18737
 .set UNUSED,194
 .set UNUSED,195
 .set AlignmentExcHigh,196
@@ -57,6 +57,7 @@
 
 .set _LVOAllocMem,		-198
 .set _LVOFreeMem,		-210
+.set _LVOSignal,		-306
 .set _LVOPutMsg,		-366
 
 .set StackSize,			0x10000

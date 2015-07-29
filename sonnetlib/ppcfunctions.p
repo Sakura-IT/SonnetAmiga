@@ -4045,24 +4045,7 @@ CreateTaskPPC:
 
 		bl FreeVecPPC
  
-.Error01:	mr	r0,r3 
-		lbz	r3,18737(r2) 
-		cmpwi	r3,1				#Check some flag? DebugMode?
-		mr	r3,r0 
-		blt-	.SetTask0 
- 
-		stwu	r3,-4(r13) 
-		subi	r13,r13,4 
-		li	r3,0 
-		stwu	r3,-4(r13) 
-		addi	r3,r2,6154 
-		stwu	r3,-4(r13)
-		bl	0x14058				#??
-		
-		addi	r13,r13,12 
-		lwz	r3,0(r13) 
-		addi	r13,r13,4 
-.SetTask0:	li	r3,0				#Error flag in r3 
+.Error01:	li	r3,0				#Error flag in r3 
  
 .SkipToEnd:	mr	r5,r3
 		lwz	r3,RunningTask(r0)
@@ -5803,13 +5786,15 @@ SignalPPC:
 		cmplwi	r0,NT_PPCTASK
 		beq-	.PPCTask
 
-		mr	r3,r4
-#		bl	0x13484				#find mirror task?/signal mirrortask?
+		mr	r8,r30						#d0
+		mr	r7,r31						#a1
+		lwz	r4,SysBase(r0)
+		li	r5,_LVOSignal
+		
+		bl Run68KLowLevel
+		
+		b	.SigExit
 
-		mr.	r3,r3
-		beq-	.SigExit
-
-		lwz	r31,34(r3)			#Returns Task
 .PPCTask:	mr	r4,r31
 		mr	r5,r30
 		mr	r3,r29
@@ -5818,32 +5803,10 @@ SignalPPC:
 		mr	r30,r4
 		mr	r3,r30
 		mr	r4,r5
-#		bl	0x7704				#Some interrupt routine
+		
+		bl CheckExcSignal
 
 		mr	r5,r3
-		cmplwi	r5,16
-		beq-	.SigAtom
-
-		lwz	r3,LN_NAME(r30)
-		mr	r0,r3
-		
-		lbz	r3,18737(r2)			#??
-		cmpwi	r3,2
-		mr	r3,r0
-		blt-	.SigAtom
-
-		stwu	r3,-4(r13)
-		subi	r13,r13,4
-		stwu	r3,-4(r13)
-		li	r3,1
-		stwu	r3,-4(r13)
-		addi	r3,r2,6264
-		stwu	r3,-4(r13)
-#		bl	0x14058				#Make mirror task?
-
-		addi	r13,r13,16
-		lwz	r3,0(r13)
-		addi	r13,r13,4
 		
 .SigAtom:	li	r4,Atomic
 		bl AtomicTest
@@ -5940,7 +5903,7 @@ GetMsgPPC:
 		addi	r5,r31,MP_PPC_INTMSG			#Private WarpOS stuff
 		lwz	r4,LH_TAILPRED+MP_PPC_INTMSG(r31)	#Needs to be checked for purpose
 		cmplw	r4,r5					#See also other functions
-		beq-	.AddrEqual				#probably system msging & port
+		beq-	.IntListEmpty				#probably system msging & port
 
 .GetMsgAtom:	li	r4,Atomic
 		bl AtomicTest
@@ -5974,8 +5937,8 @@ GetMsgPPC:
 		mr.	r3,r3
 		bne+	.PortWait2
 
-.AddrEqual:	addi	r4,r31,MP_MSGLIST
-		lwz	r5,0(r4)				#RemHeadPPC
+.IntListEmpty:	addi	r4,r31,MP_MSGLIST
+		lwz	r5,0(r4)			#RemHeadPPC
 		lwz	r3,0(r5)
 		mr.	r3,r3
 		beq-	.EmptyList
@@ -6051,7 +6014,7 @@ ReplyMsgPPC:
 		addi	r5,r31,MP_PPC_INTMSG
 		lwz	r4,LH_TAILPRED+MP_PPC_INTMSG(r31)
 		cmplw	r4,r5
-		beq-	.DoReply
+		beq-	.IntListEmpty2
 
 .ReplyAtom:	li	r4,Atomic
 
@@ -6088,9 +6051,9 @@ ReplyMsgPPC:
 		mr.	r3,r3
 		bne+	.WaitForPort2
 
-.DoReply:	addi	r4,r31,MP_MSGLIST
+.IntListEmpty2:	addi	r4,r31,MP_MSGLIST
 		mr	r5,r30
-		addi	r4,r4,4				#AddTailPPC
+		addi	r4,r4,4					#AddTailPPC
 		lwz	r3,4(r4)
 		stw	r5,4(r4)
 		stw	r4,0(r5)
@@ -6149,7 +6112,7 @@ PutMsgPPC:
 		addi	r5,r31,MP_PPC_INTMSG
 		lwz	r4,LH_TAILPRED+MP_PPC_INTMSG(r31)
 		cmplw	r4,r5
-		beq-	.IntMsg
+		beq-	.IntListEmpty3
 
 .PutAtom:	li	r4,Atomic
 
@@ -6184,11 +6147,7 @@ PutMsgPPC:
 		mr.	r3,r3
 		bne+	.W8ForPort2
 
-.IntMsg:	addi	r4,r31,MP_MSGLIST
-
-#		lbz	r3,686(r29)				#??
-#		mr.	r3,r3
-#		bne-	.NotNormalMsg
+.IntListEmpty3:	addi	r4,r31,MP_MSGLIST
 
 		li	r0,NT_MESSAGE
 		stb	r0,LN_TYPE(r30)
