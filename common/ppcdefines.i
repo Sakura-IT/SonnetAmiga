@@ -55,6 +55,42 @@
 .set AlignmentExcHigh,196
 .set AlignmentExcLow,200
 
+
+#LibBase:
+.set BASE_STOREBAT0,482
+.set IBATU0Store,482
+.set IBATL0Store,486
+.set DBATU0Store,490
+.set DBATL0Store,494
+.set BASE_STOREBAT1,498
+.set IBATU1Store,498
+.set IBATL1Store,502
+.set DBATU1Store,506
+.set DBATL1Store,510
+.set BASE_STOREBAT2,514
+.set IBATU2Store,514
+.set IBATL2Store,518
+.set DBATU2Store,522
+.set DBATL2Store,526
+.set BASE_STOREBAT3,530
+.set IBATU3Store,530
+.set IBATL3Store,534
+.set DBATU3Store,538
+.set DBATL3Store,542
+
+.set TASKPPC_BAT0,0
+.set TASKPPC_BAT1,16
+.set TASKPPC_BAT2,32
+.set TASKPPC_BAT3,48
+
+.set CHMMU_BAT0,0
+.set CHMMU_BAT1,1
+.set CHMMU_BAT2,2
+.set CHMMU_BAT3,3
+
+.set CHMMU_STANDARD,1
+.set CHMMU_BAT,2
+
 .set _LVOAllocMem,		-198
 .set _LVOFreeMem,		-210
 .set _LVOSignal,		-306

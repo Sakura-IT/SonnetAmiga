@@ -360,7 +360,7 @@ NumFunc	cmp.l (a3)+,d0
 	add.l d0,d3
 	addq.l #3,d3
 	andi.w #-4,d3
-	moveq.l #124,d0				;PosSize
+	move.l #1024,d0				;PosSize
 	move.l d0,d2
 	add.w d3,d0
 	move.l #MEMF_PUBLIC|MEMF_FAST|MEMF_PPC,d1

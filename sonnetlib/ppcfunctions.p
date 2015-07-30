@@ -1823,7 +1823,7 @@ WaitPortPPC:
 		addi	r5,r31,MP_PPC_INTMSG
 		lwz	r4,MP_PPC_INTMSG+LH_TAILPRED(r31)
 		cmplw	r4,r5
-		beq-	.Link33
+		beq-	.IntListEmpty4
 
 .WaitInLine:	li	r4,Atomic
 		bl AtomicTest
@@ -1856,7 +1856,7 @@ WaitPortPPC:
 		mr.	r3,r3
 		bne+	.PortUseWait2
 
-.Link33:	lwz	r3,MP_MSGLIST(r31)
+.IntListEmpty4:	lwz	r3,MP_MSGLIST(r31)
 		lwz	r4,LH_HEAD(r3)
 		mr.	r4,r4
 		bne-	.GotMessage
@@ -1881,7 +1881,7 @@ WaitPortPPC:
 		addi	r5,r31,MP_PPC_INTMSG
 		lwz	r4,MP_PPC_INTMSG+LH_TAILPRED(r31)
 		cmplw	r4,r5
-		beq-	.Link38
+		beq-	.IntListEmpty5
 
 .WaitInLine2:	li	r4,Atomic
 		bl AtomicTest
@@ -1915,7 +1915,7 @@ WaitPortPPC:
 		mr.	r3,r3
 		bne+	.PortUseWait4
 		
-.Link38:	mr	r3,r27
+.IntListEmpty5:	mr	r3,r27
 		lwz	r5,MP_MSGLIST(r31)
 		lwz	r4,LH_HEAD(r5)
 		mr.	r4,r4
@@ -3317,7 +3317,7 @@ InsertOnPri:
 		sub	r0,r3,r0
 		stw	r0,TASKPPC_PRIOFFSET(r5)
 .LowerPri:	lwz	r6,0(r4)
-.Huh:		mr	r4,r6
+.CompareNode:	mr	r4,r6
 		lwz	r6,0(r4)
 		mr.	r6,r6
 		beq-	.GoExit
@@ -3332,7 +3332,7 @@ InsertOnPri:
 		lwz	r0,TASKPPC_PRIOFFSET(r4)
 		add	r7,r7,r0
 		cmpw	r3,r7
-		ble+	.Huh
+		ble+	.CompareNode
 		
 .GoExit:	lwz	r3,4(r4)				#AddHeadPPC
 		stw	r5,4(r4)
@@ -6300,13 +6300,292 @@ GetHALInfo:
 		blr
 
 #********************************************************************************************
+#
+#	void GetHALInfo(HALInfoTagList) // r4
+#
+#********************************************************************************************
+
+ChangeMMU:
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		
+		mr	r31,r3
+		lwz	r3,RunningTask(r0)
+
+		cmplwi	r4,CHMMU_STANDARD
+		beq-	.ChangeToTable
+
+		cmplwi	r4,CHMMU_BAT
+		bne-	.ExitChMMU
+
+		lwz	r5,TASKPPC_FLAGS(r3)
+		ori	r5,r5,TASKPPC_BAT
+		stw	r5,TASKPPC_FLAGS(r3)
+		bl	GetBATs
+
+		b	.ExitChMMU
+
+.ChangeToTable:	lwz	r5,TASKPPC_FLAGS(r3)
+		ori	r5,r5,TASKPPC_BAT
+		xori	r5,r5,TASKPPC_BAT
+		stw	r5,TASKPPC_FLAGS(r3)
+		bl	StoreBATs
+
+.ExitChMMU:	lwz	r31,0(r13)
+		addi	r13,r13,4
+
+		DSTRYSTACKPPC
+
+		blr
+
+GetBATs:
+		mflr	r0
+		stwu	r0,-4(r13)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+
+		lwz	r4,RunningTask(r0)
+		lwz	r30,TASKPPC_BATSTORAGE(r4)
+		lwz	r31,PowerPCBase(r0)
+		
+		bl WarpSuper
+		
+		addi	r5,r30,TASKPPC_BAT0
+		li	r4,CHMMU_BAT0
+
+		bl MoveFromBAT
+
+		addi	r5,r30,TASKPPC_BAT1
+		li	r4,CHMMU_BAT1
+
+		bl MoveFromBAT
+
+		addi	r5,r30,TASKPPC_BAT2
+		li	r4,CHMMU_BAT2
+
+		bl MoveFromBAT
+
+		addi	r5,r30,TASKPPC_BAT3
+		li	r4,CHMMU_BAT3
+
+		bl MoveFromBAT
+
+		addi	r5,r31,BASE_STOREBAT0
+		li	r4,CHMMU_BAT0
+
+		bl MoveToBAT
+
+		addi	r5,r31,BASE_STOREBAT1
+		li	r4,CHMMU_BAT1
+
+		bl MoveToBAT
+
+		addi	r5,r31,BASE_STOREBAT2
+		li	r4,CHMMU_BAT2
+
+		bl MoveToBAT
+
+		addi	r5,r31,BASE_STOREBAT3
+		li	r4,CHMMU_BAT3
+
+		bl MoveToBAT
+
+		bl WarpUser
+
+		lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
+		lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtlr	r0
+
+		blr
+
+StoreBATs:
+		mflr	r0
+		stwu	r0,-4(r13)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+
+		lwz	r31,PowerPCBase(r0)
+		lwz	r4,RunningTask(r0)
+		lwz	r30,TASKPPC_BATSTORAGE(r4)
+		
+		bl WarpSuper
+		
+		addi	r5,r30,TASKPPC_BAT0
+		li	r4,CHMMU_BAT0
+
+		bl MoveToBAT
+
+		addi	r5,r30,TASKPPC_BAT1
+		li	r4,CHMMU_BAT1
+
+		bl MoveToBAT
+
+		addi	r5,r30,TASKPPC_BAT2
+		li	r4,CHMMU_BAT2
+
+		bl MoveToBAT
+
+		addi	r5,r30,TASKPPC_BAT3
+		li	r4,CHMMU_BAT3
+
+		bl MoveToBAT
+
+		bl WarpUser
+
+		lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
+		lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtlr	r0
+
+		blr
+		
+#********************************************************************************************
+#
+#	Support: void MoveToBAT(BAT#, BATArray) // r4,r5 / Must be in Supervisor Mode
+#
+#********************************************************************************************
+
+MoveToBAT:
+		mflr	r0
+		stwu	r0,-4(r13)
+		mfmsr	r9
+		ori	r0,r9,(PSL_IR|PSL_DR)
+		xori	r0,r0,(PSL_IR|PSL_DR)
+		mtmsr	r0
+		sync	
+		isync	
+		
+		lwz	r3,0(r5)
+		lwz	r6,4(r5)
+		lwz	r7,8(r5)
+		lwz	r8,12(r5)
+		
+		cmplwi	r4,CHMMU_BAT0
+		beq-	.MoveBat0
+		
+		cmplwi	r4,CHMMU_BAT1
+		beq-	.MoveBat1
+		
+		cmplwi	r4,CHMMU_BAT2
+		beq-	.MoveBat2
+		
+		cmplwi	r4,CHMMU_BAT3
+		beq-	.MoveBat3
+		
+		b	.EndMoveBat
+		
+.MoveBat0:	mtibatu	0,r3
+		mtibatl	0,r6
+		mtdbatu	0,r7
+		mtdbatl	0,r8
+		b 	.EndMoveBat
+		
+.MoveBat1:	mtibatu	1,r3
+		mtibatl	1,r6
+		mtdbatu	1,r7
+		mtdbatl	1,r8
+		b	.EndMoveBat
+		
+.MoveBat2:	mtibatu	2,r3
+		mtibatl	2,r6
+		mtdbatu	2,r7
+		mtdbatl	2,r8
+		b	.EndMoveBat
+		
+.MoveBat3:	mtibatu	3,r3
+		mtibatl	3,r6
+		mtdbatu	3,r7
+		mtdbatl	3,r8
+		
+.EndMoveBat:	mtmsr	r9
+		sync	
+		isync	
+		lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtlr	r0
+		
+		blr	
+
+#********************************************************************************************
+#
+#	Support: void MoveFromBAT(BAT#, BATArray) // r4,r5 / Must be in Supervisor Mode
+#
+#********************************************************************************************
+
+MoveFromBAT:
+		mflr	r0
+		stwu	r0,-4(r13)
+		cmplwi	r4,CHMMU_BAT0
+		beq-	.MoveFBat0
+		
+		cmplwi	r4,CHMMU_BAT1
+		beq-	.MoveFBat1
+		
+		cmplwi	r4,CHMMU_BAT2
+		beq-	.MoveFBat2
+		
+		cmplwi	r4,CHMMU_BAT3
+		beq-	.MoveFBat3
+		
+		b	.EndMoveFBat
+		
+.MoveFBat0:	mfibatu	r0,0
+		stw	r0,0(r5)
+		mfibatl	r0,0
+		stw	r0,4(r5)
+		mfdbatu	r0,0
+		stw	r0,8(r5)
+		mfdbatl	r0,0
+		stw	r0,12(r5)
+		b	.EndMoveFBat
+		
+.MoveFBat1:	mfibatu	r0,1
+		stw	r0,0(r5)
+		mfibatl	r0,1
+		stw	r0,4(r5)
+		mfdbatu	r0,1
+		stw	r0,8(r5)
+		mfdbatl	r0,1
+		stw	r0,12(r5)
+		b	.EndMoveFBat
+		
+.MoveFBat2:	mfibatu	r0,2
+		stw	r0,0(r5)
+		mfibatl	r0,2
+		stw	r0,4(r5)
+		mfdbatu	r0,2
+		stw	r0,8(r5)
+		mfdbatl	r0,2
+		stw	r0,12(r5)
+		b	.EndMoveFBat
+		
+.MoveFBat3:	mfibatu	r0,3
+		stw	r0,0(r5)
+		mfibatl	r0,3
+		stw	r0,4(r5)
+		mfdbatu	r0,3
+		stw	r0,8(r5)
+		mfdbatl	r0,3
+		stw	r0,12(r5)
+		
+.EndMoveFBat:	lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtlr	r0
+		
+		blr	
+
+#********************************************************************************************
 
 SetExcHandler:			li	r3,0
 				blr
 RemExcHandler:			blr
 WaitTime:			li	r3,0
-				blr
-ChangeMMU:			blr
 				blr
 FreeAllMem:			blr
 RawDoFmtPPC:			li	r3,0
