@@ -55,7 +55,8 @@ SetExcMMU:
 ClearExcMMU:
 		stw	r4,-8(r1)
 		mfmsr	r4
-		andi.	r4,r4,~(PSL_IR|PSL_DR)@l
+		ori	r4,r4,(PSL_IR|PSL_DR)
+		xori	r4,r4,(PSL_IR|PSL_DR)
 		mtmsr	r4				#Disable MMU
 		isync
 		lwz	r4,-8(r1)
@@ -3719,12 +3720,20 @@ CreateTaskPPC:
  
 		lwz	r3,18720(r2)			#? 
 		stw	r3,64(r20)			#4 bytes at end of BATSTORAGE? 
-		addi	r4,r26,480			#480 in ContextMem 
+		addi	r4,r26,480			#480 in ContextMem (Segment Regs)
  
-		lwz	r3,17652(r2)			#WARP! 
-		lwz	r0,-346(r3) 
-		mtlr	r0 
-		blrl	 
+ 		bl WarpSuper
+ 
+		li	r0,16
+		mtctr	r0
+		li	r3,0
+		subi	r4,r4,4
+.SegCpLoop:	mfsrin	r0,r3
+		stwu	r0,4(r4)
+		addis	r3,r3,4096
+		bdnz+	.SegCpLoop
+ 
+ 		bl WarpUser
  
  		loadreg	r4,TASKATTR_EXITCODE
 		li	r5,0 
@@ -3936,15 +3945,24 @@ CreateTaskPPC:
 		
 		bl ReleaseSemaphorePPC
  
-		lwz	r3,17652(r2)			#WARP! ICACHEINVALL 
-		lwz	r0,-100(r3) 
-		mtlr	r0 
-		blrl	 
- 
-		lwz	r3,17652(r2)			#WARP! 
-		lwz	r0,-52(r3) 
-		mtlr	r0 
-		blrl	 
+ 		bl WarpSuper
+		
+		b	.Mojo4
+.Mojo5:		mfspr	r0,HID0				#Invalidate ICache
+		ori	r0,r0,HID0_ICFI
+		mtspr	HID0,r0
+		xori	r0,r0,HID0_ICFI
+		mtspr	HID0,r0
+		isync	
+		b 	.Mojo6
+.Mojo4:		b 	.Mojo5
+		
+.Mojo6:		bl WarpUser
+  
+#		lwz	r3,17652(r2)			#WARP! #4 (Zero datacache (dcbz))
+#		lwz	r0,-52(r3) 
+#		mtlr	r0 
+#		blrl	 
  
 .WaitAtomic01:	li	r4,Atomic
 		
@@ -3955,7 +3973,7 @@ CreateTaskPPC:
  
 		lwz	r3,TASKPPC_FLAGS(r31)
 		andi.	r0,r3,TASKPPC_SYSTEM
-		bne-	.SystemTask			#Yes -> c684 
+		bne-	.SystemTask			#Yes -> Skip next 
  
 		lwz	r5,IdDefTasks(r0)		#Normal Tasks +1
 		addi	r5,r5,1 
