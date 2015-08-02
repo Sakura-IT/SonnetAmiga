@@ -587,6 +587,7 @@ RtnLL	move.l (a7)+,a1
 	move.l IFQPR(a2),a2
 	move.l d0,MN_PPSTRUCT+6*4(a2)
 	move.l #"DONE",MN_IDENTIFIER(a2)
+	move.l MN_PPC(a1),MN_PPC(a2)
 	bra ReUse
 	
 PushMsg	moveq.l #11,d4

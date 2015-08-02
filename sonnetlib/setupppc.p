@@ -1451,9 +1451,28 @@ EInt:		b	.FPUnav
 		bne	.NxtInQ
 		
 		lwz	r4,MN_PPC(r5)
+		
 		li	r3,TS_READY
 		stb	r3,TC_STATE(r4)
-							#PutMsgPPC r5 to currenttask
+		
+		mr	r3,r4
+				
+		lwz	r4,TASKPPC_MSGPORT(r3)				
+		lbz	r6,MP_SIGBIT(r4)
+		li	r8,1
+		slw	r8,r8,r6		
+		addi	r4,r4,MP_MSGLIST						
+		lwz	r0,TC_SIGRECVD(r3)
+		or	r0,r0,r8
+		stw	r0,TC_SIGRECVD(r3)
+				
+		addi	r4,r4,4				#PutMsg r5 to currenttask
+		lwz	r3,4(r4)			#AddTailPPC
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
+									
 		b	.NxtInQ
 		
 .MsgTPPC:	la	r4,NewTasks(r0)

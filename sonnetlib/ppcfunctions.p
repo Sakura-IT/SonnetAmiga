@@ -368,7 +368,7 @@ AllocVecPPC:	BUILDSTACKPPC
 		li	r5,_LVOAllocMem
 			
 		bl 	Run68KLowLevel
-		
+				
 		mr.	r4,r3
 		beq	.AllocErr
 		
@@ -1919,6 +1919,7 @@ WaitPortPPC:
 .IntListEmpty5:	mr	r3,r27
 		lwz	r5,MP_MSGLIST(r31)
 		lwz	r4,LH_HEAD(r5)
+						
 		mr.	r4,r4
 		beq+	.NoMessage
 		mr	r3,r5
@@ -2040,6 +2041,7 @@ PutXMsgPPC:
 #
 #********************************************************************************************
 
+
 WaitFor68K:	
 		BUILDSTACKPPC
 
@@ -2049,20 +2051,30 @@ WaitFor68K:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 
-		mr	r31,r4
-				
-		lwz	r3,RunningTask(r0)
-		li	r4,TS_CHANGING
-		stb	r4,TC_STATE(r3)		
-		
-		bl 	CauseInterrupt			#Set task in wait status
-		
-#		get new msg in r30
+		mr	r31,r4	
 
-		mr	r27,r30		
+.WasNoMsg:	lwz	r4,RunningTask(r0)
+		lwz	r4,TASKPPC_MSGPORT(r4)		
+		
+		bl WaitPortPPC		
+							
+.WasNoDone:	lwz	r4,RunningTask(r0)
+		lwz	r4,TASKPPC_MSGPORT(r4)
+		
+		bl GetMsgPPC
+				
+		mr	r30,r3
+		mr.	r27,r30
+		
+		beq	.WasNoMsg
+		
+		loadreg	r4,"DONE"
+		lwz	r29,MN_IDENTIFIER(r30)
+		cmpw	r4,r29
+		bne	.WasNoDone
 		
 		mfctr	r29
-		bl	WarpSuper
+		bl WarpSuper
 		
 		li	r28,6
 		mtctr	r28
@@ -2070,7 +2082,7 @@ WaitFor68K:
 		addi	r27,r27,L1_CACHE_LINE_SIZE
 		bdnz	.PPInvalid
 		
-		bl	WarpUser
+		bl WarpUser
 
 		subi	r4,r31,4
 		addi	r29,r30,MN_PPSTRUCT-4		#r30 = new msg
@@ -2121,7 +2133,7 @@ Run68K:
 		stwu	r25,-4(r13)
 		stwu	r24,-4(r13)
 		stwu	r23,-4(r13)
-		
+				
 		mr	r31,r4
 		
 		mfctr	r25
@@ -2189,7 +2201,7 @@ Run68K:
 		stwbrx	r23,r24,r3			#triggers Interrupt
 
 		mr	r4,r29
-		
+						
 		bl 	WaitFor68K
 		
 		mtctr	r25
@@ -5571,7 +5583,7 @@ WaitPPC:
 .WaitForRun:	lbz	r0,TC_STATE(r31)
 		cmplwi	r0,TS_RUN
 		bne+	.WaitForRun
-
+		
 .WaitPPCAtom2:	li	r4,Atomic
 
 		bl AtomicTest
@@ -5580,11 +5592,12 @@ WaitPPC:
 		beq+	.WaitPPCAtom2
 		
 		lwz	r28,TC_SIGWAIT(r31)
+		
 		b	.RecheckSig
 
 .GotSignals:	xor	r6,r5,r6
 		stw	r6,TC_SIGRECVD(r31)
-
+				
 		li	r4,Atomic
 		
 		bl AtomicDone
@@ -5721,7 +5734,7 @@ Run68KLowLevel:
 		lwz	r30,0(r30)
 
 		subi	r5,r30,4
-		
+				
 		li	r6,48
 		li	r7,0
 		mtctr	r6
@@ -5743,27 +5756,29 @@ Run68KLowLevel:
 		lwz	r4,MCTask(r0)
 		la	r4,pr_MsgPort(r4)
 		stw	r4,MN_MCTASK(r30)
+		lwz	r5,RunningTask(r0)
+		stw	r5,MN_PPC(r30)
 				
 		sync
-		
+
 		mr	r24,r30
 		li	r31,6					#MsgLen/Cache_Line
 		mtctr	r31
 .FlushMsg2:	dcbf	r0,r24
 		addi	r24,r24,L1_CACHE_LINE_SIZE
-		bdnz	.FlushMsg2
+		bdnz+	.FlushMsg2
 		
 		lis	r3,EUMB
 		li	r24,OPHPR
 		lwbrx	r31,r24,r3		
-		stw	r30,0(r31)		
+		stw	r30,0(r31)						
 		addi	r23,r31,4
 		loadreg	r4,0xbfff
-		and	r23,r23,r4				#Keep it 8000-BFFE
+		and	r23,r23,r4				#Keep it 8000-BFFE		
 		stwbrx	r23,r24,r3				#triggers Interrupt
-		
-		mr	r4,r30		
 
+		mr	r4,r30		
+		
 		bl	WaitFor68K
 		
 		mr	r3,r4					# return d0 - See WaitFor68K
@@ -6596,7 +6611,342 @@ MoveFromBAT:
 		addi	r13,r13,4
 		mtlr	r0
 		
-		blr	
+		blr
+		
+#********************************************************************************************
+#
+#	void FreeAllMem(void) // 
+#
+#********************************************************************************************		
+
+FreeAllMem:	blr
+		BUILDSTACKPPC
+
+		lwz	r4,MemSem(r0)
+		
+		bl ObtainSemaphorePPC
+
+		lwz	r3,RunningTask(r0)
+
+		bl	.DoFree
+
+		lwz	r4,MemSem(r0)
+
+		bl ReleaseSemaphorePPC
+
+		DSTRYSTACKPPC
+
+		blr
+		
+.DoFree:	stw	r13,-4(r1)			#From FreeAllMem
+		mflr	r0
+		stw	r0,8(r1)
+		stwu	r1,-48(r1)
+		lwz	r3,TASKPPC_TASKPOOLS(r3)
+		b	.NextPool
+
+.PListNotEmpty:	lwz	r5,0(r3)
+		lwz	r4,4(r3)
+		stw	r5,0(r4)
+		lwz	r5,4(r3)
+		lwz	r4,0(r3)
+		stw	r5,4(r4)
+		bl	.GotPoolMem
+
+		mr	r3,r13
+.NextPool:	lwz	r13,0(r3)
+		cmplwi	r13,0
+		bne+	.PListNotEmpty
+		addi	r1,r1,48
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r13,-4(r1)
+		blr
+
+.GotPoolMem:	stw	r16,-4(r1)
+		stw	r15,-8(r1)
+		stw	r14,-12(r1)
+		stw	r13,-16(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mr	r15,r3
+		stwu	r1,-64(r1)
+		cmplwi	r15,0
+		beq-	.GotExit
+		
+		lwz	r13,36(r15)			#Pool
+		lwz	r14,24(r15)			#Pool
+		lwz	r3,8(r15)			#Pool?
+		andi.	r3,r3,1
+		bne-	.Unknown1
+		
+		lwz	r4,0(r15)
+		lwz	r3,4(r15)
+		stw	r4,0(r3)
+		lwz	r4,4(r15)
+		lwz	r3,0(r15)
+		stw	r4,4(r3)
+		b	.Unknown1
+
+.UnknownLoop1:	lwz	r4,8(r13)
+		mr	r3,r13
+		
+		bl	Support1
+		
+		lwz	r4,8(r13)			#Len
+		mr	r3,r13				#Block
+		
+		bl Run68KLowLevel
+		
+		
+		mr	r13,r16
+.Unknown1:	lwz	r16,0(r13)
+		cmplwi	r16,0
+		bne+	.UnknownLoop1
+		b	.Unknown2
+
+.UnknownLoop2:	lwz	r4,16(r15)
+		mr	r3,r14
+		
+		bl	Support1
+		
+		lwz	r4,16(r15)
+		mr	r3,r14
+		
+		bl Run68KLowLevel	
+		
+		mr	r14,r13
+.Unknown2:	lwz	r13,0(r14)
+		cmplwi	r13,0
+		bne+	.UnknownLoop2
+		
+		mr	r3,r15
+		li	r4,48
+
+		bl Run68KLowLevel
+
+.GotExit:	addi	r1,r1,64
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r16,-4(r1)
+		lwz	r15,-8(r1)
+		lwz	r14,-12(r1)
+		lwz	r13,-16(r1)
+		blr
+		
+#********************************************************************************************		
+
+Support1:	
+		BUILDSTACKPPC					#3rd jump from FreeVecPPC 7380
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
+		stwu	r25,-4(r13)
+		stwu	r24,-4(r13)
+
+		lbz	r6,18736(r2)			#MemFlag TLB?
+		mr.	r6,r6
+		beq-	.ExitSupp
+
+		mr	r5,r3
+		add	r6,r5,r4
+		lwz	r4,17748(r2)
+		lis	r0,0xffff
+		ori	r0,r0,0xf000
+		addi	r5,r5,0x0fff
+		and	r5,r5,r0
+		and	r6,r6,r0
+		cmpw	r5,r6
+		beq-	.ExitSupp
+
+		li	r7,2
+		li	r8,0
+		li	r9,31
+		lwz	r10,17744(r2)
+		mr	r31,r5
+		mr	r30,r6
+
+		bl WarpSuper
+		bl Warp43
+		bl WarpUser
+
+		lwz	r3,15728(r2)
+		lwz	r25,410(r3)			#Base+410
+.NextSupp:	lwz	r24,0(r25)
+		mr.	r24,r24
+		beq-	.ExitSupp
+
+		lwz	r4,8(r25)
+		mr	r5,r31
+		mr	r6,r30
+		li	r7,2
+		li	r8,0
+		li	r9,31
+		lwz	r10,17744(r2)
+
+		bl WarpSuper
+		bl Warp43
+		bl WarpUser
+
+		mr	r25,r24
+		b	.NextSupp
+
+.ExitSupp:	lwz	r24,0(r13)
+		lwz	r25,4(r13)
+		lwz	r26,8(r13)
+		lwz	r27,12(r13)
+		lwz	r28,16(r13)
+		lwz	r29,20(r13)
+		lwz	r30,24(r13)
+		lwz	r31,28(r13)
+		addi	r13,r13,32
+
+		DSTRYSTACKPPC
+		
+		blr
+		
+#********************************************************************************************
+		
+Warp43:
+		mflr	r0
+		stwu	r0,-4(r13)
+		subi	r0,r10,1
+		rlwinm	r0,r0,16,16,31
+		rlwimi	r4,r0,0,23,31
+		bl	.ySupport
+		lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtlr	r0
+		blr
+
+.ySupport:	mflr	r0
+		stwu	r0,-4(r13)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		mfmsr	r29
+		ori	r0,r29,48
+		xori	r0,r0,48
+		mtmsr	r0
+		
+		sync	
+		isync	
+		
+		li	r0,64
+		mtctr	r0
+		li	r10,0
+		
+.TLBLoop:	tlbie	r10
+		addi	r10,r10,4096
+		bdnz+	.TLBLoop
+		
+		sub	r0,r6,r5
+		rlwinm	r0,r0,20,12,31
+		mtctr	r0
+		mr	r30,r9
+		lis	r9,-4096			#Change to hex
+		ori	r9,r9,0
+		mr	r10,r7
+		mr	r11,r8
+		
+.BigLoop1:	mfctr	r0
+		stwu	r0,-4(r13)
+		and	r8,r9,r5
+		mfsrin	r6,r8
+		rlwinm	r12,r6,7,0,24
+		oris	r12,r12,32768
+		rlwimi	r12,r5,10,26,31
+		ori	r31,r12,64
+		
+		bl	.xSupport
+		
+		subi	r3,r3,8
+		subi	r6,r6,8
+		li	r0,8
+		mtctr	r0
+		
+.UnknownLoop3:	lwzu	r0,8(r6)
+		cmpw	r0,r12
+		bdnzf+	2,.UnknownLoop3
+		
+		beq-	.Unknown4
+		
+		li	r0,8
+		mtctr	r0
+		
+.UnknownLoop4:	lwzu	r0,8(r3)
+		cmpw	r0,r31
+		bdnzf+	2,.UnknownLoop4
+		
+		mr	r6,r3
+		bne-	.Unknown5
+		
+.Unknown4:	lwz	r3,4(r6)
+		rlwinm	r0,r3,29,28,31
+		andc	r0,r0,r30
+		and	r8,r11,r30
+		or	r8,r8,r0
+		rlwimi	r3,r8,3,25,28
+		cmplwi	r10,4
+		beq-	.Unknown6
+		
+		rlwimi	r3,r10,0,30,31
+.Unknown6:	stw	r3,4(r6)
+.Unknown5:	addi	r5,r5,4096
+		lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtctr	r0
+		bdnz+	.BigLoop1
+		
+		mtmsr	r29
+		sync	
+		isync	
+		
+		lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
+		lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtlr	r0
+		blr
+
+.xSupport:	mflr	r0
+		stwu	r0,-4(r13)
+		stwu	r8,-4(r13)
+		stwu	r7,-4(r13)
+		stwu	r5,-4(r13)
+		rlwinm	r0,r5,20,16,31
+		xor	r5,r6,r0
+		not	r6,r5
+		rlwinm	r7,r5,22,10,31
+		rlwinm	r8,r6,22,10,31
+		and	r7,r7,r4
+		and	r8,r8,r4
+		rlwinm	r0,r4,16,16,31
+		rlwinm	r3,r4,16,16,31
+		or	r7,r7,r0
+		or	r8,r8,r3
+		rlwinm	r0,r4,0,0,6
+		mr	r3,r0
+		rlwimi	r0,r7,16,7,15
+		rlwimi	r3,r8,16,7,15
+		rlwimi	r0,r5,6,16,25
+		rlwimi	r3,r6,6,16,25
+		mr	r6,r0
+		lwz	r5,0(r13)
+		lwz	r7,4(r13)
+		lwz	r8,8(r13)
+		addi	r13,r13,12
+		lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtlr	r0
+		
+		blr
 
 #********************************************************************************************
 
@@ -6605,7 +6955,6 @@ SetExcHandler:			li	r3,0
 RemExcHandler:			blr
 WaitTime:			li	r3,0
 				blr
-FreeAllMem:			blr
 RawDoFmtPPC:			li	r3,0
 				blr
 
