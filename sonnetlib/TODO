@@ -1,11 +1,11 @@
-The TO-DO list (28MAY15):
+The TO-DO list (04AUG15):
 
-PPC -> 68K Communication	90%	PutXMsg/WaitForPPC need rewrite
-68K -> PPC Communication	90%	PutXMsgPPC/WaitFor68K need rewrite
+PPC -> 68K Communication	99%	PutXMsg needs rewrite
+68K -> PPC Communication	99%	PutXMsgPPC needs rewrite
 Scheduler			50%	Multitasking is implemented and working in a simple preemptive round-robin system
 MMU Table Setup			00%	Needs to be rewritten to tables so WarpOS can use the BATs
-PPC -> PPC Communication	25%	The likes of PutMsgPPC etc. still needs to be written
-Library Functionality		75%	25% of the functions not working or not implemented. Mostly internal Msg, task and debug related
+PPC -> PPC Communication	99%	Needs debugging
+Library Functionality		90%	10% of the functions not working or not implemented. Mostly memory and debug related
 Cache Coherency			80%	No coherency after data loaded by 68K (loadseg(), read()). L2 Cache is the culprit
 WarpOS Compatibility		25%	Simple programs work after patching. Patching will be mandetory or recompilation.
 AmigaOS Patcher			00%	To catch certain output of functions through Run68K() and copy them to sonnet space.
