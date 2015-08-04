@@ -225,7 +225,20 @@ EnqueuePPC:
 #********************************************************************************************
 
 FindNamePPC:
-		lwz	r3,0(r4)
+	
+		rlwinm.	r3,r4,2,31,31
+		beq+	.ZorroIIISpace
+		
+		lwz	r4,SysBase(r0)
+		li	r5,_LVOFindName
+		mr	r6,r4					#a0
+		mr	r7,r5					#a1
+		
+		bl	Run68KLowLevel
+		
+		b	.E4
+		
+.ZorroIIISpace:	lwz	r3,0(r4)
 		mr.	r3,r3
 		beq-	.E4
 		subi	r8,r5,1

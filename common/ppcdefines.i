@@ -93,6 +93,7 @@
 
 .set _LVOAllocMem,		-198
 .set _LVOFreeMem,		-210
+.set _LVOFindName,		-276
 .set _LVOSignal,		-306
 .set _LVOPutMsg,		-366
 
