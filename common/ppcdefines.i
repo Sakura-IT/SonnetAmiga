@@ -468,6 +468,14 @@
 .set MN_ARG1,180
 .set MN_ARG0,184
 .set MN_MCTASK,188
+.set MH_ATTRIBUTES,14			# characteristics of this region
+.set MH_FIRST,16			# first free region
+.set MH_LOWER,20			# lower memory bound
+.set MH_UPPER,24			# upper memory bound+1
+.set MH_FREE,28				# number of free bytes
+.set MC_NEXT,0
+.set MC_BYTES,4
+.set MH_SIZE,32
 .set PP_CODE,MN_PPSTRUCT
 .set PP_OFFSET,PP_CODE+4
 .set PP_REGS,PP_CODE+20
@@ -481,6 +489,7 @@
 .set LN_TYPE,8
 .set LN_PRI,9
 .set LN_NAME,10
+.set LN_SIZE,14
 .set ATTEMPT_SUCCESS,-1
 .set ATTEMPT_FAILURE,0
 .set CMP_EQUAL,0
