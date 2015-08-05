@@ -5335,7 +5335,7 @@ CreatePoolPPC:
 		li	r31,0
 		
 		cmpw	r5,r6
-		blt	.TooSmall
+		blt	.NoCreatePool
 		
 		addi	r30,r5,31
 		loadreg r29,0xffffffe0
@@ -5345,14 +5345,13 @@ CreatePoolPPC:
 		mr	r28,r6
 		
 		li	r4,POOL_SIZE				#struct Pool
-#		mr	r5,r29
-		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
+		mr	r5,r29
 		li	r6,32
 		
 		bl AllocVecPPC
 		
 		mr.	r31,r3
-		beq-	.TooSmall
+		beq-	.NoCreatePool
 		
 		la	r4,POOL_PUDDLELIST(r31)
 		
@@ -5366,7 +5365,7 @@ CreatePoolPPC:
 		stw	r30,POOL_PUDDLESIZE(r31)
 		stw	r28,POOL_TRESHSIZE(r31)
 		
-.TooSmall:	mr	r3,r31
+.NoCreatePool:	mr	r3,r31
 		
 		lwz	r28,0(r13)
 		lwz	r29,4(r13)
@@ -5380,7 +5379,7 @@ CreatePoolPPC:
 		
 #********************************************************************************************
 #
-#	void DeletePoolPPC(poolheader) // r4
+#	void DeletePoolPPC(poolheader) // r4		BROKEN
 #
 #********************************************************************************************
 
@@ -5399,7 +5398,7 @@ DeletePoolPPC:
 		mr.	r4,r3
 		beq	.NextBlock	
 		
-		bl FreeVecPPC
+		bl FreeVecPPC				#Should be DeallocatePPC (BROKEN)
 		
 		b	.NextPuddle
 	
@@ -5425,7 +5424,7 @@ DeletePoolPPC:
 		
 #********************************************************************************************
 #
-#	memory = AllocPooledPPC(poolheader, size) // r3=r4,r5
+#	memory = AllocPooledPPC(poolheader, size) // r3=r4,r5 		TO BE CHECKED
 #
 #********************************************************************************************
 
@@ -5435,6 +5434,7 @@ AllocPooledPPC:
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
 		
 		mr	r31,r4
 		mr	r30,r5
@@ -5449,7 +5449,7 @@ AllocPooledPPC:
 		cmpw	r29,r30
 		ble	.DoPuddle
 		
-		addi	r4,r30,8			#Make room for MLN
+		addi	r4,r30,32			#Make room for Node, 32 aligned (CHECK)
 		lwz	r5,POOL_REQUIREMENTS(r31)
 		li	r6,32
 		
@@ -5457,49 +5457,76 @@ AllocPooledPPC:
 		
 		mr.	r5,r3
 		
-		beq-	.NoPooledMem
+		beq-	.ExitPooledMem
 				
 		li	r0,0
 		stw	r0,0(r5)
 		stw	r0,4(r5)		
 		mr	r29,r5		
 		la	r4,POOL_BLOCKLIST(r31)
+				
+		bl AddHeadPPC		
 		
+		addi	r3,r3,32			#Return memory (CHECK)
+
+		b	.ExitPooledMem
 		
-		bl AddHeadPPC
+.DoPuddle:	la	r4,POOL_PUDDLELIST(r31)
+.NextMH:	lwz	r5,LN_SUCC(r4)
+		mr.	r29,r5
+		beq	.MakeHeader
 		
+.LoopBack:	mr	r4,r5
+		mr	r5,r30
 		
-		la	r3,8(r29)			#Point beyond Minimal List Node
+		bl AllocatePPC				#mh, size
 		
-		
-		b	.NoPooledMem
-		
-.DoPuddle:	addi	r4,r30,8			#STUB (same as block at the moment)
-		lwz	r5,POOL_REQUIREMENTS(r31)
+		mr.	r3,r3
+		bne	.ExitPooledMem
+
+		mr	r4,r29
+		b	.NextMH
+
+.MakeHeader:	lwz	r4,POOL_PUDDLESIZE(r31)
+		addi	r4,r4,MH_SIZE
+		lwz	r5,POOL_REQUIREMENTS(r3)
 		li	r6,32
 		
 		bl AllocVecPPC
 		
 		mr.	r5,r3
-		beq-	.NoPooledMem
-		li	r0,0
-		stw	r0,0(r5)
-		stw	r0,4(r5)
-		mr	r29,r5
+		
+		beq-	.ExitPooledMem
+		
+		addi	r4,r5,MH_SIZE
+		stw	r4,MH_FIRST(r5)
+		stw	r4,MH_LOWER(r5)
+		li	r3,0
+		stw	r3,MC_NEXT(r4)
+		lwz	r3,POOL_PUDDLESIZE(r31)
+		stw	r3,MC_BYTES(r4)
+		addi	r4,r4,r3		
+		stw	r3,MH_FREE(r5)
+		stw	r4,MH_UPPER(r5)
+		
 		la	r4,POOL_PUDDLELIST(r31)
+		mr	r28,r5
 		
 		bl AddHeadPPC
+
+		mr	r5,r28
+
+		b	.LoopBack
 		
-		la	r3,8(r29)
-		
-.NoPooledMem:	lwz	r4,MemSem(r0)
+.ExitPooledMem:	lwz	r4,MemSem(r0)
 		
 		bl ReleaseSemaphorePPC
 		
-		lwz	r29,0(r13)
-		lwz	r30,4(r13)
-		lwz	r31,8(r13)
-		addi	r13,r13,12
+		lwz	r28,0(r13)
+		lwz	r29,4(r13)
+		lwz	r30,8(r13)
+		lwz	r31,12(r13)
+		addi	r13,r13,16
 		
 		DSTRYSTACKPPC
 		
@@ -5507,7 +5534,99 @@ AllocPooledPPC:
 		
 #********************************************************************************************
 #
-#	void FreePooledPPC(poolheader, memory) // r4,r5
+#	support: memory = AllocatePPC(Memheader, byteSize) // r3=r4,r5
+#
+#********************************************************************************************
+
+AllocatePPC:
+		BUILDSTACKPPC
+		
+		stwu	r31,-4(r13)		
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		
+		mr.	r31,r5
+		beq-	.ExitAlloc
+		
+		mr	r30,r4
+		addi	r31,r31,31			#Check: Original was 7
+		loadreg	r29,-31
+		and	r31,r31,r29
+		
+		lwz	r29,MH_FREE(r30)
+		cmpw	r31,29
+		ble	.EnoughRoom
+		
+		li	r3,0
+		
+		b	.ExitAlloc
+		
+.EnoughRoom:	la	r4,MH_FIRST(r30)
+				
+.NextChunk:	lwz	r5,MC_NEXT(r4)
+		mr.	r3,r5
+		
+		beq-	.ExitAlloc
+		
+		lwz	r29,MC_BYTES(r5)
+		cmpw	r31,r29
+		bgt	.TooBeaucoup
+		bne	.NotPerfect				
+
+		lwz	r29,MC_NEXT(r5)
+		stw	r29,MC_NEXT(r4)		
+		mr	r3,r29
+		
+		b	.SetFree
+
+.NotPerfect:	add	r28,r5,r31
+		lwz	r29,MC_NEXT(r5)
+		stw	r29,MC_NEXT(r28)
+		lwz	r29,MC_BYTES(r5)
+		sub	r29,r29,r31
+		stw	r29,MC_BYTES(r28)
+		stw	r28,MC_NEXT(r4)
+		mr	r3,r28
+		
+		b	.SetFree
+		
+.TooBeaucoup:	lwz	r4,MC_NEXT(r4)
+
+		bne	.NextChunk
+
+.SetFree:	lwz	r29,MH_FREE(r30)
+		sub	r29,r29,r31
+		stw	r29,MH_FREE(r30)
+		
+.ExitAlloc:	lwz	r28,0(r13)
+		lwz	r29,4(r13)
+		lwz	r30,8(r13)
+		lwz	r31,12(r13)
+		addi	r13,r13,16
+		
+		DSTRYSTACKPPC
+		
+		blr
+		
+#********************************************************************************************
+#
+#	support: void DeallocatePPC(Memheader, memoryBlock, byteSize) // r3=r4,r5,r6
+#
+#********************************************************************************************
+
+DeallocatePPC:
+		BUILDSTACKPPC
+		
+		nop
+		
+		DSTRYSTACKPPC
+		
+		blr
+
+#********************************************************************************************
+#
+#	void FreePooledPPC(poolheader, memory) // r4,r5		BROKEN
 #
 #********************************************************************************************
 
@@ -5530,13 +5649,13 @@ FreePooledPPC:
 		cmpw	r29,r30
 		ble	.DoFrPuddle
 		
-		subi	r4,r30,8
+		subi	r4,r30,LN_SIZE
 		
-		bl RemovePPC
+		bl RemovePPC				#No actual freeing yet (BROKEN)
 
 		b	.FrPooledMem
 		
-.DoFrPuddle:	subi	r4,r30,8			#STUB (same as block at the moment)
+.DoFrPuddle:	subi	r4,r30,LN_SIZE			#BROKEN (same as block at the moment)
 
 		bl RemovePPC				
 		
