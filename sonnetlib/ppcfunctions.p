@@ -5611,18 +5611,108 @@ AllocatePPC:
 		
 #********************************************************************************************
 #
-#	support: void DeallocatePPC(Memheader, memoryBlock, byteSize) // r3=r4,r5,r6
+#	support: void DeallocatePPC(Memheader, memoryBlock, byteSize) // r3=r4,r5,r6(a0,a1,d0)
 #
 #********************************************************************************************
 
 DeallocatePPC:
 		BUILDSTACKPPC
 		
-		nop
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		
+		mr.	r31,r6
+		
+		beq 	.ExitDealloc
+		
+		mr	r29,r4
+		
+		loadreg	r28,-32
+		and	r30,r5,r28
+		sub	r5,r30,r6		#check
+		add	r6,r5,r31
+		addi	r6,r6,31
+		and.	r6,r6,r28
+		
+		beq	.ExitDealloc
+		
+		la	r28,MH_FIRST(r29)
+		lwz	r27,MC_NEXT(r28)
+		mr.	r27,r27
+		
+		beq	.LinkNewMC
+		
+.NextMemChunk:	cmpw	r27,r30
+		
+		bgt	.CorrectMC		#bcs -> bgt check
+		beq	.GuruTime
+		
+		lwz	r27,MC_NEXT(r27)
+		
+		bne	.NextMemChunk
+		
+.CorrectMC:	la	r28,MH_FIRST(r29)
+		cmpw	r27,r29
+		
+		beq	.LinkNewMC
+		
+		lwz	r28,MC_BYTES(r27)
+		add	r28,r28,r27
+		cmpw	r30,r28
+		
+		beq	.JoinThem
+		bgt	.GuruTime		#bgt correct?
+		
+.LinkNewMC:	lwz	r28,MC_NEXT(r27)
+		stw	r28,MC_NEXT(r30)
+		stw	r30,MC_NEXT(r27)		
+		stw	r6,MC_BYTES(r30)
+		
+		b	.DoNextMC
+		
+.JoinThem:	lwz	r28,MC_BYTES(r30)
+		add	r28,r28,r6
+		stw	r28,MC_BYTES(r30)
+				
+.DoNextMC:	lwz	r5,MC_NEXT(r30)
+		mr.	r5,r5
+		
+		beq	.UpdateFree
+		
+		lwz	r4,MC_BYTES(r30)
+		add	r4,r4,r30
+		cmpw	r5,r4
+		
+		bgt	.GuruTime		#bgt check
+		bne	.UpdateFree
+		
+		lwz	r4,MC_NEXT(r5)
+		lwz	r27,MC_NEXT(r4)
+		stw	r27,MC_NEXT(r5)
+		lwz	r27,MC_BYTES(r4)
+		lwz	r28,MC_BYTES(r5)
+		add	r28,r28,r27
+		stw	r28,MC_BYTES(r5)
+				
+.UpdateFree:	lwz	r5,MH_FREE(r29)
+		add	r5,r5,r6
+		stw	r5,MH_FREE(r29)		
+		
+.ExitDealloc:	lwz	r27,0(r13)
+		lwz	r28,4(r13)
+		lwz	r29,8(r13)
+		lwz	r30,12(r13)
+		lwz	r31,16(r13)
+		addi	r13,r13,20
 		
 		DSTRYSTACKPPC
 		
 		blr
+
+.GuruTime:	b	.GuruTime		#STUB
 
 #********************************************************************************************
 #
