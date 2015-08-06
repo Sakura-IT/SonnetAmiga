@@ -5379,7 +5379,7 @@ CreatePoolPPC:
 		
 #********************************************************************************************
 #
-#	void DeletePoolPPC(poolheader) // r4		BROKEN
+#	void DeletePoolPPC(poolheader) // r4
 #
 #********************************************************************************************
 
@@ -5391,6 +5391,10 @@ DeletePoolPPC:
 		mr.	r31,r4
 		beq-	.NoHeader
 		
+		lwz	r4,MemSem(r0)
+		
+		bl ObtainSemaphorePPC
+		
 .NextPuddle:	la	r4,POOL_PUDDLELIST(r31)
 		
 		bl RemHeadPPC
@@ -5398,7 +5402,7 @@ DeletePoolPPC:
 		mr.	r4,r3
 		beq	.NextBlock	
 		
-		bl FreeVecPPC				#Should be DeallocatePPC (BROKEN)
+		bl FreeVecPPC
 		
 		b	.NextPuddle
 	
@@ -5414,6 +5418,10 @@ DeletePoolPPC:
 .AllFreed:	mr	r4,r31
 		
 		bl FreeVecPPC
+		
+		lwz	r4,MemSem(r0)
+		
+		bl ReleaseSemaphorePPC
 		
 .NoHeader:	lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -5442,7 +5450,6 @@ AllocPooledPPC:
 		lwz	r4,MemSem(r0)
 		
 		bl ObtainSemaphorePPC
-		
 		
 		lwz	r29,POOL_TRESHSIZE(r31)
 		
@@ -5716,7 +5723,7 @@ DeallocatePPC:
 
 #********************************************************************************************
 #
-#	void FreePooledPPC(poolheader, memory) // r4,r5		BROKEN
+#	void FreePooledPPC(poolheader, memory, size) // r4,r5,r6
 #
 #********************************************************************************************
 
@@ -5726,9 +5733,11 @@ FreePooledPPC:
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
 		
 		mr	r31,r4
 		mr	r30,r5
+		mr	r28,r6
 		
 		lwz	r4,MemSem(r0)
 		
@@ -5737,26 +5746,67 @@ FreePooledPPC:
 		lwz	r29,POOL_TRESHSIZE(r31)
 		
 		cmpw	r29,r30
+		
 		ble	.DoFrPuddle
 		
-		subi	r4,r30,LN_SIZE
+		mr	r4,r30
 		
-		bl RemovePPC				#No actual freeing yet (BROKEN)
+		bl RemovePPC
+		
+		subi	r4,r30,32
+		
+		bl FreeVecPPC
 
-		b	.FrPooledMem
+		b	.ExitFreePool
 		
-.DoFrPuddle:	subi	r4,r30,LN_SIZE			#BROKEN (same as block at the moment)
+.DoFrPuddle:	lwz	r29,POOL_PUDDLELIST(r31)
+		lwz	r29,MLH_HEAD(r29)
+		
+.NextMHNode:	lwz	r4,MH_LOWER(r29)
+		cmpw	r4,r30
 
-		bl RemovePPC				
+		blt	.OutOfBounds
 		
-.FrPooledMem:	lwz	r4,MemSem(r0)
+		lwz	r4,MH_UPPER(r29)
+		cmpw	r4,r30
+
+		bge	.OutOfBounds
+		
+		b	.CorrectMHFnd
+		
+.OutOfBounds:	lwz	r29,LN_SUCC(r29)
+
+		b	.NextMHNode
+		
+.CorrectMHFnd:	mr	r4,r29
+		mr	r5,r30
+		mr	r6,r28
+		
+		bl DeallocatePPC
+		
+		lwz	r4,MH_FREE(r29)
+		lwz	r5,POOL_PUDDLESIZE(r31)
+		cmpw	r4,r5
+		
+		bne	.ExitFreePool
+		
+		mr	r4,r29
+		
+		bl RemovePPC
+		
+		subi	r4,r29,32
+		
+		bl FreeVecPPC		
+		
+.ExitFreePool:	lwz	r4,MemSem(r0)
 		
 		bl ReleaseSemaphorePPC
 		
-		lwz	r29,0(r13)
-		lwz	r30,4(r13)
-		lwz	r31,8(r13)
-		addi	r13,r13,12
+		lwz	r28,0(r13)
+		lwz	r29,4(r13)
+		lwz	r30,8(r13)
+		lwz	r31,12(r13)
+		addi	r13,r13,16
 		
 		DSTRYSTACKPPC
 		
