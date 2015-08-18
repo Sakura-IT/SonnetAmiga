@@ -5334,7 +5334,7 @@ CreatePoolPPC:
 		
 		li	r31,0
 		
-		cmpw	r5,r6
+		cmplw	r5,r6
 		blt	.NoCreatePool
 		
 		addi	r30,r5,31
@@ -5453,7 +5453,7 @@ AllocPooledPPC:
 		
 		lwz	r29,POOL_TRESHSIZE(r31)
 		
-		cmpw	r29,r30
+		cmplw	r29,r30
 		ble	.DoPuddle
 		
 		addi	r4,r30,32			#Make room for Node, 32 aligned (CHECK)
@@ -5562,7 +5562,7 @@ AllocatePPC:
 		and	r31,r31,r29
 		
 		lwz	r29,MH_FREE(r30)
-		cmpw	r31,29
+		cmplw	r31,29
 		ble	.EnoughRoom
 		
 		li	r3,0
@@ -5577,7 +5577,7 @@ AllocatePPC:
 		beq-	.ExitAlloc
 		
 		lwz	r29,MC_BYTES(r5)
-		cmpw	r31,r29
+		cmplw	r31,r29
 		bgt	.TooBeaucoup
 		bne	.NotPerfect				
 
@@ -5652,7 +5652,7 @@ DeallocatePPC:
 		
 		beq	.LinkNewMC
 		
-.NextMemChunk:	cmpw	r27,r30
+.NextMemChunk:	cmplw	r27,r30
 		
 		bgt	.CorrectMC		#bcs -> bgt check
 		beq	.GuruTime
@@ -5668,7 +5668,7 @@ DeallocatePPC:
 		
 		lwz	r28,MC_BYTES(r27)
 		add	r28,r28,r27
-		cmpw	r30,r28
+		cmplw	r30,r28
 		
 		beq	.JoinThem
 		bgt	.GuruTime		#bgt correct?
@@ -5691,7 +5691,7 @@ DeallocatePPC:
 		
 		lwz	r4,MC_BYTES(r30)
 		add	r4,r4,r30
-		cmpw	r5,r4
+		cmplw	r5,r4
 		
 		bgt	.GuruTime		#bgt check
 		bne	.UpdateFree
@@ -5745,7 +5745,7 @@ FreePooledPPC:
 
 		lwz	r29,POOL_TRESHSIZE(r31)
 		
-		cmpw	r29,r30
+		cmplw	r29,r30
 		
 		ble	.DoFrPuddle
 		
@@ -5763,12 +5763,12 @@ FreePooledPPC:
 		lwz	r29,MLH_HEAD(r29)
 		
 .NextMHNode:	lwz	r4,MH_LOWER(r29)
-		cmpw	r4,r30
+		cmplw	r4,r30
 
 		blt	.OutOfBounds
 		
 		lwz	r4,MH_UPPER(r29)
-		cmpw	r4,r30
+		cmplw	r4,r30
 
 		bge	.OutOfBounds
 		
