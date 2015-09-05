@@ -5336,7 +5336,7 @@ CreatePoolPPC:
 		
 		cmplw	r5,r6
 		blt	.NoCreatePool
-		
+	
 		addi	r30,r5,31
 		loadreg r29,0xffffffe0
 		and	r30,r30,r29
@@ -5415,6 +5415,8 @@ DeletePoolPPC:
 		
 		bl FreeVecPPC
 		
+		b	.NextBlock
+		
 .AllFreed:	mr	r4,r31
 		
 		bl FreeVecPPC
@@ -5454,27 +5456,31 @@ AllocPooledPPC:
 		lwz	r29,POOL_TRESHSIZE(r31)
 		
 		cmplw	r29,r30
-		ble	.DoPuddle
+		bge	.DoPuddle
 		
-		addi	r4,r30,32			#Make room for Node, 32 aligned (CHECK)
+		addi	r4,r30,32			#Make room for Node, 32 aligned
 		lwz	r5,POOL_REQUIREMENTS(r31)
 		li	r6,32
 		
 		bl AllocVecPPC
 		
-		mr.	r5,r3
+		mr.	r28,r3
 		
 		beq-	.ExitPooledMem
-				
+		
+		mr	r5,r3				
 		li	r0,0
 		stw	r0,0(r5)
 		stw	r0,4(r5)		
 		mr	r29,r5		
 		la	r4,POOL_BLOCKLIST(r31)
 				
-		bl AddHeadPPC		
+		bl AddHeadPPC
 		
-		addi	r3,r3,32			#Return memory (CHECK)
+		li	r3,NT_MEMORY
+		stb	r3,LN_TYPE(r28)
+		
+		addi	r3,r28,32			#Return memory
 
 		b	.ExitPooledMem
 		
@@ -5508,6 +5514,10 @@ AllocPooledPPC:
 		addi	r4,r5,MH_SIZE
 		stw	r4,MH_FIRST(r5)
 		stw	r4,MH_LOWER(r5)
+		li	r3,NT_MEMORY
+		stb	r3,LN_TYPE(r5)
+		lwz	r3,POOL_REQUIREMENTS(r31)
+		sth	r3,MH_ATTRIBUTES(r5)
 		li	r3,0
 		stw	r3,MC_NEXT(r4)
 		lwz	r3,POOL_PUDDLESIZE(r31)
@@ -5745,14 +5755,14 @@ FreePooledPPC:
 
 		lwz	r29,POOL_TRESHSIZE(r31)
 		
-		cmplw	r29,r30
+		cmplw	r29,r28
 		
-		ble	.DoFrPuddle
+		bge	.DoFrPuddle
 		
-		mr	r4,r30
+		subi	r4,r30,32
 		
 		bl RemovePPC
-		
+
 		subi	r4,r30,32
 		
 		bl FreeVecPPC

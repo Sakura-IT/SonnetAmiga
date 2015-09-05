@@ -484,6 +484,7 @@
 .set NT_MESSAGE,5
 .set NT_FREEMSG,6
 .set NT_REPLYMSG,7
+.set NT_MEMORY,10
 .set LN_SUCC,0
 .set LN_PRED,4
 .set LN_TYPE,8
