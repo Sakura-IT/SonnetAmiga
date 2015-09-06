@@ -5484,13 +5484,17 @@ AllocPooledPPC:
 
 		b	.ExitPooledMem
 		
-.DoPuddle:	lwz	r4,POOL_PUDDLELIST(r31)
-.NextMH:	lwz	r5,LN_SUCC(r4)
-		mr.	r29,r5
+.DoPuddle:	la	r4,POOL_PUDDLELIST(r31)
+		lwz	r29,LH_TAILPRED(r4)
+		cmplw	r4,r9
+		beq	.MakeHeader
+		lwz	r4,LH_HEAD(r4)
+		
+.NextMH:	lwz	r29,LN_SUCC(r4)
+		mr.	r29,r29
 		beq	.MakeHeader
 		
-.LoopBack:	mr	r4,r5
-		mr	r5,r30
+.LoopBack:	mr	r5,r30
 		
 		bl AllocatePPC				#mh, size
 		
@@ -5531,7 +5535,7 @@ AllocPooledPPC:
 		
 		bl AddHeadPPC
 
-		mr	r5,r28
+		mr	r4,r28
 
 		b	.LoopBack
 		
@@ -5563,9 +5567,10 @@ AllocatePPC:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 		
-		mr.	r31,r5
+		mr.	r3,r5
 		beq-	.ExitAlloc
 		
+		mr	r31,r5
 		mr	r30,r4
 		addi	r31,r31,31			#Check: Original was 7
 		loadreg	r29,0xffffffe0
@@ -5593,7 +5598,7 @@ AllocatePPC:
 
 		lwz	r29,MC_NEXT(r5)
 		stw	r29,MC_NEXT(r4)		
-		mr	r3,r29
+		mr	r3,r5
 		
 		b	.SetFree
 
@@ -5609,7 +5614,8 @@ AllocatePPC:
 		b	.SetFree
 		
 .TooBeaucoup:	lwz	r4,MC_NEXT(r4)
-
+		mr.	r4,r4
+		
 		bne	.NextChunk
 		
 		li	r3,0
