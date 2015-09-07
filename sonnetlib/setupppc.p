@@ -1373,6 +1373,8 @@ EInt:		b	.FPUnav
 		mtsprg0	r0
 		mfsrr1	r0
 		mtsprg1	r0
+		mfxer	r0
+		mtsprg3	r0
 
 		BUILDSTACKPPC
 
@@ -1719,6 +1721,8 @@ EInt:		b	.FPUnav
 	
 		DSTRYSTACKPPC
 	
+		mfsprg3	r0
+		mtxer	r0
 		mfsprg1 r0
 		mtsrr1	r0
 		mfsprg0	r0
@@ -1826,6 +1830,8 @@ TestRoutine:	b	.IntReturn
 		stwu	r0,4(r6)
 		mfctr	r0
 		stwu	r0,4(r6)
+		mfsprg3	r0
+		stwu	r0,4(r6)			#xer
 		mfsprg2	r0
 		stwu	r0,4(r6)
 		stwu	r3,4(r6)
@@ -1867,7 +1873,7 @@ TestRoutine:	b	.IntReturn
 		stwu	r29,4(r6)
 		stwu	r30,4(r6)
 		stwu	r31,4(r6)
-		stfdu	f0,8(r6)			#Pad to make align on 8
+		stfdu	f0,4(r6)			#NO Pad to make align on 8
 		stfdu	f1,8(r6)
 		stfdu	f2,8(r6)
 		stfdu	f3,8(r6)
@@ -1913,6 +1919,8 @@ TestRoutine:	b	.IntReturn
 		lwzu	r0,4(r9)
 		mtctr	r0
 		lwzu	r0,4(r9)
+		mtxer	r0
+		lwzu	r0,4(r9)
 		lwzu	r1,4(r9)
 		lwzu	r2,4(r9)
 		lwzu	r3,4(r9)
@@ -1945,7 +1953,7 @@ TestRoutine:	b	.IntReturn
 		lwzu	r29,4(r9)
 		lwzu	r30,4(r9)
 		lwzu	r31,4(r9)
-		lfdu	f0,8(r9)			#Pad to make align on 8
+		lfdu	f0,4(r9)			#NO Pad to make align on 8
 		lfdu	f1,8(r9)
 		lfdu	f2,8(r9)
 		lfdu	f3,8(r9)
@@ -2034,6 +2042,8 @@ TestRoutine:	b	.IntReturn
 		mtsprg0	r0
 		mfsrr1	r0
 		mtsprg1	r0
+		mfxer	r0
+		mtsprg3	r0
 
 		BUILDSTACKPPC
 
