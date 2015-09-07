@@ -5782,15 +5782,19 @@ FreePooledPPC:
 .DoFrPuddle:	lwz	r29,POOL_PUDDLELIST(r31)
 		lwz	r29,MLH_HEAD(r29)
 		
-.NextMHNode:	lwz	r4,MH_LOWER(r29)
+.NextMHNode:	lwz	r4,LN_SUCC(r29)
+		mr.	r4,r4
+		beq	.ExitFreePool			#Needs an error message (GURU?)
+
+		lwz	r4,MH_LOWER(r29)
 		cmplw	r4,r30
 
-		blt	.OutOfBounds
+		bgt	.OutOfBounds
 		
 		lwz	r4,MH_UPPER(r29)
 		cmplw	r4,r30
 
-		bge	.OutOfBounds
+		ble	.OutOfBounds
 		
 		b	.CorrectMHFnd
 		
@@ -5814,7 +5818,7 @@ FreePooledPPC:
 		
 		bl RemovePPC
 		
-		subi	r4,r29,32
+		mr	r4,r29
 		
 		bl FreeVecPPC		
 		
