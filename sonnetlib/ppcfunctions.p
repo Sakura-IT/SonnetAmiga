@@ -5659,7 +5659,7 @@ DeallocatePPC:
 		
 		loadreg	r28,-32
 		and	r30,r5,r28
-		sub	r5,r30,r6		#check
+		sub	r5,r5,r30
 		add	r6,r5,r31
 		addi	r6,r6,31
 		and.	r6,r6,r28
@@ -5670,11 +5670,15 @@ DeallocatePPC:
 		lwz	r27,MC_NEXT(r28)
 		mr.	r27,r27
 		
-		beq	.LinkNewMC
+		bne	.NextMemChunk
+		
+		mr	r27,r28
+		
+		b	.LinkNewMC
 		
 .NextMemChunk:	cmplw	r27,r30
 		
-		bgt	.CorrectMC		#bcs -> bgt check
+		bgt	.CorrectMC
 		beq	.GuruTime
 		
 		lwz	r27,MC_NEXT(r27)
@@ -5691,7 +5695,7 @@ DeallocatePPC:
 		cmplw	r30,r28
 		
 		beq	.JoinThem
-		bgt	.GuruTime		#bgt correct?
+		bgt	.GuruTime			#bgt correct?
 		
 .LinkNewMC:	lwz	r28,MC_NEXT(r27)
 		stw	r28,MC_NEXT(r30)
@@ -5713,7 +5717,7 @@ DeallocatePPC:
 		add	r4,r4,r30
 		cmplw	r5,r4
 		
-		bgt	.GuruTime		#bgt check
+		bgt	.GuruTime			#bgt check
 		bne	.UpdateFree
 		
 		lwz	r4,MC_NEXT(r5)
@@ -5779,7 +5783,7 @@ FreePooledPPC:
 
 		b	.ExitFreePool
 		
-.DoFrPuddle:	lwz	r29,POOL_PUDDLELIST(r31)
+.DoFrPuddle:	la	r29,POOL_PUDDLELIST(r31)
 		lwz	r29,MLH_HEAD(r29)
 		
 .NextMHNode:	lwz	r4,LN_SUCC(r29)
@@ -5802,9 +5806,9 @@ FreePooledPPC:
 
 		b	.NextMHNode
 		
-.CorrectMHFnd:	mr	r4,r29
-		mr	r5,r30
-		mr	r6,r28
+.CorrectMHFnd:	mr	r4,r29				#MH
+		mr	r5,r30				#Block
+		mr	r6,r28				#Size
 		
 		bl DeallocatePPC
 		
