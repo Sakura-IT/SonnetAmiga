@@ -6472,6 +6472,8 @@ PutMsgPPC:
 		li	r0,-1
 		stb	r0,PortInUse(r0)
 
+		li	r4,Atomic
+
 		bl AtomicDone
 
 		bl CauseInterrupt
@@ -7247,12 +7249,159 @@ Warp43:
 		mtlr	r0
 		
 		blr
+		
+#********************************************************************************************
+#
+#	void RemExcHandler(XLock) // r4
+#
+#********************************************************************************************
+
+RemExcHandler:
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+
+		mr.	r4,r4
+		beq-	.NoXLock
+
+		mr	r31,r3
+		mr	r30,r4
+
+.RemExcAtom:	li	r4,Atomic
+
+		bl AtomicTest
+
+		mr.	r3,r3
+		
+		beq+	.RemExcAtom
+
+		addi	r4,r31,382			#In lib base
+		mr	r5,r30
+		lwz	r3,0(r4)
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+
+		li	r4,Atomic
+
+		bl AtomicDone
+
+		bl CauseInterrupt
+
+		lwz	r3,46(r30)
+.MiniLoop:	lwz	r4,26(r3)
+		rlwinm.	r0,r4,28,31,31
+		bne+	.MiniLoop
+
+		mr	r3,r30
+		
+		bl	.FreeAllMem
+
+		mr	r4,r30
+		
+		bl	FreeVecPPC
+
+.NoXLock:	lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
+
+		DSTRYSTACKPPC
+
+		blr
+		
+#********************************************************************************************
+
+.FreeAllMem:	
+		mflr	r0
+		stwu	r0,-4(r13)
+		stwu	r31,-4(r13)
+		mr	r31,r3
+		
+		lwz	r4,50(r31)
+		mr.	r4,r4
+		beq-	.NoMem50
+
+		bl	FreeVecPPC
+
+.NoMem50:	lwz	r4,54(r31)
+		mr.	r4,r4
+		beq-	.NoMem54
+
+		bl	FreeVecPPC
+
+.NoMem54:	lwz	r4,58(r31)
+		mr.	r4,r4
+		beq-	.NoMem58
+
+		bl	FreeVecPPC
+
+.NoMem58:	lwz	r4,94(r31)
+		mr.	r4,r4
+		beq-	.NoMem94
+
+		bl	FreeVecPPC
+
+.NoMem94:	lwz	r4,62(r31)
+		mr.	r4,r4
+		beq-	.NoMem62
+
+		bl	FreeVecPPC
+
+.NoMem62:	lwz	r4,66(r31)
+		mr.	r4,r4
+		beq-	.NoMem66
+
+		bl	FreeVecPPC
+
+.NoMem66:	lwz	r4,70(r31)
+		mr.	r4,r4
+		beq-	.NoMem70
+
+		bl	FreeVecPPC
+
+.NoMem70:	lwz	r4,74(r31)
+		mr.	r4,r4
+		beq-	.NoMem74
+
+		bl	FreeVecPPC
+
+.NoMem74:	lwz	r4,78(r31)
+		mr.	r4,r4
+		beq-	.NoMem78
+
+		bl	FreeVecPPC
+
+.NoMem78:	lwz	r4,82(r31)
+		mr.	r4,r4
+		beq-	.NoMem82
+
+		bl	FreeVecPPC
+
+.NoMem82:	lwz	r4,86(r31)
+		mr.	r4,r4
+		beq-	.NoMem86
+
+		bl	FreeVecPPC
+
+.NoMem86:	lwz	r4,90(r31)
+		mr.	r4,r4
+		beq-	.NoMem90
+
+		bl	FreeVecPPC
+
+.NoMem90:	lwz	r31,0(r13)
+		addi	r13,r13,4
+		lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtlr	r0
+		blr	
 
 #********************************************************************************************
 
 SetExcHandler:			li	r3,0
 				blr
-RemExcHandler:			blr
 WaitTime:			li	r3,0
 				blr
 RawDoFmtPPC:			li	r3,0
