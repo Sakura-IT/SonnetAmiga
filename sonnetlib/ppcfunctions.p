@@ -7396,12 +7396,567 @@ RemExcHandler:
 		lwz	r0,0(r13)
 		addi	r13,r13,4
 		mtlr	r0
+		blr
+		
+#********************************************************************************************
+#
+#	XLock = SetExcHandler(ExcTags) // r3=r4
+#
+#********************************************************************************************		
+
+SetExcHandler:	
+		BUILDSTACKPPC	
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
+
+		li	r26,0
+
+		mr	r27,r3
+		mr	r31,r4
+
+		li	r4,98
+		loadreg	r5,0x10001
+		li	r6,0
+		li	r7,0
+		
+		bl	AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.NoMemAvail
+
+		mr	r30,r3
+
+		loadreg	r4,EXCATTR_CODE
+		li	r5,0
+		mr	r6,r31
+		
+		bl	GetTagDataPPC
+
+		mr.	r3,r3
+		beq-	.NoExcCode
+
+		stw	r3,14(r30)
+
+		loadreg	r4,EXCATTR_DATA
+		li	r5,0
+		mr	r6,r31
+		
+		bl	GetTagDataPPC
+
+		stw	r3,18(r30)
+
+		loadreg	r4,EXCATTR_NAME
+		li	r5,0
+		mr	r6,r31
+		
+		bl	GetTagDataPPC
+
+		stw	r3,10(r30)
+
+		loadreg	r4,EXCATTR_PRI
+		li	r5,0
+		mr	r6,r31
+		
+		bl	GetTagDataPPC
+
+		extsb	r3,r3
+		stb	r3,9(r30)
+		li	r0,2
+		stb	r0,8(r30)
+
+		loadreg	r4,EXCATTR_FLAGS
+		li	r5,0
+		mr	r6,r31
+		
+		bl	GetTagDataPPC
+
+		stw	r3,26(r30)
+		rlwinm.	r0,r3,(32-EXC_SMALLCONTEXT),31,31
+		bne-	.HasContext
+
+		rlwinm.	r0,r3,(32-EXC_LARGECONTEXT),31,31
+		bne-	.HasContext
+
+		b	.NoExcCode
+
+.HasContext:	mr	r28,r3
+
+		loadreg	r4,EXCATTR_TASK
+		li	r5,0
+		mr	r6,r31
+		
+		bl	GetTagDataPPC
+
+		andi.	r0,r28,(1<<EXC_GLOBAL)
+		bne-	.ExcIsGlobal
+
+		rlwinm.	r0,r28,(32-EXC_LOCAL),31,31
+		bne-	.ExcIsLocal
+
+		b	.NoExcCode
+
+.ExcIsLocal:	mr.	r3,r3
+		bne-	.ExcIsGlobal
+
+		lwz	r3,RunningTask(r0)
+.ExcIsGlobal:	stw	r3,22(r30)
+
+		loadreg	r4,0x80101007				#Unknown Tag
+		li	r5,0
+		mr	r6,r31
+		
+		bl	GetTagDataPPC
+
+		mr.	r3,r3
+		beq-	.NoUnknownTag
+
+		stw	r3,34(r30)
+		li	r0,0
+		stw	r0,38(r30)
+		stw	r0,42(r30)
+
+.NoUnknownTag:	loadreg	r4,EXCATTR_EXCID
+		li	r5,0
+		mr	r6,r31
+		
+		bl	GetTagDataPPC
+
+		stw	r3,30(r30)
+		mr	r29,r3
+		rlwinm.	r0,r29,(32-EXC_MCHECK),31,31
+		beq-	.NoMachineChk
+
+		li	r4,46
+		loadreg	r5,0x10001
+		li	r6,0
+		li	r7,0
+		
+		bl	AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.NoMemAvail2
+
+		stw	r3,50(r30)
+		mr	r26,r3
+.NoMachineChk:	rlwinm.	r0,r29,(32-EXC_DACCESS),31,31
+		beq-	.NoDataAccess
+
+		li	r4,46
+		loadreg	r5,0x10001
+		li	r6,0
+		li	r7,0
+		
+		bl	AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.NoMemAvail2
+
+		stw	r3,54(r30)
+		mr	r26,r3
+.NoDataAccess:	rlwinm.	r0,r29,(32-EXC_IACCESS),31,31
+		beq-	.NoInstAccess
+
+		li	r4,46
+		loadreg	r5,0x10001
+		li	r6,0
+		li	r7,0
+		
+		bl	AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.NoMemAvail2
+
+		stw	r3,58(r30)
+		mr	r26,r3
+.NoInstAccess:	rlwinm.	r0,r29,(32-EXC_INTERRUPT),31,31
+		beq-	.NoExtInt
+
+		li	r4,46
+		loadreg	r5,0x10001
+		li	r6,0
+		li	r7,0
+		
+		bl	AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.NoMemAvail2
+
+		stw	r3,94(r30)
+		mr	r26,r3
+.NoExtInt:	rlwinm.	r0,r29,(32-EXC_ALIGN),31,31
+		beq-	.NoAlignment
+
+		li	r4,46
+		loadreg	r5,0x10001
+		li	r6,0
+		li	r7,0
+		
+		bl	AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.NoMemAvail2
+
+		stw	r3,62(r30)
+		mr	r26,r3
+.NoAlignment:	rlwinm.	r0,r29,(32-EXC_PROGRAM),31,31
+		beq-	.NoProgram
+
+		li	r4,46
+		loadreg	r5,0x10001
+		li	r6,0
+		li	r7,0
+		
+		bl	AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.NoMemAvail2
+
+		stw	r3,66(r30)
+		mr	r26,r3
+.NoProgram:	rlwinm.	r0,r29,(32-EXC_FPUN),31,31
+		beq-	.NoFPUnavail
+
+		li	r4,46
+		loadreg	r5,0x10001
+		li	r6,0
+		li	r7,0
+		
+		bl	AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.NoMemAvail2
+
+		stw	r3,70(r30)
+		mr	r26,r3
+.NoFPUnavail:	rlwinm.	r0,r29,23,31,31				#EXC_UNKNOWN9
+		beq-	.NoUnknown2
+
+		li	r4,46
+		loadreg	r5,0x10001
+		li	r6,0
+		li	r7,0
+		
+		bl	AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.NoMemAvail2
+
+		stw	r3,74(r30)
+		mr	r26,r3
+.NoUnknown2:	rlwinm.	r0,r29,20,31,31				#EXC_UNKNOWN12
+		beq-	.NoUnknown3
+
+		li	r4,46
+		loadreg	r5,0x10001
+		li	r6,0
+		li	r7,0
+		
+		bl	AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.NoMemAvail2
+
+		stw	r3,78(r30)
+		mr	r26,r3
+.NoUnknown3:	rlwinm.	r0,r29,(32-EXC_TRACE),31,31
+		beq-	.NoTrace
+
+		li	r4,46
+		loadreg	r5,0x10001
+		li	r6,0
+		li	r7,0
+		
+		bl	AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.NoMemAvail2
+
+		stw	r3,82(r30)
+		mr	r26,r3
+.NoTrace:	rlwinm.	r0,r29,(32-EXC_PERFMON),31,31
+		beq-	.NoPerfMon
+
+		li	r4,46
+		loadreg	r5,0x10001
+		li	r6,0
+		li	r7,0
+		
+		bl	AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.NoMemAvail2
+
+		stw	r3,86(r30)
+		mr	r26,r3
+.NoPerfMon:	rlwinm.	r0,r29,(32-EXC_IABR),31,31
+		beq-	.NoIABR
+
+		li	r4,46
+		loadreg	r5,0x10001
+		li	r6,0
+		li	r7,0
+		
+		bl	AllocVecPPC
+
+		mr.	r3,r3
+		beq-	.NoMemAvail2
+
+		stw	r3,90(r30)
+		mr	r26,r3
+.NoIABR:	stw	r26,46(r30)
+
+.SetExcAtom:	li	r4,Atomic
+		
+		bl	AtomicTest
+
+		mr.	r3,r3
+		beq+	.SetExcAtom
+
+		mr	r3,r30
+		bl	.MakeLists
+
+		li	r4,Atomic
+		
+		bl	AtomicDone
+
+		bl	CauseInterrupt
+
+		mr.	r26,r26					#??
+		beq-	.SkipNext1
+
+.ExcLoop:	lwz	r3,26(r26)
+		rlwinm.	r0,r3,28,31,31
+		beq+	.ExcLoop
+
+.SkipNext1:	mr	r3,r30
+		b	.DoResult
+
+.NoMemAvail2:	mr	r3,r30
+		bl	.FreeAllMem
+
+.NoExcCode:	mr	r4,r30
+
+		bl	FreeVecPPC
+
+.NoMemAvail:	li	r4,0
+
+.DoResult:	mr	r3,r4
+
+		lwz	r26,0(r13)
+		lwz	r27,4(r13)
+		lwz	r28,8(r13)
+		lwz	r29,12(r13)
+		lwz	r30,16(r13)
+		lwz	r31,20(r13)
+		addi	r13,r13,24
+		
+		DSTRYSTACKPPC
+
+		blr
+		
+#*******************************************************************************************		
+
+.MakeLists:		
+		mflr	r0
+		stwu	r0,-4(r13)
+		mr	r6,r3
+		lwz	r4,15728(r2)
+		addi	r4,r4,368
+		lwz	r5,50(r6)
+		mr.	r5,r5
+		beq-	.NoValue50
+		
+		loadreg	r3,0x4
+		
+		bl	.CopyIt
+		
+		lwz	r3,0(r4)
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+.NoValue50:	lwz	r5,54(r6)
+		mr.	r5,r5
+		beq-	.NoValue54
+		
+		loadreg	r3,0x8
+		
+		bl	.CopyIt
+		
+		lwz	r3,0(r4)
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+.NoValue54:	lwz	r5,58(r6)
+		mr.	r5,r5
+		beq-	.NoValue58
+		
+		loadreg	r3,0x10
+		
+		bl	.CopyIt
+		
+		lwz	r3,0(r4)
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+.NoValue58:	lwz	r5,94(r6)
+		mr.	r5,r5
+		beq-	.NoValue94
+		
+		loadreg	r3,0x20
+		
+		bl	.CopyIt
+		
+		lwz	r3,0(r4)
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+.NoValue94:	lwz	r5,62(r6)
+		mr.	r5,r5
+		beq-	.NoValue62
+		
+		loadreg	r3,0x40
+		
+		bl	.CopyIt
+		
+		lwz	r3,0(r4)
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+.NoValue62:	lwz	r5,66(r6)
+		mr.	r5,r5
+		beq-	.NoValue66
+		
+		loadreg	r3,0x80
+		
+		bl	.CopyIt
+		
+		lwz	r3,0(r4)
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+.NoValue66:	lwz	r5,70(r6)
+		mr.	r5,r5
+		beq-	.NoValue70
+		
+		loadreg	r3,0x100
+		
+		bl	.CopyIt
+		
+		lwz	r3,0(r4)
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+.NoValue70:	lwz	r5,74(r6)
+		mr.	r5,r5
+		beq-	.NoValue74
+		
+		loadreg	r3,0x200
+		
+		bl	.CopyIt
+		
+		lwz	r3,0(r4)
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+.NoValue74:	lwz	r5,78(r6)
+		mr.	r5,r5
+		beq-	.NoValue78
+		
+		loadreg	r3,0x1000
+		
+		bl	.CopyIt
+		
+		lwz	r3,0(r4)
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+.NoValue78:	lwz	r5,82(r6)
+		mr.	r5,r5
+		beq-	.NoValue82
+		
+		loadreg	r3,0x2000
+		
+		bl	.CopyIt
+		
+		lwz	r3,0(r4)
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+.NoValue82:	lwz	r5,86(r6)
+		mr.	r5,r5
+		beq-	.NoValue86
+		
+		loadreg	r3,0x8000
+		
+		bl	.CopyIt
+		
+		lwz	r3,0(r4)
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+.NoValue86:	lwz	r5,90(r6)
+		mr.	r5,r5
+		beq-	.NoValue90
+		
+		loadreg	r3,0x80000
+		
+		bl	.CopyIt
+		
+		lwz	r3,0(r4)
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+.NoValue90:	lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtlr	r0
+		blr		
+
+.CopyIt:
+		mflr	r0
+		stwu	r0,-4(r13)
+		lbz	r0,9(r6)
+		stb	r0,9(r5)
+		lwz	r0,10(r6)
+		stw	r0,10(r5)
+		lwz	r0,14(r6)
+		stw	r0,14(r5)
+		lwz	r0,18(r6)
+		stw	r0,18(r5)
+		lwz	r0,22(r6)
+		stw	r0,22(r5)
+		lwz	r0,26(r6)
+		stw	r0,26(r5)
+		lwz	r0,34(r6)
+		stw	r0,34(r5)
+		lwz	r0,38(r6)
+		stw	r0,38(r5)
+		lwz	r0,42(r6)
+		stw	r0,42(r5)
+		stw	r3,30(r5)
+		lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtlr	r0
 		blr	
 
 #********************************************************************************************
 
-SetExcHandler:			li	r3,0
-				blr
 WaitTime:			li	r3,0
 				blr
 RawDoFmtPPC:			li	r3,0
