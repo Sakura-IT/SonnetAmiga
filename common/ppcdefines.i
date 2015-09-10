@@ -110,6 +110,14 @@
 .set SwitchFreq,50				#50Hz
 .set Quantum,(SonnetTimerFreq/SwitchFreq)	#1/50s
 
+.set EXCATTR_CODE,		0x80101000		#
+.set EXCATTR_DATA,		0x80101001		#
+.set EXCATTR_TASK,		0x80101002		#
+.set EXCATTR_EXCID,		0x80101003		#
+.set EXCATTR_FLAGS,		0x80101004		#
+.set EXCATTR_NAME,		0x80101005		#
+.set EXCATTR_PRI,		0x80101006		#
+
 .set PPCINFO_CPU,		0x80102000		#CPU type (see below)
 .set PPCINFO_PVR,             	0x80102001		#PVR value
 .set PPCINFO_ICACHE,          	0x80102002		#Instruction cache state
@@ -130,6 +138,23 @@
 .set CPUF_G4,			0x00400000
 .set CPUF_750,			0x00200000
 .set CPUF_7400,			0x00400000
+
+.set EXC_GLOBAL,0            				#global handler
+.set EXC_LOCAL,1             				#task dependant handler
+.set EXC_SMALLCONTEXT,2      				#small context structure
+.set EXC_LARGECONTEXT,3      				#large context structure
+.set EXC_ACTIVE,4            				#private
+
+.set EXC_MCHECK,2            				#machine check exception
+.set EXC_DACCESS,3           				#data access exception
+.set EXC_IACCESS,4           				#instruction access exception
+.set EXC_INTERRUPT,5         				#external interrupt (V15+)
+.set EXC_ALIGN,6             				#alignment exception
+.set EXC_PROGRAM,7           				#program exception
+.set EXC_FPUN,8              				#FP unavailable exception
+.set EXC_TRACE,13            				#trace exception
+.set EXC_PERFMON,15          				#performance monitor exception
+.set EXC_IABR,19 					#IA breakpoint exception
 
 .set FPF_EN_OVERFLOW,0        				#enable overflow exception
 .set FPF_EN_UNDERFLOW,1       				#enable underflow exception
