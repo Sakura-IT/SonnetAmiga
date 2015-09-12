@@ -57,6 +57,8 @@
 
 
 #LibBase:
+
+.set LIST_REMOVEDTASKS,130
 .set LIST_REMOVEDEXC,382
 .set LIST_INSTALLEDEXC,368
 
@@ -105,6 +107,8 @@
 .set IBATL3Store,534
 .set DBATU3Store,538
 .set DBATL3Store,542
+
+.set BASE_INVALBATS,546
 
 .set TASKPPC_BAT0,0
 .set TASKPPC_BAT1,16
@@ -643,3 +647,5 @@
 .set ME_ADDR,0
 .set ME_LENGTH,4
 .set MLH_HEAD,0
+.set TV_SECS,0
+.set TV_MICRO,4
