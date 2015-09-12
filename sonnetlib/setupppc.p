@@ -301,6 +301,11 @@ End:		mflr	r4
 		stw	r4,MemSem(r14)
 		addi	r6,r6,32
 		bl	.InitSem
+		
+		addi	r4,r30,SSPPC_SIZE*5
+		stw	r4,WaitListSem(r14)
+		addi	r6,r6,32
+		bl	.InitSem
 				
 		bl	.SetupMsgFIFOs
 		
