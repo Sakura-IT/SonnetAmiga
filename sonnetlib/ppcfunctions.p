@@ -7276,7 +7276,7 @@ RemExcHandler:
 		
 		beq+	.RemExcAtom
 
-		addi	r4,r31,382			#In lib base
+		addi	r4,r31,LIST_REMOVEDEXC			#In lib base
 		mr	r5,r30
 		lwz	r3,0(r4)
 		stw	r5,0(r4)
@@ -7290,10 +7290,10 @@ RemExcHandler:
 
 		bl CauseInterrupt
 
-		lwz	r3,46(r30)
-.MiniLoop:	lwz	r4,26(r3)
-		rlwinm.	r0,r4,28,31,31
-		bne+	.MiniLoop
+		lwz	r3,EXCDATA_LASTEXC(r30)
+.WaitActive:	lwz	r4,EXCDATA_FLAGS(r3)
+		rlwinm.	r0,r4,(32-EXC_ACTIVE),31,31
+		bne+	.WaitActive				#Done in interrupt
 
 		mr	r3,r30
 		
@@ -7319,79 +7319,79 @@ RemExcHandler:
 		stwu	r31,-4(r13)
 		mr	r31,r3
 		
-		lwz	r4,50(r31)
+		lwz	r4,EXCDATA_MCHECK(r31)
 		mr.	r4,r4
-		beq-	.NoMem50
+		beq-	.NoMemMCheck
 
 		bl	FreeVecPPC
 
-.NoMem50:	lwz	r4,54(r31)
+.NoMemMCheck:	lwz	r4,EXCDATA_DACCESS(r31)
 		mr.	r4,r4
-		beq-	.NoMem54
+		beq-	.NoMemDAccess
 
 		bl	FreeVecPPC
 
-.NoMem54:	lwz	r4,58(r31)
+.NoMemDAccess:	lwz	r4,EXCDATA_IACCESS(r31)
 		mr.	r4,r4
-		beq-	.NoMem58
+		beq-	.NoMemIAccess
 
 		bl	FreeVecPPC
 
-.NoMem58:	lwz	r4,94(r31)
+.NoMemIAccess:	lwz	r4,EXCDATA_INTERRUPT(r31)
 		mr.	r4,r4
-		beq-	.NoMem94
+		beq-	.NoMemInt
 
 		bl	FreeVecPPC
 
-.NoMem94:	lwz	r4,62(r31)
+.NoMemInt:	lwz	r4,EXCDATA_ALIGN(r31)
 		mr.	r4,r4
-		beq-	.NoMem62
+		beq-	.NoMemAlign
 
 		bl	FreeVecPPC
 
-.NoMem62:	lwz	r4,66(r31)
+.NoMemAlign:	lwz	r4,EXCDATA_PROGRAM(r31)
 		mr.	r4,r4
-		beq-	.NoMem66
+		beq-	.NoMemProgram
 
 		bl	FreeVecPPC
 
-.NoMem66:	lwz	r4,70(r31)
+.NoMemProgram:	lwz	r4,EXCDATA_FPUN(r31)
 		mr.	r4,r4
-		beq-	.NoMem70
+		beq-	.NoMemFPUn
 
 		bl	FreeVecPPC
 
-.NoMem70:	lwz	r4,74(r31)
+.NoMemFPUn:	lwz	r4,EXCDATA_EXCUNKNOWN9(r31)
 		mr.	r4,r4
-		beq-	.NoMem74
+		beq-	.NoMemUnknwn9
 
 		bl	FreeVecPPC
 
-.NoMem74:	lwz	r4,78(r31)
+.NoMemUnknwn9:	lwz	r4,EXCDATA_EXCUNKNOWN12(r31)
 		mr.	r4,r4
-		beq-	.NoMem78
+		beq-	.NoMemUnknwn12
 
 		bl	FreeVecPPC
 
-.NoMem78:	lwz	r4,82(r31)
+.NoMemUnknwn12:	lwz	r4,EXCDATA_TRACE(r31)
 		mr.	r4,r4
-		beq-	.NoMem82
+		beq-	.NoMemTrace
 
 		bl	FreeVecPPC
 
-.NoMem82:	lwz	r4,86(r31)
+.NoMemTrace:	lwz	r4,EXCDATA_PERFMON(r31)
 		mr.	r4,r4
-		beq-	.NoMem86
+		beq-	.NoMemPerfMon
 
 		bl	FreeVecPPC
 
-.NoMem86:	lwz	r4,90(r31)
+.NoMemPerfMon:	lwz	r4,EXCDATA_IABR(r31)
 		mr.	r4,r4
-		beq-	.NoMem90
+		beq-	.NoMemIABR
 
 		bl	FreeVecPPC
 
-.NoMem90:	lwz	r31,0(r13)
+.NoMemIABR:	lwz	r31,0(r13)
 		addi	r13,r13,4
 		lwz	r0,0(r13)
 		addi	r13,r13,4
@@ -7440,7 +7440,7 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoExcCode
 
-		stw	r3,14(r30)
+		stw	r3,EXCDATA_CODE(r30)
 
 		loadreg	r4,EXCATTR_DATA
 		li	r5,0
@@ -7448,7 +7448,7 @@ SetExcHandler:
 		
 		bl	GetTagDataPPC
 
-		stw	r3,18(r30)
+		stw	r3,EXCDATA_DATA(r30)
 
 		loadreg	r4,EXCATTR_NAME
 		li	r5,0
@@ -7456,7 +7456,7 @@ SetExcHandler:
 		
 		bl	GetTagDataPPC
 
-		stw	r3,10(r30)
+		stw	r3,EXCDATA_NAME(r30)
 
 		loadreg	r4,EXCATTR_PRI
 		li	r5,0
@@ -7465,9 +7465,9 @@ SetExcHandler:
 		bl	GetTagDataPPC
 
 		extsb	r3,r3
-		stb	r3,9(r30)
-		li	r0,2
-		stb	r0,8(r30)
+		stb	r3,EXCDATA_PRI(r30)
+		li	r0,NT_INTERRUPT
+		stb	r0,EXCDATA_TYPE(r30)
 
 		loadreg	r4,EXCATTR_FLAGS
 		li	r5,0
@@ -7475,7 +7475,7 @@ SetExcHandler:
 		
 		bl	GetTagDataPPC
 
-		stw	r3,26(r30)
+		stw	r3,EXCDATA_FLAGS(r30)
 		rlwinm.	r0,r3,(32-EXC_SMALLCONTEXT),31,31
 		bne-	.HasContext
 
@@ -7504,7 +7504,7 @@ SetExcHandler:
 		bne-	.ExcIsGlobal
 
 		lwz	r3,RunningTask(r0)
-.ExcIsGlobal:	stw	r3,22(r30)
+.ExcIsGlobal:	stw	r3,EXCDATA_TASK(r30)
 
 		loadreg	r4,0x80101007				#Unknown Tag
 		li	r5,0
@@ -7515,10 +7515,10 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoUnknownTag
 
-		stw	r3,34(r30)
+		stw	r3,EXCDATA_UNKNOWN1(r30)
 		li	r0,0
-		stw	r0,38(r30)
-		stw	r0,42(r30)
+		stw	r0,EXCDATA_UNKNOWN2(r30)
+		stw	r0,EXCDATA_UNKNOWN3(r30)
 
 .NoUnknownTag:	loadreg	r4,EXCATTR_EXCID
 		li	r5,0
@@ -7526,7 +7526,7 @@ SetExcHandler:
 		
 		bl	GetTagDataPPC
 
-		stw	r3,30(r30)
+		stw	r3,EXCDATA_EXCID(r30)
 		mr	r29,r3
 		rlwinm.	r0,r29,(32-EXC_MCHECK),31,31
 		beq-	.NoMachineChk
@@ -7541,7 +7541,7 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoMemAvail2
 
-		stw	r3,50(r30)
+		stw	r3,EXCDATA_MCHECK(r30)
 		mr	r26,r3
 .NoMachineChk:	rlwinm.	r0,r29,(32-EXC_DACCESS),31,31
 		beq-	.NoDataAccess
@@ -7556,7 +7556,7 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoMemAvail2
 
-		stw	r3,54(r30)
+		stw	r3,EXCDATA_DACCESS(r30)
 		mr	r26,r3
 .NoDataAccess:	rlwinm.	r0,r29,(32-EXC_IACCESS),31,31
 		beq-	.NoInstAccess
@@ -7571,7 +7571,7 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoMemAvail2
 
-		stw	r3,58(r30)
+		stw	r3,EXCDATA_IACCESS(r30)
 		mr	r26,r3
 .NoInstAccess:	rlwinm.	r0,r29,(32-EXC_INTERRUPT),31,31
 		beq-	.NoExtInt
@@ -7586,7 +7586,7 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoMemAvail2
 
-		stw	r3,94(r30)
+		stw	r3,EXCDATA_INTERRUPT(r30)
 		mr	r26,r3
 .NoExtInt:	rlwinm.	r0,r29,(32-EXC_ALIGN),31,31
 		beq-	.NoAlignment
@@ -7601,7 +7601,7 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoMemAvail2
 
-		stw	r3,62(r30)
+		stw	r3,EXCDATA_ALIGN(r30)
 		mr	r26,r3
 .NoAlignment:	rlwinm.	r0,r29,(32-EXC_PROGRAM),31,31
 		beq-	.NoProgram
@@ -7616,7 +7616,7 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoMemAvail2
 
-		stw	r3,66(r30)
+		stw	r3,EXCDATA_PROGRAM(r30)
 		mr	r26,r3
 .NoProgram:	rlwinm.	r0,r29,(32-EXC_FPUN),31,31
 		beq-	.NoFPUnavail
@@ -7631,9 +7631,9 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoMemAvail2
 
-		stw	r3,70(r30)
+		stw	r3,EXCDATA_FPUN(r30)
 		mr	r26,r3
-.NoFPUnavail:	rlwinm.	r0,r29,23,31,31				#EXC_UNKNOWN9
+.NoFPUnavail:	rlwinm.	r0,r29,(32-EXC_UNKNOWN9),31,31
 		beq-	.NoUnknown2
 
 		li	r4,46
@@ -7646,9 +7646,9 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoMemAvail2
 
-		stw	r3,74(r30)
+		stw	r3,EXCDATA_EXCUNKNOWN9(r30)
 		mr	r26,r3
-.NoUnknown2:	rlwinm.	r0,r29,20,31,31				#EXC_UNKNOWN12
+.NoUnknown2:	rlwinm.	r0,r29,(32-EXC_UNKNOWN12),31,31
 		beq-	.NoUnknown3
 
 		li	r4,46
@@ -7661,7 +7661,7 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoMemAvail2
 
-		stw	r3,78(r30)
+		stw	r3,EXCDATA_EXCUNKNOWN12(r30)
 		mr	r26,r3
 .NoUnknown3:	rlwinm.	r0,r29,(32-EXC_TRACE),31,31
 		beq-	.NoTrace
@@ -7676,7 +7676,7 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoMemAvail2
 
-		stw	r3,82(r30)
+		stw	r3,EXCDATA_TRACE(r30)
 		mr	r26,r3
 .NoTrace:	rlwinm.	r0,r29,(32-EXC_PERFMON),31,31
 		beq-	.NoPerfMon
@@ -7691,7 +7691,7 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoMemAvail2
 
-		stw	r3,86(r30)
+		stw	r3,EXCDATA_PERFMON(r30)
 		mr	r26,r3
 .NoPerfMon:	rlwinm.	r0,r29,(32-EXC_IABR),31,31
 		beq-	.NoIABR
@@ -7706,9 +7706,9 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoMemAvail2
 
-		stw	r3,90(r30)
+		stw	r3,EXCDATA_IABR(r30)
 		mr	r26,r3
-.NoIABR:	stw	r26,46(r30)
+.NoIABR:	stw	r26,EXCDATA_LASTEXC(r30)
 
 .SetExcAtom:	li	r4,Atomic
 		
@@ -7726,14 +7726,14 @@ SetExcHandler:
 
 		bl	CauseInterrupt
 
-		mr.	r26,r26					#??
-		beq-	.SkipNext1
+		mr.	r26,r26
+		beq-	.NoExcDefined
 
-.ExcLoop:	lwz	r3,26(r26)
-		rlwinm.	r0,r3,28,31,31
+.ExcLoop:	lwz	r3,EXCDATA_FLAGS(r26)
+		rlwinm.	r0,r3,(32-EXC_ACTIVE),31,31
 		beq+	.ExcLoop
 
-.SkipNext1:	mr	r3,r30
+.NoExcDefined:	mr	r4,r30
 		b	.DoResult
 
 .NoMemAvail2:	mr	r3,r30
@@ -7765,13 +7765,13 @@ SetExcHandler:
 		mflr	r0
 		stwu	r0,-4(r13)
 		mr	r6,r3
-		lwz	r4,15728(r2)
-		addi	r4,r4,368
-		lwz	r5,50(r6)
+		lwz	r4,PowerPCBase(r0)
+		addi	r4,r4,LIST_INSTALLEDEXC
+		lwz	r5,EXCDATA_MCHECK(r6)
 		mr.	r5,r5
-		beq-	.NoValue50
+		beq-	.NoVMCheck
 		
-		loadreg	r3,0x4
+		loadreg	r3,(1<<EXC_MCHECK)
 		
 		bl	.CopyIt
 		
@@ -7780,11 +7780,12 @@ SetExcHandler:
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-.NoValue50:	lwz	r5,54(r6)
-		mr.	r5,r5
-		beq-	.NoValue54
 		
-		loadreg	r3,0x8
+.NoVMCheck:	lwz	r5,EXCDATA_DACCESS(r6)
+		mr.	r5,r5
+		beq-	.NoVDAccess
+		
+		loadreg	r3,(1<<EXC_DACCESS)
 		
 		bl	.CopyIt
 		
@@ -7793,11 +7794,12 @@ SetExcHandler:
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-.NoValue54:	lwz	r5,58(r6)
-		mr.	r5,r5
-		beq-	.NoValue58
 		
-		loadreg	r3,0x10
+.NoVDAccess:	lwz	r5,EXCDATA_IACCESS(r6)
+		mr.	r5,r5
+		beq-	.NoVIAccess
+		
+		loadreg	r3,(1<<EXC_IACCESS)
 		
 		bl	.CopyIt
 		
@@ -7806,11 +7808,12 @@ SetExcHandler:
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-.NoValue58:	lwz	r5,94(r6)
-		mr.	r5,r5
-		beq-	.NoValue94
 		
-		loadreg	r3,0x20
+.NoVIAccess:	lwz	r5,EXCDATA_INTERRUPT(r6)
+		mr.	r5,r5
+		beq-	.NoVInterrupt
+		
+		loadreg	r3,(1<<EXC_INTERRUPT)
 		
 		bl	.CopyIt
 		
@@ -7819,11 +7822,12 @@ SetExcHandler:
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-.NoValue94:	lwz	r5,62(r6)
-		mr.	r5,r5
-		beq-	.NoValue62
 		
-		loadreg	r3,0x40
+.NoVInterrupt:	lwz	r5,EXCDATA_ALIGN(r6)
+		mr.	r5,r5
+		beq-	.NoVAlign
+		
+		loadreg	r3,(1<<EXC_ALIGN)
 		
 		bl	.CopyIt
 		
@@ -7832,11 +7836,12 @@ SetExcHandler:
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-.NoValue62:	lwz	r5,66(r6)
-		mr.	r5,r5
-		beq-	.NoValue66
 		
-		loadreg	r3,0x80
+.NoVAlign:	lwz	r5,EXCDATA_PROGRAM(r6)
+		mr.	r5,r5
+		beq-	.NoVProgram
+		
+		loadreg	r3,(1<<EXC_PROGRAM)
 		
 		bl	.CopyIt
 		
@@ -7845,11 +7850,12 @@ SetExcHandler:
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-.NoValue66:	lwz	r5,70(r6)
-		mr.	r5,r5
-		beq-	.NoValue70
 		
-		loadreg	r3,0x100
+.NoVProgram:	lwz	r5,EXCDATA_FPUN(r6)
+		mr.	r5,r5
+		beq-	.NoVFPUn
+		
+		loadreg	r3,(1<<EXC_FPUN)
 		
 		bl	.CopyIt
 		
@@ -7858,11 +7864,12 @@ SetExcHandler:
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-.NoValue70:	lwz	r5,74(r6)
-		mr.	r5,r5
-		beq-	.NoValue74
 		
-		loadreg	r3,0x200
+.NoVFPUn:	lwz	r5,EXCDATA_EXCUNKNOWN9(r6)
+		mr.	r5,r5
+		beq-	.NoVUnknown9
+		
+		loadreg	r3,(1<<EXC_UNKNOWN9)
 		
 		bl	.CopyIt
 		
@@ -7871,11 +7878,12 @@ SetExcHandler:
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-.NoValue74:	lwz	r5,78(r6)
-		mr.	r5,r5
-		beq-	.NoValue78
 		
-		loadreg	r3,0x1000
+.NoVUnknown9:	lwz	r5,EXCDATA_EXCUNKNOWN12(r6)
+		mr.	r5,r5
+		beq-	.NoVUnknown12
+		
+		loadreg	r3,(1<<EXC_UNKNOWN12)
 		
 		bl	.CopyIt
 		
@@ -7884,11 +7892,12 @@ SetExcHandler:
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-.NoValue78:	lwz	r5,82(r6)
-		mr.	r5,r5
-		beq-	.NoValue82
 		
-		loadreg	r3,0x2000
+.NoVUnknown12:	lwz	r5,EXCDATA_TRACE(r6)
+		mr.	r5,r5
+		beq-	.NoVTrace
+		
+		loadreg	r3,(1<<EXC_TRACE)
 		
 		bl	.CopyIt
 		
@@ -7897,11 +7906,12 @@ SetExcHandler:
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-.NoValue82:	lwz	r5,86(r6)
-		mr.	r5,r5
-		beq-	.NoValue86
 		
-		loadreg	r3,0x8000
+.NoVTrace:	lwz	r5,EXCDATA_PERFMON(r6)
+		mr.	r5,r5
+		beq-	.NoVPerfMon
+		
+		loadreg	r3,(1<<EXC_PERFMON)
 		
 		bl	.CopyIt
 		
@@ -7910,11 +7920,12 @@ SetExcHandler:
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-.NoValue86:	lwz	r5,90(r6)
-		mr.	r5,r5
-		beq-	.NoValue90
 		
-		loadreg	r3,0x80000
+.NoVPerfMon:	lwz	r5,EXCDATA_IABR(r6)
+		mr.	r5,r5
+		beq-	.NoVIABR
+		
+		loadreg	r3,(1<<EXC_IABR)
 		
 		bl	.CopyIt
 		
@@ -7923,33 +7934,36 @@ SetExcHandler:
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-.NoValue90:	lwz	r0,0(r13)
+		
+.NoVIABR:	lwz	r0,0(r13)
 		addi	r13,r13,4
 		mtlr	r0
-		blr		
+		blr
+		
+#*******************************************************************************************
 
 .CopyIt:
 		mflr	r0
 		stwu	r0,-4(r13)
-		lbz	r0,9(r6)
-		stb	r0,9(r5)
-		lwz	r0,10(r6)
-		stw	r0,10(r5)
-		lwz	r0,14(r6)
-		stw	r0,14(r5)
-		lwz	r0,18(r6)
-		stw	r0,18(r5)
-		lwz	r0,22(r6)
-		stw	r0,22(r5)
-		lwz	r0,26(r6)
-		stw	r0,26(r5)
-		lwz	r0,34(r6)
-		stw	r0,34(r5)
-		lwz	r0,38(r6)
-		stw	r0,38(r5)
-		lwz	r0,42(r6)
-		stw	r0,42(r5)
-		stw	r3,30(r5)
+		lbz	r0,EXCDATA_PRI(r6)
+		stb	r0,EXCDATA_PRI(r5)
+		lwz	r0,EXCDATA_NAME(r6)
+		stw	r0,EXCDATA_NAME(r5)
+		lwz	r0,EXCDATA_CODE(r6)
+		stw	r0,EXCDATA_CODE(r5)
+		lwz	r0,EXCDATA_DATA(r6)
+		stw	r0,EXCDATA_DATA(r5)
+		lwz	r0,EXCDATA_TASK(r6)
+		stw	r0,EXCDATA_TASK(r5)
+		lwz	r0,EXCDATA_FLAGS(r6)
+		stw	r0,EXCDATA_FLAGS(r5)
+		lwz	r0,EXCDATA_UNKNOWN1(r6)
+		stw	r0,EXCDATA_UNKNOWN1(r5)
+		lwz	r0,EXCDATA_UNKNOWN2(r6)
+		stw	r0,EXCDATA_UNKNOWN2(r5)
+		lwz	r0,EXCDATA_UNKNOWN3(r6)
+		stw	r0,EXCDATA_UNKNOWN3(r5)
+		stw	r3,EXCDATA_EXCID(r5)
 		lwz	r0,0(r13)
 		addi	r13,r13,4
 		mtlr	r0
