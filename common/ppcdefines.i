@@ -57,6 +57,34 @@
 
 
 #LibBase:
+.set LIST_REMOVEDEXC,382
+.set LIST_INSTALLEDEXC,368
+
+.set EXCDATA_TYPE,8				#Always NT_INTERRUPT
+.set EXCDATA_PRI,9				#This
+.set EXCDATA_NAME,10
+.set EXCDATA_CODE,14
+.set EXCDATA_DATA,18
+.set EXCDATA_TASK,22
+.set EXCDATA_FLAGS,26
+.set EXCDATA_EXCID,30
+.set EXCDATA_UNKNOWN1,34
+.set EXCDATA_UNKNOWN2,38
+.set EXCDATA_UNKNOWN3,42			#Up and including this copied to MEM
+.set EXCDATA_LASTEXC,46
+.set EXCDATA_MCHECK,50
+.set EXCDATA_DACCESS,54
+.set EXCDATA_IACCESS,58
+.set EXCDATA_ALIGN,62
+.set EXCDATA_PROGRAM,66
+.set EXCDATA_FPUN,70
+.set EXCDATA_EXCUNKNOWN9,74
+.set EXCDATA_EXCUNKNOWN12,78
+.set EXCDATA_TRACE,82
+.set EXCDATA_PERFMON,86
+.set EXCDATA_IABR,90
+.set EXCDATA_INTERRUPT,94
+
 .set BASE_STOREBAT0,482
 .set IBATU0Store,482
 .set IBATL0Store,486
@@ -152,6 +180,8 @@
 .set EXC_ALIGN,6             				#alignment exception
 .set EXC_PROGRAM,7           				#program exception
 .set EXC_FPUN,8              				#FP unavailable exception
+.set EXC_UNKNOWN9,9					#Not documented
+.set EXC_UNKNOWN12,12					#Not documented
 .set EXC_TRACE,13            				#trace exception
 .set EXC_PERFMON,15          				#performance monitor exception
 .set EXC_IABR,19 					#IA breakpoint exception
@@ -506,6 +536,7 @@
 .set PP_REGS,PP_CODE+20
 .set PP_FREGS,PP_CODE+80
 .set PP_SIZE,144
+.set NT_INTERRUPT,2
 .set NT_MESSAGE,5
 .set NT_FREEMSG,6
 .set NT_REPLYMSG,7
