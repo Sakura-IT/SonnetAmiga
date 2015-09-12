@@ -200,7 +200,7 @@ RemTailPPC:
 #********************************************************************************************
 
 EnqueuePPC:
-		lbz	r3,9(r5)
+		lbz	r3,LN_PRI(r5)
 		extsb	r3,r3
 		lwz	r6,0(r4)
 .Loop1:		mr	r4,r6
@@ -290,22 +290,21 @@ NewListPPC:
 #********************************************************************************************
 
 AddTimePPC:
-		lwz	r6,4(r4)
-		lwz	r7,4(r5)
+		lwz	r6,TV_MICRO(r4)
+		lwz	r7,TV_MICRO(r5)
 		add	r6,r6,r7
-		lis	r0,0xf
-		ori	r0,r0,0x4240
+		loadreg	r0,1000000
 		li	r3,0
 		cmplw	r6,r0
 		blt-	.Link2
 		sub	r6,r6,r0
 		li	r3,1
-.Link2:		lwz	r8,0(r4)
-		lwz	r9,0(r5)
+.Link2:		lwz	r8,TV_SECS(r4)
+		lwz	r9,TV_SECS(r5)
 		add	r8,r8,r9
 		add	r8,r8,r3
-		stw	r6,4(r4)
-		stw	r8,0(r4)
+		stw	r6,TV_MICRO(r4)
+		stw	r8,TV_SECS(r4)
 		blr	
 
 #********************************************************************************************
@@ -315,22 +314,21 @@ AddTimePPC:
 #********************************************************************************************
 
 SubTimePPC:
-		lwz	r6,4(r4)
-		lwz	r7,4(r5)
+		lwz	r6,TV_MICRO(r4)
+		lwz	r7,TV_MICRO(r5)
 		sub	r6,r6,r7
 		li	r3,0
 		mr.	r6,r6
 		bge-	.Link3
-		lis	r0,0xf
-		ori	r0,r0,0x4240
+		loadreg	r0,1000000
 		add	r6,r6,r0
 		li	r3,1
-.Link3:		lwz	r8,0(r4)
-		lwz	r9,0(r5)
+.Link3:		lwz	r8,TV_SECS(r4)
+		lwz	r9,TV_SECS(r5)
 		sub	r8,r8,r9
 		sub	r8,r8,r3
-		stw	r6,4(r4)
-		stw	r8,0(r4)
+		stw	r6,TV_MICRO(r4)
+		stw	r8,TV_SECS(r4)
 		blr	
 
 
@@ -341,13 +339,13 @@ SubTimePPC:
 #********************************************************************************************
 
 CmpTimePPC:
-		lwz	r6,0(r4)
-		lwz	r7,0(r5)
+		lwz	r6,TV_SECS(r4)
+		lwz	r7,TV_SECS(r5)
 		cmplw	r6,r7
 		blt-	.Link5
 		bgt-	.Link4
-		lwz	r8,4(r4)
-		lwz	r9,4(r5)
+		lwz	r8,TV_MICRO(r4)
+		lwz	r9,TV_MICRO(r5)
 		cmplw	r8,r9
 		blt-	.Link5
 		bgt-	.Link4
@@ -585,15 +583,14 @@ GetSysTimePPC:
 		cmplw	r7,r3
 		bne+	.Loop5
 		bl	.Link17
-		stw	r3,0(r6)
+		stw	r3,TV_SECS(r6)
 		mullw	r7,r5,r3
 		sub	r7,r4,r7
-		lis	r0,0xf
-		ori	r0,r0,0x4240
+		loadreg	r0,1000000
 		mullw	r4,r0,r7
 		mulhw	r3,r0,r7
 		bl	.Link17
-		stw	r3,4(r6)
+		stw	r3,TV_MICRO(r6)
 		lwz	r6,0(r13)
 		lwzu	r7,4(r13)
 		addi	r13,r13,4
@@ -1084,7 +1081,7 @@ SetSignalPPC:
 
 		mr	r3,r6
 		li	r4,0
-		bl	CheckExcSignal
+		bl CheckExcSignal
 
 		mr	r3,r31
 		lwz	r30,0(r13)
@@ -2033,12 +2030,16 @@ PutXMsgPPC:
 		mr	r31,r4
 		mr	r30,r5
 		
-		bl	FlushL1DCache
+		bl FlushL1DCache
 				
 		mr 	r4,r31
 		mr	r5,r30
 		
-		bl Signal68K
+		lis	r3,EUMB		
+		stw	r5,0x5c(r3)
+		sync
+		stw	r4,0x58(r3)
+		sync
 
 .NoSigTask:	lwz	r30,0(r13)
 		lwz	r31,4(r13)
@@ -2234,24 +2235,26 @@ Run68K:
 		
 #********************************************************************************************
 #
-#	void Signal68K(Port, Message) // r4,r5
+#	void Signal68K(Task, Signal) // r4,r5
 #
 #********************************************************************************************
 
-Signal68K:						#Should be Task/Signal
+Signal68K:
 		BUILDSTACKPPC
 		
-		stwu	r31,-4(r13)
+		stwu	r8,-4(r13)
+		stwu	r7,-4(r13)
 		
-		lis	r3,EUMB
+		mr	r8,r5						#d0
+		mr	r7,r4						#a1
+		lwz	r4,SysBase(r0)
+		li	r5,_LVOSignal
 		
-		stw	r5,0x5c(r3)
-		sync
-		stw	r4,0x58(r3)
-		sync
+		bl Run68KLowLevel
 		
-		lwz	r31,0(r13)
-		addi	r13,r13,4
+		lwz	r7,0(r13)
+		lwz	r8,4(r13)
+		addi	r13,r13,8
 		
 		DSTRYSTACKPPC
 		
@@ -2613,8 +2616,7 @@ SetCache:
 		mr	r5,r31
 		
 		add	r5,r5,r4
-		lis	r0,-1
-		ori	r0,r0,0xffe0
+		loadreg r0,0xffffffe0
 		and	r4,r4,r0
 		addi	r5,r5,31
 		and	r5,r5,r0
@@ -2745,8 +2747,7 @@ SetCache:
 		mr	r5,r6
 		
 		add	r5,r5,r4
-		lis	r0,-1
-		ori	r0,r0,0xffe0
+		loadreg	r0,0xffffffe0
 		and	r4,r4,r0
 		addi	r5,r5,31
 		and	r5,r5,r0
@@ -2791,8 +2792,7 @@ SetCache:
 		mr	r5,r6
 		
 		add	r5,r5,r4
-		lis	r0,-1
-		ori	r0,r0,0xffe0
+		loadreg	r0,0xffffffe0
 		and	r4,r4,r0
 		addi	r5,r5,31
 		and	r5,r5,r0
@@ -3495,7 +3495,7 @@ CreateTaskPPC:
 		beq-	.Error04			#Error NoName 
  
 		mr	r29,r3
-		bl	GetLen
+		bl GetLen
  
 		addi	r3,r3,1 
 		mr	r4,r3 
@@ -3534,7 +3534,7 @@ CreateTaskPPC:
 		mr	r4,r22 
 		stw	r4,LN_NAME(r31)
  
-		bl	CopyStr
+		bl CopyStr
  
  		loadreg r4,TASKATTR_SYSTEM
 		li	r5,0 
@@ -3699,14 +3699,12 @@ CreateTaskPPC:
 		stw	r4,LH_TAIL(r5) 
 		stw	r5,LH_TAIL(r3) 
  
-		lis	r0,0 
-		ori	r0,r0,61552
 		loadreg	r0,0xf070
 		stw	r0,4(r26)			#f070 to location 1?? 
 		stw	r25,148(r26)			#Code to location 37 
 		stw	r2,40(r26)			#TOC to location 10 
-		lwz	r3,8000(r2) 
-		stw	r3,0(r26)			#8000(TOC) to location 0?? 
+#		lwz	r3,8000(r2) 
+#		stw	r3,0(r26)			#8000(TOC) to location 0?? 
  
  		loadreg	r4,TASKATTR_BAT
 		lis	r5,0 
@@ -3722,7 +3720,7 @@ CreateTaskPPC:
 		mr.	r3,r3 
 		beq-	.NoBATs				#NoBATs 
  
-		addi	r5,r23,478			#Default BATS in PowerPCBase? 
+		addi	r5,r23,BASE_STOREBAT0-4		#Default BATS in PowerPCBase
 		lis	r3,0 
 		ori	r3,r3,TASKPPC_BAT
 		lwz	r6,TASKPPC_FLAGS(r31) 
@@ -3730,12 +3728,12 @@ CreateTaskPPC:
 		stw	r6,TASKPPC_FLAGS(r31) 
 		b	.GetBATs 
  
-.NoBATs:	addi	r5,r23,542			#Invalid BATS in PowerPCBase? 
+.NoBATs:	addi	r5,r23,BASE_INVALBATS-4		#Invalid BATS in PowerPCBase
 .GetBATs:	lwzu	r0,4(r5)			#PowerPCBase 
 		stwu	r0,4(r4)			#ContextMem 416-476 104-119 
 		bdnz+	.GetBATs 
  
-		addi	r5,r23,542			#Copy to TASKPPC_BATSTORAGE 
+		addi	r5,r23,BASE_INVALBATS-4		#Copy to TASKPPC_BATSTORAGE 
 		subi	r4,r20,4 
 		li	r0,16 
 		mtctr	r0 
@@ -3743,8 +3741,8 @@ CreateTaskPPC:
 		stwu	r0,4(r4) 
 		bdnz+	.ToStorage 
  
-		lwz	r3,18720(r2)			#? 
-		stw	r3,64(r20)			#4 bytes at end of BATSTORAGE? 
+#		lwz	r3,18720(r2)			#? 
+#		stw	r3,64(r20)			#4 bytes at end of BATSTORAGE? 
 		addi	r4,r26,480			#480 in ContextMem (Segment Regs)
  
  		bl WarpSuper
@@ -4027,7 +4025,7 @@ CreateTaskPPC:
 		divwu	r0,r7,r8 
 		stw	r0,TASKPPC_DESIRED(r31)
 		
-		bl	InsertOnPri
+		bl InsertOnPri
 		
 		li	r0,-1 
 		stb	r0,RescheduleFlag(r0)		#Reschedule flag 
@@ -4961,7 +4959,8 @@ SetExceptPPC:
 
 		mr	r3,r6
 		li	r4,0
-		bl	CheckExcSignal
+		
+		bl CheckExcSignal
 
 		mr	r3,r31
 
@@ -5027,6 +5026,8 @@ DeleteTaskPPC:
 .EmptySnoopLst:	lwz	r4,SnoopSem(r0)
 		
 		bl ReleaseSemaphorePPC
+
+		b	.NotTwo				#STUB
 
 		mr	r3,r31
 		bl	0x13354				#? Check for mirror task?
@@ -5100,10 +5101,10 @@ DeleteTaskPPC:
 		
 		bl ReleaseSemaphorePPC
 	
-		lwz	r4,17740(r2)			#Task	(Voyager or Babylon 5?)
-		lwz	r5,17736(r2)			#Signal
+#		lwz	r4,17740(r2)			#Task	(Voyager or Babylon 5?)
+#		lwz	r5,17736(r2)			#Signal
 		
-		bl SignalPPC
+#		bl SignalPPC
 
 		mr.	r29,r29				#This task?
 		beq-	.NotOwnTask2			#no? Skip next
@@ -5130,7 +5131,8 @@ DeleteTaskPPC:
 		stw	r3,0(r4)
 		mr	r5,r31
 		
-		la	r4,130(r0)			#?? Deleted task list at base
+		lwz	r3,PowerPCBase(r0)
+		la	r4,LIST_REMOVEDTASKS(r3)	#Deleted task list at base
 		addi	r4,r4,4				#AddTailPPC
 		lwz	r3,4(r4)
 		stw	r5,4(r4)
@@ -6159,6 +6161,7 @@ SignalPPC:
 .NotChanging:	lwz	r0,TC_SIGRECVD(r30)
 		or	r0,r0,r5
 		stw	r0,TC_SIGRECVD(r30)
+		
 		li	r4,Atomic
 		bl AtomicDone
 
@@ -6191,6 +6194,7 @@ SignalPPC:
 		stw	r7,TASKPPC_ELAPSED2(r30)
 		la	r4,ReadyTasks(r0)
 		mr	r5,r30
+		
 		bl InsertOnPri				#Prio recalculation
 							#r4 = ReadyTasksList r5 = Task
 		li	r4,Atomic
@@ -6202,6 +6206,7 @@ SignalPPC:
 		
 		li	r0,-1
 		stb	r0,RescheduleFlag(r0)
+		
 		bl CauseInterrupt
 
 .SigExit:	lwz	r28,0(r13)
@@ -6231,6 +6236,7 @@ GetMsgPPC:
 		mr	r31,r4
 
 		addi	r4,r31,MP_PPC_SEM
+		
 		bl ObtainSemaphorePPC
 
 		addi	r5,r31,MP_PPC_INTMSG			#Private WarpOS stuff
@@ -6636,7 +6642,7 @@ GetHALInfo:
 
 #********************************************************************************************
 #
-#	void GetHALInfo(HALInfoTagList) // r4
+#	void ChangeMMU(MMUMode) // r4
 #
 #********************************************************************************************
 
@@ -6673,6 +6679,8 @@ ChangeMMU:
 		DSTRYSTACKPPC
 
 		blr
+		
+#********************************************************************************************
 
 GetBATs:
 		mflr	r0
@@ -6736,6 +6744,8 @@ GetBATs:
 		mtlr	r0
 
 		blr
+		
+#********************************************************************************************
 
 StoreBATs:
 		mflr	r0
@@ -7301,7 +7311,7 @@ RemExcHandler:
 
 		mr	r4,r30
 		
-		bl	FreeVecPPC
+		bl FreeVecPPC
 
 .NoXLock:	lwz	r30,0(r13)
 		lwz	r31,4(r13)
@@ -7323,73 +7333,73 @@ RemExcHandler:
 		mr.	r4,r4
 		beq-	.NoMemMCheck
 
-		bl	FreeVecPPC
+		bl FreeVecPPC
 
 .NoMemMCheck:	lwz	r4,EXCDATA_DACCESS(r31)
 		mr.	r4,r4
 		beq-	.NoMemDAccess
 
-		bl	FreeVecPPC
+		bl FreeVecPPC
 
 .NoMemDAccess:	lwz	r4,EXCDATA_IACCESS(r31)
 		mr.	r4,r4
 		beq-	.NoMemIAccess
 
-		bl	FreeVecPPC
+		bl FreeVecPPC
 
 .NoMemIAccess:	lwz	r4,EXCDATA_INTERRUPT(r31)
 		mr.	r4,r4
 		beq-	.NoMemInt
 
-		bl	FreeVecPPC
+		bl FreeVecPPC
 
 .NoMemInt:	lwz	r4,EXCDATA_ALIGN(r31)
 		mr.	r4,r4
 		beq-	.NoMemAlign
 
-		bl	FreeVecPPC
+		bl FreeVecPPC
 
 .NoMemAlign:	lwz	r4,EXCDATA_PROGRAM(r31)
 		mr.	r4,r4
 		beq-	.NoMemProgram
 
-		bl	FreeVecPPC
+		bl FreeVecPPC
 
 .NoMemProgram:	lwz	r4,EXCDATA_FPUN(r31)
 		mr.	r4,r4
 		beq-	.NoMemFPUn
 
-		bl	FreeVecPPC
+		bl FreeVecPPC
 
 .NoMemFPUn:	lwz	r4,EXCDATA_EXCUNKNOWN9(r31)
 		mr.	r4,r4
 		beq-	.NoMemUnknwn9
 
-		bl	FreeVecPPC
+		bl FreeVecPPC
 
 .NoMemUnknwn9:	lwz	r4,EXCDATA_EXCUNKNOWN12(r31)
 		mr.	r4,r4
 		beq-	.NoMemUnknwn12
 
-		bl	FreeVecPPC
+		bl FreeVecPPC
 
 .NoMemUnknwn12:	lwz	r4,EXCDATA_TRACE(r31)
 		mr.	r4,r4
 		beq-	.NoMemTrace
 
-		bl	FreeVecPPC
+		bl FreeVecPPC
 
 .NoMemTrace:	lwz	r4,EXCDATA_PERFMON(r31)
 		mr.	r4,r4
 		beq-	.NoMemPerfMon
 
-		bl	FreeVecPPC
+		bl FreeVecPPC
 
 .NoMemPerfMon:	lwz	r4,EXCDATA_IABR(r31)
 		mr.	r4,r4
 		beq-	.NoMemIABR
 
-		bl	FreeVecPPC
+		bl FreeVecPPC
 
 .NoMemIABR:	lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -7424,7 +7434,7 @@ SetExcHandler:
 		li	r6,0
 		li	r7,0
 		
-		bl	AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.NoMemAvail
@@ -7435,7 +7445,7 @@ SetExcHandler:
 		li	r5,0
 		mr	r6,r31
 		
-		bl	GetTagDataPPC
+		bl GetTagDataPPC
 
 		mr.	r3,r3
 		beq-	.NoExcCode
@@ -7446,7 +7456,7 @@ SetExcHandler:
 		li	r5,0
 		mr	r6,r31
 		
-		bl	GetTagDataPPC
+		bl GetTagDataPPC
 
 		stw	r3,EXCDATA_DATA(r30)
 
@@ -7454,7 +7464,7 @@ SetExcHandler:
 		li	r5,0
 		mr	r6,r31
 		
-		bl	GetTagDataPPC
+		bl GetTagDataPPC
 
 		stw	r3,EXCDATA_NAME(r30)
 
@@ -7462,7 +7472,7 @@ SetExcHandler:
 		li	r5,0
 		mr	r6,r31
 		
-		bl	GetTagDataPPC
+		bl GetTagDataPPC
 
 		extsb	r3,r3
 		stb	r3,EXCDATA_PRI(r30)
@@ -7473,7 +7483,7 @@ SetExcHandler:
 		li	r5,0
 		mr	r6,r31
 		
-		bl	GetTagDataPPC
+		bl GetTagDataPPC
 
 		stw	r3,EXCDATA_FLAGS(r30)
 		rlwinm.	r0,r3,(32-EXC_SMALLCONTEXT),31,31
@@ -7490,7 +7500,7 @@ SetExcHandler:
 		li	r5,0
 		mr	r6,r31
 		
-		bl	GetTagDataPPC
+		bl GetTagDataPPC
 
 		andi.	r0,r28,(1<<EXC_GLOBAL)
 		bne-	.ExcIsGlobal
@@ -7510,7 +7520,7 @@ SetExcHandler:
 		li	r5,0
 		mr	r6,r31
 		
-		bl	GetTagDataPPC
+		bl GetTagDataPPC
 
 		mr.	r3,r3
 		beq-	.NoUnknownTag
@@ -7524,7 +7534,7 @@ SetExcHandler:
 		li	r5,0
 		mr	r6,r31
 		
-		bl	GetTagDataPPC
+		bl GetTagDataPPC
 
 		stw	r3,EXCDATA_EXCID(r30)
 		mr	r29,r3
@@ -7536,7 +7546,7 @@ SetExcHandler:
 		li	r6,0
 		li	r7,0
 		
-		bl	AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.NoMemAvail2
@@ -7551,7 +7561,7 @@ SetExcHandler:
 		li	r6,0
 		li	r7,0
 		
-		bl	AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.NoMemAvail2
@@ -7566,7 +7576,7 @@ SetExcHandler:
 		li	r6,0
 		li	r7,0
 		
-		bl	AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.NoMemAvail2
@@ -7581,7 +7591,7 @@ SetExcHandler:
 		li	r6,0
 		li	r7,0
 		
-		bl	AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.NoMemAvail2
@@ -7596,7 +7606,7 @@ SetExcHandler:
 		li	r6,0
 		li	r7,0
 		
-		bl	AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.NoMemAvail2
@@ -7611,7 +7621,7 @@ SetExcHandler:
 		li	r6,0
 		li	r7,0
 		
-		bl	AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.NoMemAvail2
@@ -7626,7 +7636,7 @@ SetExcHandler:
 		li	r6,0
 		li	r7,0
 		
-		bl	AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.NoMemAvail2
@@ -7641,7 +7651,7 @@ SetExcHandler:
 		li	r6,0
 		li	r7,0
 		
-		bl	AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.NoMemAvail2
@@ -7656,7 +7666,7 @@ SetExcHandler:
 		li	r6,0
 		li	r7,0
 		
-		bl	AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.NoMemAvail2
@@ -7671,7 +7681,7 @@ SetExcHandler:
 		li	r6,0
 		li	r7,0
 		
-		bl	AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.NoMemAvail2
@@ -7686,7 +7696,7 @@ SetExcHandler:
 		li	r6,0
 		li	r7,0
 		
-		bl	AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.NoMemAvail2
@@ -7701,7 +7711,7 @@ SetExcHandler:
 		li	r6,0
 		li	r7,0
 		
-		bl	AllocVecPPC
+		bl AllocVecPPC
 
 		mr.	r3,r3
 		beq-	.NoMemAvail2
@@ -7712,7 +7722,7 @@ SetExcHandler:
 
 .SetExcAtom:	li	r4,Atomic
 		
-		bl	AtomicTest
+		bl AtomicTest
 
 		mr.	r3,r3
 		beq+	.SetExcAtom
@@ -7722,9 +7732,9 @@ SetExcHandler:
 
 		li	r4,Atomic
 		
-		bl	AtomicDone
+		bl AtomicDone
 
-		bl	CauseInterrupt
+		bl CauseInterrupt
 
 		mr.	r26,r26
 		beq-	.NoExcDefined
@@ -7741,7 +7751,7 @@ SetExcHandler:
 
 .NoExcCode:	mr	r4,r30
 
-		bl	FreeVecPPC
+		bl FreeVecPPC
 
 .NoMemAvail:	li	r4,0
 
