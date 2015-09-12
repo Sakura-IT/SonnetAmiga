@@ -37,7 +37,7 @@
 .set RescheduleFlag,115				#626
 .set AllTasks,116				#MLH
 .set NewTasks,128				#MLH, Shared, 32 aligned
-.set SnoopSem,1140				#Pointer
+.set SnoopSem,140				#Pointer
 .set SnoopList,144				#MLH (424)
 .set CurrentPort,156				#610
 .set NumAllTasks,160				#630
@@ -54,13 +54,15 @@
 .set UNUSED,195
 .set AlignmentExcHigh,196
 .set AlignmentExcLow,200
-
+.set WaitListSem,204				#18150
 
 #LibBase:
 
 .set LIST_REMOVEDTASKS,130
 .set LIST_REMOVEDEXC,382
 .set LIST_INSTALLEDEXC,368
+.set LIST_WAITTIME,396
+.set FLAG_WAIT,627
 
 .set EXCDATA_TYPE,8				#Always NT_INTERRUPT
 .set EXCDATA_PRI,9				#This
@@ -509,6 +511,7 @@
 .set SIGF_SINGLE,16
 .set SIGB_DOS,8
 .set SIGF_DOS,256
+.set SIGF_WAIT,1024
 .set MP_FLAGS,14
 .set MP_SIGBIT,15
 .set MP_SIGTASK,16
@@ -649,3 +652,6 @@
 .set MLH_HEAD,0
 .set TV_SECS,0
 .set TV_MICRO,4
+.set WAITTIME_TIME1,14
+.set WAITTIME_TIME2,18
+.set WAITTIME_TASK,22
