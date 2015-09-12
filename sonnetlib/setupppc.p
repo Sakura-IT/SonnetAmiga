@@ -225,12 +225,21 @@ End:		mflr	r4
 		stw	r14,Atomic(r0)
 		stw	r28,4(r29)			#Signal 68k that PPC is initialized
 
-.WInit:		loadreg r6,"INIT"
+		loadreg r6,"INIT"
+.WInit:		la	r28,Init(r0)
+		dcbi	r0,r28
 		lwz	r28,Init(r0)
 		cmplw	r28,r6
 		bne	.WInit
 		
 		isync					#Wait for 68k to set up library
+		
+		li	r4,0
+		li	r3,8
+		mtctr	r3
+.InvBase:	dcbi	r0,r4
+		addi	r4,r4,L1_CACHE_LINE_SIZE
+		bdnz+	.InvBase			#Invalidate zero page
 
 		la	r4,ReadyTasks(r0)
 		bl	.MakeList
@@ -251,6 +260,13 @@ End:		mflr	r4
 		bl	.MakeList
 		
 		la	r4,NewTasks(r0)
+		bl	.MakeList
+		
+		lwz	r3,PowerPCBase(r0)
+		la	r4,LIST_REMOVEDEXC(r3)
+		bl	.MakeList
+		
+		la	r4,LIST_INSTALLEDEXC(r3)
 		bl	.MakeList
 		
 		li	r3,0x7000			#Put Semaphores at 0x7000
