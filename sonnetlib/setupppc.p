@@ -263,6 +263,10 @@ End:		mflr	r4
 		bl	.MakeList
 		
 		lwz	r3,PowerPCBase(r0)
+		
+		la	r4,LIST_REMOVEDTASKS(r3)
+		bl	.MakeList
+		
 		la	r4,LIST_REMOVEDEXC(r3)
 		bl	.MakeList
 		
