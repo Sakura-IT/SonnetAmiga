@@ -7262,7 +7262,7 @@ Warp43:
 		
 #********************************************************************************************
 #
-#	void RemExcHandler(XLock) // r4
+#	void RemExcHandler(XLock) // r4			*NEEDS FUNCTIONALITY IN INTERRUPT
 #
 #********************************************************************************************
 
@@ -7410,7 +7410,7 @@ RemExcHandler:
 		
 #********************************************************************************************
 #
-#	XLock = SetExcHandler(ExcTags) // r3=r4
+#	XLock = SetExcHandler(ExcTags) // r3=r4		*NEEDS FUNCTIONALITY IN INTERRUPT
 #
 #********************************************************************************************		
 
@@ -7977,14 +7977,231 @@ SetExcHandler:
 		lwz	r0,0(r13)
 		addi	r13,r13,4
 		mtlr	r0
-		blr	
-
+		blr
+		
+#********************************************************************************************
+#
+#	signals = WaitTime(signalSet, Time) // r3=r4,r5	*NEEDS FUNCTIONALITY IN INTERRUPT
+#
 #********************************************************************************************
 
-WaitTime:			li	r3,0
-				blr
-RawDoFmtPPC:			li	r3,0
-				blr
+WaitTime:
+		BUILDSTACKPPC
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
+
+		mr	r30,r4
+		mr	r29,r3
+		lwz	r26,RunningTask(r0)
+		
+		lwz	r4,WaitListSem(r0)
+		
+		bl ObtainSemaphorePPC
+
+		li	r0,-1
+		stb	r0,FLAG_WAIT(r29)
+		
+		stwu	r31,-4(r13)
+		mr	r31,r13
+		subi	r13,r13,26
+		subi	r31,r31,26
+
+		loadreg	r4,60000000
+		mr	r28,r5
+		
+		bl	.CalculateTime
+
+		loadreg	r8,60000000
+		divwu	r27,r28,r8
+		mullw	r6,r27,r8
+		sub	r4,r28,r6
+		mr	r28,r3
+		
+		bl	.CalculateTime
+
+.TimeLoop:	mftbu	r4
+		mftbl	r5
+		mftbu	r0
+		cmplw	r0,r4
+		bne+	.TimeLoop
+
+		mtctr	r27
+		mr.	r27,r27
+		beq-	.TimeIsUp
+
+.WaitLoop:	addc	r5,r5,r28
+		addze	r4,r4
+		bdnz+	.WaitLoop
+
+.TimeIsUp:	addc	r5,r5,r3
+		addze	r4,r4
+		li	r9,0
+		stw	r4,WAITTIME_TIME1(r31)
+		stw	r5,WAITTIME_TIME2(r31)
+		stw	r26,WAITTIME_TASK(r31)
+		li	r0,0
+		stb	r0,LN_PRI(r31)
+		li	r0,0
+		stb	r0,LN_TYPE(r31)
+		lwz	r0,LN_NAME(r26)
+		stw	r0,LN_NAME(r31)
+		addi	r4,r29,LIST_WAITTIME
+		mr	r5,r31
+		
+		lwz	r3,0(r4)			#AddHeadPPC
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+		
+		li	r0,0		
+		stb	r0,FLAG_WAIT(r29)
+
+		lwz	r4,WaitListSem(r0)
+		
+		bl ReleaseSemaphorePPC
+
+		mr	r4,r30
+		ori	r4,r4,SIGF_WAIT
+		mr	r27,r4
+
+		bl WaitPPC
+
+		mr	r6,r3
+		li	r0,-1
+		stb	r0,FLAG_WAIT(r29)
+
+.WaitTimeAtom:	li	r4,Atomic
+		
+		bl AtomicTest
+
+		mr.	r3,r3
+		beq+	.WaitTimeAtom
+
+		lwz	r26,RunningTask(r0)
+		lwz	r4,TC_SIGRECVD(r26)
+		or	r5,r6,r4
+		rlwinm.	r0,r5,22,31,31
+		bne-	.WrongSignal
+
+		mr	r4,r31
+		
+		lwz	r3,0(r4)			#RemovePPC
+		lwz	r4,4(r4)
+		stw	r4,4(r3)
+		stw	r3,0(r4)
+		
+		b	.CorrectSignal
+
+.WrongSignal:	ori	r4,r4,SIGF_WAIT
+		xori	r4,r4,SIGF_WAIT
+		stw	r4,TC_SIGRECVD(r26)
+
+.CorrectSignal:	li	r4,Atomic
+
+		bl AtomicDone
+
+		li	r0,0
+		stb	r0,FLAG_WAIT(r29)
+		mr	r30,r6
+		ori	r30,r30,SIGF_WAIT
+		xori	r30,r30,SIGF_WAIT
+		addi	r31,r31,26
+		mr	r13,r31
+		lwz	r31,0(r13)
+		addi	r13,r13,4
+
+		mr	r3,r30
+		
+		lwz	r26,0(r13)
+		lwz	r27,4(r13)
+		lwz	r28,8(r13)
+		lwz	r29,12(r13)
+		lwz	r30,16(r13)
+		lwz	r31,20(r13)
+		addi	r13,r13,24
+
+		DSTRYSTACKPPC
+
+		blr
+		
+#********************************************************************************************		
+
+.CalculateTime:		
+		stw	r2,20(r1)
+		mflr	r0
+		stw	r0,8(r1)
+		mfcr	r0
+		stw	r0,4(r1)
+
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-44(r1)
+		
+		loadreg	r5,SonnetBusClock
+		
+		mr	r6,r4
+		mulhw	r3,r5,r6
+		mullw	r4,r5,r6
+
+		loadreg	r5,4000000
+
+		bl	.Calculator
+		
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r0,8(r1)
+		mtlr	r0
+		lwz	r0,4(r1)
+		mtcr	r0
+		lwz	r2,20(r1)
+		
+		blr
+
+.Calculator:	li	r0,32
+		mtctr	r0
+		li	r6,0
+		mr.	r3,r3
+		
+.DoCalcLoop:	bge-	.XNotNeg
+
+		addc	r4,r4,r4
+		adde	r3,r3,r3
+		add	r6,r6,r6
+		b	.XWasNeg
+		
+.XNotNeg:	addc	r4,r4,r4
+		adde	r3,r3,r3
+		add	r6,r6,r6
+		cmplw	r5,r3
+		bgt-	.SkipNext
+		
+.XWasNeg:	sub.	r3,r3,r5
+		addi	r6,r6,1
+.SkipNext:	bdnz+	.DoCalcLoop
+
+		mr	r3,r6
+		
+		blr
+
+#********************************************************************************************
+#
+#	NextData = RawDoFmtPPC(FormatString, DataStream, PutChProc, PutChData) // r3=r4,r5,r6,r7
+#
+#********************************************************************************************
+
+RawDoFmtPPC:	BUILDSTACKPPC
+
+		li	r3,0
+		
+		DSTRYSTACKPPC
+		
+		blr
 
 #********************************************************************************************
 EndFunctions:
