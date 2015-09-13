@@ -270,6 +270,9 @@ End:		mflr	r4
 		la	r4,LIST_REMOVEDEXC(r3)
 		bl	.MakeList
 		
+		la	r4,LIST_READYEXC(r3)
+		bl	.MakeList
+		
 		la	r4,LIST_INSTALLEDEXC(r3)
 		bl	.MakeList
 		
@@ -2125,21 +2128,52 @@ TestRoutine:	b	.IntReturn
 		isync					#Also reenable FPU
 		sync
 		
-		lwz	r3,PowerPCBase(r0)
+.ListLoop:	lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_READYEXC(r3)
 
-		lwz	r5,LH_TAILPRED(r4)
-		cmplw	r4,r5
-		beq	.NoExcHandlers
+		lwz	r5,0(r4)
+		lwz	r3,0(r5)
+		mr.	r3,r3
+		beq-	.NoExcHandlers
+		stw	r3,0(r4)
+		stw	r4,4(r3)
+		mr	r3,r5
 				
-		nop
+		b	.ListLoop
 		
-.NoExcHandlers:	la	r4,LIST_REMOVEDEXC(r3)
-		lwz	r5,LH_TAILPRED(r4)
-		cmplw	r4,r5
-		beq	.NoRemExc
+.NoExcHandlers:	lwz	r3,PowerPCBase(r0)
+		la	r4,LIST_REMOVEDEXC(r3)
 		
-		nop		
+		lwz	r5,0(r4)			#RemHeadPPC
+		lwz	r3,0(r5)
+		mr.	r3,r3
+		beq-	.NoRemExc
+		stw	r3,0(r4)
+		stw	r4,4(r3)
+		mr	r7,r5
+		
+		li	r5,12
+		mtctr	r5
+		la	r6,EXCDATA_LASTEXC(r7)
+		
+.NextExc:	lwzu	r4,4(r6)
+		mr.	r4,r4
+		beq	.NotInstalled
+		
+		lwz	r3,0(r4)			#RemovePPC
+		lwz	r4,4(r4)
+		stw	r4,4(r3)
+		stw	r3,0(r4)
+		
+.NotInstalled:	bdnz+	.NextExc
+		
+		lwz	r6,EXCDATA_LASTEXC(r7)
+		lwz	r7,EXCDATA_FLAGS(r6)
+		ori	r7,r7,(1<<EXC_ACTIVE)
+		xori	r7,r7,(1<<EXC_ACTIVE)
+		stw	r7,EXCDATA_FLAGS(r6)
+		
+		b	.NoExcHandlers
 		
 .NoRemExc:	b	.RDecInt
 		
