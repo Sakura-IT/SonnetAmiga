@@ -273,6 +273,42 @@ End:		mflr	r4
 		la	r4,LIST_INSTALLEDEXC(r3)
 		bl	.MakeList
 		
+		la	r4,LIST_EXCMCHECK(r3)
+		bl	.MakeList
+		
+		la	r4,LIST_EXCDACCESS(r3)
+		bl	.MakeList
+		
+		la	r4,LIST_EXCIACCESS(r3)
+		bl	.MakeList
+		
+		la	r4,LIST_EXCALIGN(r3)
+		bl	.MakeList
+		
+		la	r4,LIST_EXCPROGRAM(r3)
+		bl	.MakeList
+		
+		la	r4,LIST_EXCFPUN(r3)
+		bl	.MakeList
+		
+		la	r4,LIST_EXCDECREMENTER(r3)
+		bl	.MakeList
+		
+		la	r4,LIST_EXCSYSTEMCALL(r3)
+		bl	.MakeList
+		
+		la	r4,LIST_EXCTRACE(r3)
+		bl	.MakeList
+		
+		la	r4,LIST_EXCPERFMON(r3)
+		bl	.MakeList
+		
+		la	r4,LIST_EXCIABR(r3)
+		bl	.MakeList
+		
+		la	r4,LIST_EXCINTERRUPT(r3)
+		bl	.MakeList
+		
 		li	r3,0x7000			#Put Semaphores at 0x7000
 		li	r6,0x7200			#Put Semaphores memory at 0x7200
 		
