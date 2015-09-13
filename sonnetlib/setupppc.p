@@ -1543,7 +1543,12 @@ EInt:		b	.FPUnav
 		
 .MsgTPPC:	la	r4,NewTasks(r0)
 		
-		LIBCALLPOWERPC AddTailPPC
+		addi	r4,r4,4				#AddTailPPC
+		lwz	r3,4(r4)
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
 		
 .NxtInQ:	lis	r3,EUMB
 		li	r4,IPHPR
@@ -1591,12 +1596,20 @@ EInt:		b	.FPUnav
 .GotOneWait:			
 		mr	r6,r4
 		
-		LIBCALLPOWERPC	RemovePPC
+		lwz	r3,0(r4)			#RemovePPC
+		lwz	r4,4(r4)
+		stw	r4,4(r3)
+		stw	r3,0(r4)
 		
 		mr	r5,r6
 		la	r4,ReadyTasks(r0)
 		
-		LIBCALLPOWERPC AddTailPPC
+		addi	r4,r4,4				#AddTailPPC
+		lwz	r3,4(r4)
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
 
 .EndOfWaitList:	
 		lwz	r9,RunningTask(r0)
@@ -1606,9 +1619,15 @@ EInt:		b	.FPUnav
 .NewTask:	la	r4,NewTasks(r0)
 		mr	r6,r4
 
-		LIBCALLPOWERPC RemHeadPPC
+		lwz	r5,0(r4)			#RemHeadPPC
+		lwz	r3,0(r5)
+		mr.	r3,r3
+		beq-	.NoNode5
+		stw	r3,0(r4)
+		stw	r4,4(r3)
+		mr	r3,r5
 	
-		mr.	r9,r3
+.NoNode5:	mr.	r9,r3
 		beq	.ReturnToUser
 
 		mr	r3,r9
@@ -1812,9 +1831,15 @@ TestRoutine:	b	.IntReturn
 		
 		la	r4,ReadyTasks(r0)
 		
-		LIBCALLPOWERPC RemHeadPPC
+		lwz	r5,0(r4)			#RemHeadPPC
+		lwz	r3,0(r5)
+		mr.	r3,r3
+		beq-	.NoNode3
+		stw	r3,0(r4)
+		stw	r4,4(r3)
+		mr	r3,r5
 		
-		mr.	r9,r3
+.NoNode3:	mr.	r9,r3
 		
 		beq	.NewTask
 
@@ -1838,17 +1863,29 @@ TestRoutine:	b	.IntReturn
 		
 		la	r4,NewTasks(r0)
 		mr	r6,r4
+		
+		lwz	r5,0(r4)			#RemHeadPPC
+		lwz	r3,0(r5)
+		mr.	r3,r3
+		beq-	.NoNode1
+		stw	r3,0(r4)
+		stw	r4,4(r3)
+		mr	r3,r5
 	
-		LIBCALLPOWERPC RemHeadPPC
-	
-		mr.	r9,r3
+.NoNode1:	mr.	r9,r3
 		bne	.SwitchNew			#Dispatch fixed bug
 
 		la	r4,ReadyTasks(r0)
 	
-		LIBCALLPOWERPC RemHeadPPC
+		lwz	r5,0(r4)			#RemHeadPPC
+		lwz	r3,0(r5)
+		mr.	r3,r3
+		beq-	.NoNode2
+		stw	r3,0(r4)
+		stw	r4,4(r3)
+		mr	r3,r5
 	
-		mr.	r9,r3	
+.NoNode2:	mr.	r9,r3	
 		bne	.SwitchOld
 		
 		b	.ReturnToUser
@@ -1864,7 +1901,12 @@ TestRoutine:	b	.IntReturn
 		
 		bl	.StoreContext
 		
-		LIBCALLPOWERPC AddTailPPC
+		addi	r4,r4,4				#AddTailPPC
+		lwz	r3,4(r4)
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
 		
 		b	.LoadContext
 	
@@ -1878,7 +1920,12 @@ TestRoutine:	b	.IntReturn
 		
 		bl	.StoreContext
 		
-		LIBCALLPOWERPC AddTailPPC
+		addi	r4,r4,4				#AddTailPPC
+		lwz	r3,4(r4)
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
 
 		b	.Dispatch
 		
@@ -2063,16 +2110,27 @@ TestRoutine:	b	.IntReturn
 		
 		bl	.StoreContext
 		
-		LIBCALLPOWERPC AddTailPPC
+		addi	r4,r4,4				#AddTailPPC
+		lwz	r3,4(r4)
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
 		
 		li	r4,0
 		stw	r4,RunningTask(r0)
 
 		la	r4,ReadyTasks(r0)
 
-		LIBCALLPOWERPC RemHeadPPC
+		lwz	r5,0(r4)			#RemHeadPPC
+		lwz	r3,0(r5)
+		mr.	r3,r3
+		beq-	.NoNode4
+		stw	r3,0(r4)
+		stw	r4,4(r3)
+		mr	r3,r5
 
-		mr.	r9,r3
+.NoNode4:	mr.	r9,r3
 		beq	.DoIdle
 		
 		li	r0,TS_RUN
