@@ -2131,13 +2131,17 @@ TestRoutine:	b	.IntReturn
 .ListLoop:	lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_READYEXC(r3)
 
-		lwz	r5,0(r4)
+		lwz	r5,0(r4)			#RemHeadPPC
 		lwz	r3,0(r5)
 		mr.	r3,r3
 		beq-	.NoExcHandlers
 		stw	r3,0(r4)
 		stw	r4,4(r3)
-		mr	r3,r5
+		mr	r7,r5
+			
+		lwz	r6,EXCDATA_FLAGS(r7)
+		ori	r6,r6,(1<<EXC_ACTIVE)
+		stw	r6,EXCDATA_FLAGS(r7)
 				
 		b	.ListLoop
 		
@@ -2152,6 +2156,7 @@ TestRoutine:	b	.IntReturn
 		stw	r4,4(r3)
 		mr	r7,r5
 		
+		mfctr	r0
 		li	r5,12
 		mtctr	r5
 		la	r6,EXCDATA_LASTEXC(r7)
@@ -2167,6 +2172,7 @@ TestRoutine:	b	.IntReturn
 		
 .NotInstalled:	bdnz+	.NextExc
 		
+		mtctr	r0
 		lwz	r6,EXCDATA_LASTEXC(r7)
 		lwz	r7,EXCDATA_FLAGS(r6)
 		ori	r7,r7,(1<<EXC_ACTIVE)
