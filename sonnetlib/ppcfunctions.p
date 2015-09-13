@@ -5488,7 +5488,7 @@ AllocPooledPPC:
 		
 .DoPuddle:	la	r4,POOL_PUDDLELIST(r31)
 		lwz	r29,LH_TAILPRED(r4)
-		cmplw	r4,r9
+		cmplw	r4,r29
 		beq	.MakeHeader
 		lwz	r4,LH_HEAD(r4)
 		
@@ -7776,7 +7776,7 @@ SetExcHandler:
 		stwu	r0,-4(r13)
 		mr	r6,r3
 		lwz	r4,PowerPCBase(r0)
-		addi	r4,r4,LIST_INSTALLEDEXC
+		addi	r4,r4,LIST_READYEXC
 		lwz	r5,EXCDATA_MCHECK(r6)
 		mr.	r5,r5
 		beq-	.NoVMCheck
