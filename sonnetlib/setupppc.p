@@ -2124,7 +2124,24 @@ TestRoutine:	b	.IntReturn
 		mtmsr	r5				#Reenable MMU (can affect srr0/srr1 acc Docs)
 		isync					#Also reenable FPU
 		sync
-		b	.RDecInt
+		
+		lwz	r3,PowerPCBase(r0)
+		la	r4,LIST_READYEXC(r3)
+
+		lwz	r5,LH_TAILPRED(r4)
+		cmplw	r4,r5
+		beq	.NoExcHandlers
+				
+		nop
+		
+.NoExcHandlers:	la	r4,LIST_REMOVEDEXC(r3)
+		lwz	r5,LH_TAILPRED(r4)
+		cmplw	r4,r5
+		beq	.NoRemExc
+		
+		nop		
+		
+.NoRemExc:	b	.RDecInt
 		
 #********************************************************************************************
 
