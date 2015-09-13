@@ -82,8 +82,8 @@
 .set EXCDATA_ALIGN,62
 .set EXCDATA_PROGRAM,66
 .set EXCDATA_FPUN,70
-.set EXCDATA_EXCUNKNOWN9,74
-.set EXCDATA_EXCUNKNOWN12,78
+.set EXCDATA_DECREMENTER,74
+.set EXCDATA_SYSTEMCALL,78
 .set EXCDATA_TRACE,82
 .set EXCDATA_PERFMON,86
 .set EXCDATA_IABR,90
@@ -186,8 +186,8 @@
 .set EXC_ALIGN,6             				#alignment exception
 .set EXC_PROGRAM,7           				#program exception
 .set EXC_FPUN,8              				#FP unavailable exception
-.set EXC_UNKNOWN9,9					#Not documented
-.set EXC_UNKNOWN12,12					#Not documented
+.set EXC_DECREMENTER,9					#Decrementer exception
+.set EXC_SYSTEMCALL,12					#sc instruction exception
 .set EXC_TRACE,13            				#trace exception
 .set EXC_PERFMON,15          				#performance monitor exception
 .set EXC_IABR,19 					#IA breakpoint exception

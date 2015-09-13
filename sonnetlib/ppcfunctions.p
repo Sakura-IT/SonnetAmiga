@@ -7371,19 +7371,19 @@ RemExcHandler:
 
 		bl FreeVecPPC
 
-.NoMemFPUn:	lwz	r4,EXCDATA_EXCUNKNOWN9(r31)
+.NoMemFPUn:	lwz	r4,EXCDATA_DECREMENTER(r31)
 		mr.	r4,r4
-		beq-	.NoMemUnknwn9
+		beq-	.NoMemDec
 
 		bl FreeVecPPC
 
-.NoMemUnknwn9:	lwz	r4,EXCDATA_EXCUNKNOWN12(r31)
+.NoMemDec:	lwz	r4,EXCDATA_SYSTEMCALL(r31)
 		mr.	r4,r4
-		beq-	.NoMemUnknwn12
+		beq-	.NoMemSC
 
 		bl FreeVecPPC
 
-.NoMemUnknwn12:	lwz	r4,EXCDATA_TRACE(r31)
+.NoMemSC:	lwz	r4,EXCDATA_TRACE(r31)
 		mr.	r4,r4
 		beq-	.NoMemTrace
 
@@ -7643,8 +7643,8 @@ SetExcHandler:
 
 		stw	r3,EXCDATA_FPUN(r30)
 		mr	r26,r3
-.NoFPUnavail:	rlwinm.	r0,r29,(32-EXC_UNKNOWN9),31,31
-		beq-	.NoUnknown2
+.NoFPUnavail:	rlwinm.	r0,r29,(32-EXC_DECREMENTER),31,31
+		beq-	.NoDecrementer
 
 		li	r4,46
 		loadreg	r5,0x10001
@@ -7656,10 +7656,10 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoMemAvail2
 
-		stw	r3,EXCDATA_EXCUNKNOWN9(r30)
+		stw	r3,EXCDATA_DECREMENTER(r30)
 		mr	r26,r3
-.NoUnknown2:	rlwinm.	r0,r29,(32-EXC_UNKNOWN12),31,31
-		beq-	.NoUnknown3
+.NoDecrementer:	rlwinm.	r0,r29,(32-EXC_SYSTEMCALL),31,31
+		beq-	.NoSC
 
 		li	r4,46
 		loadreg	r5,0x10001
@@ -7671,9 +7671,9 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoMemAvail2
 
-		stw	r3,EXCDATA_EXCUNKNOWN12(r30)
+		stw	r3,EXCDATA_SYSTEMCALL(r30)
 		mr	r26,r3
-.NoUnknown3:	rlwinm.	r0,r29,(32-EXC_TRACE),31,31
+.NoSC:		rlwinm.	r0,r29,(32-EXC_TRACE),31,31
 		beq-	.NoTrace
 
 		li	r4,46
@@ -7875,11 +7875,11 @@ SetExcHandler:
 		stw	r4,4(r5)
 		stw	r5,4(r3)
 		
-.NoVFPUn:	lwz	r5,EXCDATA_EXCUNKNOWN9(r6)
+.NoVFPUn:	lwz	r5,EXCDATA_DECREMENTER(r6)
 		mr.	r5,r5
-		beq-	.NoVUnknown9
+		beq-	.NoVDec
 		
-		loadreg	r3,(1<<EXC_UNKNOWN9)
+		loadreg	r3,(1<<EXC_DECREMENTER)
 		
 		bl	.CopyIt
 		
@@ -7889,11 +7889,11 @@ SetExcHandler:
 		stw	r4,4(r5)
 		stw	r5,4(r3)
 		
-.NoVUnknown9:	lwz	r5,EXCDATA_EXCUNKNOWN12(r6)
+.NoVDec:	lwz	r5,EXCDATA_SYSTEMCALL(r6)
 		mr.	r5,r5
-		beq-	.NoVUnknown12
+		beq-	.NoVSC
 		
-		loadreg	r3,(1<<EXC_UNKNOWN12)
+		loadreg	r3,(1<<EXC_SYSTEMCALL)
 		
 		bl	.CopyIt
 		
@@ -7903,7 +7903,7 @@ SetExcHandler:
 		stw	r4,4(r5)
 		stw	r5,4(r3)
 		
-.NoVUnknown12:	lwz	r5,EXCDATA_TRACE(r6)
+.NoVSC:		lwz	r5,EXCDATA_TRACE(r6)
 		mr.	r5,r5
 		beq-	.NoVTrace
 		
