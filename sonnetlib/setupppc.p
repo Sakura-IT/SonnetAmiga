@@ -1433,12 +1433,19 @@ EInt:		b	.FPUnav
 		b	.DecInt
 
 		mtsprg2	r0
-		mfsrr0	r0
-		mtsprg0	r0
 		mfsrr1	r0
 		mtsprg1	r0
 		mfxer	r0
 		mtsprg3	r0
+
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
+		isync					#Also reenable FPU
+		sync
+
+		mfsrr0	r0
+		mtsprg0	r0
 
 		BUILDSTACKPPC
 
@@ -1449,12 +1456,6 @@ EInt:		b	.FPUnav
 		stwu	r7,-4(r13)
 		stwu	r8,-4(r13)
 		stwu	r9,-4(r13)
-
-		mfmsr	r5
-		ori	r5,r5,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r5				#Reenable MMU (can affect srr0/srr1 acc Docs)
-		isync					#Also reenable FPU
-		sync
 
 		lis	r3,EUMBEPICPROC
 		lwz	r5,EPIC_IACK(r3)		#Read IACKR to acknowledge interrupt
@@ -1502,7 +1503,7 @@ EInt:		b	.FPUnav
 		li	r4,6				#MsgLen/Cache_Line
 		mtctr	r4
 .InvMsg:	dcbi	r0,r6
-		addi	r6,r24,L1_CACHE_LINE_SIZE
+		addi	r6,r6,L1_CACHE_LINE_SIZE
 		bdnz	.InvMsg
 		
 		sync
@@ -1638,7 +1639,7 @@ EInt:		b	.FPUnav
 		li	r4,32				#TaskLen/Cache_Line
 		mtctr	r4
 .InvTask:	dcbi	r0,r6
-		addi	r6,r24,L1_CACHE_LINE_SIZE
+		addi	r6,r6,L1_CACHE_LINE_SIZE
 		bdnz	.InvTask
 		
 		isync		
@@ -2139,7 +2140,8 @@ TestRoutine:	b	.IntReturn
 		
 		b	.LoadContext
 
-.DoIdle:	loadreg	r19,IdleTask			#Start hardcoded at 0x7400
+.DoIdle:	loadreg	r0,IdleTask			#Start hardcoded at 0x7400
+		mtsrr0	r0
 
 		loadreg	r1,StackSize-0x20		#System stack in unused mem (See sonnet.s)
 		
@@ -2147,25 +2149,30 @@ TestRoutine:	b	.IntReturn
 		subi	r13,r1,4
 		stwu	r1,-284(r1)
 		
-		mfsrr1	r18
-		ori	r18,r18,PSL_PR|PSL_EE
-		mtsrr1 	r18		
-		mtsrr0	r19
+		mfsprg1	r0
+		mtsrr1	r0		
 		
-		li	r19,0
-		stb	r19,ExceptionMode(r0)
+		li	r0,0
+		stb	r0,ExceptionMode(r0)
 		
 		rfi
 
 #********************************************************************************************
 		
 .DecInt:	mtsprg2	r0
-		mfsrr0	r0
-		mtsprg0	r0
 		mfsrr1	r0
 		mtsprg1	r0
 		mfxer	r0
 		mtsprg3	r0
+
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
+		isync					#Also reenable FPU
+		sync
+
+		mfsrr0	r0
+		mtsprg0	r0
 
 		BUILDSTACKPPC
 
@@ -2179,12 +2186,6 @@ TestRoutine:	b	.IntReturn
 
 		loadreg r5,"DECI"
 		stw	r5,0xf4(r0)
-		
-		mfmsr	r5
-		ori	r5,r5,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r5				#Reenable MMU (can affect srr0/srr1 acc Docs)
-		isync					#Also reenable FPU
-		sync
 		
 .ListLoop:	lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_READYEXC(r3)
@@ -2362,6 +2363,13 @@ PrInt:							#Privilege Exception
 		mfcr	r3
 		mtsprg2	r3
 		mtsprg3	r0
+		
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
+		isync					#Also reenable FPU
+		sync
+		
 		mfsrr0	r3
 		lwz	r0,ViolationAddress(r0)
 		cmplw	r0,r3
