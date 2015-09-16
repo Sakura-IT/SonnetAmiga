@@ -195,8 +195,8 @@ Sonnet	move.l d7,a0
 	move.l #$0000F0FF,OMBAR(a3)		;Processor outbound mem at $FFF00000
 
 	move.l a2,d4
-EndDrty	move.l #$48003f00,(a5)
-	lea $3f00(a5),a5
+EndDrty	move.l #$48002f00,(a5)
+	lea $2f00(a5),a5
 	lea PPCCode(pc),a2
 	move.l #PPCLen,d6
 	lsr.l #2,d6
@@ -316,7 +316,7 @@ MoveSon	move.l (a0)+,(a1)+
 	move.l a2,IS_DATA(a1)
 	lea IntName(pc),a2
 	move.l a2,LN_NAME(a1)
-	moveq.l #10,d0
+	moveq.l #15,d0
 	move.b d0,LN_PRI(a1)
 	moveq.l #NT_INTERRUPT,d0
 	move.b d0,LN_TYPE(a1)
