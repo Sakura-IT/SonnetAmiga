@@ -694,7 +694,7 @@ Caches:		mfspr	r4,HID0
 		mtspr	HID0,r4
 		sync
 		
-#		blr					#REMOVE ME FOR L1 CACHE
+		blr					#REMOVE ME FOR L1 CACHE
 							#L1 cache off for now
 							#to fix coherancy problems
 		mfspr	r4,HID0
@@ -1437,15 +1437,14 @@ EInt:		b	.FPUnav
 		mtsprg1	r0
 		mfxer	r0
 		mtsprg3	r0
+		mfsrr0	r0
+		mtsprg0	r0
 
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
 		isync					#Also reenable FPU
 		sync
-
-		mfsrr0	r0
-		mtsprg0	r0
 
 		BUILDSTACKPPC
 
@@ -2164,15 +2163,14 @@ TestRoutine:	b	.IntReturn
 		mtsprg1	r0
 		mfxer	r0
 		mtsprg3	r0
+		mfsrr0	r0
+		mtsprg0	r0
 
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
 		isync					#Also reenable FPU
 		sync
-
-		mfsrr0	r0
-		mtsprg0	r0
 
 		BUILDSTACKPPC
 
@@ -2187,8 +2185,8 @@ TestRoutine:	b	.IntReturn
 		loadreg r5,"DECI"
 		stw	r5,0xf4(r0)
 		
-.ListLoop:	lwz	r3,PowerPCBase(r0)
-		la	r4,LIST_READYEXC(r3)
+.ListLoop:	lwz	r9,PowerPCBase(r0)
+		la	r4,LIST_READYEXC(r9)
 
 		lwz	r5,0(r4)			#RemHeadPPC
 		lwz	r3,0(r5)
@@ -2196,13 +2194,104 @@ TestRoutine:	b	.IntReturn
 		beq-	.NoExcHandlers
 		stw	r3,0(r4)
 		stw	r4,4(r3)
-		mr	r7,r5
 			
-		lwz	r6,EXCDATA_FLAGS(r7)
+		lwz	r8,EXCDATA_EXCID(r5)
+		
+		rlwinm.	r0,r8,(32-EXC_MCHECK),31,31
+		beq	.NoMCheck
+		
+		la	r4,LIST_EXCMCHECK(r9)
+		b	.InsertOnPri
+		
+.NoMCheck:	rlwinm.	r0,r8,(32-EXC_DACCESS),31,31
+		beq	.NoDAccess
+		
+		la	r4,LIST_EXCDACCESS(r9)
+		b	.InsertOnPri
+		
+.NoDAccess:	rlwinm.	r0,r8,(32-EXC_IACCESS),31,31
+		beq	.NoIAccess
+		
+		la	r4,LIST_EXCIACCESS(r9)
+		b	.InsertOnPri
+		
+.NoIAccess:	rlwinm.	r0,r8,(32-EXC_INTERRUPT),31,31
+		beq	.NoInterrupt
+		
+		la	r4,LIST_EXCINTERRUPT(r9)
+		b	.InsertOnPri
+		
+.NoInterrupt:	rlwinm.	r0,r8,(32-EXC_ALIGN),31,31
+		beq	.NoAlign
+		
+		la	r4,LIST_EXCALIGN(r9)
+		b	.InsertOnPri
+		
+.NoAlign:	rlwinm.	r0,r8,(32-EXC_PROGRAM),31,31
+		beq	.NoProgram
+		
+		la	r4,LIST_EXCPROGRAM(r9)
+		b	.InsertOnPri
+		
+.NoProgram:	rlwinm.	r0,r8,(32-EXC_FPUN),31,31
+		beq	.NoFPUn
+		
+		la	r4,LIST_EXCFPUN(r9)
+		b	.InsertOnPri
+				
+.NoFPUn:	rlwinm.	r0,r8,(32-EXC_DECREMENTER),31,31
+		beq	.NoDecrementer
+		
+		la	r4,LIST_EXCDECREMENTER(r9)
+		b	.InsertOnPri
+		
+.NoDecrementer:	rlwinm.	r0,r8,(32-EXC_SYSTEMCALL),31,31
+		beq	.NoSystemCall
+		
+		la	r4,LIST_EXCSYSTEMCALL(r9)
+		b	.InsertOnPri		
+		
+.NoSystemCall:	rlwinm.	r0,r8,(32-EXC_TRACE),31,31
+		beq	.NoTrace
+		
+		la	r4,LIST_EXCTRACE(r9)
+		b	.InsertOnPri		
+
+.NoTrace:	rlwinm.	r0,r8,(32-EXC_PERFMON),31,31
+		beq	.NoPerfMon
+		
+		la	r4,LIST_EXCPERFMON(r9)
+		b	.InsertOnPri
+
+.NoPerfMon:	rlwinm.	r0,r8,(32-EXC_IABR),31,31
+		beq	.NoIABR
+		
+		la	r4,LIST_EXCIABR(r9)
+		b	.InsertOnPri
+		
+.NoIABR:	lwz	r6,EXCDATA_FLAGS(r5)
 		ori	r6,r6,(1<<EXC_ACTIVE)
-		stw	r6,EXCDATA_FLAGS(r7)
+		stw	r6,EXCDATA_FLAGS(r5)
 				
 		b	.ListLoop
+		
+.InsertOnPri:	lbz	r3,LN_PRI(r5)			#EnqueuePPC
+		extsb	r3,r3
+		lwz	r6,0(r4)
+.InsertLoop1:	mr	r4,r6
+		lwz	r6,0(r4)
+		mr.	r6,r6
+		beq-	.InsertLink1
+		lbz	r7,LN_PRI(r4)
+		extsb	r7,r7
+		cmpw	r3,r7
+		ble+	.InsertLoop1
+		lwz	r3,4(r4)
+.InsertLink1:	stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
+		b	.NoIABR		
 		
 .NoExcHandlers:	lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_REMOVEDEXC(r3)
@@ -2245,10 +2334,11 @@ TestRoutine:	b	.IntReturn
 #********************************************************************************************
 
 .BreakPoint:	
-		mfmsr	r15
-		ori	r15,r15,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r15				#Reenable MMU (can affect srr0/srr1 acc Docs)
-		isync					#Also reenable FPU
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0				#Reenable MMU & FPU
+		isync
+		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_DCE
 		xori	r0,r0,HID0_DCE
@@ -2282,6 +2372,8 @@ TestRoutine:	b	.IntReturn
 		stw	r3,0xf4(r0)
 		mfsrr0	r3
 		stw	r3,0xf8(r0)
+		mfsrr1	r3
+		stw	r3,0xfc(r0)
 .HaltFP:	b	.HaltFP
 
 #********************************************************************************************
@@ -2362,14 +2454,6 @@ PrInt:							#Privilege Exception
 		mtsprg1	r3
 		mfcr	r3
 		mtsprg2	r3
-		mtsprg3	r0
-		
-		mfmsr	r0
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
-		isync					#Also reenable FPU
-		sync
-		
 		mfsrr0	r3
 		lwz	r0,ViolationAddress(r0)
 		cmplw	r0,r3
