@@ -14,7 +14,7 @@
 .set SonnetBase,0
 .set SysBase,4
 .set PPCMemHeader,8
-.set CPUInfo,12
+.set UNUSED,12
 .set CPUHID0,16
 .set CPUHID1,20
 .set CPUSDR1,24
@@ -55,6 +55,7 @@
 .set AlignmentExcHigh,196
 .set AlignmentExcLow,200
 .set WaitListSem,204				#18150
+.set CPUInfo,208
 
 #LibBase:
 
