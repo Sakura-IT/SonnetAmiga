@@ -694,7 +694,7 @@ Caches:		mfspr	r4,HID0
 		mtspr	HID0,r4
 		sync
 		
-		blr					#REMOVE ME FOR L1 CACHE
+#		blr					#REMOVE ME FOR L1 CACHE
 							#L1 cache off for now
 							#to fix coherancy problems
 		mfspr	r4,HID0
