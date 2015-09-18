@@ -1,0 +1,80 @@
+wosdb history
+=============
+
+
+V0.4c	10-Mar-01
+	o An access to 0x00000004 caused a DSI exception, which has to
+	  be emulated by the WarpUp kernel. An ugly side-effect is, that
+	  currently the instruction directly following this access can't
+	  be traced and will be skipped in trace-mode.
+	o New PPC disasssembler module 1.3, which fixes float-instructions
+	  with four operands (the last two ones were swapped).
+
+V0.4b	09-Nov-00
+	o New PPC disassembler module V1.2, which fixes mffs, mtfsf, mtfsfi.
+
+
+V0.4a	05-Mar-00
+	o HUNK_RELOC32SHORT or HUNK_DREL32 hunks are correctly recognized
+	  now. Before the symbols disappeared, when your executable
+	  contained such a hunk (which happened often with StormC or
+	  PowerAsm generated executables).
+
+
+V0.4	26-Feb-00
+	o Fixed symbol names shown as return address during stack
+	  frame trace-back.
+
+
+V0.3c	19-Feb-00
+	o New PPC disassembler module V1.1, which recognizes fabs.
+
+
+V0.3b	30-Jan-00
+	o Year 2000 update.
+	o Using new PPC disassembler module V1.0, which fixes the
+	  instructions stfsx, lfdx, etc..
+
+
+V0.3a	07-May-99
+	o '?' command is no longer repeatable by hitting return.
+	o Support for arguments. They may be specified behind the
+          program name.
+	o Compatible to StormC/PPC.
+	o "@_..." and "@x..." symbol names are recognized.
+
+
+V0.3	04-May-99
+	o Fixed/enhanced task-termination notification. It's completely
+	  done on PPC side now. The debugged task will immediately exit,
+	  when the final "blr" was executed.
+	o 'S' shows all symbols.
+
+
+V0.2	02-May-99
+	o Disassembly and memory dump display only valid memory regions.
+	o Command 'tb' shows stack frame trace-back.
+
+
+V0.1	01-May-99
+	First usable version. There are no known bugs besides
+	running into a WOS-exception, when disassembling or watching
+	memory at an illegal address.
+	The following features are implemented:
+	- change PC to next/previous instruction
+	- show help
+	- arithmetic expression evaluation, which supports constants,
+	  symbols and register-contents
+	- changing GP- and FP-registers
+	- loading and unloading of WarpOS programs
+	- breakpoints (set, clear, temporary)
+	- disassembler with symbol support
+	- memory dump with symbol support
+	- single-step trace
+	- trace to next instruction
+	- show all registers
+	- exit debugger
+
+
+V0.0	17-Apr-99
+	Project started.
