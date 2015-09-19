@@ -1431,6 +1431,7 @@ EInt:		b	.FPUnav
 		b	.Trace
 		b	.BreakPoint
 		b	.DecInt
+		b	.PrInt
 
 		mtsprg2	r0
 		mfsrr1	r0
@@ -1738,6 +1739,7 @@ EInt:		b	.FPUnav
 		lfd	f6,PP_FREGS+6*8(r8)
 		lfd	f7,PP_FREGS+7*8(r8)
 		lwz	r9,PP_OFFSET(r8)
+		mr	r7,r8
 		lwz	r8,PP_CODE(r8)
 		add	r8,r8,r9
 		
@@ -1755,7 +1757,6 @@ EInt:		b	.FPUnav
 		li	r8,0
 		stb	r8,ExceptionMode(r0)
 		
-		mr	r7,r8
 		mr	r9,r8
 		mr	r10,r8
 		mr 	r11,r8
@@ -1773,14 +1774,26 @@ EInt:		b	.FPUnav
 		mtsrr1	r0
 		mfsprg0	r0
 		mtsrr0	r0
-
+				
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_ICFI
+		mtspr	HID0,r0
+		
 		li	r0,0
 		
-		mfspr	r7,HID0
-		ori	r7,r7,HID0_ICFI
-		mtspr	HID0,r7
+		lwz	r7,PP_FLAGS(r7)
+		rlwinm.	r7,r7,(32-PPB_THROW),31,31
+		beq	.NoThrow
 		
-		mr	r7,r0
+		mfsrr1	r7
+		oris	r7,r7,1<<(15-SRR1_TRAP)
+		mtsrr1	r7
+		
+		mr	r7,r0	
+				
+		b	.PrInt
+		
+.NoThrow:	mr	r7,r0
 		
 		rfi
 		
@@ -2422,38 +2435,17 @@ TestRoutine:	b	.IntReturn
 .HaltDSI:	b	.HaltDSI
 
 #********************************************************************************************
-	
-EIntEnd:
-		mflr	r4				#Setup a small jumptable for exceptions
-		loadreg	r5,0x48002b1c
-		stw	r5,0x500(r0)			#External Interrupt
-		loadreg r5,0x48002718
-		stw	r5,0x900(r0)			#Decrementer
-		loadreg	r5,0x48001d14
-		stw	r5,0x1300(r0)			#Instruction Address Breakpoint
-		loadreg	r5,0x48002310
-		stw	r5,0xd00(r0)			#Trace
-		loadreg	r5,0x48002d0c
-		stw	r5,0x300(r0)			#DSI
-		loadreg	r5,0x48002c08
-		stw	r5,0x400(r0)			#ISI
-		loadreg	r5,0x48002a04
-		stw	r5,0x600(r0)			#Alignment
-		loadreg	r5,0x48002800
-		stw	r5,0x800(r0)			#FP Unavailable
-	
-		li	r3,0x3000			#Jump from Exception immediatly to 0x3000
-		li	r5,EIntEnd-EInt
-		li	r6,0
-		bl	copy_and_flush
-		bl	PrIntEnd
 
-#********************************************************************************************
-
-PrInt:							#Privilege Exception		
+.PrInt:							#Privilege Exception		
 		mtsprg1	r3
+		
 		mfcr	r3
 		mtsprg2	r3
+		
+		mfsrr1	r3
+		rlwinm.	r0,r3,(SRR1_TRAP+1),31,31
+		bne	.DoTrap
+		
 		mfsrr0	r3
 		lwz	r0,ViolationAddress(r0)
 		cmplw	r0,r3
@@ -2479,18 +2471,42 @@ PrInt:							#Privilege Exception
 		stw	r3,0xfc(r0)			#Original calling function
 .xxHaltErr2:	b .xxHaltErr2
 
-#********************************************************************************************
+.DoTrap:	nop
+		loadreg r3,"TRAP"
+		stw	r3,0xf4(r0)
+		mfsrr1	r3
+		stw	r3,0xf8(r0)
+.xxHaltTrap:	b .xxHaltTrap
 
-PrIntEnd:
-		mflr	r4
-		li	r3,0x700
-		li	r5,PrIntEnd-PrInt
+#********************************************************************************************
+	
+EIntEnd:
+		mflr	r4				#Setup a small jumptable for exceptions
+		loadreg r5,0x48002b20			#Program/Trap/Illegal
+		stw	r5,0x500(r0)
+		loadreg	r5,0x4800291c
+		stw	r5,0x700(r0)			#External Interrupt
+		loadreg r5,0x48002718
+		stw	r5,0x900(r0)			#Decrementer
+		loadreg	r5,0x48001d14
+		stw	r5,0x1300(r0)			#Instruction Address Breakpoint
+		loadreg	r5,0x48002310
+		stw	r5,0xd00(r0)			#Trace
+		loadreg	r5,0x48002d0c
+		stw	r5,0x300(r0)			#DSI
+		loadreg	r5,0x48002c08
+		stw	r5,0x400(r0)			#ISI
+		loadreg	r5,0x48002a04
+		stw	r5,0x600(r0)			#Alignment
+		loadreg	r5,0x48002800
+		stw	r5,0x800(r0)			#FP Unavailable
+	
+		li	r3,0x3000			#Jump from Exception immediatly to 0x3000
+		li	r5,EIntEnd-EInt
 		li	r6,0
 		bl	copy_and_flush
-	
 		mtlr	r15
 		blr
 
 #********************************************************************************************
-
 PPCEnd:

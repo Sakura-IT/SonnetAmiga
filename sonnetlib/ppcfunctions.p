@@ -7438,8 +7438,6 @@ SetExcHandler:
 
 		mr.	r3,r3
 		beq-	.NoMemAvail
-		
-		stw	r3,0x144(r0)
 
 		mr	r30,r3
 
