@@ -207,12 +207,12 @@ EnqueuePPC:
 		lwz	r6,0(r4)
 		mr.	r6,r6
 		beq-	.Link1
-		lbz	r7,9(r4)
+		lbz	r7,LN_PRI(r4)
 		extsb	r7,r7
 		cmpw	r3,r7
 		ble+	.Loop1
-		lwz	r3,4(r4)
-.Link1:		stw	r5,4(r4)
+.Link1:		lwz	r3,4(r4)
+		stw	r5,4(r4)
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
@@ -2007,7 +2007,7 @@ WarpUser:
 		mr.	r0,r0
 		bne	.InException
 
-		mfmsr	r0			
+		mfmsr	r0
 		ori	r0,r0,PSL_PR		#SET Bit 17 (PR) To User
 		mtmsr	r0
 .InException:	isync	
@@ -7438,6 +7438,8 @@ SetExcHandler:
 
 		mr.	r3,r3
 		beq-	.NoMemAvail
+		
+		stw	r3,0x144(r0)
 
 		mr	r30,r3
 
