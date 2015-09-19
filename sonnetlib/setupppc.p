@@ -1788,8 +1788,10 @@ EInt:		b	.FPUnav
 		mfsrr1	r7
 		oris	r7,r7,1<<(15-SRR1_TRAP)
 		mtsrr1	r7
-		
-		mr	r7,r0	
+		mfsrr0	r7
+		subi	r7,r7,4
+		mtsrr0	r7
+		mr	r7,r0
 				
 		b	.PrInt
 		
@@ -2457,7 +2459,7 @@ TestRoutine:	b	.IntReturn
 		ori	r3,r3,PSL_PR			#Set to Super
 		xori	r3,r3,PSL_PR
 		mtsrr1	r3
-		mfsprg2	r3
+.GoBack:	mfsprg2	r3
 		mtcr	r3
 		mfsprg1	r3
 		li	r0,0				#SuperKey
@@ -2472,11 +2474,10 @@ TestRoutine:	b	.IntReturn
 .xxHaltErr2:	b .xxHaltErr2
 
 .DoTrap:	nop
-		loadreg r3,"TRAP"
-		stw	r3,0xf4(r0)
-		mfsrr1	r3
-		stw	r3,0xf8(r0)
-.xxHaltTrap:	b .xxHaltTrap
+		mfsrr0	r3
+		addi	r3,r3,4				#Next instruction
+		mtsrr0	r3
+		b	.GoBack
 
 #********************************************************************************************
 	
