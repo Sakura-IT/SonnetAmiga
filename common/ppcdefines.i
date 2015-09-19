@@ -339,6 +339,8 @@
 .set MCCR3,0xF8			#Memory Control Configuration Register 3
 .set MCCR4,0xFC			#Memory Control Configuration Register 4
 
+.set SRR1_TRAP,14
+
 .set PVR,287
 
 .set srr1,27
@@ -573,9 +575,11 @@
 .set MH_SIZE,32
 .set PP_CODE,MN_PPSTRUCT
 .set PP_OFFSET,PP_CODE+4
+.set PP_FLAGS,PP_CODE+8
 .set PP_REGS,PP_CODE+20
 .set PP_FREGS,PP_CODE+80
 .set PP_SIZE,144
+.set PPB_THROW,2
 .set NT_INTERRUPT,2
 .set NT_MESSAGE,5
 .set NT_FREEMSG,6
