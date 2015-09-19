@@ -193,6 +193,25 @@
 .set EXC_LARGECONTEXT,3      				#large context structure
 .set EXC_ACTIVE,4            				#private
 
+.set EXCF_GLOBAL,		0x00000001
+.set EXCF_LOCAL,		0x00000002
+.set EXCF_SMALLCONTEXT,		0x00000004
+.set EXCF_LARGECONTEXT,		0x00000008
+.set EXCF_ACTIVE,		0x00000010
+
+.set EXCF_MCHECK,		0x00000004
+.set EXCF_DACCESS,		0x00000008
+.set EXCF_IACCESS,		0x00000010
+.set EXCF_INTERRUPT,		0x00000020
+.set EXCF_ALIGN,		0x00000040
+.set EXCF_PROGRAM,		0x00000080
+.set EXCF_FPUN,			0x00000100
+.set EXCF_DECREMENTER,		0x00000200
+.set EXCF_SYSTEMCALL,		0x00001000
+.set EXCF_TRACE,		0x00002000
+.set EXCF_PERFMON,		0x00008000
+.set EXCF_IABR,			0x00080000
+
 .set EXC_MCHECK,2            				#machine check exception
 .set EXC_DACCESS,3           				#data access exception
 .set EXC_IACCESS,4           				#instruction access exception
@@ -669,3 +688,4 @@
 .set WAITTIME_TIME1,14
 .set WAITTIME_TIME2,18
 .set WAITTIME_TASK,22
+.set TAG_DONE,0
