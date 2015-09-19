@@ -2286,12 +2286,12 @@ TestRoutine:	b	.IntReturn
 		extsb	r7,r7
 		cmpw	r3,r7
 		ble+	.InsertLoop1
-		lwz	r3,4(r4)
-.InsertLink1:	stw	r5,4(r4)
+.InsertLink1:	lwz	r3,4(r4)
+		stw	r5,4(r4)
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
-		b	.NoIABR		
+		b	.NoIABR
 		
 .NoExcHandlers:	lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_REMOVEDEXC(r3)
