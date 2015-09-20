@@ -54,7 +54,7 @@
 	XREF	AddUniqueSemaphorePPC,IsExceptionMode
 
 	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,MCTask,Init
-	XREF	SysBase,PowerPCBase
+	XREF	SysBase,PowerPCBase,DOSBase
 	XDEF	_PowerPCBase
 
 ;********************************************************************************************
@@ -300,6 +300,7 @@ MoveSon	move.l (a0)+,(a1)+
 	move.l a1,(a1)					;Sonnet relocated mem at $0
 	move.l d0,_PowerPCBase-Buffer(a4)
 	move.l a6,SysBase(a1)
+	move.l DosBase(pc),DOSBase(a1)
 
 	move.l d0,a1
 	jsr _LVOAddLibrary(a6)
