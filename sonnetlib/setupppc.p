@@ -3,7 +3,7 @@
 .include ppcmacros-std.i
 
 .global PPCCode,PPCLen,RunningTask,WaitingTasks,Init,ViolationAddress
-.global MCTask,SysBase,PowerPCBase
+.global MCTask,SysBase,PowerPCBase,DOSBase
 
 .set	PPCLen,(PPCEnd-PPCCode)
 
@@ -694,7 +694,7 @@ Caches:		mfspr	r4,HID0
 		mtspr	HID0,r4
 		sync
 		
-#		blr					#REMOVE ME FOR L1 CACHE
+		blr					#REMOVE ME FOR L1 CACHE
 							#L1 cache off for now
 							#to fix coherancy problems
 		mfspr	r4,HID0
@@ -1652,6 +1652,7 @@ EInt:		b	.FPUnav
 		stw	r4,TASKPPC_CONTEXTMEM(r8)
 		stw	r9,TASKPPC_STARTMSG(r8)
 		lwz	r31,MN_ARG1(r9)
+		stw	r31,TASKPPC_STACKSIZE(r8)
 		addi	r4,r8,1024
 		lwz	r6,SonnetBase(r0)
 		xor	r4,r4,r6		
@@ -1661,6 +1662,12 @@ EInt:		b	.FPUnav
 		subi	r4,r4,32
 		stw	r4,TC_SPREG(r8)
 		mr	r1,r4
+		
+		addi	r4,r8,TC_MEMENTRY
+		stw	r4,8(r4)
+		li	r0,0
+		stwu	r0,4(r4)
+		stw	r4,-4(r4)
 		
 		stw	r13,-4(r1)
 		subi	r13,r1,4
@@ -2349,23 +2356,36 @@ TestRoutine:	b	.IntReturn
 #********************************************************************************************
 
 .BreakPoint:	
+		BUILDSTACKPPC
+		
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU & FPU
 		isync
 		
-		mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		xori	r0,r0,HID0_DCE
-		sync	
-		mtspr	HID0,r0
-		isync
+		lwz	r3,PowerPCBase(r0)
+		la	r31,LIST_EXCIABR(r3)
+		lwz	r31,0(r31)
+		lwz	r0,0(r31)
+		mr.	r0,r0
+		beq	.LastBPHandler
 		
-		loadreg	r3,"WARP"
-		stw	r3,0xf4(r0)
-		mfsrr0	r3
-		stw	r3,0xf8(r0)
-.BrkPnt:	b	.BrkPnt
+		mr	r30,r31
+		mr	r31,r0
+		
+		mflr	r29
+		mtlr	r0
+		blrl
+		mtlr	r29
+		
+		loadreg	r0,"WARP"
+		stw	r0,0xf4(r0)
+		mfsrr0	r0
+		stw	r0,0xf8(r0)		
+		
+.LastBPHandler:	DSTRYSTACKPPC
+
+		rfi
 
 #********************************************************************************************
 
@@ -2477,6 +2497,37 @@ TestRoutine:	b	.IntReturn
 		mfsrr0	r3
 		addi	r3,r3,4				#Next instruction
 		mtsrr0	r3
+		
+		
+		BUILDSTACKPPC
+		
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0				#Reenable MMU & FPU
+		
+		isync
+		lwz	r3,PowerPCBase(r0)
+		la	r31,LIST_EXCPROGRAM(r3)
+		lwz	r31,0(r31)
+		lwz	r0,0(r31)
+		mr.	r0,r0
+		beq	.LastPrHandler
+		
+		mr	r30,r31
+		mr	r31,r0
+		
+		mflr	r29
+		mtlr	r0
+		blrl
+		mtlr	r29
+		
+		loadreg	r0,"TRAP"
+		stw	r0,0xf4(r0)
+		mfsrr0	r0
+		stw	r0,0xf8(r0)
+		
+.LastPrHandler:	DSTRYSTACKPPC
+		
 		b	.GoBack
 
 #********************************************************************************************
