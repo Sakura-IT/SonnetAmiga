@@ -8197,11 +8197,401 @@ WaitTime:
 
 RawDoFmtPPC:	BUILDSTACKPPC
 
-		li	r3,0
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
+		stwu	r25,-4(r13)
+		stwu	r24,-4(r13)
+		stwu	r23,-4(r13)
+		stwu	r22,-4(r13)
+		stwu	r21,-4(r13)
+		stwu	r20,-4(r13)
+		stwu	r19,-4(r13)
+		stwu	r18,-4(r13)
+
+		cmplwi	r6,1
+		beq-	.DoNoFmt
+
+		lwz	r3,PowerPCBase(r0)
+
+		mr	r28,r4
+		mr	r29,r5
+		mr	r30,r6
+		mr	r18,r7
+		stwu	r26,-4(r13)
+		mr	r26,r13
+		subi	r13,r13,16
+		stwu	r29,-4(r13)
+		mr	r25,r28
+		b	.DoFmt
+
+.NextFmtChar:	mr.	r30,r30
+		bne-	.DoPutChProc
+
+		stb	r3,0(r18)
+		addi	r18,r18,1
+		b	.NoPutChProc
+
+.DoPutChProc:	mtlr	r30
+		mr	r4,r3
+		mr	r3,r18
+		blrl	
+		mr	r18,r3
+
+.NoPutChProc:	lwz	r3,0(r13)
+		addi	r13,r13,4
+		mr	r13,r26
+		lwz	r26,0(r13)
+		addi	r13,r13,4
+.DoNoFmt:	lwz	r18,0(r13)
+
+		lwz	r19,4(r13)
+		lwz	r20,8(r13)
+		lwz	r21,12(r13)
+		lwz	r22,16(r13)
+		lwz	r23,20(r13)
+		lwz	r24,24(r13)
+		lwz	r25,28(r13)
+		lwz	r26,32(r13)
+		lwz	r27,36(r13)
+		lwz	r28,40(r13)
+		lwz	r29,44(r13)
+		lwz	r30,48(r13)
+		lwz	r31,52(r13)
+		addi	r13,r13,56
 		
 		DSTRYSTACKPPC
 		
+		blr	
+
+.NormalChar:	mr.	r30,r30
+		bne-	.PutChProc
+
+		stb	r3,0(r18)
+		addi	r18,r18,1
+		b	.DoFmt
+
+.PutChProc:	mtlr	r30
+		mr	r4,r3
+		mr	r3,r18
+		blrl	
+		mr	r18,r3
+
+.DoFmt:		lbz	r3,0(r25)
+		addi	r25,r25,1
+		mr.	r3,r3
+		beq+	.NextFmtChar
+
+		cmplwi	r3,"%"
+		bne+	.NormalChar
+
+		subi	r24,r26,16
+		xor	r20,r20,r20
+		lbz	r3,0(r25)
+		cmplwi	r3,"-"
+		bne-	.NoJustif
+
+		ori	r20,r20,1
+		addi	r25,r25,1
+.NoJustif:	lbz	r3,0(r25)
+		cmplwi	r3,"0"
+		bne-	.NoZeroPadding
+
+		ori	r20,r20,2
+.NoZeroPadding:	bl	.GetNum
+
+		mr	r23,r3
+		xor	r22,r22,r22
+		lbz	r3,0(r25)
+		cmplwi	r3,"."
+		bne-	.NoTruncate
+
+		addi	r25,r25,1
+		bl	.GetNum
+
+		mr	r22,r3
+.NoTruncate:	lbz	r3,0(r25)
+		cmplwi	r3,"l"
+		bne-	.NoLong
+
+		ori	r20,r20,4
+		addi	r25,r25,1
+.NoLong:	lbz	r3,0(r25)
+		addi	r25,r25,1
+		cmplwi	r3,"d"
+		beq-	.IsDecimal
+
+		cmplwi	r3,"D"
+		bne-	.NotDecimal
+
+.IsDecimal:	bl	.GetParameter
+
+		bl	.MakeDecimal
+
+		b	.FmtOutput
+
+.NotDecimal:	cmplwi	r3,"x"
+		beq-	.IsHex
+
+		cmplwi	r3,"X"
+		bne-	.IsNotHex
+
+.IsHex:		bl	.GetParameter
+
+		bl	.MakeHex
+
+		b	.FmtOutput
+
+.IsNotHex:	cmplwi	r3,"s"
+		bne-	.NotString
+
+		bl	.GetIntParam
+
+		mr.	r21,r21
+		beq+	.DoFmt
+
+		mr	r24,r21
+		b	.StrOutput
+
+.NotString:	cmplwi	r3,"b"
+		bne-	.NoBSTR
+
+		bl	.GetIntParam
+
+		mr.	r21,r21
+		beq+	.DoFmt
+
+		rlwinm	r21,r21,2,0,29
+		mr	r24,r21
+		lbz	r19,0(r24)
+		addi	r24,r24,1
+		mr.	r19,r19
+		beq+	.DoFmt
+
+		subi	r19,r19,1
+		lbzx	r0,r24,r19
+		mr.	r0,r0
+		beq-	.BSTROutput
+
+		addi	r19,r19,1
+		b	.BSTROutput
+
+.NoBSTR:	cmplwi	r3,"u"
+		beq-	.UnsignedDec
+
+		cmplwi	r3,"U"
+		bne-	.NoUnsignedDec
+
+.UnsignedDec:	bl	.GetParameter
+
+		bl	.OutputNum
+
+		b	.FmtOutput
+
+.NoUnsignedDec:	cmplwi	r3,"c"
+		bne+	.NormalChar
+
+		bl	.GetParameter
+
+		stb	r21,0(r24)
+		addi	r24,r24,1
+.FmtOutput:	xor	r0,r0,r0
+		stb	r0,0(r24)
+		subi	r24,r26,16
+.StrOutput:	mr	r28,r24
+		li	r19,-1
+.FmtLoop:	lbz	r0,0(r28)
+		addi	r28,r28,1
+		mr.	r0,r0
+		beq-	.FmtZero
+
+		subi	r19,r19,1
+		b	.FmtLoop
+
+.FmtZero:	not	r19,r19
+.BSTROutput:	mr.	r22,r22
+		beq-	.GetR19
+
+		cmplw	r19,r22
+		bgt-	.GetR22
+
+.GetR19:	mr	r22,r19
+.GetR22:	sub.	r23,r23,r22
+		bge-	.FmtPos
+
+		xor	r23,r23,r23
+.FmtPos:	andi.	r0,r20,1
+		bne-	.HasJust
+
+		bl	.PerformPad
+
+.HasJust:	mr.	r22,r22
+		beq-	.ZeroParam
+
+		mtctr	r22
+.NextOne:	lbz	r3,0(r24)
+		addi	r24,r24,1
+		mr.	r30,r30
+		bne-	.DoPutChProc4
+
+		stb	r3,0(r18)
+		addi	r18,r18,1
+		b	.SkipToNext3
+
+.DoPutChProc4:	mtlr	r30
+		mr	r4,r3
+		mr	r3,r18
+		blrl	
+
+		mr	r18,r3
+.SkipToNext3:	bdnz+	.NextOne
+
+.ZeroParam:	andi.	r0,r20,1
+		beq+	.DoFmt
+
+		bl	.PerformPad
+
+		b	.DoFmt
+
+#********************************************************************************************
+
+.PerformPad:	mflr	r0
+		stwu	r0,-4(r13)
+		li	r19," "
+		andi.	r0,r20,2
+		beq-	.NoZeroPad
+
+		lbz	r3,0(r24)
+		cmplwi	r3,"-"
+		bne-	.DoPadding
+
+		addi	r24,r24,1
+		subi	r22,r22,1
+		mr.	r30,r30
+		bne-	.DoPutChProc2
+
+		stb	r3,0(r18)
+		addi	r18,r18,1
+		b	.DoPadding
+
+.DoPutChProc2:	mtlr	r30
+		mr	r4,r3
+		mr	r3,r18
+		blrl	
+		mr	r18,r3
+.DoPadding:	li	r19,"0"
+.NoZeroPad:	mr.	r23,r23
+		beq-	.PadExit
+
+		mtctr	r23
+.PadNext:	mr	r3,r19
+		mr.	r30,r30
+		bne-	.DoPutChProc3
+
+		stb	r3,0(r18)
+		addi	r18,r18,1
+		b	.SkipToNext2
+
+.DoPutChProc3:	mtlr	r30
+		mr	r4,r3
+		mr	r3,r18
+		blrl	
+		mr	r18,r3
+.SkipToNext2:	bdnz+	.PadNext
+
+.PadExit:	lwz	r0,0(r13)
+		addi	r13,r13,4
+		mtlr	r0
+		blr	
+
+#********************************************************************************************
+
+.GetParameter:	andi.	r0,r20,4
+		bne-	.GetIntParam
+		lwz	r29,0(r13)
+		lha	r21,0(r29)
+		addi	r29,r29,2
+		stw	r29,0(r13)
+		blr	
+
+.GetIntParam:	lwz	r29,0(r13)
+		lwz	r21,0(r29)
+		addi	r29,r29,4
+		stw	r29,0(r13)
+		blr	
+
+.GetNum:	xor	r3,r3,r3
+.NextNum:	lbz	r19,0(r25)
+		addi	r25,r25,1
+		cmplwi	r19,"0"
+		blt-	.NoValidNum
+
+		cmplwi	r19,"9"
+		bgt-	.NoValidNum
+
+		mulli	r3,r3,10
+		subi	r19,r19,48
+		add	r3,r3,r19
+		b	.NextNum
+
+.NoValidNum:	subi	r25,r25,1
+		blr	
+
+#********************************************************************************************
+
+.MakeDecimal:	mr.	r21,r21
+		bge-	.OutputNum
+
+		li	r0,"-"
+		stb	r0,0(r24)
+		addi	r24,r24,1
+		neg	r21,r21
+.OutputNum:	li	r3,"0"
+
+		add	r21,r21,r3
+		stb	r21,0(r24)
+		addi	r24,r24,1
 		blr
+
+#********************************************************************************************
+
+.MakeHex:	mr.	r21,r21
+		beq+	.OutputNum
+
+		xor	r27,r27,r27
+		andi.	r0,r20,4
+		bne-	.IsNotLongH
+
+		li	r19,4
+		mtctr	r19
+		rlwinm	r21,r21,16,0,31
+		b	.NextHex
+
+.IsNotLongH:	li	r19,8
+		mtctr	r19
+.NextHex:	rlwinm	r21,r21,4,0,31
+		andi.	r3,r21,15
+		bne-	.MakeComp
+
+		mr.	r27,r27
+		beq-	.SkipToNext
+
+.MakeComp:	eqv	r27,r27,r27
+		cmplwi	r3,9
+		bgt-	.IsLetter
+
+		addi	r3,r3,48
+		b	.OutputHex
+
+.IsLetter:	addi	r3,r3,55
+.OutputHex:	stb	r3,0(r24)
+		addi	r24,r24,1
+.SkipToNext:	bdnz+	.NextHex
+
+		blr	
 
 #********************************************************************************************
 EndFunctions:
