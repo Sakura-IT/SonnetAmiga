@@ -14,7 +14,7 @@
 .set SonnetBase,0
 .set SysBase,4
 .set PPCMemHeader,8
-.set UNUSED,12
+.set DOSBase,12
 .set CPUHID0,16
 .set CPUHID1,20
 .set CPUSDR1,24
@@ -144,6 +144,7 @@
 .set _LVOFindName,		-276
 .set _LVOSignal,		-306
 .set _LVOPutMsg,		-366
+.set _LVOVPrintF,		-954
 
 .set StackSize,			0x10000
 .set IdleTask,			0x7400
