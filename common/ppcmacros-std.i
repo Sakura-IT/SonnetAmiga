@@ -45,9 +45,9 @@
 	stw	r13,-4(r1)
 	subi	r13,r1,4
 	.if (\1 = "")
-	stw	r1,-1080(r1)
+	stwu	r1,-1080(r1)
 	.else
-	stw	r1,-(\1+56)(r1)
+	stwu	r1,-(\1+56)(r1)
 	.endif
 .endm
 
