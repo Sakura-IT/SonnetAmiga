@@ -35,7 +35,7 @@
 .endm
 
 .macro prolog
-	.if (\2 = "TOC"
+	.if (\2 = "TOC")
 	stw	r2,20(r1)
 	.endif
 	mflr	r0
@@ -63,12 +63,12 @@
 
 .macro	epilog
 	lwz     r1,0(r1)
-	lwz     r13,-4(stack)
+	lwz     r13,-4(r1)
 	lwz     r0,8(r1)
 	mtlr    r0
 	lwz     r0,4(r1)
 	mtcr    r0
-.if     (\1 = "TOC")
+	.if     (\1 = "TOC")
 	lwz     r2,20(r1)
 .endif
 	blr
