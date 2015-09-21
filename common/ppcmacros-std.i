@@ -47,7 +47,7 @@
 	.if (\1 = "")
 	stw	r1,-1080(r1)
 	.else
-	stw	r1,-\1(r1)
+	stw	r1,-(\1+56)(r1)
 	.endif
 .endm
 
@@ -71,7 +71,6 @@
 	.if     (\1 = "TOC")
 	lwz     r2,20(r1)
 .endif
-	blr
 .endm
 
 .macro RUN68K # code, offset
