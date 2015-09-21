@@ -17,7 +17,6 @@
 .endm
 
 .macro LIBCALLPOWERPC # function
-#	li	r3,SonnetBase
 	lwz	r3,PowerPCBase(r0)
 	lwz     r0,_LVO\1+2(r3)
 	mtlr    r0
@@ -35,6 +34,23 @@
 	stwu	r1,-284(r1)
 .endm
 
+.macro prolog
+	.if (\2 = "TOC"
+	stw	r2,20(r1)
+	.endif
+	mflr	r0
+	stw	r0,8(r1)
+	mfcr	r0
+	stw	r0,4(r1)
+	stw	r13,-4(r1)
+	subi	r13,r1,4
+	.if (\1 = "")
+	stw	r1,-1080(r1)
+	.else
+	stw	r1,-\1(r1)
+	.endif
+.endm
+
 .macro DSTRYSTACKPPC
 	lwz	r1,0(r1)
 	lwz	r13,-4(r1)
@@ -43,6 +59,19 @@
 	lwz	r0,4(r1)
 	mtcr	r0
 	lwz	r2,20(r1)
+.endm
+
+.macro	epilog
+	lwz     r1,0(r1)
+	lwz     r13,-4(stack)
+	lwz     r0,8(r1)
+	mtlr    r0
+	lwz     r0,4(r1)
+	mtcr    r0
+.if     (\1 = "TOC")
+	lwz     r2,20(r1)
+.endif
+	blr
 .endm
 
 .macro RUN68K # code, offset
