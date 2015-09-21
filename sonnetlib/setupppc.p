@@ -2467,7 +2467,7 @@ TestRoutine:	b	.IntReturn
 		mtmsr	r0				#Reenable MMU & FPU
 		isync
 		
-		BUILDSTACKPPC
+		prolog	1024,"TOC"
 				
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -2639,7 +2639,7 @@ TestRoutine:	b	.IntReturn
 		lwz	r31,12(r13)
 		addi	r13,r13,16
 
-		DSTRYSTACKPPC
+		epilog	"TOC"
 		
 		li	r0,0				#SuperKey
 		
