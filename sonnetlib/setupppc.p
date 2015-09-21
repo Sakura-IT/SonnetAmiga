@@ -2365,7 +2365,8 @@ TestRoutine:	b	.IntReturn
 		
 		lwz	r3,PowerPCBase(r0)
 		la	r31,LIST_EXCIABR(r3)
-		lwz	r31,0(r31)
+		
+.NextBExc:	lwz	r31,0(r31)
 		lwz	r0,0(r31)
 		mr.	r0,r0
 		beq	.LastBPHandler
@@ -2381,7 +2382,9 @@ TestRoutine:	b	.IntReturn
 		loadreg	r0,"WARP"
 		stw	r0,0xf4(r0)
 		mfsrr0	r0
-		stw	r0,0xf8(r0)		
+		stw	r0,0xf8(r0)
+		
+		b	.NextBExc		
 		
 .LastBPHandler:	DSTRYSTACKPPC
 
@@ -2458,31 +2461,188 @@ TestRoutine:	b	.IntReturn
 
 #********************************************************************************************
 
-.PrInt:							#Privilege Exception		
+.PrInt:							#Program Exception (UNDER DEVELOPMENT)
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0				#Reenable MMU & FPU
+		isync
+		
+		BUILDSTACKPPC
+				
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		
+		mfsrr1	r0
+		rlwinm.	r0,r0,(SRR1_TRAP+1),31,31	#Check for TRAP exception type
+		beq	.NoAddPC
+		
+		mfsrr0	r0
+		addi	r0,r0,4				#Next instruction
+		mtsrr0	r0
+		
+.NoAddPC:	lwz	r31,PowerPCBase(r0)
+		la	r31,LIST_EXCPROGRAM(r31)
+.NextPExc:	lwz	r31,0(r31)			#Are there handlers in place?
+		lwz	r0,0(r31)
+		mr.	r0,r0
+		beq	.LastPrHandler
+		
+		mr	r30,r31
+		mr	r31,r0
+		
+		lwz	r0,EXCDATA_TASK(r30)
+		mr.	r0,r0
+		beq 	.DoExc
+		lwz	r28,RunningTask(r0)
+		cmpw	r0,r28
+		beq	.DoExc
+		
+		b	.NextPExc
+		
+.DoExc:		mflr	r29
+		lwz	r0,EXCDATA_CODE(r30)
+		mtlr	r0
+		lwz	r2,EXCDATA_DATA(r30)
+		
+		lwz	r0,EXCDATA_FLAGS(r30)
+		rlwinm.	r0,r0,(32-EXC_LARGECONTEXT),31,31
+		bne-	.LargeContext
+
+		subi	r13,r13,8
+		stw	r3,4(r13)
+		loadreg	r0,EXCF_PROGRAM
+		stw	r0,0(r13)
+		mr	r3,r13
+		mtsprg1	r29
+		mtsprg2	r1
+		mtsprg3	r2
+		
+		mtlr	r30
+		blrl
+		mtlr	r29
+				
+		b	.NextPExc
+		
+.LargeContext:	subi	r13,r13,424
 		mtsprg1	r3
+		mr	r3,r13
+		li	r0,EXC_PROGRAM
+		stw	r0,0(r3)
+		mfsrr0	r0
+		stw	r0,4(r3)
+		mfsrr1	r0
+		stwu	r0,4(r3)
+		mfdar	r0
+		stwu	r0,4(r3)
+		mfdsisr	r0
+		stwu	r0,4(r3)
+		mfcr	r0
+		stwu	r0,4(r3)
+		mfctr	r0
+		stwu	r0,4(r3)
+		stwu	r29,4(r3)
+		mfxer	r0
+		stwu	r0,4(r3)		
+		mffs	r0
+		stfd	r0,4(r3)
+		lwz	r0,8(r3)
+		stwu	r0,4(r3)		
+		loadreg	r0,"WARP"
+		stwu	r0,4(r3)
+		stwu	r1,4(r3)
+		stwu	r2,4(r3)
+		mfsprg1	r0
+		stwu	r0,4(r3)
+		stwu	r4,4(r3)
+		stwu	r5,4(r3)
+		stwu	r6,4(r3)
+		stwu	r7,4(r3)
+		stwu	r8,4(r3)
+		stwu	r9,4(r3)
+		stwu	r10,4(r3)
+		stwu	r11,4(r3)
+		stwu	r12,4(r3)
+		stwu	r13,4(r3)
+		stwu	r14,4(r3)
+		stwu	r15,4(r3)
+		stwu	r16,4(r3)
+		stwu	r17,4(r3)
+		stwu	r18,4(r3)
+		stwu	r19,4(r3)
+		stwu	r20,4(r3)
+		stwu	r21,4(r3)
+		stwu	r22,4(r3)
+		stwu	r23,4(r3)
+		stwu	r24,4(r3)
+		stwu	r25,4(r3)
+		stwu	r26,4(r3)
+		stwu	r27,4(r3)
+		stwu	r28,4(r3)
+		stwu	r29,4(r3)
+		stwu	r30,4(r3)
+		stwu	r31,4(r3)
+		stfdu	f0,4(r3)
+		stfdu	f1,8(r3)
+		stfdu	f2,8(r3)
+		stfdu	f3,8(r3)
+		stfdu	f4,8(r3)
+		stfdu	f5,8(r3)
+		stfdu	f6,8(r3)
+		stfdu	f7,8(r3)
+		stfdu	f8,8(r3)
+		stfdu	f9,8(r3)
+		stfdu	f10,8(r3)
+		stfdu	f11,8(r3)
+		stfdu	f12,8(r3)
+		stfdu	f13,8(r3)
+		stfdu	f14,8(r3)
+		stfdu	f15,8(r3)		
+		stfdu	f16,8(r3)
+		stfdu	f17,8(r3)
+		stfdu	f18,8(r3)
+		stfdu	f19,8(r3)
+		stfdu	f20,8(r3)
+		stfdu	f21,8(r3)
+		stfdu	f22,8(r3)
+		stfdu	f23,8(r3)
+		stfdu	f24,8(r3)
+		stfdu	f25,8(r3)
+		stfdu	f26,8(r3)
+		stfdu	f27,8(r3)
+		stfdu	f28,8(r3)
+		stfdu	f29,8(r3)
+		stfdu	f30,8(r3)
+		stfdu	f31,8(r3)
+		mr	r3,r13
+		mtlr	r30
+		blrl
+		mtlr	r29
 		
-		mfcr	r3
-		mtsprg2	r3
-		
-		mfsrr1	r3
-		rlwinm.	r0,r3,(SRR1_TRAP+1),31,31
-		bne	.DoTrap
-		
-		mfsrr0	r3
+.LastPrHandler:		
+		mfsrr0	r31
 		lwz	r0,ViolationAddress(r0)
-		cmplw	r0,r3
+		cmplw	r0,r31
 		bne-	.HaltErr
 		
-		addi	r3,r3,4				#Next instruction
-		mtsrr0	r3
-		mfsrr1	r3
-		ori	r3,r3,PSL_PR			#Set to Super
-		xori	r3,r3,PSL_PR
-		mtsrr1	r3
-.GoBack:	mfsprg2	r3
-		mtcr	r3
-		mfsprg1	r3
+		addi	r31,r31,4			#Next instruction
+		mtsrr0	r31
+		mfsrr1	r31
+		ori	r31,r31,PSL_PR			#Set to Super
+		xori	r31,r31,PSL_PR
+		mtsrr1	r31
+
+		lwz	r28,0(r13)
+		lwz	r29,4(r13)
+		lwz	r30,8(r13)
+		lwz	r31,12(r13)
+		addi	r13,r13,16
+
+		DSTRYSTACKPPC
+		
 		li	r0,0				#SuperKey
+		
 		rfi
 
 .HaltErr:	loadreg r3,"HALT"			#DEBUG
@@ -2491,44 +2651,8 @@ TestRoutine:	b	.IntReturn
 		stw	r3,0xf8(r0)			#Current PC
 		mflr	r3
 		stw	r3,0xfc(r0)			#Original calling function
+		
 .xxHaltErr2:	b .xxHaltErr2
-
-.DoTrap:	nop
-		mfsrr0	r3
-		addi	r3,r3,4				#Next instruction
-		mtsrr0	r3
-		
-		
-		BUILDSTACKPPC
-		
-		mfmsr	r0
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r0				#Reenable MMU & FPU
-		
-		isync
-		lwz	r3,PowerPCBase(r0)
-		la	r31,LIST_EXCPROGRAM(r3)
-		lwz	r31,0(r31)
-		lwz	r0,0(r31)
-		mr.	r0,r0
-		beq	.LastPrHandler
-		
-		mr	r30,r31
-		mr	r31,r0
-		
-		mflr	r29
-		mtlr	r0
-		blrl
-		mtlr	r29
-		
-		loadreg	r0,"TRAP"
-		stw	r0,0xf4(r0)
-		mfsrr0	r0
-		stw	r0,0xf8(r0)
-		
-.LastPrHandler:	DSTRYSTACKPPC
-		
-		b	.GoBack
 
 #********************************************************************************************
 	
