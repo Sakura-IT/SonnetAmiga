@@ -2109,7 +2109,7 @@ TestRoutine:	b	.IntReturn
 		lfdu	f20,8(r9)
 		lfdu	f21,8(r9)
 		lfdu	f22,8(r9)
-		lfdu	f23,8(r9)		
+		lfdu	f23,8(r9)
 		lfdu	f24,8(r9)
 		lfdu	f25,8(r9)
 		lfdu	f26,8(r9)
@@ -2358,6 +2358,13 @@ TestRoutine:	b	.IntReturn
 .BreakPoint:	
 		BUILDSTACKPPC
 		
+		loadreg	r0,"WARP"
+		stw	r0,0xf4(r0)
+		mfsrr0	r0
+		stw	r0,0xf8(r0)
+		
+.DebugIABR:	b	.DebugIABR			#Reached when EXC_PROGRAM has no more bugs
+		
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU & FPU
@@ -2378,11 +2385,6 @@ TestRoutine:	b	.IntReturn
 		mtlr	r0
 		blrl
 		mtlr	r29
-		
-		loadreg	r0,"WARP"
-		stw	r0,0xf4(r0)
-		mfsrr0	r0
-		stw	r0,0xf8(r0)
 		
 		b	.NextBExc		
 		
@@ -2461,7 +2463,8 @@ TestRoutine:	b	.IntReturn
 
 #********************************************************************************************
 
-.PrInt:							#Program Exception (UNDER DEVELOPMENT)
+.PrInt:		
+		mtsprg0	r0				#Program Exception (UNDER DEVELOPMENT)
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU & FPU
@@ -2505,12 +2508,11 @@ TestRoutine:	b	.IntReturn
 		lwz	r0,EXCDATA_CODE(r30)
 		mtlr	r0
 		lwz	r2,EXCDATA_DATA(r30)
-		
 		lwz	r0,EXCDATA_FLAGS(r30)
 		rlwinm.	r0,r0,(32-EXC_LARGECONTEXT),31,31
 		bne-	.LargeContext
 
-		subi	r13,r13,8
+		subi	r13,r13,16
 		stw	r3,4(r13)
 		loadreg	r0,EXCF_PROGRAM
 		stw	r0,0(r13)
@@ -2518,10 +2520,23 @@ TestRoutine:	b	.IntReturn
 		mtsprg1	r29
 		mtsprg2	r1
 		mtsprg3	r2
+				
+		mfsprg0	r0
+		stw	r0,12(r13)
+		mtsprg0	r13
+		loadreg	r0,"WARP"
+		stw	r31,8(r13)
 		
-		mtlr	r30
 		blrl
-		mtlr	r29
+		
+		mfsprg0	r13
+		lwz	r31,8(r13)
+		lwz	r0,12(r13)
+		mtsprg0	r0
+		addi	r13,r13,16
+				
+		cmpwi	r3,EXCRETURN_ABORT
+		beq	.LastPrHandler
 				
 		b	.NextPExc
 		
@@ -2538,18 +2553,18 @@ TestRoutine:	b	.IntReturn
 		stwu	r0,4(r3)
 		mfdsisr	r0
 		stwu	r0,4(r3)
-		mfcr	r0
+		mfcr	r0			#Need to be picked from stack
 		stwu	r0,4(r3)
 		mfctr	r0
 		stwu	r0,4(r3)
 		stwu	r29,4(r3)
 		mfxer	r0
-		stwu	r0,4(r3)		
-		mffs	r0
-		stfd	r0,4(r3)
+		stwu	r0,4(r3)
+		mffs	f0			#trashes f0...
+		stfd	f0,4(r3)
 		lwz	r0,8(r3)
-		stwu	r0,4(r3)		
-		loadreg	r0,"WARP"
+		stwu	r0,4(r3)
+		mfsprg0	r0		
 		stwu	r0,4(r3)
 		stwu	r1,4(r3)
 		stwu	r2,4(r3)
@@ -2579,10 +2594,10 @@ TestRoutine:	b	.IntReturn
 		stwu	r25,4(r3)
 		stwu	r26,4(r3)
 		stwu	r27,4(r3)
-		stwu	r28,4(r3)
-		stwu	r29,4(r3)
-		stwu	r30,4(r3)
-		stwu	r31,4(r3)
+		stwu	r28,4(r3)		#Need to be picked from stack
+		stwu	r29,4(r3)		#"
+		stwu	r30,4(r3)		#"
+		stwu	r31,4(r3)		#"
 		stfdu	f0,4(r3)
 		stfdu	f1,8(r3)
 		stfdu	f2,8(r3)
@@ -2615,10 +2630,102 @@ TestRoutine:	b	.IntReturn
 		stfdu	f29,8(r3)
 		stfdu	f30,8(r3)
 		stfdu	f31,8(r3)
+		
 		mr	r3,r13
-		mtlr	r30
+		mtsprg3	r3
+		loadreg	r0,"WARP"
 		blrl
-		mtlr	r29
+		
+		mfsprg3	r31
+		
+		lwzu	r0,4(r31)		#Skips Exc type
+		mtsrr0	r0
+		lwzu	r0,4(r31)
+		mtsrr1	r0
+		lwzu	r0,4(r31)
+		mtdar	r0
+		lwzu	r0,4(r31)
+		mtdsisr	r0		
+		lwzu	r0,4(r31)
+		mtcr	r0			#Part of stack...
+		lwzu	r0,4(r31)
+		mtctr	r0
+		lwzu	r0,4(r31)
+		mtlr	r0			#Part of stack...
+		lwzu	r0,4(r31)
+		mtxer	r0
+		lfd	f0,0(r31)
+		mtfsf	0xff,f0
+		lwzu	r0,8(r31)
+		lwzu	r1,4(r31)
+		lwzu	r2,4(r31)
+		lwzu	r3,4(r31)		#Overwrites status...
+		lwzu	r4,4(r31)
+		lwzu	r5,4(r31)
+		lwzu	r6,4(r31)
+		lwzu	r7,4(r31)
+		lwzu	r8,4(r31)
+		lwzu	r9,4(r31)
+		lwzu	r10,4(r31)
+		lwzu	r11,4(r31)
+		lwzu	r12,4(r31)
+		lwzu	r13,4(r31)
+		lwzu	r14,4(r31)
+		lwzu	r15,4(r31)
+		lwzu	r16,4(r31)
+		lwzu	r17,4(r31)
+		lwzu	r18,4(r31)
+		lwzu	r19,4(r31)
+		lwzu	r20,4(r31)
+		lwzu	r21,4(r31)
+		lwzu	r22,4(r31)
+		lwzu	r23,4(r31)
+		lwzu	r24,4(r31)
+		lwzu	r25,4(r31)
+		lwzu	r26,4(r31)
+		lwzu	r27,4(r31)
+		lwzu	r28,4(r31)
+		lwzu	r29,4(r31)
+		lwz	r30,8(r31)
+		mtsprg3	r30
+		lwzu	r30,4(r31)		
+		lfdu	f0,8(r31)		#skips r31 (is in mtsprg3)
+		lfdu	f1,8(r31)
+		lfdu	f2,8(r31)
+		lfdu	f3,8(r31)
+		lfdu	f4,8(r31)
+		lfdu	f5,8(r31)
+		lfdu	f6,8(r31)
+		lfdu	f7,8(r31)
+		lfdu	f8,8(r31)
+		lfdu	f9,8(r31)
+		lfdu	f10,8(r31)
+		lfdu	f11,8(r31)
+		lfdu	f12,8(r31)
+		lfdu	f13,8(r31)
+		lfdu	f14,8(r31)
+		lfdu	f15,8(r31)
+		lfdu	f16,8(r31)
+		lfdu	f17,8(r31)
+		lfdu	f18,8(r31)
+		lfdu	f19,8(r31)
+		lfdu	f20,8(r31)
+		lfdu	f21,8(r31)
+		lfdu	f22,8(r31)
+		lfdu	f23,8(r31)
+		lfdu	f24,8(r31)
+		lfdu	f25,8(r31)
+		lfdu	f26,8(r31)
+		lfdu	f27,8(r31)
+		lfdu	f28,8(r31)
+		lfdu	f29,8(r31)
+		lfdu	f30,8(r31)
+		lfdu	f31,8(r31)
+		
+		cmpwi	r3,EXCRETURN_ABORT
+		beq	.LastPrHandler		
+		
+		b	.NextPExc
 		
 .LastPrHandler:		
 		mfsrr0	r31
