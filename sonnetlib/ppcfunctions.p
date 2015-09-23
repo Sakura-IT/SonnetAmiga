@@ -440,6 +440,7 @@ GetInfo:
 		stwu	r6,-4(r13)
 		stwu	r5,-4(r13)
 		stwu	r4,-4(r13)
+
 		li	r6,1
 		
 		bl WarpSuper
@@ -953,7 +954,7 @@ FreeSignalPPC:
 
 #********************************************************************************************
 #
-#	signalnum = AllocSignalPPC(signalNum) // r4
+#	signalnum = AllocSignalPPC(signalNum) // r3=r4
 #
 #********************************************************************************************
 
@@ -1005,13 +1006,10 @@ AllocSignalPPC:
 		li	r4,Atomic
 		bl AtomicDone
 		
-		lwz	r4,0(r13)
+		lwz	r3,0(r13)
 		addi	r13,r13,4
-
-.EndSig:	mr	r4,r3
-		mr	r3,r4
 		
-		DSTRYSTACKPPC
+.EndSig:	DSTRYSTACKPPC
 		
 		blr	
 		
@@ -4194,7 +4192,7 @@ ChangeStack:
 
 		mr	r29,r4	
 
-		lwz	r3,RunningTask(r0)		
+		lwz	r3,RunningTask(r0)
 		mr	r28,r3
 		lwz	r5,TASKPPC_STACKSIZE(r3)
 		cmplw	r4,r5
@@ -4226,11 +4224,11 @@ ChangeStack:
 		stw	r29,ML_SIZE+ME_LENGTH(r3)
 		mr	r5,r3
 		addi	r4,r28,TC_MEMENTRY
-		lwz	r3,LH_HEAD(r4)
-		stw	r5,LH_HEAD(r4)
-		stw	r3,LH_HEAD(r5)
-		stw	r4,LH_TAIL(r5)
-		stw	r5,LH_TAIL(r3)
+		lwz	r3,LN_SUCC(r4)
+		stw	r5,LN_SUCC(r4)
+		stw	r3,LN_SUCC(r5)
+		stw	r4,LN_PRED(r5)
+		stw	r5,LN_PRED(r3)
 		lwz	r3,TC_SPLOWER(r28)
 		lwz	r4,TC_SPUPPER(r28)
 		mr	r27,r4
@@ -8246,8 +8244,8 @@ RawDoFmtPPC:	BUILDSTACKPPC
 		mr	r13,r26
 		lwz	r26,0(r13)
 		addi	r13,r13,4
+		
 .DoNoFmt:	lwz	r18,0(r13)
-
 		lwz	r19,4(r13)
 		lwz	r20,8(r13)
 		lwz	r21,12(r13)
@@ -8521,7 +8519,9 @@ RawDoFmtPPC:	BUILDSTACKPPC
 		lwz	r21,0(r29)
 		addi	r29,r29,4
 		stw	r29,0(r13)
-		blr	
+		blr
+		
+#*******************************************************************************************
 
 .GetNum:	xor	r3,r3,r3
 .NextNum:	lbz	r19,0(r25)
@@ -8592,6 +8592,6 @@ RawDoFmtPPC:	BUILDSTACKPPC
 .SkipToNext:	bdnz+	.NextHex
 
 		blr	
-
+		
 #********************************************************************************************
 EndFunctions:
