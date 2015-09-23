@@ -2464,18 +2464,28 @@ TestRoutine:	b	.IntReturn
 #********************************************************************************************
 
 .PrInt:		
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-1080(r1)		
+
 		mtsprg0	r0				#Program Exception (UNDER DEVELOPMENT)
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU & FPU
 		isync
-		
-		prolog	1024,"TOC"
+		mfsprg0	r0
 				
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r2,-4(r13)
+		stwu	r0,-4(r13)
+		
+		mfcr	r0
+		stwu	r0,-4(r13)
 		
 		mfsrr1	r0
 		rlwinm.	r0,r0,(SRR1_TRAP+1),31,31	#Check for TRAP exception type
@@ -2505,43 +2515,56 @@ TestRoutine:	b	.IntReturn
 		b	.NextPExc
 		
 .DoExc:		mflr	r29
+		mtsprg0	r31
 		lwz	r0,EXCDATA_CODE(r30)
 		mtlr	r0
-		lwz	r2,EXCDATA_DATA(r30)
 		lwz	r0,EXCDATA_FLAGS(r30)
 		rlwinm.	r0,r0,(32-EXC_LARGECONTEXT),31,31
 		bne-	.LargeContext
-
-		subi	r13,r13,16
+		
+		mtsprg3	r2
+		lwz	r2,EXCDATA_DATA(r30)
+		mtsprg1	r29		
+		subi	r13,r13,XCO_SIZE
 		stw	r3,4(r13)
 		loadreg	r0,EXCF_PROGRAM
 		stw	r0,0(r13)
 		mr	r3,r13
-		mtsprg1	r29
-		mtsprg2	r1
-		mtsprg3	r2
-				
-		mfsprg0	r0
-		stw	r0,12(r13)
-		mtsprg0	r13
-		loadreg	r0,"WARP"
-		stw	r31,8(r13)
+		mtsprg2	r1				
 		
-		blrl
+		lwz	r0,4+XCO_SIZE(r13)
+		lwz	r27,16+XCO_SIZE(r13)
+		lwz	r28,20+XCO_SIZE(r13)
+		lwz	r29,24+XCO_SIZE(r13)
+		lwz	r30,28+XCO_SIZE(r13)
+		lwz	r31,32+XCO_SIZE(r13)
 		
-		mfsprg0	r13
-		lwz	r31,8(r13)
-		lwz	r0,12(r13)
-		mtsprg0	r0
-		addi	r13,r13,16
-				
+		blrl					#DO NOT TRASH R13 IN HANDLER!
+
+		addi	r13,r13,XCO_SIZE
+		
+		stw	r0,4(r13)
+		stw	r27,16(r13)
+		stw	r28,20(r13)
+		stw	r29,24(r13)
+		stw	r30,28(r13)
+		stw	r31,32(r13)
+		
+		mfsprg1	r31
+		mtlr	r31
+		mfsprg2	r1
+		mfsprg3	r2
+		mfsprg0	r31
+			
+		stw	r2,8(r13)								
 		cmpwi	r3,EXCRETURN_ABORT
 		beq	.LastPrHandler
 				
 		b	.NextPExc
 		
-.LargeContext:	subi	r13,r13,424
-		mtsprg1	r3
+.LargeContext:	mtsprg2	r31
+		mr	r31,r13
+		subi	r13,r13,EC_SIZE
 		mr	r3,r13
 		li	r0,EXC_PROGRAM
 		stw	r0,0(r3)
@@ -2553,22 +2576,24 @@ TestRoutine:	b	.IntReturn
 		stwu	r0,4(r3)
 		mfdsisr	r0
 		stwu	r0,4(r3)
-		mfcr	r0			#Need to be picked from stack
+		lwz	r0,0(r31)		#cr
 		stwu	r0,4(r3)
 		mfctr	r0
 		stwu	r0,4(r3)
 		stwu	r29,4(r3)
 		mfxer	r0
 		stwu	r0,4(r3)
-		mffs	f0			#trashes f0...
+		stfd	f0,16(r3)
+		mffs	f0
 		stfd	f0,4(r3)
+		lfd	f0,16(r3)
 		lwz	r0,8(r3)
 		stwu	r0,4(r3)
-		mfsprg0	r0		
+		lwz	r0,4(r31)		#r0
 		stwu	r0,4(r3)
 		stwu	r1,4(r3)
 		stwu	r2,4(r3)
-		mfsprg1	r0
+		lwz	r0,12(r31)		#r3
 		stwu	r0,4(r3)
 		stwu	r4,4(r3)
 		stwu	r5,4(r3)
@@ -2593,11 +2618,16 @@ TestRoutine:	b	.IntReturn
 		stwu	r24,4(r3)
 		stwu	r25,4(r3)
 		stwu	r26,4(r3)
-		stwu	r27,4(r3)
-		stwu	r28,4(r3)		#Need to be picked from stack
-		stwu	r29,4(r3)		#"
-		stwu	r30,4(r3)		#"
-		stwu	r31,4(r3)		#"
+		lwz	r0,16(r31)
+		stwu	r0,4(r3)
+		lwz	r0,20(r31)
+		stwu	r0,4(r3)
+		lwz	r0,24(r31)
+		stwu	r0,4(r3)
+		lwz	r0,28(r31)
+		stwu	r0,4(r3)
+		lwz	r0,32(r31)
+		stwu	r0,4(r3)
 		stfdu	f0,4(r3)
 		stfdu	f1,8(r3)
 		stfdu	f2,8(r3)
@@ -2633,10 +2663,12 @@ TestRoutine:	b	.IntReturn
 		
 		mr	r3,r13
 		mtsprg3	r3
-		loadreg	r0,"WARP"
+		lwz	r2,EXCDATA_DATA(r30)
+
 		blrl
 		
 		mfsprg3	r31
+		mfsprg2	r13
 		
 		lwzu	r0,4(r31)		#Skips Exc type
 		mtsrr0	r0
@@ -2647,11 +2679,12 @@ TestRoutine:	b	.IntReturn
 		lwzu	r0,4(r31)
 		mtdsisr	r0		
 		lwzu	r0,4(r31)
-		mtcr	r0			#Part of stack...
+		mtcr	r0
+		stw	r0,0(r13)
 		lwzu	r0,4(r31)
 		mtctr	r0
 		lwzu	r0,4(r31)
-		mtlr	r0			#Part of stack...
+		mtlr	r0
 		lwzu	r0,4(r31)
 		mtxer	r0
 		lfd	f0,0(r31)
@@ -2659,7 +2692,8 @@ TestRoutine:	b	.IntReturn
 		lwzu	r0,8(r31)
 		lwzu	r1,4(r31)
 		lwzu	r2,4(r31)
-		lwzu	r3,4(r31)		#Overwrites status...
+		lwzu	r4,4(r31)
+		stw	r4,12(r13)		#r3
 		lwzu	r4,4(r31)
 		lwzu	r5,4(r31)
 		lwzu	r6,4(r31)
@@ -2669,7 +2703,9 @@ TestRoutine:	b	.IntReturn
 		lwzu	r10,4(r31)
 		lwzu	r11,4(r31)
 		lwzu	r12,4(r31)
-		lwzu	r13,4(r31)
+		lwzu	r14,4(r31)
+		lwz	r15,0(r1)
+		stw	r14,-4(r15)		#r13
 		lwzu	r14,4(r31)
 		lwzu	r15,4(r31)
 		lwzu	r16,4(r31)
@@ -2684,12 +2720,17 @@ TestRoutine:	b	.IntReturn
 		lwzu	r25,4(r31)
 		lwzu	r26,4(r31)
 		lwzu	r27,4(r31)
+		stw	r27,16(r13)
 		lwzu	r28,4(r31)
+		stw	r28,20(r13)
 		lwzu	r29,4(r31)
+		stw	r29,24(r13)
 		lwz	r30,8(r31)
+		stw	r30,32(r13)
 		mtsprg3	r30
-		lwzu	r30,4(r31)		
-		lfdu	f0,8(r31)		#skips r31 (is in mtsprg3)
+		lwzu	r30,4(r31)
+		stw	r30,28(r13)
+		lfdu	f0,8(r31)		#skips r31 (is in sprg3)
 		lfdu	f1,8(r31)
 		lfdu	f2,8(r31)
 		lfdu	f3,8(r31)
@@ -2722,6 +2763,8 @@ TestRoutine:	b	.IntReturn
 		lfdu	f30,8(r31)
 		lfdu	f31,8(r31)
 		
+		mfsprg0	r31
+		
 		cmpwi	r3,EXCRETURN_ABORT
 		beq	.LastPrHandler		
 		
@@ -2740,15 +2783,22 @@ TestRoutine:	b	.IntReturn
 		xori	r31,r31,PSL_PR
 		mtsrr1	r31
 
-		lwz	r28,0(r13)
-		lwz	r29,4(r13)
-		lwz	r30,8(r13)
-		lwz	r31,12(r13)
-		addi	r13,r13,16
+		lwz	r0,0(r13)
+		mtcr	r0
+		lwz	r0,4(r13)
+		lwz	r2,8(r13)
+		lwz	r3,12(r13)
+		lwz	r27,16(r13)
+		lwz	r28,20(r13)
+		lwz	r29,24(r13)
+		lwz	r30,28(r13)
+		lwz	r31,32(r13)
+		addi	r13,r13,36
 
-		epilog	"TOC"
-		
 		li	r0,0				#SuperKey
+
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)			#r13 still unchanged...
 		
 		rfi
 
