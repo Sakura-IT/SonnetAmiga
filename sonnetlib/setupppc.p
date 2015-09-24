@@ -1434,6 +1434,10 @@ EInt:		b	.FPUnav
 		b	.PrInt
 
 		mtsprg2	r0
+		
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
+		
 		mfsrr1	r0
 		mtsprg1	r0
 		mfxer	r0
@@ -1573,9 +1577,6 @@ EInt:		b	.FPUnav
 
 .RDecInt:	loadreg	r3,"EXEX"
 		stw	r3,0xf4(r0)
-
-		li	r3,-1
-		stb	r3,ExceptionMode(r0)
 
 		lwz	r9,TaskException(r0)
 		mr.	r9,r9
@@ -1760,9 +1761,6 @@ EInt:		b	.FPUnav
 		isync
 
 .NoBreak:	mtsprg0	r8
-
-		li	r8,0
-		stb	r8,ExceptionMode(r0)
 		
 		mr	r9,r8
 		mr	r10,r8
@@ -1803,6 +1801,7 @@ EInt:		b	.FPUnav
 		b	.PrInt
 		
 .NoThrow:	mr	r7,r0
+		stb	r0,ExceptionMode(r0)
 		
 		rfi
 		
@@ -1812,8 +1811,6 @@ EInt:		b	.FPUnav
 		lwz	r9,0xf0(r0)				#Debug counter to check
 		addi	r9,r9,1					#Whether exception is still
 		stw	r9,0xf0(r0)				#running
-		li	r9,0
-		stb	r9,ExceptionMode(r0)
 		
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
@@ -1832,6 +1829,10 @@ EInt:		b	.FPUnav
 		mtsrr1	r0
 		mfsprg0	r0
 		mtsrr0	r0
+		
+		li	r0,0
+		stb	r0,ExceptionMode(r0)
+		
 		mfsprg2	r0
 
 		rfi
@@ -2181,6 +2182,10 @@ TestRoutine:	b	.IntReturn
 #********************************************************************************************
 		
 .DecInt:	mtsprg2	r0
+
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
+
 		mfsrr1	r0
 		mtsprg1	r0
 		mfxer	r0
@@ -2464,16 +2469,20 @@ TestRoutine:	b	.IntReturn
 #********************************************************************************************
 
 .PrInt:		
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-1080(r1)		
-
 		mtsprg0	r0				#Program Exception (UNDER DEVELOPMENT)
+		
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
+		
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU & FPU
 		isync
 		mfsprg0	r0
+				
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-1080(r1)
 				
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -2482,12 +2491,11 @@ TestRoutine:	b	.IntReturn
 		stwu	r27,-4(r13)
 		stwu	r3,-4(r13)
 		stwu	r2,-4(r13)
-		stwu	r0,-4(r13)
-		
+		stwu	r0,-4(r13)		
 		mfcr	r0
 		stwu	r0,-4(r13)
 		
-		mfsrr1	r0
+		mfsrr1	r0		
 		rlwinm.	r0,r0,(SRR1_TRAP+1),31,31	#Check for TRAP exception type
 		beq	.NoAddPC
 		
@@ -2503,8 +2511,7 @@ TestRoutine:	b	.IntReturn
 		beq	.LastPrHandler
 		
 		mr	r30,r31
-		mr	r31,r0
-		
+								
 		lwz	r0,EXCDATA_TASK(r30)
 		mr.	r0,r0
 		beq 	.DoExc
@@ -2517,7 +2524,7 @@ TestRoutine:	b	.IntReturn
 .DoExc:		mflr	r29
 		mtsprg0	r31
 		lwz	r0,EXCDATA_CODE(r30)
-		mtlr	r0
+		mtlr	r0		
 		lwz	r0,EXCDATA_FLAGS(r30)
 		rlwinm.	r0,r0,(32-EXC_LARGECONTEXT),31,31
 		bne-	.LargeContext
@@ -2562,15 +2569,16 @@ TestRoutine:	b	.IntReturn
 				
 		b	.NextPExc
 		
-.LargeContext:	mtsprg2	r31
+.LargeContext:	mtsprg2	r13
 		mr	r31,r13
 		subi	r13,r13,EC_SIZE
 		mr	r3,r13
+				
 		li	r0,EXC_PROGRAM
 		stw	r0,0(r3)
 		mfsrr0	r0
-		stw	r0,4(r3)
-		mfsrr1	r0
+		stwu	r0,4(r3)
+		mfsrr1	r0		
 		stwu	r0,4(r3)
 		mfdar	r0
 		stwu	r0,4(r3)
@@ -2664,7 +2672,7 @@ TestRoutine:	b	.IntReturn
 		mr	r3,r13
 		mtsprg3	r3
 		lwz	r2,EXCDATA_DATA(r30)
-
+		
 		blrl
 		
 		mfsprg3	r31
@@ -2783,7 +2791,7 @@ TestRoutine:	b	.IntReturn
 		xori	r31,r31,PSL_PR
 		mtsrr1	r31
 
-		lwz	r0,0(r13)
+.WasTrap:	lwz	r0,0(r13)
 		mtcr	r0
 		lwz	r0,4(r13)
 		lwz	r2,8(r13)
@@ -2800,9 +2808,16 @@ TestRoutine:	b	.IntReturn
 		lwz	r1,0(r1)
 		lwz	r13,-4(r1)			#r13 still unchanged...
 		
+		stb	r0,ExceptionMode(r0)
+		
 		rfi
 
-.HaltErr:	loadreg r3,"HALT"			#DEBUG
+.HaltErr:	lis	r31,8
+		mfsrr1	r0
+		and.	r0,r0,r31
+		bne	.WasTrap			#Trashes r0.....
+		
+		loadreg r3,"HALT"			#DEBUG
 		stw	r3,0xf4(r0)			#Error
 		mfsrr0	r3
 		stw	r3,0xf8(r0)			#Current PC
