@@ -38,6 +38,8 @@
 #********************************************************************************************
 
 SetExcMMU:
+		blr					#DUMMY pending better MMU support
+
 		stw	r4,-8(r1)
 		mfmsr	r4
 		ori	r4,r4,(PSL_IR|PSL_DR)
@@ -53,13 +55,15 @@ SetExcMMU:
 #********************************************************************************************
 
 ClearExcMMU:
+		blr					#DUMMY pending better MMU support
+
 		stw	r4,-8(r1)
 		mfmsr	r4
 		ori	r4,r4,(PSL_IR|PSL_DR)
 		xori	r4,r4,(PSL_IR|PSL_DR)
 		mtmsr	r4				#Disable MMU
 		isync
-		lwz	r4,-8(r1)
+		lwz	r4,-8(r1)		
 		blr	
 	
 #********************************************************************************************
@@ -6204,6 +6208,10 @@ SignalPPC:
 		
 		li	r0,-1
 		stb	r0,RescheduleFlag(r0)
+		
+		lwz	r0,ExceptionMode(r0)		#CHECK FOR BETTER SOLUTION
+		mr	r0,r0				#EXCEPTION SIGNALS? (7404)
+		bne	.SigExit		
 		
 		bl CauseInterrupt
 
