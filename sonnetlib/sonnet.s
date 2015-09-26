@@ -551,7 +551,17 @@ ReUse	move.l a2,d7
 	move.l d7,IFQPR(a2)				;Message the PPC
 	bra.s NextMsg
 	
-Sig68k	move.l ThisTask(a6),a0
+Sig68k	move.l	#_LVOCreateNewProc,d6			;Start of compatibility patches
+	move.l	MN_PPSTRUCT+4(a1),d7
+	cmp.l	d6,d7
+	bne.s NoCNP
+	
+	move.l SonnetBase(pc),d6			;TODO check for lib_base
+	move.l MN_PPSTRUCT+24(a1),d7
+	or.l d6,d7
+	move.l d7,MN_PPSTRUCT+24(a1)	
+	
+NoCNP	move.l ThisTask(a6),a0
 	lea pr_MsgPort(a0),a0
 	move.l a0,MN_REPLYPORT(a1)
 	move.l MN_MIRROR(a1),a0
@@ -1347,8 +1357,6 @@ CausePPCInterrupt:
 
 ;********************************************************************************************
 
-DriverID
-	dc.b "WarpUp hardware driver for Sonnet Crescendo 7200 PCI",0
 	cnop	0,4
 
 Buffer
@@ -1529,6 +1537,6 @@ EndFlag	dc.l	-1
 LibName
 	dc.b	"sonnet.library",0,0
 IDString
-	dc.b	"$VER: sonnet.library 1.0 (01-Apr-15)",0
+	dc.b	"$VER: sonnet.library 1.0 (01-Oct-15)",0
 	cnop	0,4
 EndCP	end
