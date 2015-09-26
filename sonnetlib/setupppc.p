@@ -1461,6 +1461,10 @@ EInt:		b	.FPUnav
 		stwu	r8,-4(r13)
 		stwu	r9,-4(r13)
 
+		mfspr	r5,IABR
+		stw	r5,0xfc(r0)
+
+
 		lis	r3,EUMBEPICPROC
 		lwz	r5,EPIC_IACK(r3)		#Read IACKR to acknowledge interrupt
 
@@ -1793,9 +1797,6 @@ EInt:		b	.FPUnav
 		mfsrr1	r7
 		oris	r7,r7,1<<(15-SRR1_TRAP)
 		mtsrr1	r7
-		mfsrr0	r7
-		subi	r7,r7,4
-		mtsrr0	r7
 		mr	r7,r0
 				
 		b	.PrInt
@@ -2495,15 +2496,12 @@ TestRoutine:	b	.IntReturn
 		mfcr	r0
 		stwu	r0,-4(r13)
 		
-		mfsrr1	r0		
-		rlwinm.	r0,r0,(SRR1_TRAP+1),31,31	#Check for TRAP exception type
-		beq	.NoAddPC
-		
-		mfsrr0	r0
-		addi	r0,r0,4				#Next instruction
-		mtsrr0	r0
-		
-.NoAddPC:	lwz	r31,PowerPCBase(r0)
+		mfsrr0	r31
+		lwz	r0,ViolationAddress(r0)
+		cmplw	r0,r31
+		beq	.Privvy
+				
+		lwz	r31,PowerPCBase(r0)
 		la	r31,LIST_EXCPROGRAM(r31)
 .NextPExc:	lwz	r31,0(r31)			#Are there handlers in place?
 		lwz	r0,0(r31)
@@ -2784,7 +2782,7 @@ TestRoutine:	b	.IntReturn
 		cmplw	r0,r31
 		bne-	.HaltErr
 		
-		addi	r31,r31,4			#Next instruction
+.Privvy:	addi	r31,r31,4			#Next instruction
 		mtsrr0	r31
 		mfsrr1	r31
 		ori	r31,r31,PSL_PR			#Set to Super
@@ -2812,10 +2810,11 @@ TestRoutine:	b	.IntReturn
 		
 		rfi
 
-.HaltErr:	lis	r31,8
+.HaltErr:	lis	r31,SRR1_TRAP-12
 		mfsrr1	r0
+		
 		and.	r0,r0,r31
-		bne	.WasTrap			#Trashes r0.....
+		bne	.WasTrap			#Trashes r0.....(With SuperKey)
 		
 		loadreg r3,"HALT"			#DEBUG
 		stw	r3,0xf4(r0)			#Error
