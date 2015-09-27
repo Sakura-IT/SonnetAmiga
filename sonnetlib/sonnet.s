@@ -530,7 +530,7 @@ GetLoop	move.l d6,a0
 	cmp.l #"FPPC",d0
 	beq MsgFPPC
 	cmp.l #"F68k",d0
-	beq.s MsgF68k
+	beq MsgF68k
 	cmp.l #"LL68",d0
 	beq MsgLL68
 	bra.s GetLoop
@@ -551,12 +551,15 @@ ReUse	move.l a2,d7
 	move.l d7,IFQPR(a2)				;Message the PPC
 	bra.s NextMsg
 	
-Sig68k	move.l	#_LVOCreateNewProc,d6			;Start of compatibility patches
-	move.l	MN_PPSTRUCT+4(a1),d7
+Sig68k	move.l DosBase(pc),d6
+	move.l	MN_PPSTRUCT(a1),d7
 	cmp.l	d6,d7
 	bne.s NoCNP
-	
-	move.l SonnetBase(pc),d6			;TODO check for lib_base
+	move.l	#_LVOCreateNewProc,d6			;Start of compatibility patches
+	move.l	MN_PPSTRUCT+4(a1),d7
+	cmp.l	d6,d7
+	bne.s NoCNP	
+	move.l SonnetBase(pc),d6
 	move.l MN_PPSTRUCT+24(a1),d7
 	or.l d6,d7
 	move.l d7,MN_PPSTRUCT+24(a1)	
