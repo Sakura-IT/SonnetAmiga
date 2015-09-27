@@ -447,7 +447,11 @@ GetInfo:
 
 		li	r6,1
 		
-		bl WarpSuper
+		mr	r5,r4
+		
+		bl Super
+		
+		mr	r4,r3
 
 		mfspr	r3,HID1
 		stw	r3,CPUHID1(r0)
@@ -456,7 +460,9 @@ GetInfo:
 		mfspr	r3,SDR1
 		stw	r3,CPUSDR1(r0)
 		
-		bl WarpUser	
+		bl User	
+		
+		mr	r4,r5
 		
 .TagLoop:	bl NextTagItemPPC
 
@@ -1961,9 +1967,11 @@ WaitPortPPC:
 Super:
 		BUILDSTACKPPC
 		
-		bl WarpSuper
-		
-		DSTRYSTACKPPC
+		li	r0,-1			#READ PVR (warp funcion -130)
+Violation:	mfspr	r3,PVR			#IF user then exception; r0/r3=0
+		mr	r3,r0			#IF super then r0/r3=-1
+
+		DSTRYSTACKPPC			#See Program Exception ($700)
 
 		blr	
 
@@ -1979,32 +1987,6 @@ User:
 		mr.	r4,r4
 		bne-	.WrongKey
 
-		bl WarpUser
-
-.WrongKey:	
-		DSTRYSTACKPPC
-		
-		blr
-
-#********************************************************************************************
-#
-#	Support: SuperKey = WarpSuper(void) // r3
-#
-#********************************************************************************************
-
-WarpSuper:
-		li	r0,-1			#READ PVR (warp funcion -130)
-Violation:	mfspr	r3,PVR			#IF user then exception; r0/r3=0
-		mr	r3,r0			#IF super then r0/r3=-1
-		blr				#See Program Exception ($700)
-
-#********************************************************************************************
-#
-#	void WarpUser(void)
-#
-#********************************************************************************************
-
-WarpUser:
 		lbz	r0,ExceptionMode(r0)
 		mr.	r0,r0
 		bne	.InException
@@ -2012,7 +1994,10 @@ WarpUser:
 		mfmsr	r0
 		ori	r0,r0,PSL_PR		#SET Bit 17 (PR) To User
 		mtmsr	r0
-.InException:	isync	
+.InException:	isync
+
+.WrongKey:	DSTRYSTACKPPC
+		
 		blr
 
 #********************************************************************************************
@@ -2090,7 +2075,10 @@ WaitFor68K:
 		bne	.WasNoDone
 		
 		mfctr	r29
-		bl WarpSuper
+
+		bl Super
+		
+		mr	r4,r3
 		
 		li	r28,6
 		mtctr	r28
@@ -2098,7 +2086,7 @@ WaitFor68K:
 		addi	r27,r27,L1_CACHE_LINE_SIZE
 		bdnz	.PPInvalid
 		
-		bl WarpUser
+		bl User
 
 		subi	r4,r31,4
 		addi	r29,r30,MN_PPSTRUCT-4		#r30 = new msg
@@ -2217,7 +2205,7 @@ Run68K:
 		stwbrx	r23,r24,r3			#triggers Interrupt
 
 		mr	r4,r29
-						
+
 		bl 	WaitFor68K
 		
 		mtctr	r25
@@ -2580,7 +2568,7 @@ SetCache:
 		mr	r4,r5
 		mr	r5,r6
 
-		bl WarpSuper
+		bl Super
 
 		add	r5,r5,r4
 		lis	r0,-1
@@ -2596,7 +2584,9 @@ SetCache:
 		bdnz+	.DInvalidate
 		sync
 		
-		bl WarpUser
+		mr	r4,r3
+		
+		bl User
 		
 		b	.DoneCache
 
@@ -2629,7 +2619,7 @@ SetCache:
 		addi	r4,r4,32
 		bdnz+	.FillLoop
 		
-		bl WarpSuper
+		bl Super
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_DLOCK
@@ -2638,7 +2628,9 @@ SetCache:
 		sync	
 		isync		
 
-		bl WarpUser
+		mr	r4,r3
+
+		bl User
 		
 		li	r0,-1
 		stb	r0,DLockState(r0)
@@ -2650,36 +2642,39 @@ SetCache:
 		bne	.DoneCache
 		
 		bl FlushL1DCache
-		bl WarpSuper
+		bl Super
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_DCE
 		xori	r0,r0,HID0_DCE
 		sync	
 		mtspr	HID0,r0
-		
-		bl WarpUser
+		mr	r4,r3
+				
+		bl User
 		
 		li	r0,-1
 		stb	r0,DState(r0)
 		
 		b	.DoneCache
 
-.ICACHELOCK:	bl WarpSuper
+.ICACHELOCK:	bl Super
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ILOCK
 		isync	
 		mtspr	HID0,r0
 
-		bl WarpUser
+		mr	r4,r3
+
+		bl User
 
 		b	.DoneCache
 
 .DCACHEUNLOCK:	li	r0,0
 		stb	r0,DLockState(r0)
 		
-		bl WarpSuper
+		bl Super
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_DLOCK
@@ -2688,25 +2683,29 @@ SetCache:
 		sync	
 		isync		
 
-		bl WarpUser
+		mr	r4,r3
+
+		bl User
 		
 		b	.DoneCache
 
 .DCACHEON:	li	r0,0
 		stb	r0,DState(r0)		
 		
-		bl WarpSuper
+		bl Super
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_DCE
 		mtspr	HID0,r0
 		isync
 		
-		bl WarpUser
+		mr	r4,r3
+		
+		bl User
 		
 		b	.DoneCache
 
-.ICACHEUNLOCK:	bl WarpSuper
+.ICACHEUNLOCK:	bl Super
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ILOCK
@@ -2714,22 +2713,26 @@ SetCache:
 		mtspr	HID0,r0
 		isync
 		
-		bl WarpUser
+		mr	r4,r3
+		
+		bl User
 
 		b	.DoneCache
 
-.ICACHEON:	bl WarpSuper
+.ICACHEON:	bl Super
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICE
 		mtspr	HID0,r0
 		isync
 
-		bl WarpUser
+		mr	r4,r3
+
+		bl User
 		
 		b	.DoneCache
 
-.ICACHEOFF:	bl WarpSuper
+.ICACHEOFF:	bl Super
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICE
@@ -2737,7 +2740,9 @@ SetCache:
 		isync	
 		mtspr	HID0,r0
 
-		bl WarpUser
+		mr	r4,r3
+
+		bl User
 
 		b	.DoneCache
 
@@ -2763,7 +2768,7 @@ SetCache:
 		b	.DoneCache
 
 .ICACHEINVALL:  
-		bl WarpSuper
+		bl Super
 		
 		b	.Mojo1
 .Mojo2:		mfspr	r0,HID0
@@ -2775,7 +2780,8 @@ SetCache:
 		b 	.Mojo3
 .Mojo1:		b 	.Mojo2
 		
-.Mojo3:		bl WarpUser
+.Mojo3:		mr	r4,r3
+		bl User
 		
 		b	.DoneCache
 
@@ -3747,7 +3753,8 @@ CreateTaskPPC:
 #		stw	r3,64(r20)			#4 bytes at end of BATSTORAGE? 
 		addi	r4,r26,480			#480 in ContextMem (Segment Regs)
  
- 		bl WarpSuper
+ 		bl Super
+ 		mr	r6,r3
  
 		li	r0,16
 		mtctr	r0
@@ -3758,7 +3765,9 @@ CreateTaskPPC:
 		addis	r3,r3,4096
 		bdnz+	.SegCpLoop
  
- 		bl WarpUser
+ 		mr	r4,r6
+ 
+ 		bl User
  
  		loadreg	r4,TASKATTR_EXITCODE
 		li	r5,0 
@@ -3970,7 +3979,7 @@ CreateTaskPPC:
 		
 		bl ReleaseSemaphorePPC
  
- 		bl WarpSuper
+ 		bl Super
 		
 		b	.Mojo4
 .Mojo5:		mfspr	r0,HID0				#Invalidate ICache
@@ -3982,7 +3991,8 @@ CreateTaskPPC:
 		b 	.Mojo6
 .Mojo4:		b 	.Mojo5
 		
-.Mojo6:		bl WarpUser
+.Mojo6:		mr	r4,r3
+		bl User
   
 #		lwz	r3,17652(r2)			#WARP! #4 (Zero datacache (dcbz))
 #		lwz	r0,-52(r3) 
@@ -4144,12 +4154,13 @@ SetDecInterrupt:
 .NotZ:		stwu	r31,-4(r13)
 		mr	r31,r3
 
-		bl WarpSuper
+		bl Super
 		
+		mr	r4,r3
 		mr	r3,r31
 		mtdec	r3
 		
-		bl WarpUser
+		bl User
 
 		lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -4852,16 +4863,10 @@ CauseInterrupt:
 
 		stwu	r31,-4(r13)
 
-#		li	r0,-1
-#		stb	r0,ExceptionMode(r0)
-
 		li	r4,0
 		
 		bl SetDecInterrupt
 
-#.IntWait:	lbz	r0,ExceptionMode(r0)
-#		mr.	r0,r0
-#		bne+	.IntWait
 		isync
 
 		lwz	r31,0(r13)
@@ -5192,7 +5197,7 @@ SetHardware:
 		beq-	.ClearDBreak
 		b	.HWEnd
 
-.TraceOn:	bl WarpSuper
+.TraceOn:	bl Super
 
 		mfmsr	r0
 		ori	r0,r0,PSL_SE
@@ -5200,11 +5205,13 @@ SetHardware:
 		isync	
 		sync
 		
-		bl WarpUser
+		mr	r4,r3
+		
+		bl User
 
 		b	.HWEnd
 		
-.TraceOff:	bl WarpSuper
+.TraceOff:	bl Super
 
 		mfmsr	r0
 		ori	r0,r0,PSL_SE
@@ -5213,11 +5220,13 @@ SetHardware:
 		isync	
 		sync	
 		
-		bl WarpUser
+		mr	r4,r3
+		
+		bl User
 
 		b	.HWEnd
 
-.BranchOn:	bl WarpSuper
+.BranchOn:	bl Super
 
 		mfmsr	r0
 		ori	r0,r0,PSL_BE
@@ -5225,11 +5234,13 @@ SetHardware:
 		isync	
 		sync	
 		
-		bl WarpUser
+		mr	r4,r3
+		
+		bl User
 
 		b	.HWEnd
 
-.BranchOff:	bl WarpSuper
+.BranchOff:	bl Super
 
 		mfmsr	r0
 		ori	r0,r0,PSL_BE
@@ -5238,11 +5249,13 @@ SetHardware:
 		isync	
 		sync	
 		
-		bl WarpUser
+		mr	r4,r3
+		
+		bl User
 
 		b	.HWEnd
 
-.FPExcOn:	bl WarpSuper
+.FPExcOn:	bl Super
 
 		mtfsfi	1,0
 		mtfsfi	2,0
@@ -5257,11 +5270,13 @@ SetHardware:
 		isync	
 		sync	
 		
-		bl WarpUser
+		mr	r4,r3
+		
+		bl User
 
 		b	.HWEnd
 
-.FPExcOff:	bl WarpSuper
+.FPExcOff:	bl Super
 
 		mfmsr	r0
 		ori	r0,r0,PSL_FE0|PSL_FE1
@@ -5270,11 +5285,13 @@ SetHardware:
 		isync	
 		sync	
 
-		bl WarpUser
+		mr	r4,r3
+
+		bl User
 
 		b	.HWEnd
 		
-.SetIBreak:	bl WarpSuper
+.SetIBreak:	bl Super
 		
 		mr	r4,r5
 		loadreg	r0,0xfffffffc
@@ -5282,20 +5299,24 @@ SetHardware:
 		ori	r4,r4,3
 		mtspr	IABR,r4
 
-		bl WarpUser
+		mr	r4,r3
+
+		bl User
 
 		b	.HWEnd
 
-.ClearIBreak:	bl WarpSuper
+.ClearIBreak:	bl Super
 
 		li	r0,0
 		mtspr	IABR,r0
 		
-		bl WarpUser
+		mr	r4,r3
+		
+		bl User
 
 		b	.HWEnd
 
-.SetDBreak:	bl WarpSuper
+.SetDBreak:	bl Super
 		
 		mr	r4,r5
 		loadreg	r0,0xfffffff8
@@ -5303,16 +5324,20 @@ SetHardware:
 		ori	r4,r4,7
 		mtspr	DABR,r4
 		
-		bl WarpUser
+		mr	r4,r3
+		
+		bl User
 		
 		b	.HWEnd
 
-.ClearDBreak:	bl WarpSuper
+.ClearDBreak:	bl Super
 
 		li	r0,0
 		mtspr	DABR,r0
 		
-		bl WarpUser
+		mr	r4,r3
+		
+		bl User
 		
 .HWEnd:		li	r4,HW_AVAILABLE
 
@@ -6209,8 +6234,8 @@ SignalPPC:
 		li	r0,-1
 		stb	r0,RescheduleFlag(r0)
 		
-		lwz	r0,ExceptionMode(r0)		#CHECK FOR BETTER SOLUTION
-		mr	r0,r0				#EXCEPTION SIGNALS? (7404)
+		lbz	r0,ExceptionMode(r0)		#CHECK FOR BETTER SOLUTION
+		mr.	r0,r0				#EXCEPTION SIGNALS? (7404)
 		bne	.SigExit		
 		
 		bl CauseInterrupt
@@ -6693,12 +6718,15 @@ GetBATs:
 		stwu	r0,-4(r13)
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
 
 		lwz	r4,RunningTask(r0)
 		lwz	r30,TASKPPC_BATSTORAGE(r4)
 		lwz	r31,PowerPCBase(r0)
 		
-		bl WarpSuper
+		bl Super
+		
+		mr	r29,r3
 		
 		addi	r5,r30,TASKPPC_BAT0
 		li	r4,CHMMU_BAT0
@@ -6740,13 +6768,15 @@ GetBATs:
 
 		bl MoveToBAT
 
-		bl WarpUser
+		mr	r4,r29
 
-		lwz	r30,0(r13)
-		lwz	r31,4(r13)
-		addi	r13,r13,8
-		lwz	r0,0(r13)
-		addi	r13,r13,4
+		bl User
+
+		lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		lwz	r0,12(r13)
+		addi	r13,r13,16
 		mtlr	r0
 
 		blr
@@ -6758,12 +6788,15 @@ StoreBATs:
 		stwu	r0,-4(r13)
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
 
 		lwz	r31,PowerPCBase(r0)
 		lwz	r4,RunningTask(r0)
 		lwz	r30,TASKPPC_BATSTORAGE(r4)
 		
-		bl WarpSuper
+		bl Super
+		
+		mr	r29,r3
 		
 		addi	r5,r30,TASKPPC_BAT0
 		li	r4,CHMMU_BAT0
@@ -6785,13 +6818,15 @@ StoreBATs:
 
 		bl MoveToBAT
 
-		bl WarpUser
+		mr	r4,r29
 
-		lwz	r30,0(r13)
-		lwz	r31,4(r13)
-		addi	r13,r13,8
-		lwz	r0,0(r13)
-		addi	r13,r13,4
+		bl User
+
+		lwz	r29,0(r13)
+		lwz	r30,4(r13)
+		lwz	r31,8(r13)
+		lwz	r0,12(r13)
+		addi	r13,r13,16
 		mtlr	r0
 
 		blr
@@ -7088,9 +7123,15 @@ Support1:
 		mr	r31,r5
 		mr	r30,r6
 
-		bl WarpSuper
+		bl Super
+		
+		mr	r31,r3
+		
 		bl Warp43
-		bl WarpUser
+		
+		mr	r4,r31
+		
+		bl User
 
 		lwz	r3,15728(r2)
 		lwz	r25,410(r3)			#Base+410
@@ -7106,9 +7147,15 @@ Support1:
 		li	r9,31
 		lwz	r10,17744(r2)
 
-		bl WarpSuper
+		bl Super
+		
+		mr	r31,r3
+		
 		bl Warp43
-		bl WarpUser
+		
+		mr	r4,r31
+		
+		bl User
 
 		mr	r25,r24
 		b	.NextSupp
