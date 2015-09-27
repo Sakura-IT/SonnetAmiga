@@ -1461,10 +1461,6 @@ EInt:		b	.FPUnav
 		stwu	r8,-4(r13)
 		stwu	r9,-4(r13)
 
-		mfspr	r5,IABR
-		stw	r5,0xfc(r0)
-
-
 		lis	r3,EUMBEPICPROC
 		lwz	r5,EPIC_IACK(r3)		#Read IACKR to acknowledge interrupt
 
@@ -1579,10 +1575,10 @@ EInt:		b	.FPUnav
 		lis	r3,EUMBEPICPROC
 		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
 
-.RDecInt:	loadreg	r3,"EXEX"
+		loadreg	r3,"EXEX"
 		stw	r3,0xf4(r0)
 
-		lwz	r9,TaskException(r0)
+.RDecInt:	lwz	r9,TaskException(r0)
 		mr.	r9,r9
 		bne	.TaskException
 
@@ -1779,7 +1775,7 @@ EInt:		b	.FPUnav
 		mr	r20,r8
 		mr	r21,r8
 		
-		mfsprg1	r0
+		mfsprg1	r0		
 		mtsrr1	r0
 		mfsprg0	r0
 		mtsrr0	r0
@@ -2172,7 +2168,7 @@ TestRoutine:	b	.IntReturn
 		subi	r13,r1,4
 		stwu	r1,-284(r1)
 		
-		mfsprg1	r0
+		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
 		mtsrr1	r0		
 		
 		li	r0,0
@@ -2785,6 +2781,7 @@ TestRoutine:	b	.IntReturn
 .Privvy:	addi	r31,r31,4			#Next instruction
 		mtsrr0	r31
 		mfsrr1	r31
+		
 		ori	r31,r31,PSL_PR			#Set to Super
 		xori	r31,r31,PSL_PR
 		mtsrr1	r31
