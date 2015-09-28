@@ -98,7 +98,8 @@ Start:
 		nop
 		b	.StartX
 	
-ExitCode:	li	r7,TS_REMOVED
+ExitCode:	blrl
+		li	r7,TS_REMOVED
 		lwz	r9,RunningTask(r0)
 		stb	r7,TC_STATE(r9)
 		
@@ -1676,7 +1677,7 @@ EInt:		b	.FPUnav
 		
 		loadreg	r6,IdleTask
 		addi	r6,r6,ExitCode-Start	
-		mtlr	r6
+		mtsprg0	r6
 
 		la	r6,TASKPPC_PORT(r8)		#Setup a Semaphore & MsgPort
 		addi	r4,r6,MP_PPC_INTMSG
@@ -1751,6 +1752,8 @@ EInt:		b	.FPUnav
 		lwz	r8,PP_CODE(r8)
 		add	r8,r8,r9
 		
+		mtlr	r8
+		
 		lwz	r11,Break(r0)
 		mr.	r11,r11
 		beq	.NoBreak				#Should be beq
@@ -1759,10 +1762,8 @@ EInt:		b	.FPUnav
 		ori	r11,r11,3
 		mtspr	IABR,r11				#Set breakpoint
 		isync
-
-.NoBreak:	mtsprg0	r8
 		
-		mr	r9,r8
+.NoBreak:	mr	r9,r8
 		mr	r10,r8
 		mr 	r11,r8
 		mr	r12,r8
@@ -1799,6 +1800,8 @@ EInt:		b	.FPUnav
 		
 .NoThrow:	mr	r7,r0
 		stb	r0,ExceptionMode(r0)
+		
+		loadreg	r0,"WARP"
 		
 		rfi
 		
@@ -2396,9 +2399,10 @@ TestRoutine:	b	.IntReturn
 
 #********************************************************************************************
 
-.Trace:		lwz	r0,0xfc(r0)
-		addi	r0,r0,1
-		stw	r0,0xfc(r0)
+.Trace:		loadreg	r3,"TRCE"
+		stw	r3,0xf4(r0)
+.HaltTrace:	b	.HaltTrace
+		
 		rfi
 		
 #********************************************************************************************
@@ -2766,7 +2770,7 @@ TestRoutine:	b	.IntReturn
 		lfdu	f31,8(r31)
 		
 		mfsprg0	r31
-		
+
 		cmpwi	r3,EXCRETURN_ABORT
 		beq	.LastPrHandler		
 		
