@@ -83,7 +83,7 @@ SetLen:		mr	r30,r28
 		li	r3,IdleTask			#Start hardcoded at 0x7400
 		mr	r31,r3
 
-		loadreg	r1,StackSize-0x20		#System stack in unused mem (See sonnet.s)
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
 		
 		stw	r13,-4(r1)
 		subi	r13,r1,4
@@ -97,6 +97,8 @@ Start:
 		nop
 		nop
 		b	.StartX
+	
+		trap					#For PP_THROW
 	
 ExitCode:	blrl
 		li	r7,TS_REMOVED
@@ -187,7 +189,7 @@ ExitCode:	blrl
 		stwbrx	r23,r24,r3				#triggers Interrupt
 		sync
 
-		loadreg	r1,StackSize-0x20			#System stack in unused mem
+		loadreg	r1,SysStack-0x20			#System stack in unused mem
 		subi	r13,r1,4
 		stwu	r1,-284(r1)
 
@@ -374,7 +376,7 @@ End:		mflr	r4
 #********************************************************************************************
 
 .FlushL1DCache:	
-		BUILDSTACKPPC
+		prolog	228,"TOC"
 		
 		mfctr	r3
 		
@@ -397,9 +399,7 @@ End:		mflr	r4
 
 		mtctr	r3
 		
-		DSTRYSTACKPPC
-
-		blr
+		epilog	"TOC"
 		
 #********************************************************************************************		
 
@@ -1452,7 +1452,11 @@ EInt:		b	.FPUnav
 		isync					#Also reenable FPU
 		sync
 
-		BUILDSTACKPPC
+		mr	r0,r1				#Store user stack pointer
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		stwu	r0,-4(r1)
+		
+		prolog	228,"TOC"
 
 		stwu	r3,-4(r13)
 		stwu	r4,-4(r13)
@@ -1763,21 +1767,23 @@ EInt:		b	.FPUnav
 		mtspr	IABR,r11				#Set breakpoint
 		isync
 		
-.NoBreak:	mr	r9,r8
-		mr	r10,r8
-		mr 	r11,r8
-		mr	r12,r8
-		mr	r14,r8
-		mr	r15,r8
-		mr	r16,r8
-		mr	r17,r8
-		mr	r18,r8
-		mr	r19,r8
-		mr	r20,r8
-		mr	r21,r8
+.NoBreak:	li	r0,0
+		mr	r8,r0
+		mr	r9,r0
+		mr	r10,r0
+		mr 	r11,r0
+		mr	r12,r0
+		mr	r14,r0
+		mr	r15,r0
+		mr	r16,r0
+		mr	r17,r0
+		mr	r18,r0
+		mr	r19,r0
+		mr	r20,r0
+		mr	r21,r0
 		
-		mfsprg1	r0		
-		mtsrr1	r0
+		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
+		mtsrr1	r0		
 		mfsprg0	r0
 		mtsrr0	r0
 				
@@ -1791,13 +1797,10 @@ EInt:		b	.FPUnav
 		rlwinm.	r7,r7,(32-PPB_THROW),31,31
 		beq	.NoThrow
 		
-		mfsrr1	r7
-		oris	r7,r7,1<<(15-SRR1_TRAP)
-		mtsrr1	r7
-		mr	r7,r0
-				
-		b	.PrInt
-		
+		mfsrr0	r7
+		subi	r7,r7,4					#Set start on a TRAP instruction
+		mtsrr0	r7
+
 .NoThrow:	mr	r7,r0
 		stb	r0,ExceptionMode(r0)
 		
@@ -1821,8 +1824,10 @@ EInt:		b	.FPUnav
 		lwzu	r3,4(r13)
 		addi	r13,r13,4
 	
-		DSTRYSTACKPPC
-	
+		excepilog "TOC"
+
+		lwz	r1,0(r1)				#Restore user stack
+
 		mfsprg3	r0
 		mtxer	r0
 		mfsprg1 r0
@@ -1958,6 +1963,7 @@ TestRoutine:	b	.IntReturn
 		mfsprg1 r3
 		stwu	r3,4(r6)
 		lwz	r3,0(r1)
+		lwz	r3,0(r3)			#User stack
 		lwz	r0,8(r3)			#lr
 		stwu	r0,4(r6)
 		lwz	r0,4(r3)			#cr
@@ -2165,7 +2171,7 @@ TestRoutine:	b	.IntReturn
 .DoIdle:	loadreg	r0,IdleTask			#Start hardcoded at 0x7400
 		mtsrr0	r0
 
-		loadreg	r1,StackSize-0x20		#System stack in unused mem (See sonnet.s)
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
 		
 		stw	r13,-4(r1)
 		subi	r13,r1,4
@@ -2188,18 +2194,21 @@ TestRoutine:	b	.IntReturn
 
 		mfsrr1	r0
 		mtsprg1	r0
-		mfxer	r0
-		mtsprg3	r0
 		mfsrr0	r0
 		mtsprg0	r0
-
+		mfxer	r0
+		mtsprg3	r0
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
 		isync					#Also reenable FPU
 		sync
-
-		BUILDSTACKPPC
+		
+		mr	r0,r1				#Store user stack pointer
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		stwu	r0,-4(r1)
+		
+		prolog	228,"TOC"
 
 		stwu	r3,-4(r13)
 		stwu	r4,-4(r13)
@@ -2361,7 +2370,7 @@ TestRoutine:	b	.IntReturn
 #********************************************************************************************
 
 .BreakPoint:	
-		BUILDSTACKPPC
+		prolog	228,"TOC"
 		
 		loadreg	r0,"WARP"
 		stw	r0,0xf4(r0)
@@ -2393,7 +2402,7 @@ TestRoutine:	b	.IntReturn
 		
 		b	.NextBExc		
 		
-.LastBPHandler:	DSTRYSTACKPPC
+.LastBPHandler:	excepilog "TOC"
 
 		rfi
 
@@ -2479,12 +2488,16 @@ TestRoutine:	b	.IntReturn
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU & FPU
 		isync
+
+		mr	r0,r1
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		stwu	r0,-4(r1)			#Store user stack
+		
 		mfsprg0	r0
-				
+		
 		stw	r13,-4(r1)
 		subi	r13,r1,4
-		stwu	r1,-1080(r1)
-				
+		stwu	r1,-1080(r1)				
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
@@ -2495,8 +2508,12 @@ TestRoutine:	b	.IntReturn
 		stwu	r0,-4(r13)		
 		mfcr	r0
 		stwu	r0,-4(r13)
+
+		loadreg	r29,"TRAP"
+		stw	r29,0xf4(r0)
 		
 		mfsrr0	r31
+		stw	r31,0xf8(r0)
 		lwz	r0,ViolationAddress(r0)
 		cmplw	r0,r31
 		beq	.Privvy
@@ -2504,15 +2521,17 @@ TestRoutine:	b	.IntReturn
 		lwz	r31,PowerPCBase(r0)
 		la	r31,LIST_EXCPROGRAM(r31)
 .NextPExc:	lwz	r31,0(r31)			#Are there handlers in place?
+
 		lwz	r0,0(r31)
 		mr.	r0,r0
 		beq	.LastPrHandler
 		
 		mr	r30,r31
-								
+												
 		lwz	r0,EXCDATA_TASK(r30)
 		mr.	r0,r0
 		beq 	.DoExc
+		
 		lwz	r28,RunningTask(r0)
 		cmpw	r0,r28
 		beq	.DoExc
@@ -2567,8 +2586,7 @@ TestRoutine:	b	.IntReturn
 				
 		b	.NextPExc
 		
-.LargeContext:	mtsprg2	r13
-		mr	r31,r13
+.LargeContext:	mr	r31,r13
 		subi	r13,r13,EC_SIZE
 		mr	r3,r13
 				
@@ -2586,7 +2604,7 @@ TestRoutine:	b	.IntReturn
 		stwu	r0,4(r3)
 		mfctr	r0
 		stwu	r0,4(r3)
-		stwu	r29,4(r3)
+		stwu	r29,4(r3)		#lr
 		mfxer	r0
 		stwu	r0,4(r3)
 		stfd	f0,16(r3)
@@ -2597,7 +2615,9 @@ TestRoutine:	b	.IntReturn
 		stwu	r0,4(r3)
 		lwz	r0,4(r31)		#r0
 		stwu	r0,4(r3)
-		stwu	r1,4(r3)
+		lwz	r29,0(r1)
+		lwz	r0,0(r29)
+		stwu	r0,4(r3)		#r1
 		stwu	r2,4(r3)
 		lwz	r0,12(r31)		#r3
 		stwu	r0,4(r3)
@@ -2610,7 +2630,9 @@ TestRoutine:	b	.IntReturn
 		stwu	r10,4(r3)
 		stwu	r11,4(r3)
 		stwu	r12,4(r3)
-		stwu	r13,4(r3)
+		lwz	r2,0(r1)
+		lwz	r0,-4(r2)		
+		stwu	r0,4(r3)		#r13
 		stwu	r14,4(r3)
 		stwu	r15,4(r3)
 		stwu	r16,4(r3)
@@ -2625,15 +2647,15 @@ TestRoutine:	b	.IntReturn
 		stwu	r25,4(r3)
 		stwu	r26,4(r3)
 		lwz	r0,16(r31)
-		stwu	r0,4(r3)
+		stwu	r0,4(r3)		#r27
 		lwz	r0,20(r31)
-		stwu	r0,4(r3)
+		stwu	r0,4(r3)		#r28
 		lwz	r0,24(r31)
-		stwu	r0,4(r3)
+		stwu	r0,4(r3)		#r29
 		lwz	r0,28(r31)
-		stwu	r0,4(r3)
+		stwu	r0,4(r3)		#r30
 		lwz	r0,32(r31)
-		stwu	r0,4(r3)
+		stwu	r0,4(r3)		#r31
 		stfdu	f0,4(r3)
 		stfdu	f1,8(r3)
 		stfdu	f2,8(r3)
@@ -2666,16 +2688,16 @@ TestRoutine:	b	.IntReturn
 		stfdu	f29,8(r3)
 		stfdu	f30,8(r3)
 		stfdu	f31,8(r3)
-		
+
 		mr	r3,r13
 		mtsprg3	r3
+
 		lwz	r2,EXCDATA_DATA(r30)
-		
+
 		blrl
-		
+
 		mfsprg3	r31
-		mfsprg2	r13
-		
+
 		lwzu	r0,4(r31)		#Skips Exc type
 		mtsrr0	r0
 		lwzu	r0,4(r31)
@@ -2686,7 +2708,6 @@ TestRoutine:	b	.IntReturn
 		mtdsisr	r0		
 		lwzu	r0,4(r31)
 		mtcr	r0
-		stw	r0,0(r13)
 		lwzu	r0,4(r31)
 		mtctr	r0
 		lwzu	r0,4(r31)
@@ -2696,10 +2717,11 @@ TestRoutine:	b	.IntReturn
 		lfd	f0,0(r31)
 		mtfsf	0xff,f0
 		lwzu	r0,8(r31)
-		lwzu	r1,4(r31)
 		lwzu	r2,4(r31)
-		lwzu	r4,4(r31)
-		stw	r4,12(r13)		#r3
+		mtsprg1	r2			#(New) User stack pointer
+		lwzu	r2,4(r31)
+		mtsprg2	r3
+		lwzu	r3,4(r31)
 		lwzu	r4,4(r31)
 		lwzu	r5,4(r31)
 		lwzu	r6,4(r31)
@@ -2709,9 +2731,7 @@ TestRoutine:	b	.IntReturn
 		lwzu	r10,4(r31)
 		lwzu	r11,4(r31)
 		lwzu	r12,4(r31)
-		lwzu	r14,4(r31)
-		lwz	r15,0(r1)
-		stw	r14,-4(r15)		#r13
+		lwzu	r13,4(r31)
 		lwzu	r14,4(r31)
 		lwzu	r15,4(r31)
 		lwzu	r16,4(r31)
@@ -2726,16 +2746,11 @@ TestRoutine:	b	.IntReturn
 		lwzu	r25,4(r31)
 		lwzu	r26,4(r31)
 		lwzu	r27,4(r31)
-		stw	r27,16(r13)
 		lwzu	r28,4(r31)
-		stw	r28,20(r13)
 		lwzu	r29,4(r31)
-		stw	r29,24(r13)
 		lwz	r30,8(r31)
-		stw	r30,32(r13)
 		mtsprg3	r30
 		lwzu	r30,4(r31)
-		stw	r30,28(r13)
 		lfdu	f0,8(r31)		#skips r31 (is in sprg3)
 		lfdu	f1,8(r31)
 		lfdu	f2,8(r31)
@@ -2769,6 +2784,26 @@ TestRoutine:	b	.IntReturn
 		lfdu	f30,8(r31)
 		lfdu	f31,8(r31)
 		
+		mfsprg3	r31
+		
+		stw	r13,-4(r1)
+		subi	r13,r1,4				
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r2,-4(r13)
+		stwu	r0,-4(r13)		
+		mfcr	r0
+		stwu	r0,-4(r13)
+
+		mfsprg1	r3
+		lwz	r31,0(r1)
+		stw	r3,0(r31)		#Change User Stack
+
+		mfsprg2	r3
 		mfsprg0	r31
 
 		cmpwi	r3,EXCRETURN_ABORT
@@ -2801,11 +2836,12 @@ TestRoutine:	b	.IntReturn
 		lwz	r30,28(r13)
 		lwz	r31,32(r13)
 		addi	r13,r13,36
-
+		
 		li	r0,0				#SuperKey
 
 		lwz	r1,0(r1)
-		lwz	r13,-4(r1)			#r13 still unchanged...
+		lwz	r13,-4(r1)
+		lwz	r1,0(r1)			#User stack restored
 		
 		stb	r0,ExceptionMode(r0)
 		
