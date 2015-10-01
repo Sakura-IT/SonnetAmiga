@@ -2824,6 +2824,9 @@ TestRoutine:	b	.IntReturn
 		ori	r31,r31,PSL_PR			#Set to Super
 		xori	r31,r31,PSL_PR
 		mtsrr1	r31
+		
+		li	r0,0				#SuperKey
+		mtsprg0	r0
 
 .WasTrap:	lwz	r0,0(r13)
 		mtcr	r0
@@ -2836,14 +2839,15 @@ TestRoutine:	b	.IntReturn
 		lwz	r30,28(r13)
 		lwz	r31,32(r13)
 		addi	r13,r13,36
-		
-		li	r0,0				#SuperKey
 
 		lwz	r1,0(r1)
 		lwz	r13,-4(r1)
 		lwz	r1,0(r1)			#User stack restored
 		
+		li	r0,0
 		stb	r0,ExceptionMode(r0)
+		
+		mfsprg0	r0
 		
 		rfi
 
@@ -2851,7 +2855,9 @@ TestRoutine:	b	.IntReturn
 		mfsrr1	r0
 		
 		and.	r0,r0,r31
-		bne	.WasTrap			#Trashes r0.....(With SuperKey)
+		lwz	r0,4(r13)
+		mtsprg0	r0
+		bne	.WasTrap
 		
 		loadreg r3,"HALT"			#DEBUG
 		stw	r3,0xf4(r0)			#Error
