@@ -56,6 +56,7 @@
 .set AlignmentExcLow,200
 .set WaitListSem,204				#18150
 .set CPUInfo,208
+.set SysStackPointer,212
 
 #LibBase:
 
@@ -149,7 +150,7 @@
 .set _LVOPutMsg,		-366
 .set _LVOVPrintF,		-954
 
-.set StackSize,			0x10000
+.set SysStack,			0x10000			#Length max $8000
 .set IdleTask,			0x7400
 
 .set MEMF_PUBLIC,		0x00000001

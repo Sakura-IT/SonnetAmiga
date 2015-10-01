@@ -70,6 +70,19 @@
 	mtcr    r0
 	.if     (\1 = "TOC")
 	lwz     r2,20(r1)
+	blr
+.endif
+.endm
+
+.macro	excepilog
+	lwz     r1,0(r1)
+	lwz     r13,-4(r1)
+	lwz     r0,8(r1)
+	mtlr    r0
+	lwz     r0,4(r1)
+	mtcr    r0
+	.if     (\1 = "TOC")
+	lwz     r2,20(r1)
 .endif
 .endm
 
