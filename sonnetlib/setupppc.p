@@ -2590,7 +2590,7 @@ TestRoutine:	b	.IntReturn
 		subi	r13,r13,EC_SIZE
 		mr	r3,r13
 				
-		li	r0,EXC_PROGRAM
+		li	r0,EXCF_PROGRAM
 		stw	r0,0(r3)
 		mfsrr0	r0
 		stwu	r0,4(r3)
