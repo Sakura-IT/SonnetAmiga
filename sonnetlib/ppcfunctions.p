@@ -37,7 +37,7 @@
 #
 #********************************************************************************************
 
-SetExcMMU:
+SetExcMMU:	
 		blr					#DUMMY pending better MMU support
 
 		stw	r4,-8(r1)
@@ -366,7 +366,7 @@ CmpTimePPC:
 #
 #********************************************************************************************
 
-AllocVecPPC:	BUILDSTACKPPC
+AllocVecPPC:	prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r9,-4(r13)
@@ -399,10 +399,8 @@ AllocVecPPC:	BUILDSTACKPPC
 		lwz	r31,8(r13)
 		addi	r13,r13,12
 		
-		DSTRYSTACKPPC
-		
-		blr
-	
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	Result = FreeVecPPC(MemBlock)	// r3=r4 r3 should be MEMERR_SUCCESS on success
@@ -410,7 +408,7 @@ AllocVecPPC:	BUILDSTACKPPC
 #********************************************************************************************		
 
 FreeVecPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r8,-4(r13)
 		stwu	r7,-4(r13)
@@ -426,9 +424,7 @@ FreeVecPPC:
 		lwz	r8,4(r13)
 		addi	r13,r13,8
 		
-		DSTRYSTACKPPC
-		
-		blr		
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -437,7 +433,7 @@ FreeVecPPC:
 #********************************************************************************************		
 
 GetInfo:	
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r8,-4(r13)
 		stwu	r7,-4(r13)
@@ -482,9 +478,9 @@ GetInfo:
 		lwzu	r8,4(r13)
 		addi	r13,r13,4
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 		
-		blr
+#********************************************************************************************
 
 .UserTag:	rlwinm.	r7,r3,0,27,31
 		beq	.INFO_CPU		
@@ -580,7 +576,7 @@ GetInfo:
 #********************************************************************************************
 
 GetSysTimePPC:	
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r7,-4(r13)
 		stwu	r6,-4(r13)
@@ -606,9 +602,9 @@ GetSysTimePPC:
 		lwzu	r7,4(r13)
 		addi	r13,r13,4
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 		
-		blr
+#********************************************************************************************
 
 .Link17:	mfctr	r0
 		stwu	r0,-4(r13)
@@ -757,7 +753,7 @@ FindTagItemPPC:
 #********************************************************************************************
 
 FlushL1DCache:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		mfctr	r3
 		
@@ -780,10 +776,8 @@ FlushL1DCache:
 
 		mtctr	r3
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-				
 #********************************************************************************************
 #
 #	message = AllocXMsgPPC(bodysize, replyport) // r3=r4,r5
@@ -792,7 +786,7 @@ FlushL1DCache:
 
 
 AllocXMsgPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -814,10 +808,8 @@ AllocXMsgPPC:
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 		
-		DSTRYSTACKPPC
-				
-		blr		
-		
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	void FreeXMsgPPC(message) // r4
@@ -825,13 +817,11 @@ AllocXMsgPPC:
 #********************************************************************************************		
 
 FreeXMsgPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		bl FreeVecPPC
 		
-		DSTRYSTACKPPC
-		
-		blr		
+		epilog "TOC"		
 
 #********************************************************************************************
 #
@@ -840,7 +830,7 @@ FreeXMsgPPC:
 #********************************************************************************************
 
 CreateMsgPortPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -900,10 +890,8 @@ CreateMsgPortPPC:
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	void DeleteMsgPortPPC(MsgPortPPC) // r4
@@ -911,7 +899,7 @@ CreateMsgPortPPC:
 #********************************************************************************************
 
 DeleteMsgPortPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		mr.	r31,r4
@@ -932,9 +920,7 @@ DeleteMsgPortPPC:
 .NoPortDef:	lwz	r31,0(r13)
 		addi	r13,r13,4
 
-		DSTRYSTACKPPC
-				
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -943,7 +929,7 @@ DeleteMsgPortPPC:
 #********************************************************************************************
 
 FreeSignalPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		extsb	r4,r4
 		cmpwi	r4,-1
@@ -958,9 +944,7 @@ FreeSignalPPC:
 		stw	r3,TC_SIGALLOC(r5)
 
 .NoSigDef:	
-		DSTRYSTACKPPC
-		
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -969,7 +953,7 @@ FreeSignalPPC:
 #********************************************************************************************
 
 AllocSignalPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		extsb	r4,r4
 
@@ -1019,10 +1003,8 @@ AllocSignalPPC:
 		lwz	r3,0(r13)
 		addi	r13,r13,4
 		
-.EndSig:	DSTRYSTACKPPC
-		
-		blr	
-		
+.EndSig:	epilog "TOC"	
+
 #********************************************************************************************
 #
 #	Support: result =  AtomicTest(TestLocation) // r3=r4
@@ -1063,7 +1045,7 @@ AtomicDone:
 #********************************************************************************************
 
 SetSignalPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -1096,9 +1078,7 @@ SetSignalPPC:
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 		
-		DSTRYSTACKPPC
-		
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -1107,7 +1087,7 @@ SetSignalPPC:
 #********************************************************************************************
 
 LockTaskList:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 
@@ -1120,9 +1100,7 @@ LockTaskList:
 		lwz	r31,0(r13)
 		addi	r13,r13,4
 		
-		DSTRYSTACKPPC
-		
-		blr	
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -1131,15 +1109,13 @@ LockTaskList:
 #********************************************************************************************
 
 UnLockTaskList:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		lwz	r4,TaskListSem(r0)
 
 		bl ReleaseSemaphorePPC
 
-		DSTRYSTACKPPC
-		
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -1148,7 +1124,7 @@ UnLockTaskList:
 #********************************************************************************************
 
 InitSemaphorePPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 				
 		stwu	r31,-4(r13)
 		mr	r31,r4
@@ -1177,9 +1153,7 @@ InitSemaphorePPC:
 .SemDone:	lwz	r31,0(r13)
 		addi	r13,r13,4
 		
-		DSTRYSTACKPPC
-		
-		blr	
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -1188,7 +1162,7 @@ InitSemaphorePPC:
 #********************************************************************************************
 
 FreeSemaphorePPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 				
 		mr.	r4,r4
 		beq-	.NoSemDef
@@ -1198,9 +1172,7 @@ FreeSemaphorePPC:
 		bl FreeVecPPC
 
 .NoSemDef:	
-		DSTRYSTACKPPC
-
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -1209,7 +1181,7 @@ FreeSemaphorePPC:
 #********************************************************************************************
 
 ObtainSemaphorePPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 				
 		mfctr	r0
 		stwu	r0,-4(r13)
@@ -1310,9 +1282,7 @@ ObtainSemaphorePPC:
 		addi	r13,r13,4
 		mtctr	r0
 		
-		DSTRYSTACKPPC
-
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -1321,7 +1291,7 @@ ObtainSemaphorePPC:
 #********************************************************************************************
 
 AttemptSemaphorePPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		mfctr	r0
 		stwu	r0,-4(r13)
@@ -1383,9 +1353,7 @@ AttemptSemaphorePPC:
 		addi	r13,r13,4
 		mtctr	r0
 		
-		DSTRYSTACKPPC
-
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -1394,7 +1362,7 @@ AttemptSemaphorePPC:
 #********************************************************************************************
 
 ReleaseSemaphorePPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		mfctr	r0
 		stwu	r0,-4(r13)
@@ -1587,9 +1555,9 @@ ReleaseSemaphorePPC:
 		addi	r13,r13,4
 		mtctr	r0
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr	
+#********************************************************************************************	
 
 .Error68k:	li	r4,Atomic
 		bl AtomicDone
@@ -1603,7 +1571,7 @@ ReleaseSemaphorePPC:
 #********************************************************************************************
 
 AddSemaphorePPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 				
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -1634,9 +1602,7 @@ AddSemaphorePPC:
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 		
-		DSTRYSTACKPPC
-		
-		blr	
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -1645,7 +1611,7 @@ AddSemaphorePPC:
 #********************************************************************************************
 
 RemSemaphorePPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 				
 		stwu	r31,-4(r13)
 
@@ -1668,9 +1634,7 @@ RemSemaphorePPC:
 		lwz	r31,0(r13)
 		addi	r13,r13,4
 		
-		DSTRYSTACKPPC
-
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -1679,7 +1643,7 @@ RemSemaphorePPC:
 #********************************************************************************************
 
 FindSemaphorePPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 				
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -1706,9 +1670,7 @@ FindSemaphorePPC:
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 		
-		DSTRYSTACKPPC
-
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -1717,7 +1679,7 @@ FindSemaphorePPC:
 #********************************************************************************************
 
 AddPortPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -1746,9 +1708,7 @@ AddPortPPC:
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 		
-		DSTRYSTACKPPC
-		
-		blr	
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -1757,7 +1717,7 @@ AddPortPPC:
 #********************************************************************************************
 
 RemPortPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		mr	r31,r4
@@ -1779,9 +1739,7 @@ RemPortPPC:
 		lwz	r31,0(r13)
 		addi	r13,r13,4
 		
-		DSTRYSTACKPPC
-
-		blr	
+		epilog "TOC"	
 
 #********************************************************************************************
 #
@@ -1790,7 +1748,7 @@ RemPortPPC:
 #********************************************************************************************
 
 FindPortPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		mr	r31,r3
@@ -1813,9 +1771,7 @@ FindPortPPC:
 		lwz	r31,0(r13)
 		addi	r13,r13,4
 		
-		DSTRYSTACKPPC
-		
-		blr	
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -1824,7 +1780,7 @@ FindPortPPC:
 #********************************************************************************************
 
 WaitPortPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -1954,10 +1910,8 @@ WaitPortPPC:
 		lwz	r31,16(r13)
 		addi	r13,r13,20
 		
-		DSTRYSTACKPPC
-		
-		blr
-		
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	SuperKey = Super(void) // r3 (0 on first switch, -1 on the rest)
@@ -1965,15 +1919,13 @@ WaitPortPPC:
 #********************************************************************************************
 
 Super:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		li	r0,-1			#READ PVR (warp funcion -130)
 Violation:	mfspr	r3,PVR			#IF user then exception; r0/r3=0
 		mr	r3,r0			#IF super then r0/r3=-1
 
-		DSTRYSTACKPPC			#See Program Exception ($700)
-
-		blr	
+		epilog "TOC"			#See Program Exception ($700)	
 
 #********************************************************************************************
 #
@@ -1982,7 +1934,7 @@ Violation:	mfspr	r3,PVR			#IF user then exception; r0/r3=0
 #********************************************************************************************
 
 User:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		mr.	r4,r4
 		bne-	.WrongKey
@@ -1996,9 +1948,7 @@ User:
 		mtmsr	r0
 .InException:	isync
 
-.WrongKey:	DSTRYSTACKPPC
-		
-		blr
+.WrongKey:	epilog "TOC"
 
 #********************************************************************************************
 #
@@ -2007,7 +1957,7 @@ User:
 #********************************************************************************************
 
 PutXMsgPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -2032,9 +1982,7 @@ PutXMsgPPC:
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 		
-		DSTRYSTACKPPC
-		
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -2044,7 +1992,7 @@ PutXMsgPPC:
 
 
 WaitFor68K:	
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -2118,10 +2066,8 @@ WaitFor68K:
 		lwz	r31,16(r13)
 		addi	r13,r13,20
 		
-		DSTRYSTACKPPC
-				
-		blr
-		
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	status = Run68K(PPStruct) // r3=r4
@@ -2129,7 +2075,7 @@ WaitFor68K:
 #********************************************************************************************
 
 Run68K:		
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -2219,10 +2165,8 @@ Run68K:
 		lwzu	r31,4(r13)
 		addi	r13,r13,4
 
-		DSTRYSTACKPPC
-		
-		blr
-		
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	void Signal68K(Task, Signal) // r4,r5
@@ -2230,7 +2174,7 @@ Run68K:
 #********************************************************************************************
 
 Signal68K:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r8,-4(r13)
 		stwu	r7,-4(r13)
@@ -2246,10 +2190,8 @@ Signal68K:
 		lwz	r8,4(r13)
 		addi	r13,r13,8
 		
-		DSTRYSTACKPPC
-		
-		blr	
-	
+		epilog "TOC"	
+
 #********************************************************************************************
 #
 #	void CopyMemPPC(source, dest, size) // r4,r5,r6
@@ -2257,7 +2199,7 @@ Signal68K:
 #********************************************************************************************
 
 CopyMemPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		andi.	r3,r4,7
 		bne-	.NoSAlign8
@@ -2315,7 +2257,7 @@ CopyMemPPC:
 		bdnz+	.SmallLoop4
 		b	.ExitCopy
 		
-.Align8:	rlwinm	r7,r6,29,3,31
+.Align8:	rlwinm	r7,r6,29,3,31		
 		mtctr	r7
 		subi	r4,r4,8
 		subi	r5,r5,8
@@ -2333,10 +2275,8 @@ CopyMemPPC:
 		stbu	r0,1(r5)
 		bdnz+	.SmallLoop8
 
-.ExitCopy:	DSTRYSTACKPPC
+.ExitCopy:	epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	oldport = SetReplyPortPPC(Message, MsgPortPPC) // r3=r4,r5
@@ -2344,14 +2284,12 @@ CopyMemPPC:
 #********************************************************************************************
 			
 SetReplyPortPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		lwz	r3,MN_REPLYPORT(r4)
 		stw	r5,MN_REPLYPORT(r4)
 		
-		DSTRYSTACKPPC
-		
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -2360,7 +2298,7 @@ SetReplyPortPPC:
 #********************************************************************************************
 
 TrySemaphorePPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		mfctr	r0
 		stwu	r0,-4(r13)
@@ -2520,10 +2458,8 @@ TrySemaphorePPC:
 		addi	r13,r13,4
 		mtctr	r0
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	Void SetCache(cacheflags, start, length) // r4,r5,r6
@@ -2531,7 +2467,7 @@ TrySemaphorePPC:
 #********************************************************************************************	
 		
 SetCache:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -2828,9 +2764,7 @@ SetCache:
 		lwz	r31,8(r13)
 		addi	r13,r13,12
 		
-		DSTRYSTACKPPC
-		
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -2839,7 +2773,7 @@ SetCache:
 #********************************************************************************************
 
 ModifyFPExc:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		mr	r5,r4
 		andi.	r0,r5,1
@@ -2902,9 +2836,9 @@ ModifyFPExc:
 		li	r4,16
 		bl	.FP_DIS
 
-.NoDisInvalid:	DSTRYSTACKPPC
+.NoDisInvalid:	epilog "TOC"
 
-		blr
+#********************************************************************************************
 		
 .FP_EN:		stw	r2,20(r1)
 		mflr	r0
@@ -3022,7 +2956,7 @@ ModifyFPExc:
 #********************************************************************************************
 
 AddUniquePortPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -3055,10 +2989,8 @@ AddUniquePortPPC:
 		lwz	r31,8(r13)
 		addi	r13,r13,12
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	status =  AddUniqueSemaphorePPC(SignalSemaphorePPC) // r3=r4. r4 has an initialized LN_NAME
@@ -3066,7 +2998,7 @@ AddUniquePortPPC:
 #********************************************************************************************
 
 AddUniqueSemaphorePPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -3101,10 +3033,8 @@ AddUniqueSemaphorePPC:
 		lwz	r31,8(r13)
 		addi	r13,r13,12
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	status =  PutPublicMsgPPC(Portname, message) // r3=r4,r5
@@ -3112,7 +3042,7 @@ AddUniqueSemaphorePPC:
 #********************************************************************************************	
 	
 PutPublicMsgPPC:
-		BUILDSTACKPPC		
+		prolog 228,"TOC"		
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -3147,10 +3077,8 @@ PutPublicMsgPPC:
 		lwz	r31,8(r13)
 		addi	r13,r13,12
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	void AllocPrivateMem(void)	// Dummy (as in powerpc.library)
@@ -3158,7 +3086,7 @@ PutPublicMsgPPC:
 #********************************************************************************************
 
 AllocPrivateMem:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -3168,9 +3096,7 @@ AllocPrivateMem:
 		lwz	r31,8(r13)
 		addi	r13,r13,12
 
-		DSTRYSTACKPPC
-		
-		blr	
+		epilog "TOC"	
 
 #********************************************************************************************
 #
@@ -3179,7 +3105,7 @@ AllocPrivateMem:
 #********************************************************************************************
 
 FreePrivateMem:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -3189,10 +3115,8 @@ FreePrivateMem:
 		lwz	r31,8(r13)
 		addi	r13,r13,12
 
-		DSTRYSTACKPPC
-		
-		blr
-		
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	TaskPPC = FindTaskByID(taskID) // r3=r4
@@ -3200,7 +3124,7 @@ FreePrivateMem:
 #********************************************************************************************
 
 FindTaskByID:		
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -3238,10 +3162,8 @@ FindTaskByID:
 		lwz	r31,8(r13)
 		addi	r13,r13,12
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	OldNice = SetNiceValue(TaskPPC, Nice) // r3=r4,r5
@@ -3249,7 +3171,7 @@ FindTaskByID:
 #********************************************************************************************
 	
 SetNiceValue:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -3279,10 +3201,8 @@ SetNiceValue:
 		lwz	r31,8(r13)
 		addi	r13,r13,12
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	Support: StrLen = GetLen(String) // r3=r3
@@ -3397,7 +3317,7 @@ InsertOnPri:
 #********************************************************************************************
 
 CreateTaskPPC:	
-		BUILDSTACKPPC	
+		prolog 228,"TOC"	
  
 		stwu	r31,-4(r13) 
 		stwu	r30,-4(r13) 
@@ -4128,10 +4048,8 @@ CreateTaskPPC:
 		lwz	r31,60(r13) 
 		addi	r13,r13,64 
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		 
 #********************************************************************************************
 #
 #	Void SetDecInterrupt(Delay) // r4
@@ -4139,7 +4057,7 @@ CreateTaskPPC:
 #********************************************************************************************
 
 SetDecInterrupt:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		loadreg	r5,Quantum
 		mr	r6,r4
@@ -4165,9 +4083,9 @@ SetDecInterrupt:
 		lwz	r31,0(r13)
 		addi	r13,r13,4
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr	
+#********************************************************************************************
 
 .GetDelay:	li	r0,32
 		mtctr	r0
@@ -4197,7 +4115,7 @@ SetDecInterrupt:
 #********************************************************************************************
 
 ChangeStack:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -4288,9 +4206,7 @@ ChangeStack:
 		lwz	r31,16(r13)
 		addi	r13,r13,20
 		
-		DSTRYSTACKPPC
-		
-		blr	
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -4299,7 +4215,7 @@ ChangeStack:
 #********************************************************************************************
 
 FindTaskPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		mr.	r4,r4
 		bne-	.NotOwnTask
@@ -4334,9 +4250,7 @@ FindTaskPPC:
 		lwz	r31,0(r13)
 		addi	r13,r13,4
 
-.ExitFind:	DSTRYSTACKPPC
-
-		blr
+.ExitFind:	epilog "TOC"
 
 #********************************************************************************************
 #
@@ -4355,7 +4269,7 @@ IsExceptionMode:
 #********************************************************************************************
 
 ProcurePPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -4429,9 +4343,7 @@ ProcurePPC:
 		lwz	r31,12(r13)
 		addi	r13,r13,16
 
-		DSTRYSTACKPPC
-
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -4440,7 +4352,7 @@ ProcurePPC:
 #********************************************************************************************
 
 VacatePPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -4503,9 +4415,7 @@ VacatePPC:
 		lwz	r31,8(r13)
 		addi	r13,r13,12
 
-		DSTRYSTACKPPC
-		
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -4514,7 +4424,7 @@ VacatePPC:
 #********************************************************************************************
 
 SnoopTask:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -4600,10 +4510,8 @@ SnoopTask:
 		lwz	r31,8(r13)
 		addi	r13,r13,12
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	void EndSnoopTask(SnoopID) // r4
@@ -4611,7 +4519,7 @@ SnoopTask:
 #********************************************************************************************
 		
 EndSnoopTask:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -4641,10 +4549,8 @@ EndSnoopTask:
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	void ObtainSemaphoreSharedPPC(SignalSemaphorPPC) // r4
@@ -4653,7 +4559,7 @@ EndSnoopTask:
 
 ObtainSemaphoreSharedPPC:
 		
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		mfctr	r0
 		stwu	r0,-4(r13)
@@ -4766,10 +4672,8 @@ ObtainSemaphoreSharedPPC:
 		addi	r13,r13,4
 		mtctr	r0
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	status = AttemptSemaphoreSharedPPC(SignalSemaphorPPC) // r4
@@ -4778,7 +4682,7 @@ ObtainSemaphoreSharedPPC:
 
 AttemptSemaphoreSharedPPC:
 
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		mfctr	r0
 		stwu	r0,-4(r13)
@@ -4847,10 +4751,8 @@ AttemptSemaphoreSharedPPC:
 		addi	r13,r13,4
 		mtctr	r0
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	Support: void CauseInterrupt(void) // Interrupt using the Decrementer Exception
@@ -4859,7 +4761,7 @@ AttemptSemaphoreSharedPPC:
 	
 CauseInterrupt:
 
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 
@@ -4872,10 +4774,8 @@ CauseInterrupt:
 		lwz	r31,0(r13)
 		addi	r13,r13,4
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	Support: oldSignals = CheckExcSignal(Task, Signal) // r3=r3,r4
@@ -4883,7 +4783,7 @@ CauseInterrupt:
 #********************************************************************************************		
 		
 CheckExcSignal:		
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		mr	r7,r3
 		mr	r8,r4
@@ -4919,10 +4819,8 @@ CheckExcSignal:
 	
 		mr	r3,r8
 		
-		DSTRYSTACKPPC
-		
-		blr
-		
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	oldSignals = SetExceptPPC(newSignals, signalMask, flag) // r3=r4,r5,r6
@@ -4930,7 +4828,7 @@ CheckExcSignal:
 #********************************************************************************************
 
 SetExceptPPC:	
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -4977,9 +4875,7 @@ SetExceptPPC:
 		lwz	r31,12(r13)
 		addi	r13,r13,16
 
-		DSTRYSTACKPPC
-
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -4988,7 +4884,7 @@ SetExceptPPC:
 #********************************************************************************************
 
 DeleteTaskPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -5162,10 +5058,8 @@ DeleteTaskPPC:
 		lwz	r31,20(r13)
 		addi	r13,r13,24
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	Status = SetHardware(hardwareflags, parameter) // r3=r4,r5
@@ -5173,7 +5067,7 @@ DeleteTaskPPC:
 #********************************************************************************************
 
 SetHardware:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		cmplwi	r4,HW_TRACEON
 		beq-	.TraceOn
@@ -5204,7 +5098,6 @@ SetHardware:
 		mtmsr	r0
 		isync	
 		sync
-		
 		mr	r4,r3
 		
 		bl User
@@ -5219,7 +5112,6 @@ SetHardware:
 		mtmsr	r0
 		isync	
 		sync	
-		
 		mr	r4,r3
 		
 		bl User
@@ -5233,7 +5125,6 @@ SetHardware:
 		mtmsr	r0
 		isync	
 		sync	
-		
 		mr	r4,r3
 		
 		bl User
@@ -5248,7 +5139,6 @@ SetHardware:
 		mtmsr	r0
 		isync	
 		sync	
-		
 		mr	r4,r3
 		
 		bl User
@@ -5269,7 +5159,6 @@ SetHardware:
 		mtmsr	r0
 		isync	
 		sync	
-		
 		mr	r4,r3
 		
 		bl User
@@ -5284,7 +5173,6 @@ SetHardware:
 		mtmsr	r0
 		isync	
 		sync	
-
 		mr	r4,r3
 
 		bl User
@@ -5298,7 +5186,6 @@ SetHardware:
 		and	r4,r4,r0
 		ori	r4,r4,3
 		mtspr	IABR,r4
-
 		mr	r4,r3
 
 		bl User
@@ -5309,7 +5196,6 @@ SetHardware:
 
 		li	r0,0
 		mtspr	IABR,r0
-		
 		mr	r4,r3
 		
 		bl User
@@ -5323,7 +5209,6 @@ SetHardware:
 		and	r4,r4,r0		
 		ori	r4,r4,7
 		mtspr	DABR,r4
-		
 		mr	r4,r3
 		
 		bl User
@@ -5334,19 +5219,15 @@ SetHardware:
 
 		li	r0,0
 		mtspr	DABR,r0
-		
 		mr	r4,r3
 		
 		bl User
 		
 .HWEnd:		li	r4,HW_AVAILABLE
-
 		mr	r3,r4
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	Poolheader = CreatePoolPPC(attr, puddlesize, treshsize) // r3=r4,r5,r6 r4 is ignored
@@ -5354,7 +5235,7 @@ SetHardware:
 #********************************************************************************************		
 
 CreatePoolPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -5402,10 +5283,8 @@ CreatePoolPPC:
 		lwz	r31,12(r13)
 		addi	r13,r13,16		
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	void DeletePoolPPC(poolheader) // r4
@@ -5413,7 +5292,7 @@ CreatePoolPPC:
 #********************************************************************************************
 
 DeletePoolPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 
@@ -5457,10 +5336,8 @@ DeletePoolPPC:
 .NoHeader:	lwz	r31,0(r13)
 		addi	r13,r13,4
 		
-		DSTRYSTACKPPC
-				
-		blr
-		
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	memory = AllocPooledPPC(poolheader, size) // r3=r4,r5 		TO BE CHECKED
@@ -5468,7 +5345,7 @@ DeletePoolPPC:
 #********************************************************************************************
 
 AllocPooledPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -5578,10 +5455,8 @@ AllocPooledPPC:
 		lwz	r31,12(r13)
 		addi	r13,r13,16
 		
-		DSTRYSTACKPPC
-		
-		blr
-		
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	support: memory = AllocatePPC(Memheader, byteSize) // r3=r4,r5
@@ -5589,7 +5464,7 @@ AllocPooledPPC:
 #********************************************************************************************
 
 AllocatePPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)		
 		stwu	r30,-4(r13)
@@ -5661,10 +5536,8 @@ AllocatePPC:
 		lwz	r31,12(r13)
 		addi	r13,r13,16
 		
-		DSTRYSTACKPPC
-		
-		blr
-		
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	support: void DeallocatePPC(Memheader, memoryBlock, byteSize) // r3=r4,r5,r6(a0,a1,d0)
@@ -5672,7 +5545,7 @@ AllocatePPC:
 #********************************************************************************************
 
 DeallocatePPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -5768,9 +5641,9 @@ DeallocatePPC:
 		lwz	r31,16(r13)
 		addi	r13,r13,20
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 		
-		blr
+#********************************************************************************************
 
 .GuruTime:	b	.GuruTime		#STUB
 
@@ -5781,7 +5654,7 @@ DeallocatePPC:
 #********************************************************************************************
 
 FreePooledPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -5865,10 +5738,8 @@ FreePooledPPC:
 		lwz	r31,12(r13)
 		addi	r13,r13,16
 		
-		DSTRYSTACKPPC
-		
-		blr
-		
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	signals = WaitPPC(signalSet) // r3=r4
@@ -5876,7 +5747,7 @@ FreePooledPPC:
 #********************************************************************************************
 
 WaitPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -5884,9 +5755,8 @@ WaitPPC:
 		stwu	r28,-4(r13)
 
 		lwz	r31,RunningTask(r0)
-
 		mr	r28,r4
-		
+
 .WaitPPCAtom:	li	r4,Atomic
 
 		bl AtomicTest
@@ -5939,10 +5809,8 @@ WaitPPC:
 		lwz	r31,12(r13)
 		addi	r13,r13,16
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	oldpriority = SetTaskPriPPC(taskPPC, priority) // r3=r4,r5
@@ -5950,7 +5818,7 @@ WaitPPC:
 #********************************************************************************************
 
 SetTaskPriPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -6021,10 +5889,8 @@ SetTaskPriPPC:
 		lwz	r31,8(r13)
 		addi	r13,r13,12
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	d0 = Run68KLowLevel(Code, Offset, a0, a1, d0, d1) // r3=r4,r5,r6,r7,r8,r9
@@ -6032,7 +5898,7 @@ SetTaskPriPPC:
 #********************************************************************************************
 
 Run68KLowLevel:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -6123,10 +5989,8 @@ Run68KLowLevel:
 		lwz	r31,32(r13)
 		addi	r13,r13,36
 		
-		DSTRYSTACKPPC
-		
-		blr
-		
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	void SignalPPC(taskPPC, signals) // r4,r5
@@ -6134,7 +5998,7 @@ Run68KLowLevel:
 #********************************************************************************************
 
 SignalPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
@@ -6233,11 +6097,7 @@ SignalPPC:
 		
 		li	r0,-1
 		stb	r0,RescheduleFlag(r0)
-		
-		lbz	r0,ExceptionMode(r0)		#CHECK FOR BETTER SOLUTION
-		mr.	r0,r0				#EXCEPTION SIGNALS? (7404)
-		bne	.SigExit		
-		
+
 		bl CauseInterrupt
 
 .SigExit:	lwz	r28,0(r13)
@@ -6246,10 +6106,8 @@ SignalPPC:
 		lwz	r31,12(r13)
 		addi	r13,r13,16
 		
-		DSTRYSTACKPPC
-		
-		blr
-		
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	message = GetMsgPPC(MsgPortPPC) // r3=r4
@@ -6257,7 +6115,7 @@ SignalPPC:
 #********************************************************************************************
 
 GetMsgPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -6326,10 +6184,8 @@ GetMsgPPC:
 		lwz	r31,8(r13)
 		addi	r13,r13,12
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	void ReplyMsgPPC(message) // r4
@@ -6337,7 +6193,7 @@ GetMsgPPC:
 #********************************************************************************************
 
 ReplyMsgPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -6453,10 +6309,8 @@ ReplyMsgPPC:
 		lwz	r31,12(r13)
 		addi	r13,r13,16
 		
-		DSTRYSTACKPPC
-		
-		blr
-		
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	void PutMsgPPC(MsgPortPPC, message) // r4,r5
@@ -6464,7 +6318,7 @@ ReplyMsgPPC:
 #********************************************************************************************
 
 PutMsgPPC:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -6554,10 +6408,8 @@ PutMsgPPC:
 		lwz	r31,12(r13)
 		addi	r13,r13,16
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	void SetScheduling(SchedTagList) // r4 - Not working with current scheduler
@@ -6565,7 +6417,7 @@ PutMsgPPC:
 #********************************************************************************************
 
 SetScheduling:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -6596,9 +6448,7 @@ SetScheduling:
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 		
-		DSTRYSTACKPPC
-		
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -6607,7 +6457,7 @@ SetScheduling:
 #********************************************************************************************
 
 SPrintF:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r7,-4(r13)
 		stwu	r6,-4(r13)
@@ -6623,10 +6473,8 @@ SPrintF:
 		lwz	r7,4(r13)
 		addi	r13,r13,8
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 #
 #	void GetHALInfo(HALInfoTagList) // r4
@@ -6634,7 +6482,7 @@ SPrintF:
 #********************************************************************************************
 
 GetHALInfo:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -6667,9 +6515,7 @@ GetHALInfo:
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 
-		DSTRYSTACKPPC
-
-		blr
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -6678,7 +6524,7 @@ GetHALInfo:
 #********************************************************************************************
 
 ChangeMMU:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		
@@ -6707,10 +6553,8 @@ ChangeMMU:
 .ExitChMMU:	lwz	r31,0(r13)
 		addi	r13,r13,4
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 
 GetBATs:
@@ -6973,7 +6817,7 @@ MoveFromBAT:
 #********************************************************************************************		
 
 FreeAllMem:	blr
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		lwz	r4,MemSem(r0)
 		
@@ -6987,9 +6831,9 @@ FreeAllMem:	blr
 
 		bl ReleaseSemaphorePPC
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
+#********************************************************************************************
 		
 .DoFree:	stw	r13,-4(r1)			#From FreeAllMem
 		mflr	r0
@@ -7090,7 +6934,7 @@ FreeAllMem:	blr
 #********************************************************************************************		
 
 Support1:	
-		BUILDSTACKPPC					#3rd jump from FreeVecPPC 7380
+		prolog 228,"TOC"					#3rd jump from FreeVecPPC 7380
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -7170,10 +7014,8 @@ Support1:
 		lwz	r31,28(r13)
 		addi	r13,r13,32
 
-		DSTRYSTACKPPC
-		
-		blr
-		
+		epilog "TOC"
+
 #********************************************************************************************
 		
 Warp43:
@@ -7320,7 +7162,7 @@ Warp43:
 #********************************************************************************************
 
 RemExcHandler:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -7370,10 +7212,8 @@ RemExcHandler:
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************
 
 .FreeAllMem:	
@@ -7468,7 +7308,7 @@ RemExcHandler:
 #********************************************************************************************		
 
 SetExcHandler:	
-		BUILDSTACKPPC	
+		prolog 228,"TOC"	
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -7818,10 +7658,8 @@ SetExcHandler:
 		lwz	r31,20(r13)
 		addi	r13,r13,24
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #*******************************************************************************************		
 
 .MakeLists:		
@@ -8039,7 +7877,7 @@ SetExcHandler:
 #********************************************************************************************
 
 WaitTime:
-		BUILDSTACKPPC
+		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -8179,10 +8017,8 @@ WaitTime:
 		lwz	r31,20(r13)
 		addi	r13,r13,24
 
-		DSTRYSTACKPPC
+		epilog "TOC"
 
-		blr
-		
 #********************************************************************************************		
 
 .CalculateTime:		
@@ -8248,7 +8084,7 @@ WaitTime:
 #
 #********************************************************************************************
 
-RawDoFmtPPC:	BUILDSTACKPPC
+RawDoFmtPPC:	prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -8316,9 +8152,9 @@ RawDoFmtPPC:	BUILDSTACKPPC
 		lwz	r31,52(r13)
 		addi	r13,r13,56
 		
-		DSTRYSTACKPPC
+		epilog "TOC"
 		
-		blr	
+#********************************************************************************************	
 
 .NormalChar:	mr.	r30,r30
 		bne-	.PutChProc
