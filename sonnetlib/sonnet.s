@@ -252,11 +252,13 @@ Wait	move.l $6004(a1),d5
 	lea MH_SIZE(a0),a1
 	move.l a1,MH_FIRST(a0)
 	clr.l (a1)
+
 	move.l d6,d1
-	sub.l #32,d1
-	move.l d1,4(a1)
+	sub.l #PageTableSize+32,d1			;for pagetable
+	move.l d1,MC_BYTES(a1)
 	move.l a1,MH_LOWER(a0)
 	add.l a0,d6
+	sub.l #PageTableSize,d6				;for pagetable
 	move.l d6,MH_UPPER(a0)
 	move.l d1,MH_FREE(a0)
 	move.l a0,a1
