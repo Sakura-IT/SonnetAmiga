@@ -35,7 +35,7 @@ PPCCode:						#0x4000	System initialization
 		bl	InstallExceptions		#Put exceptions in place
 
 		lis	r27,0x8000			#Upper boundary PCI Memory Mediator
-		mr	r26,r8				#Oops, hardcoded
+		mr	r26,r8				#This is hardcoded at the moment
 
 		li	r28,17
 		mtctr	r28
@@ -730,7 +730,10 @@ Wait2:		mfl2cr	r3
 
 #********************************************************************************************
 
-mmuSetup:	loadreg	r4,IBAT0L_VAL			#To be converted to tables (PTEGs)
+mmuSetup:	
+		mflr	r30
+		
+		loadreg	r4,IBAT0L_VAL			#To be converted to tables (PTEGs)
 		loadreg	r3,IBAT0U_VAL
 		mtspr ibat0l,r4
 		mtspr ibat0u,r3
@@ -783,15 +786,126 @@ mmuSetup:	loadreg	r4,IBAT0L_VAL			#To be converted to tables (PTEGs)
 		mtspr dbat3l,r4
 		mtspr dbat3u,r3
 		isync
-							#BATs are now set up, now invalidate tlb entries
-		li	r7,64
+							#BATs are now set up
+							
+#********************************************************************************************
+
+		loadreg	r3,0x08000000			#dummy
+		loadreg	r4,0x0c000000			#dummy
+		
+.GetPTSize:	sub	r6,r4,r3
+		srwi	r6,r6,7				#Get pt_size
+		rlwinm.	r8,r6,20,12,31			#is pt_size >= 64 KB
+		bne	.Cont
+		lis	r6,0x10
+		
+.Cont:		loadreg	r3,0x03000000			#dummy
+
+		sub	r3,r3,r6			#Set pt_loc
+		mr	r7,r3
+		xor	r9,r9,r9
+		ori	r9,r9,0xffff			#set up SDR1
+		
+		rlwinm	r8,r9,16,0,15			#set HTABORG
+		and	r15,r3,r8
+		
+.htabmask:	rlwinm	r8,r9,16,0,15			#set HTABMASK
+		and.	r8,r8,r15
+		beq	.Exithtab
+		cmpwi	r9,0
+		ble	.Exithtab
+		srwi	r9,r9,1
+		b	.htabmask
+		
+.Exithtab:	or	r15,r15,r9
+		mtspr	SDR1,r15			#set SDR1
+
+		loadreg	r8,0x08000000			#dummy
+		loadreg	r9,0x0c000000			#dummy
+
+		rlwinm	r3,r8,4,28,31			#get 4 MSBs
+		rlwinm	r4,r9,4,28,31
+
+		lis	r8,0x6000			#set ks and kp
+.srx_set:	or	r5,r3,r8
+		bl	.set_srx
+		addi	r3,r3,1
+		cmpw	r3,r4
+		ble	.srx_set
+
+		rlwinm	r6,r6,30,0,31			#r6 = pt_size, r7 = pt_loc
+		mtctr	r6
+		xor	r8,r8,r8
+		subi	r7,r7,4
+		
+.zero_out:	stwu	r8,4(r7)
+		bdnz	.zero_out
+
+		loadreg	r3,0x08000000			#dummy
+		loadreg	r4,0x0c000000			#dummy
+		
+.load_PTEs:	cmpw	r3,r4
+		bge	.ExitTBL
+		
+		rlwinm	r8,r3,4,28,31
+		bl	.get_srx
+		
+		li	r5,PTE_CACHE_INHIBITED		#set WIMG
+		
+		rlwinm	r11,r13,7,1,24
+		rlwimi	r11,r3,10,26,31
+		oris	r11,r11,0x8000
+		
+		rlwinm	r12,r3,0,0,19
+		rlwimi	r12,r5,3,25,28
+		ori	r12,r12,0x180			#R=C=1, PP=00 (with ks/kp=1 = no access)
+
+		rlwinm	r14,r3,20,16,31
+		rlwinm	r15,r13,0,13,31
+		xor	r14,r14,r15			#Calculate Hash1
+		
+		mfspr	r15,SDR1
+.calc_PTEG:	rlwinm	r16,r14,22,23,31
+		and	r16,r16,r15
+		rlwinm	r8,r15,16,23,31
+		or	r16,r16,r8
+		
+		xor	r9,r9,r9
+		rlwimi	r9,r15,0,0,6
+		rlwimi	r9,r16,16,7,15
+		rlwimi	r9,r14,6,16,25
+		
+		subi	r9,r9,8
+		li	r10,8
+		mtctr	r10
+		
+.next:		lwzu	r8,8(r9)
+		rlwinm.	r8,r8,1,31,31
+		beq	.store_PTE
+		bdnz	.next
+
+		rlwinm.	r16,r11,26,31,31
+		bne	.ExitTBL			#Should not happen (no room for Hash2)
+		
+		xoris	r14,r14,0xffff
+		xori	r14,r14,0xffff
+		ori	r11,r11,0x40
+		b	.calc_PTEG			#Try Hash2
+
+.store_PTE:	stw	r11,0(r9)
+		stw	r12,4(r9)
+		
+		addi	r3,r3,0x1000			#Next page of 4096 bytes
+		b	.load_PTEs
+		
+.ExitTBL:	li	r7,64				#Now invalidate tlb entries
 		mtctr	r7
 		li	r7,0
 .tlblp:		tlbie	r7
 		addi	r7,r7,0x1000
 		bdnz+	.tlblp
 		tlbsync
-	
+
 		mfmsr	r4
 		andi.	r4,r4,~PSL_IP@l			#Exception prefix from 0xfff00000 to 0x0
 		ori	r4,r4,(PSL_IR|PSL_DR)		#Translation enable
@@ -799,8 +913,176 @@ mmuSetup:	loadreg	r4,IBAT0L_VAL			#To be converted to tables (PTEGs)
 		isync
 		sync
 
-		blr
+		mtlr	r30
 
+		blr
+		
+#********************************************************************************************
+
+.set_srx:	cmpwi	r3,0
+		beq	.mtsr0
+		cmpwi	r3,1
+		beq	.mtsr1
+		cmpwi	r3,2
+		beq	.mtsr2
+		cmpwi	r3,3
+		beq	.mtsr3
+		cmpwi	r3,4
+		beq	.mtsr4
+		cmpwi	r3,5
+		beq	.mtsr5
+		cmpwi	r3,6
+		beq	.mtsr6
+		cmpwi	r3,7
+		beq	.mtsr7
+		cmpwi	r3,8
+		beq	.mtsr8
+		cmpwi	r3,9
+		beq	.mtsr9
+		cmpwi	r3,10
+		beq	.mtsr10
+		cmpwi	r3,11
+		beq	.mtsr11
+		cmpwi	r3,12
+		beq	.mtsr12
+		cmpwi	r3,13
+		beq	.mtsr13
+		cmpwi	r3,14
+		beq	.mtsr14
+		cmpwi	r3,15
+		beq	.mtsr15
+		
+.mtsr0:		mtsr	0,r5
+		blr
+		
+.mtsr1:		mtsr	1,r5
+		blr
+		
+.mtsr2:		mtsr	2,r5
+		blr
+		
+.mtsr3:		mtsr	3,r5
+		blr
+		
+.mtsr4:		mtsr	4,r5
+		blr
+		
+.mtsr5:		mtsr	5,r5
+		blr
+		
+.mtsr6:		mtsr	6,r5
+		blr
+		
+.mtsr7:		mtsr	7,r5
+		blr
+		
+.mtsr8:		mtsr	8,r5
+		blr
+		
+.mtsr9:		mtsr	9,r5
+		blr
+		
+.mtsr10:	mtsr	10,r5
+		blr
+		
+.mtsr11:	mtsr	11,r5
+		blr
+		
+.mtsr12:	mtsr	12,r5
+		blr
+		
+.mtsr13:	mtsr	13,r5
+		blr
+		
+.mtsr14:	mtsr	14,r5
+		blr
+		
+.mtsr15:	mtsr	15,r5
+		blr
+		
+#********************************************************************************************
+
+.get_srx:	cmpwi	r8,0
+		beq	.mfsr0
+		cmpwi	r8,1
+		beq	.mfsr1
+		cmpwi	r8,2
+		beq	.mfsr2
+		cmpwi	r8,3
+		beq	.mfsr3
+		cmpwi	r8,4
+		beq	.mfsr4
+		cmpwi	r8,5
+		beq	.mfsr5
+		cmpwi	r8,6
+		beq	.mfsr6
+		cmpwi	r8,7
+		beq	.mfsr7
+		cmpwi	r8,8
+		beq	.mfsr8
+		cmpwi	r8,9
+		beq	.mfsr9
+		cmpwi	r8,10
+		beq	.mfsr10
+		cmpwi	r8,11
+		beq	.mfsr11
+		cmpwi	r8,12
+		beq	.mfsr12
+		cmpwi	r8,13
+		beq	.mfsr13
+		cmpwi	r8,14
+		beq	.mfsr14
+		cmpwi	r8,15
+		beq	.mfsr15
+		
+.mfsr0:		mfsr	r13,0
+		blr
+		
+.mfsr1:		mfsr	r13,1
+		blr
+		
+.mfsr2:		mfsr	r13,2
+		blr
+		
+.mfsr3:		mfsr	r13,3
+		blr
+		
+.mfsr4:		mfsr	r13,4
+		blr
+		
+.mfsr5:		mfsr	r13,5
+		blr
+		
+.mfsr6:		mfsr	r13,6
+		blr
+		
+.mfsr7:		mfsr	r13,7
+		blr
+		
+.mfsr8:		mfsr	r13,8
+		blr
+		
+.mfsr9:		mfsr	r13,9
+		blr
+		
+.mfsr10:	mfsr	r13,10
+		blr
+		
+.mfsr11:	mfsr	r13,11
+		blr
+		
+.mfsr12:	mfsr	r13,12
+		blr
+		
+.mfsr13:	mfsr	r13,13
+		blr
+		
+.mfsr14:	mfsr	r13,14
+		blr
+		
+.mfsr15:	mfsr	r13,15
+		blr
+		
 #********************************************************************************************
 	
 ConfigWrite32:	lis	r20,CONFIG_ADDR			#Various PCI command routines
@@ -1803,7 +2085,7 @@ EInt:		b	.FPUnav
 
 .NoThrow:	mr	r7,r0
 		stb	r0,ExceptionMode(r0)
-		
+
 		loadreg	r0,"WARP"
 		
 		rfi
@@ -1837,6 +2119,9 @@ EInt:		b	.FPUnav
 		
 		li	r0,0
 		stb	r0,ExceptionMode(r0)
+		
+		loadreg	r0,"USER"
+		stw	r0,0xf4(r0)
 		
 		mfsprg2	r0
 
@@ -2203,7 +2488,7 @@ TestRoutine:	b	.IntReturn
 		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
 		isync					#Also reenable FPU
 		sync
-		
+
 		mr	r0,r1				#Store user stack pointer
 		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
 		stwu	r0,-4(r1)
@@ -2463,7 +2748,28 @@ TestRoutine:	b	.IntReturn
 
 #********************************************************************************************
 
-.DSI:		mfspr	r0,HID0
+.DSI:		mtsprg0	r7
+		mfsrr0	r7
+		
+		lwz	r6,SysBase(r0)
+		cmpw	r6,r10
+		bne	.NoClutch
+		
+		xoris	r7,r7,0x7c00			#dummy
+		lwz	r7,0(r7)
+		loadreg	r0,0x80ca0142			#MemList(sysbase)->r6
+
+		cmpw	r0,r7
+		bne	.NoClutch
+		
+		mfsrr0	r7
+		addi	r7,r7,4
+		mtsrr0	r7
+		lwz	r6,PPCMemHeader(r0)		#dummy
+		mfsprg0	r7
+		rfi
+
+.NoClutch:	mfspr	r0,HID0
 		ori	r0,r0,HID0_DCE
 		xori	r0,r0,HID0_DCE
 		sync	
@@ -2527,6 +2833,8 @@ TestRoutine:	b	.IntReturn
 		beq	.LastPrHandler
 		
 		mr	r30,r31
+				
+		stw	r30,0x110(r0)
 												
 		lwz	r0,EXCDATA_TASK(r30)
 		mr.	r0,r0
@@ -2589,7 +2897,7 @@ TestRoutine:	b	.IntReturn
 .LargeContext:	mr	r31,r13
 		subi	r13,r13,EC_SIZE
 		mr	r3,r13
-				
+
 		li	r0,EXCF_PROGRAM
 		stw	r0,0(r3)
 		mfsrr0	r0
@@ -2824,7 +3132,7 @@ TestRoutine:	b	.IntReturn
 		ori	r31,r31,PSL_PR			#Set to Super
 		xori	r31,r31,PSL_PR
 		mtsrr1	r31
-		
+
 		li	r0,0				#SuperKey
 		mtsprg0	r0
 
@@ -2846,6 +3154,9 @@ TestRoutine:	b	.IntReturn
 		
 		li	r0,0
 		stb	r0,ExceptionMode(r0)
+
+		loadreg	r0,"USER"
+		stw	r0,0xf4(r0)
 		
 		mfsprg0	r0
 		
