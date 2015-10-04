@@ -78,7 +78,6 @@ SetLen:		mr	r30,r28
 
 		bl	mmuSetup			#Setup BATs. Needs to be changed to tables
 		bl	Epic				#Setup the EPIC controller
-		bl	Caches				#Setup the L1 and L2 cache
 
 		li	r3,IdleTask			#Start hardcoded at 0x7400
 		mr	r31,r3
@@ -91,9 +90,12 @@ SetLen:		mr	r30,r28
 
 		bl	End
 
-Start:		
-		nop					#Dummy entry at absolute 0x7400
-.StartX:	nop
+Start:		lwz	r4,PowerPCBase(r0)		#Dummy entry at absolute 0x7400
+		lwz	r4,_LVOSetExcMMU+2(r4)
+		addi	r4,r4,ViolationOS		
+		stw	r4,ViolationAddress(r0)	
+		
+.StartX:	nop					#IdleTask
 		nop
 		nop
 		b	.StartX
@@ -266,6 +268,8 @@ End:		mflr	r4
 		bl	.MakeList
 		
 		lwz	r3,PowerPCBase(r0)
+		lwz	r4,SonnetBase(r0)
+		xor	r3,r3,r4
 		
 		la	r4,LIST_REMOVEDTASKS(r3)
 		bl	.MakeList
@@ -353,53 +357,20 @@ End:		mflr	r4
 		
 		mfspr	r4,PVR
 		stw	r4,CPUInfo(r0)
-		
-		lwz	r4,PowerPCBase(r0)
-		lwz	r4,_LVOSetExcMMU+2(r4)
-		addi	r4,r4,ViolationOS		
-		stw	r4,ViolationAddress(r0)
-		
-		bl	.FlushL1DCache
-		
+
 		mfspr	r4,HID0
 		ori	r4,r4,HID0_DCFI|HID0_ICFI
 		mtspr	HID0,r4
 		sync
 
 		mtsrr0	r29
-		mfmsr	r14
-		ori	r14,r14,PSL_EE|PSL_PR		#Set privilege mode to User
-		mtsrr1	r14
+		
+		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
+		mtsrr1	r0
+
+		bl	Caches				#Setup the L1 and L2 cache
 
 		rfi					#To user code
-
-#********************************************************************************************
-
-.FlushL1DCache:	
-		prolog	228,"TOC"
-		
-		mfctr	r3
-		
-		li	r4,0x7000
-
-		li	r6,0x400
-		mr	r5,r6
-		mtctr	r6
-	
-.Fl1:		lwz	r6,0(r4)
-		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz+	.Fl1
-	
-		li	r4,0x7000
-		mtctr	r5
-		
-.Fl2:		dcbf	r0,r4
-		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz+	.Fl2
-
-		mtctr	r3
-		
-		epilog	"TOC"
 		
 #********************************************************************************************		
 
@@ -733,18 +704,18 @@ Wait2:		mfl2cr	r3
 mmuSetup:	
 		mflr	r30
 		
-		loadreg	r4,IBAT0L_VAL			#To be converted to tables (PTEGs)
-		loadreg	r3,IBAT0U_VAL
-		mtspr ibat0l,r4
-		mtspr ibat0u,r3
-		isync
+#		loadreg	r4,IBAT0L_VAL			#To be converted to tables (PTEGs)
+#		loadreg	r3,IBAT0U_VAL
+#		mtspr ibat0l,r4
+#		mtspr ibat0u,r3
+#		isync
 
-		loadreg	r4,DBAT0L_VAL
-		loadreg	r3,DBAT0U_VAL
-		isync
-		mtspr dbat0l,r4
-		mtspr dbat0u,r3
-		isync
+#		loadreg	r4,DBAT0L_VAL
+#		loadreg	r3,DBAT0U_VAL
+#		isync
+#		mtspr dbat0l,r4
+#		mtspr dbat0u,r3
+#		isync
 
 		loadreg r4,IBAT1L_VAL
 		loadreg	r3,IBAT1U_VAL
@@ -906,12 +877,12 @@ mmuSetup:
 		bdnz+	.tlblp
 		tlbsync
 
-		mfmsr	r4
-		andi.	r4,r4,~PSL_IP@l			#Exception prefix from 0xfff00000 to 0x0
-		ori	r4,r4,(PSL_IR|PSL_DR)		#Translation enable
-		mtmsr	r4
-		isync
-		sync
+#		mfmsr	r4
+#		andi.	r4,r4,~PSL_IP@l			#Exception prefix from 0xfff00000 to 0x0
+#		ori	r4,r4,(PSL_IR|PSL_DR)		#Translation enable
+#		mtmsr	r4
+#		isync
+#		sync
 
 		mtlr	r30
 
@@ -1961,8 +1932,7 @@ EInt:		b	.FPUnav
 		subi	r13,r1,4
 		stwu	r1,-284(r1)		
 		
-		loadreg	r6,IdleTask
-		addi	r6,r6,ExitCode-Start	
+		loadreg	r6,IdleTask+(ExitCode-Start)
 		mtsprg0	r6
 
 		la	r6,TASKPPC_PORT(r8)		#Setup a Semaphore & MsgPort
@@ -2453,7 +2423,7 @@ TestRoutine:	b	.IntReturn
 		
 		b	.LoadContext
 
-.DoIdle:	loadreg	r0,IdleTask			#Start hardcoded at 0x7400
+.DoIdle:	loadreg	r0,IdleTask+(.StartX-Start)	#Start hardcoded at 0x7400
 		mtsrr0	r0
 
 		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
