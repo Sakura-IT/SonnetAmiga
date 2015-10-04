@@ -366,7 +366,7 @@ End:		mflr	r4
 		mtsrr0	r29
 		
 		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
-		mtsrr1	r0
+		mtsrr1	r0				#load up user MSR. Also clears PSL_IP
 
 		bl	Caches				#Setup the L1 and L2 cache
 
@@ -715,7 +715,7 @@ mmuSetup:
 #		isync
 #		mtspr dbat0l,r4
 #		mtspr dbat0u,r3
-#		isync
+#		isync					#ROM
 
 		loadreg r4,IBAT1L_VAL
 		loadreg	r3,IBAT1U_VAL
@@ -728,7 +728,7 @@ mmuSetup:
 		isync
 		mtspr dbat1l,r4
 		mtspr dbat1u,r3
-		isync
+		isync					#Sonnet RAM
 
 		loadreg r4,IBAT2L_VAL
 		loadreg r3,IBAT2U_VAL
@@ -743,7 +743,7 @@ mmuSetup:
 		isync
 		mtspr dbat2l,r4
 		mtspr dbat2u,r3
-		isync
+		isync					#Sonnet RAM virtualized to Amiga RAM
 
 		loadreg	r4,IBAT3L_VAL
 		loadreg	r3,IBAT3U_VAL
@@ -756,13 +756,20 @@ mmuSetup:
 		isync
 		mtspr dbat3l,r4
 		mtspr dbat3u,r3
-		isync
+		isync					#PCI memory ($80000000>)
 							#BATs are now set up
 							
 #********************************************************************************************
 
-		loadreg	r3,0x08000000			#dummy
-		loadreg	r4,0x0c000000			#dummy
+		loadreg	r3,0x08000000			#dummy	start effective address
+		loadreg	r4,0x0c000000			#dummy	end effective address
+		loadreg	r5,0x08000000			#dummy	start physical address
+		loadreg	r6,PTE_CACHE_INHIBITED		#dummy 	WIMG
+		
+		mr	r17,r3
+		mr	r18,r4
+		mr	r19,r5
+		mr	r20,r6
 		
 .GetPTSize:	sub	r6,r4,r3
 		srwi	r6,r6,7				#Get pt_size
@@ -770,7 +777,7 @@ mmuSetup:
 		bne	.Cont
 		lis	r6,0x10
 		
-.Cont:		loadreg	r3,0x03000000			#dummy
+.Cont:		loadreg	r3,0x03000000			#dummy	size of sonnet memory
 
 		sub	r3,r3,r6			#Set pt_loc
 		mr	r7,r3
@@ -791,8 +798,8 @@ mmuSetup:
 .Exithtab:	or	r15,r15,r9
 		mtspr	SDR1,r15			#set SDR1
 
-		loadreg	r8,0x08000000			#dummy
-		loadreg	r9,0x0c000000			#dummy
+		mr	r8,r17
+		mr	r9,r18
 
 		rlwinm	r3,r8,4,28,31			#get 4 MSBs
 		rlwinm	r4,r9,4,28,31
@@ -812,22 +819,22 @@ mmuSetup:
 .zero_out:	stwu	r8,4(r7)
 		bdnz	.zero_out
 
-		loadreg	r3,0x08000000			#dummy
-		loadreg	r4,0x0c000000			#dummy
-		
+		mr	r3,r17
+		mr	r4,r18
+
 .load_PTEs:	cmpw	r3,r4
 		bge	.ExitTBL
 		
 		rlwinm	r8,r3,4,28,31
 		bl	.get_srx
+
+		mr	r5,r20				#set WIMG
 		
-		li	r5,PTE_CACHE_INHIBITED		#set WIMG
-		
-		rlwinm	r11,r13,7,1,24
+		rlwinm	r11,r13,7,1,24			#Upper PTE (with effective address)
 		rlwimi	r11,r3,10,26,31
-		oris	r11,r11,0x8000
+		oris	r11,r11,0x8000			#set valid bit
 		
-		rlwinm	r12,r3,0,0,19
+		rlwinm	r12,r19,0,0,19			#Lower PTE (with physical address)
 		rlwimi	r12,r5,3,25,28
 		ori	r12,r12,0x180			#R=C=1, PP=00 (with ks/kp=1 = no access)
 
@@ -835,24 +842,24 @@ mmuSetup:
 		rlwinm	r15,r13,0,13,31
 		xor	r14,r14,r15			#Calculate Hash1
 		
-		mfspr	r15,SDR1
+		mfspr	r15,SDR1			#Calculate PTEG address
 .calc_PTEG:	rlwinm	r16,r14,22,23,31
 		and	r16,r16,r15
 		rlwinm	r8,r15,16,23,31
 		or	r16,r16,r8
 		
-		xor	r9,r9,r9
+		xor	r9,r9,r9			#clear PTE
 		rlwimi	r9,r15,0,0,6
 		rlwimi	r9,r16,16,7,15
 		rlwimi	r9,r14,6,16,25
 		
-		subi	r9,r9,8
+		subi	r9,r9,8				#Look for empty PTE location
 		li	r10,8
 		mtctr	r10
 		
 .next:		lwzu	r8,8(r9)
-		rlwinm.	r8,r8,1,31,31
-		beq	.store_PTE
+		rlwinm.	r8,r8,1,31,31			#Check for valid bit
+		beq	.store_PTE			#If not valid then PTE is empty
 		bdnz	.next
 
 		rlwinm.	r16,r11,26,31,31
@@ -863,10 +870,11 @@ mmuSetup:
 		ori	r11,r11,0x40
 		b	.calc_PTEG			#Try Hash2
 
-.store_PTE:	stw	r11,0(r9)
+.store_PTE:	stw	r11,0(r9)			#Put PTEs in empty place
 		stw	r12,4(r9)
 		
 		addi	r3,r3,0x1000			#Next page of 4096 bytes
+		addi	r19,r19,0x1000
 		b	.load_PTEs
 		
 .ExitTBL:	li	r7,64				#Now invalidate tlb entries
@@ -876,13 +884,6 @@ mmuSetup:
 		addi	r7,r7,0x1000
 		bdnz+	.tlblp
 		tlbsync
-
-#		mfmsr	r4
-#		andi.	r4,r4,~PSL_IP@l			#Exception prefix from 0xfff00000 to 0x0
-#		ori	r4,r4,(PSL_IR|PSL_DR)		#Translation enable
-#		mtmsr	r4
-#		isync
-#		sync
 
 		mtlr	r30
 
@@ -2663,99 +2664,7 @@ TestRoutine:	b	.IntReturn
 
 #********************************************************************************************
 
-.Trace:		loadreg	r3,"TRCE"
-		stw	r3,0xf4(r0)
-.HaltTrace:	b	.HaltTrace
-		
-		rfi
-		
-#********************************************************************************************
-
-.FPUnav:	mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		xori	r0,r0,HID0_DCE
-		sync	
-		mtspr	HID0,r0
-		isync
-		
-		loadreg	r3,"NOFP"
-		stw	r3,0xf4(r0)
-		mfsrr0	r3
-		stw	r3,0xf8(r0)
-		mfsrr1	r3
-		stw	r3,0xfc(r0)
-.HaltFP:	b	.HaltFP
-
-#********************************************************************************************
-
-.Alignment:	mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		xori	r0,r0,HID0_DCE
-		sync	
-		mtspr	HID0,r0
-		isync
-		
-		loadreg	r3,"ALIG"
-		stw	r3,0xf4(r0)
-		mfsrr0	r3
-		stw	r3,0xf8(r0)
-.HaltAlign:	b	.HaltAlign
-
-#********************************************************************************************
-
-.ISI:		mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		xori	r0,r0,HID0_DCE
-		sync	
-		mtspr	HID0,r0
-		isync
-		
-		loadreg	r3,"ISI!"
-		stw	r3,0xf4(r0)
-		mfsrr0	r3
-		stw	r3,0xf8(r0)
-.HaltISI:	b	.HaltISI
-
-#********************************************************************************************
-
-.DSI:		mtsprg0	r7
-		mfsrr0	r7
-		
-		lwz	r6,SysBase(r0)
-		cmpw	r6,r10
-		bne	.NoClutch
-		
-		xoris	r7,r7,0x7c00			#dummy
-		lwz	r7,0(r7)
-		loadreg	r0,0x80ca0142			#MemList(sysbase)->r6
-
-		cmpw	r0,r7
-		bne	.NoClutch
-		
-		mfsrr0	r7
-		addi	r7,r7,4
-		mtsrr0	r7
-		lwz	r6,PPCMemHeader(r0)		#dummy
-		mfsprg0	r7
-		rfi
-
-.NoClutch:	mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		xori	r0,r0,HID0_DCE
-		sync	
-		mtspr	HID0,r0
-		isync
-		
-		loadreg	r3,"DSI!"
-		stw	r3,0xf4(r0)
-		mfsrr0	r3
-		stw	r3,0xf8(r0)
-.HaltDSI:	b	.HaltDSI
-
-#********************************************************************************************
-
-.PrInt:		
-		mtsprg0	r0				#Program Exception (UNDER DEVELOPMENT)
+.Trace:		mtsprg0	r0				#Program Exception
 		
 		li	r0,-1
 		stb	r0,ExceptionMode(r0)
@@ -2785,51 +2694,43 @@ TestRoutine:	b	.IntReturn
 		mfcr	r0
 		stwu	r0,-4(r13)
 
-		loadreg	r29,"TRAP"
+		loadreg	r29,"TRCE"
 		stw	r29,0xf4(r0)
-		
-		mfsrr0	r31
-		stw	r31,0xf8(r0)
-		lwz	r0,ViolationAddress(r0)
-		cmplw	r0,r31
-		beq	.Privvy
 				
 		lwz	r31,PowerPCBase(r0)
-		la	r31,LIST_EXCPROGRAM(r31)
-.NextPExc:	lwz	r31,0(r31)			#Are there handlers in place?
+		la	r31,LIST_EXCTRACE(r31)
+.NextTExc:	lwz	r31,0(r31)			#Are there handlers in place?
 
 		lwz	r0,0(r31)
 		mr.	r0,r0
-		beq	.LastPrHandler
+		beq	.LastTrHandler
 		
 		mr	r30,r31
-				
-		stw	r30,0x110(r0)
 												
 		lwz	r0,EXCDATA_TASK(r30)
 		mr.	r0,r0
-		beq 	.DoExc
+		beq 	.DoTExc
 		
 		lwz	r28,RunningTask(r0)
 		cmpw	r0,r28
-		beq	.DoExc
+		beq	.DoTExc
 		
-		b	.NextPExc
+		b	.NextTExc
 		
-.DoExc:		mflr	r29
+.DoTExc:	mflr	r29
 		mtsprg0	r31
 		lwz	r0,EXCDATA_CODE(r30)
 		mtlr	r0		
 		lwz	r0,EXCDATA_FLAGS(r30)
 		rlwinm.	r0,r0,(32-EXC_LARGECONTEXT),31,31
-		bne-	.LargeContext
+		li	r0,EXCF_TRACE
+		bne-	.LargeTContext
 		
 		mtsprg3	r2
 		lwz	r2,EXCDATA_DATA(r30)
 		mtsprg1	r29		
 		subi	r13,r13,XCO_SIZE
 		stw	r3,4(r13)
-		loadreg	r0,EXCF_PROGRAM
 		stw	r0,0(r13)
 		mr	r3,r13
 		mtsprg2	r1				
@@ -2860,15 +2761,14 @@ TestRoutine:	b	.IntReturn
 			
 		stw	r2,8(r13)								
 		cmpwi	r3,EXCRETURN_ABORT
-		beq	.LastPrHandler
+		beq	.LastTrHandler
 				
-		b	.NextPExc
+		b	.NextTExc
 		
-.LargeContext:	mr	r31,r13
+.LargeTContext:	mr	r31,r13
 		subi	r13,r13,EC_SIZE
 		mr	r3,r13
 
-		li	r0,EXCF_PROGRAM
 		stw	r0,0(r3)
 		mfsrr0	r0
 		stwu	r0,4(r3)
@@ -3085,16 +2985,465 @@ TestRoutine:	b	.IntReturn
 		mfsprg0	r31
 
 		cmpwi	r3,EXCRETURN_ABORT
+		beq	.LastTrHandler		
+		
+		b	.NextTExc
+		
+.LastTrHandler:	
+		lwz	r0,0(r13)
+		mtcr	r0
+		lwz	r0,4(r13)
+		mtsprg0	r0
+		lwz	r2,8(r13)
+		lwz	r3,12(r13)
+		lwz	r27,16(r13)
+		lwz	r28,20(r13)
+		lwz	r29,24(r13)
+		lwz	r30,28(r13)
+		lwz	r31,32(r13)
+		addi	r13,r13,36
+
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r1,0(r1)			#User stack restored
+		
+		li	r0,0
+		stb	r0,ExceptionMode(r0)
+
+		loadreg	r0,"USER"
+		stw	r0,0xf4(r0)
+		
+		mfsprg0	r0
+		
+		rfi
+		
+#********************************************************************************************
+
+.FPUnav:	mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		xori	r0,r0,HID0_DCE
+		sync	
+		mtspr	HID0,r0
+		isync
+		
+		loadreg	r3,"NOFP"
+		stw	r3,0xf4(r0)
+		mfsrr0	r3
+		stw	r3,0xf8(r0)
+		mfsrr1	r3
+		stw	r3,0xfc(r0)
+.HaltFP:	b	.HaltFP
+
+#********************************************************************************************
+
+.Alignment:	mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		xori	r0,r0,HID0_DCE
+		sync	
+		mtspr	HID0,r0
+		isync
+		
+		loadreg	r3,"ALIG"
+		stw	r3,0xf4(r0)
+		mfsrr0	r3
+		stw	r3,0xf8(r0)
+.HaltAlign:	b	.HaltAlign
+
+#********************************************************************************************
+
+.ISI:		mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		xori	r0,r0,HID0_DCE
+		sync	
+		mtspr	HID0,r0
+		isync
+		
+		loadreg	r3,"ISI!"
+		stw	r3,0xf4(r0)
+		mfsrr0	r3
+		stw	r3,0xf8(r0)
+.HaltISI:	b	.HaltISI
+
+#********************************************************************************************
+
+.DSI:		mtsprg0	r7
+		mfsrr0	r7
+		
+		lwz	r6,SysBase(r0)
+		cmpw	r6,r10
+		bne	.NoClutch
+		
+		xoris	r7,r7,0x7c00			#dummy
+		lwz	r7,0(r7)
+		loadreg	r0,0x80ca0142			#MemList(sysbase)->r6
+
+		cmpw	r0,r7
+		bne	.NoClutch
+		
+		mfsrr0	r7
+		addi	r7,r7,4
+		mtsrr0	r7
+		lwz	r6,PPCMemHeader(r0)		#dummy
+		mfsprg0	r7
+		rfi
+
+.NoClutch:	mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		xori	r0,r0,HID0_DCE
+		sync	
+		mtspr	HID0,r0
+		isync
+		
+		loadreg	r3,"DSI!"
+		stw	r3,0xf4(r0)
+		mfsrr0	r3
+		stw	r3,0xf8(r0)
+.HaltDSI:	b	.HaltDSI
+
+#********************************************************************************************
+
+.PrInt:		
+		mtsprg0	r0				#Program Exception
+		
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
+		
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0				#Reenable MMU & FPU
+		isync
+
+		mr	r0,r1
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		stwu	r0,-4(r1)			#Store user stack
+		
+		mfsprg0	r0
+		
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-1080(r1)				
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r2,-4(r13)
+		stwu	r0,-4(r13)		
+		mfcr	r0
+		stwu	r0,-4(r13)
+
+		loadreg	r29,"TRAP"
+		stw	r29,0xf4(r0)
+
+		mfsrr0	r31
+		stw	r31,0xf8(r0)
+		lwz	r0,ViolationAddress(r0)
+		cmplw	r0,r31
+		beq	.Privvy
+
+		lis	r31,SRR1_TRAP-12
+		mfsrr1	r0
+		
+		and.	r0,r0,r31
+		beq	.HaltErr			#skip ILLEGAL and PRIVILEGED
+
+		lwz	r31,PowerPCBase(r0)
+		la	r31,LIST_EXCPROGRAM(r31)
+.NextPExc:	lwz	r31,0(r31)			#Are there handlers in place?
+
+		lwz	r0,0(r31)
+		mr.	r0,r0
+		beq	.LastPrHandler
+		
+		mr	r30,r31
+
+		lwz	r0,EXCDATA_TASK(r30)
+		mr.	r0,r0
+		beq 	.DoExc
+		
+		lwz	r28,RunningTask(r0)
+		cmpw	r0,r28
+		beq	.DoExc
+		
+		b	.NextPExc
+		
+.DoExc:		mflr	r29
+		mtsprg0	r31
+		lwz	r0,EXCDATA_CODE(r30)
+		mtlr	r0		
+		lwz	r0,EXCDATA_FLAGS(r30)
+		rlwinm.	r0,r0,(32-EXC_LARGECONTEXT),31,31
+		li	r0,EXCF_PROGRAM
+		bne-	.LargeContext
+		
+		mtsprg3	r2
+		lwz	r2,EXCDATA_DATA(r30)
+		mtsprg1	r29		
+		subi	r13,r13,XCO_SIZE
+		stw	r3,4(r13)
+		stw	r0,0(r13)
+		mr	r3,r13
+		mtsprg2	r1				
+		
+		lwz	r0,4+XCO_SIZE(r13)
+		lwz	r27,16+XCO_SIZE(r13)
+		lwz	r28,20+XCO_SIZE(r13)
+		lwz	r29,24+XCO_SIZE(r13)
+		lwz	r30,28+XCO_SIZE(r13)
+		lwz	r31,32+XCO_SIZE(r13)
+		
+		blrl					#DO NOT TRASH R13 IN HANDLER!
+
+		addi	r13,r13,XCO_SIZE
+		
+		stw	r0,4(r13)
+		stw	r27,16(r13)
+		stw	r28,20(r13)
+		stw	r29,24(r13)
+		stw	r30,28(r13)
+		stw	r31,32(r13)
+		
+		mfsprg1	r31
+		mtlr	r31
+		mfsprg2	r1
+		mfsprg3	r2
+		mfsprg0	r31
+			
+		stw	r2,8(r13)								
+		cmpwi	r3,EXCRETURN_ABORT
+		beq	.LastPrHandler
+				
+		b	.NextPExc
+		
+.LargeContext:	mr	r31,r13
+		subi	r13,r13,EC_SIZE
+		mr	r3,r13
+
+		stw	r0,0(r3)
+		mfsrr0	r0
+		stwu	r0,4(r3)
+		mfsrr1	r0		
+		stwu	r0,4(r3)
+		mfdar	r0
+		stwu	r0,4(r3)
+		mfdsisr	r0
+		stwu	r0,4(r3)
+		lwz	r0,0(r31)		#cr
+		stwu	r0,4(r3)
+		mfctr	r0
+		stwu	r0,4(r3)
+		stwu	r29,4(r3)		#lr
+		mfxer	r0
+		stwu	r0,4(r3)
+		stfd	f0,16(r3)
+		mffs	f0
+		stfd	f0,4(r3)
+		lfd	f0,16(r3)
+		lwz	r0,8(r3)
+		stwu	r0,4(r3)
+		lwz	r0,4(r31)		#r0
+		stwu	r0,4(r3)
+		lwz	r29,0(r1)
+		lwz	r0,0(r29)
+		stwu	r0,4(r3)		#r1
+		stwu	r2,4(r3)
+		lwz	r0,12(r31)		#r3
+		stwu	r0,4(r3)
+		stwu	r4,4(r3)
+		stwu	r5,4(r3)
+		stwu	r6,4(r3)
+		stwu	r7,4(r3)
+		stwu	r8,4(r3)
+		stwu	r9,4(r3)
+		stwu	r10,4(r3)
+		stwu	r11,4(r3)
+		stwu	r12,4(r3)
+		lwz	r2,0(r1)
+		lwz	r0,-4(r2)		
+		stwu	r0,4(r3)		#r13
+		stwu	r14,4(r3)
+		stwu	r15,4(r3)
+		stwu	r16,4(r3)
+		stwu	r17,4(r3)
+		stwu	r18,4(r3)
+		stwu	r19,4(r3)
+		stwu	r20,4(r3)
+		stwu	r21,4(r3)
+		stwu	r22,4(r3)
+		stwu	r23,4(r3)
+		stwu	r24,4(r3)
+		stwu	r25,4(r3)
+		stwu	r26,4(r3)
+		lwz	r0,16(r31)
+		stwu	r0,4(r3)		#r27
+		lwz	r0,20(r31)
+		stwu	r0,4(r3)		#r28
+		lwz	r0,24(r31)
+		stwu	r0,4(r3)		#r29
+		lwz	r0,28(r31)
+		stwu	r0,4(r3)		#r30
+		lwz	r0,32(r31)
+		stwu	r0,4(r3)		#r31
+		stfdu	f0,4(r3)
+		stfdu	f1,8(r3)
+		stfdu	f2,8(r3)
+		stfdu	f3,8(r3)
+		stfdu	f4,8(r3)
+		stfdu	f5,8(r3)
+		stfdu	f6,8(r3)
+		stfdu	f7,8(r3)
+		stfdu	f8,8(r3)
+		stfdu	f9,8(r3)
+		stfdu	f10,8(r3)
+		stfdu	f11,8(r3)
+		stfdu	f12,8(r3)
+		stfdu	f13,8(r3)
+		stfdu	f14,8(r3)
+		stfdu	f15,8(r3)		
+		stfdu	f16,8(r3)
+		stfdu	f17,8(r3)
+		stfdu	f18,8(r3)
+		stfdu	f19,8(r3)
+		stfdu	f20,8(r3)
+		stfdu	f21,8(r3)
+		stfdu	f22,8(r3)
+		stfdu	f23,8(r3)
+		stfdu	f24,8(r3)
+		stfdu	f25,8(r3)
+		stfdu	f26,8(r3)
+		stfdu	f27,8(r3)
+		stfdu	f28,8(r3)
+		stfdu	f29,8(r3)
+		stfdu	f30,8(r3)
+		stfdu	f31,8(r3)
+
+		mr	r3,r13
+		mtsprg3	r3
+
+		lwz	r2,EXCDATA_DATA(r30)
+
+		blrl
+
+		mfsprg3	r31
+
+		lwzu	r0,4(r31)		#Skips Exc type
+		mtsrr0	r0
+		lwzu	r0,4(r31)
+		mtsrr1	r0
+		lwzu	r0,4(r31)
+		mtdar	r0
+		lwzu	r0,4(r31)
+		mtdsisr	r0		
+		lwzu	r0,4(r31)
+		mtcr	r0
+		lwzu	r0,4(r31)
+		mtctr	r0
+		lwzu	r0,4(r31)
+		mtlr	r0
+		lwzu	r0,4(r31)
+		mtxer	r0
+		lfd	f0,0(r31)
+		mtfsf	0xff,f0
+		lwzu	r0,8(r31)
+		lwzu	r2,4(r31)
+		mtsprg1	r2			#(New) User stack pointer
+		lwzu	r2,4(r31)
+		mtsprg2	r3
+		lwzu	r3,4(r31)
+		lwzu	r4,4(r31)
+		lwzu	r5,4(r31)
+		lwzu	r6,4(r31)
+		lwzu	r7,4(r31)
+		lwzu	r8,4(r31)
+		lwzu	r9,4(r31)
+		lwzu	r10,4(r31)
+		lwzu	r11,4(r31)
+		lwzu	r12,4(r31)
+		lwzu	r13,4(r31)
+		lwzu	r14,4(r31)
+		lwzu	r15,4(r31)
+		lwzu	r16,4(r31)
+		lwzu	r17,4(r31)
+		lwzu	r18,4(r31)
+		lwzu	r19,4(r31)
+		lwzu	r20,4(r31)
+		lwzu	r21,4(r31)
+		lwzu	r22,4(r31)
+		lwzu	r23,4(r31)
+		lwzu	r24,4(r31)
+		lwzu	r25,4(r31)
+		lwzu	r26,4(r31)
+		lwzu	r27,4(r31)
+		lwzu	r28,4(r31)
+		lwzu	r29,4(r31)
+		lwz	r30,8(r31)
+		mtsprg3	r30
+		lwzu	r30,4(r31)
+		lfdu	f0,8(r31)		#skips r31 (is in sprg3)
+		lfdu	f1,8(r31)
+		lfdu	f2,8(r31)
+		lfdu	f3,8(r31)
+		lfdu	f4,8(r31)
+		lfdu	f5,8(r31)
+		lfdu	f6,8(r31)
+		lfdu	f7,8(r31)
+		lfdu	f8,8(r31)
+		lfdu	f9,8(r31)
+		lfdu	f10,8(r31)
+		lfdu	f11,8(r31)
+		lfdu	f12,8(r31)
+		lfdu	f13,8(r31)
+		lfdu	f14,8(r31)
+		lfdu	f15,8(r31)
+		lfdu	f16,8(r31)
+		lfdu	f17,8(r31)
+		lfdu	f18,8(r31)
+		lfdu	f19,8(r31)
+		lfdu	f20,8(r31)
+		lfdu	f21,8(r31)
+		lfdu	f22,8(r31)
+		lfdu	f23,8(r31)
+		lfdu	f24,8(r31)
+		lfdu	f25,8(r31)
+		lfdu	f26,8(r31)
+		lfdu	f27,8(r31)
+		lfdu	f28,8(r31)
+		lfdu	f29,8(r31)
+		lfdu	f30,8(r31)
+		lfdu	f31,8(r31)
+		
+		mfsprg3	r31
+		
+		stw	r13,-4(r1)
+		subi	r13,r1,4				
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r2,-4(r13)
+		stwu	r0,-4(r13)
+		mfcr	r0
+		stwu	r0,-4(r13)
+
+		mfsprg1	r3
+		lwz	r31,0(r1)
+		stw	r3,0(r31)		#Change User Stack
+
+		mfsprg2	r3
+		mfsprg0	r31
+
+		cmpwi	r3,EXCRETURN_ABORT
 		beq	.LastPrHandler		
 		
 		b	.NextPExc
 		
-.LastPrHandler:		
-		mfsrr0	r31
-		lwz	r0,ViolationAddress(r0)
-		cmplw	r0,r31
-		bne-	.HaltErr
-		
+.LastPrHandler:	lwz	r0,4(r13)
+		mtsprg0	r0
+		b	.WasTrap
+
 .Privvy:	addi	r31,r31,4			#Next instruction
 		mtsrr0	r31
 		mfsrr1	r31
@@ -3131,22 +3480,14 @@ TestRoutine:	b	.IntReturn
 		mfsprg0	r0
 		
 		rfi
-
-.HaltErr:	lis	r31,SRR1_TRAP-12
-		mfsrr1	r0
 		
-		and.	r0,r0,r31
-		lwz	r0,4(r13)
-		mtsprg0	r0
-		bne	.WasTrap
-		
-		loadreg r3,"HALT"			#DEBUG
+.HaltErr:	loadreg r3,"HALT"			#DEBUG
 		stw	r3,0xf4(r0)			#Error
 		mfsrr0	r3
 		stw	r3,0xf8(r0)			#Current PC
 		mflr	r3
 		stw	r3,0xfc(r0)			#Original calling function
-		
+
 .xxHaltErr2:	b .xxHaltErr2
 
 #********************************************************************************************
