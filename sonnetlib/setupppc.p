@@ -720,18 +720,18 @@ mmuSetup:
 #		mtspr dbat0u,r3
 #		isync					#ROM
 
-		loadreg r4,IBAT1L_VAL
-		loadreg	r3,IBAT1U_VAL
-		mtspr ibat1l,r4
-		mtspr ibat1u,r3
-		isync
+#		loadreg r4,IBAT1L_VAL
+#		loadreg	r3,IBAT1U_VAL
+#		mtspr ibat1l,r4
+#		mtspr ibat1u,r3
+#		isync
 
-		loadreg r4,DBAT1L_VAL
-		loadreg r3,DBAT1U_VAL
-		isync
-		mtspr dbat1l,r4
-		mtspr dbat1u,r3
-		isync					#Sonnet RAM
+#		loadreg r4,DBAT1L_VAL
+#		loadreg r3,DBAT1U_VAL
+#		isync
+#		mtspr dbat1l,r4
+#		mtspr dbat1u,r3
+#		isync					#Sonnet RAM
 
 		loadreg r4,IBAT2L_VAL
 		loadreg r3,IBAT2U_VAL
@@ -770,17 +770,25 @@ mmuSetup:
 		
 		loadreg	r3,0x08000000			#dummy	start effective address
 		loadreg	r4,0x0c000000			#dummy	end effective address
-		loadreg	r5,0x08000000			#dummy	start physical address
+		mr	r5,r3				#dummy	start physical address
 		loadreg	r6,PTE_CACHE_INHIBITED		#dummy 	WIMG
 		li	r7,0				#pp = 0 - No Access
 	
 		bl	.DoTBLs
 		
-		loadreg	r3,0x80000000
+		loadreg	r3,0x80000000			#PCI memory (EUMB)
 		loadreg	r4,0x80100000
 		mr	r5,r3
 		loadreg	r6,PTE_CACHE_INHIBITED
 		li	r7,2				#pp = 2 - Read/Write Access
+		
+		bl	.DoTBLs
+		
+		li	r3,0				#Sonnet memory base
+		mr	r4,r23				#Sonnet memory size
+		mr	r5,r3
+		li	r6,0
+		li	r7,2
 		
 		bl	.DoTBLs
 		
@@ -826,19 +834,6 @@ mmuSetup:
 .Exithtab:	or	r15,r15,r9
 		mtspr	SDR1,r15			#set SDR1
 
-		mr	r8,r17
-		mr	r9,r18
-
-		rlwinm	r3,r8,4,28,31			#get 4 MSBs
-		rlwinm	r4,r9,4,28,31
-
-		lis	r8,0x6000			#set ks and kp
-.srx_set:	or	r5,r3,r8
-		bl	.set_srx
-		addi	r3,r3,1
-		cmpw	r3,r4
-		ble	.srx_set
-
 		rlwinm	r6,r6,30,0,31			#r6 = pt_size, r7 = pt_loc
 		mtctr	r6
 		xor	r8,r8,r8
@@ -859,6 +854,22 @@ mmuSetup:
 		mr	r21,r7
 		mflr	r22
 
+		mr	r8,r17
+		mr	r9,r18
+
+		rlwinm	r3,r8,4,28,31			#get 4 MSBs
+		rlwinm	r4,r9,4,28,31
+
+		lis	r8,0x6000			#set ks and kp
+.srx_set:	or	r5,r3,r8
+		bl	.set_srx
+		addi	r3,r3,1
+		cmpw	r3,r4
+		ble	.srx_set
+
+		mr	r3,r17
+		mr	r4,r18
+		
 .load_PTEs:	cmpw	r3,r4
 		bge	.ExitTBL
 		
@@ -1723,7 +1734,6 @@ EInt:		b	.FPUnav
 		
 		li	r0,-1
 		stb	r0,ExceptionMode(r0)
-
 		
 		mfsrr1	r0
 		mtsprg1	r0
