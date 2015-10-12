@@ -11,7 +11,7 @@
 
 .section "PPCSetup","acrx"
 
-PPCCode:						#0x4000	System initialization
+PPCCode:						#0x3000	System initialization
 		lis	r22,CMD_BASE
 		lis	r29,VEC_BASE			#0xfff00000
 		ori	r29,r29,0x6000			#For initial communication
@@ -90,11 +90,7 @@ SetLen:		mr	r30,r28
 
 		bl	End
 
-Start:		lwz	r4,PowerPCBase(r0)		#Dummy entry at absolute 0x7400
-		lwz	r4,_LVOSetExcMMU+2(r4)
-		addi	r4,r4,ViolationOS		
-		stw	r4,ViolationAddress(r0)	
-		
+Start:		nop					#Dummy entry at absolute 0x7400
 .StartX:	nop					#IdleTask
 		nop
 		nop
@@ -168,7 +164,7 @@ ExitCode:	blrl
 		lwz	r21,TC_SPLOWER(r4)
 		lwz	r4,SonnetBase(r0)
 		or	r4,r4,r21
-		subi	r4,r4,1024
+		subi	r4,r4,2048
 		stw	r4,MN_ARG0(r9)
 		
 		mr	r24,r9
@@ -367,6 +363,13 @@ End:		mflr	r4
 		
 		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
 		mtsrr1	r0				#load up user MSR. Also clears PSL_IP
+		
+		lwz	r4,PowerPCBase(r0)
+		lwz	r5,SonnetBase(r0)
+		xor	r4,r4,r5
+		lwz	r4,_LVOSetExcMMU+2(r4)
+		addi	r4,r4,ViolationOS		
+		stw	r4,ViolationAddress(r0)
 
 		bl	Caches				#Setup the L1 and L2 cache
 
@@ -666,7 +669,7 @@ Caches:		mfspr	r4,HID0
 		mtspr	HID0,r4
 		sync
 		
-		blr					#REMOVE ME FOR L1 CACHE
+#		blr					#REMOVE ME FOR L1 CACHE
 							#L1 cache off for now
 							#to fix coherancy problems
 		mfspr	r4,HID0
@@ -745,39 +748,64 @@ mmuSetup:
 		mtspr dbat2u,r3
 		isync					#Sonnet RAM virtualized to Amiga RAM
 
-		loadreg	r4,IBAT3L_VAL
-		loadreg	r3,IBAT3U_VAL
-		mtspr ibat3l,r4
-		mtspr ibat3u,r3
-		isync
+#		loadreg	r4,IBAT3L_VAL
+#		loadreg	r3,IBAT3U_VAL
+#		mtspr ibat3l,r4
+#		mtspr ibat3u,r3
+#		isync
 
-		loadreg	r4,DBAT3L_VAL
-		loadreg	r3,DBAT3U_VAL
-		isync
-		mtspr dbat3l,r4
-		mtspr dbat3u,r3
-		isync					#PCI memory ($80000000>)
+#		loadreg	r4,DBAT3L_VAL
+#		loadreg	r3,DBAT3U_VAL
+#		isync
+#		mtspr dbat3l,r4
+#		mtspr dbat3u,r3
+#		isync					#PCI memory ($80000000>)
 							#BATs are now set up
 							
 #********************************************************************************************
 
+		loadreg	r6,0x8000000			#Amount of memory to virtualize (128MB)
+
+		bl	.SetupPT
+		
 		loadreg	r3,0x08000000			#dummy	start effective address
 		loadreg	r4,0x0c000000			#dummy	end effective address
 		loadreg	r5,0x08000000			#dummy	start physical address
 		loadreg	r6,PTE_CACHE_INHIBITED		#dummy 	WIMG
+		li	r7,0				#pp = 0 - No Access
+	
+		bl	.DoTBLs
 		
-		mr	r17,r3
-		mr	r18,r4
-		mr	r19,r5
-		mr	r20,r6
+		loadreg	r3,0x80000000
+		loadreg	r4,0x80100000
+		mr	r5,r3
+		loadreg	r6,PTE_CACHE_INHIBITED
+		li	r7,2				#pp = 2 - Read/Write Access
 		
-.GetPTSize:	sub	r6,r4,r3
+		bl	.DoTBLs
+		
+		li	r7,64				#Now invalidate tlb entries
+		mtctr	r7
+		li	r7,0
+.tlblp:		tlbie	r7
+		addi	r7,r7,0x1000
+		bdnz+	.tlblp
+		tlbsync
+
+		mtlr	r30
+
+		blr
+
+#********************************************************************************************	
+
+.SetupPT:	mflr	r22
+		mr	r23,r8				#Save sonnet memory size
 		srwi	r6,r6,7				#Get pt_size
 		rlwinm.	r8,r6,20,12,31			#is pt_size >= 64 KB
 		bne	.Cont
 		lis	r6,0x10
 		
-.Cont:		loadreg	r3,0x03000000			#dummy	size of sonnet memory
+.Cont:		mr	r3,r23				#Size of sonnet memory
 
 		sub	r3,r3,r6			#Set pt_loc
 		mr	r7,r3
@@ -818,9 +846,18 @@ mmuSetup:
 		
 .zero_out:	stwu	r8,4(r7)
 		bdnz	.zero_out
-
-		mr	r3,r17
-		mr	r4,r18
+		
+		mtlr	r22
+		blr
+		
+#********************************************************************************************		
+		
+.DoTBLs:	mr	r17,r3
+		mr	r18,r4
+		mr	r19,r5
+		mr	r20,r6
+		mr	r21,r7
+		mflr	r22
 
 .load_PTEs:	cmpw	r3,r4
 		bge	.ExitTBL
@@ -836,7 +873,8 @@ mmuSetup:
 		
 		rlwinm	r12,r19,0,0,19			#Lower PTE (with physical address)
 		rlwimi	r12,r5,3,25,28
-		ori	r12,r12,0x180			#R=C=1, PP=00 (with ks/kp=1 = no access)
+		ori	r12,r12,0x180			#R=C=1, 
+		or	r12,r12,r21			#Set PP (00 with ks/kp=1 = no access)
 
 		rlwinm	r14,r3,20,16,31
 		rlwinm	r15,r13,0,13,31
@@ -877,16 +915,7 @@ mmuSetup:
 		addi	r19,r19,0x1000
 		b	.load_PTEs
 		
-.ExitTBL:	li	r7,64				#Now invalidate tlb entries
-		mtctr	r7
-		li	r7,0
-.tlblp:		tlbie	r7
-		addi	r7,r7,0x1000
-		bdnz+	.tlblp
-		tlbsync
-
-		mtlr	r30
-
+.ExitTBL:	mtlr	r22
 		blr
 		
 #********************************************************************************************
@@ -1660,14 +1689,16 @@ cachel1:	addi	r6,r6,4				#copy a cache line
 
 #********************************************************************************************
 
-InstallExceptions:
-		mflr	r15
-		bl	GtCode
-Halt:		nop
+InstallExceptions:					#Installs a loop on every exception
+		mflr	r15				#to make sure unsupported exceptions
+		bl	GtCode				#will not run into never-neverland
+		
+Halt:		nop					#These 2 instructions are the loop
 		b	Halt
+		
 GtCode:		mflr	r16
 		li	r17,0
-		li	r18,20
+		li	r18,20				#0x100-0x1400
 		mtctr	r18
 FillEm:		addi	r17,r17,0x100
 		lwz	r19,0(r16)
@@ -1692,6 +1723,7 @@ EInt:		b	.FPUnav
 		
 		li	r0,-1
 		stb	r0,ExceptionMode(r0)
+
 		
 		mfsrr1	r0
 		mtsprg1	r0
@@ -1896,7 +1928,7 @@ EInt:		b	.FPUnav
 .Dispatch:	lwz	r8,MN_ARG0(r9)
 		
 		mr	r6,r8
-		li	r4,32				#TaskLen/Cache_Line
+		li	r4,64				#TaskLen/Cache_Line
 		mtctr	r4
 .InvTask:	dcbi	r0,r6
 		addi	r6,r6,L1_CACHE_LINE_SIZE
@@ -1913,7 +1945,7 @@ EInt:		b	.FPUnav
 		stw	r9,TASKPPC_STARTMSG(r8)
 		lwz	r31,MN_ARG1(r9)
 		stw	r31,TASKPPC_STACKSIZE(r8)
-		addi	r4,r8,1024
+		addi	r4,r8,2048
 		lwz	r6,SonnetBase(r0)
 		xor	r4,r4,r6		
 		stw	r4,TC_SPLOWER(r8)
@@ -2427,7 +2459,7 @@ TestRoutine:	b	.IntReturn
 .DoIdle:	loadreg	r0,IdleTask+(.StartX-Start)	#Start hardcoded at 0x7400
 		mtsrr0	r0
 
-		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		loadreg	r1,SysStack-0x20		#System stack in unused mem
 		
 		stw	r13,-4(r1)
 		subi	r13,r1,4
@@ -2625,42 +2657,20 @@ TestRoutine:	b	.IntReturn
 		
 #********************************************************************************************
 
-.BreakPoint:	
-		prolog	228,"TOC"
-		
-		loadreg	r0,"WARP"
-		stw	r0,0xf4(r0)
-		mfsrr0	r0
-		stw	r0,0xf8(r0)
-		
-.DebugIABR:	b	.DebugIABR			#Reached when EXC_PROGRAM has no more bugs
-		
-		mfmsr	r0
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r0				#Reenable MMU & FPU
+.BreakPoint:	mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		xori	r0,r0,HID0_DCE
+		sync	
+		mtspr	HID0,r0
 		isync
 		
-		lwz	r3,PowerPCBase(r0)
-		la	r31,LIST_EXCIABR(r3)
-		
-.NextBExc:	lwz	r31,0(r31)
-		lwz	r0,0(r31)
-		mr.	r0,r0
-		beq	.LastBPHandler
-		
-		mr	r30,r31
-		mr	r31,r0
-		
-		mflr	r29
-		mtlr	r0
-		blrl
-		mtlr	r29
-		
-		b	.NextBExc		
-		
-.LastBPHandler:	excepilog "TOC"
-
-		rfi
+		loadreg	r3,"IABR"
+		stw	r3,0xf4(r0)
+		mfsrr0	r3
+		stw	r3,0xf8(r0)
+		mfsrr1	r3
+		stw	r3,0xfc(r0)
+.HaltIABR:	b	.HaltIABR
 
 #********************************************************************************************
 
@@ -3066,24 +3076,68 @@ TestRoutine:	b	.IntReturn
 
 #********************************************************************************************
 
-.DSI:		mtsprg0	r7
-		mfsrr0	r7
-		
-		lwz	r6,SysBase(r0)
-		cmpw	r6,r10
-		bne	.NoClutch
+.DSI:		mtsprg0	r7				#Now contains experimental Neuss
+		mfsrr0	r7				#code. Needs to be rewritten.
 		
 		xoris	r7,r7,0x7c00			#dummy
 		lwz	r7,0(r7)
+		
+		loadreg	r0,0x881c0000
+		cmpw	r0,r7
+		bne	.NextC1
+		
+		lwz	r28,RunningTask(r0)
+		addi	r28,r28,TASKPPC_NAME
+		b	.Clutch
+		
+.NextC1:	lwz	r6,SysBase(r0)
+		cmpw	r6,r10
+		bne	.NextC2
+
 		loadreg	r0,0x80ca0142			#MemList(sysbase)->r6
+		lwz	r6,PPCMemHeader(r0)		#dummy
 
 		cmpw	r0,r7
-		bne	.NoClutch
+		beq	.Clutch
 		
-		mfsrr0	r7
+.NextC2:	loadreg	r0,0x881b0000
+		cmpw	r0,r7
+		bne	.NextC3
+		
+		lwz	r27,RunningTask(r0)
+		addi	r27,r27,TASKPPC_ARGS
+		b	.Clutch
+		
+.NextC3:	loadreg	r0,0x881d0000
+		cmpw	r0,r7
+		bne	.NextC4
+		
+		lwz	r29,RunningTask(r0)
+		addi	r29,r29,TASKPPC_ARGS
+		b	.Clutch		
+		
+.NextC4:	loadreg r0,0x881f0000
+		cmpw	r0,r7
+		bne	.NextC5
+		
+		lwz	r31,RunningTask(r0)
+		addi	r31,r31,TASKPPC_ARGS
+		b	.Clutch			
+		
+.NextC5:	loadreg r0,0x88030000
+		cmpw	r0,r7
+		bne	.NextC5
+		
+		lwz	r3,RunningTask(r0)
+		addi	r3,r3,TASKPPC_ARGS
+		b	.Clutch		
+		
+.NextC6:	nop
+		b	.NoClutch
+		
+.Clutch:	mfsrr0	r7
 		addi	r7,r7,4
 		mtsrr0	r7
-		lwz	r6,PPCMemHeader(r0)		#dummy
 		mfsprg0	r7
 		rfi
 
@@ -3098,6 +3152,7 @@ TestRoutine:	b	.IntReturn
 		stw	r3,0xf4(r0)
 		mfsrr0	r3
 		stw	r3,0xf8(r0)
+		stw	r31,0xfc(r0)
 .HaltDSI:	b	.HaltDSI
 
 #********************************************************************************************
