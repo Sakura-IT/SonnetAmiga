@@ -31,7 +31,7 @@
 .set SemListSem,80				#Pointer
 .set PortListSem,84				#Pointer
 .set Ports,88					#MLH
-.set ViolationAddress,100			#Pointer
+.set ViolationAddress,216			#Pointer
 .set MCTask,104					#Pointer
 .set TaskException,108				#Pointer
 .set DState,112
@@ -678,6 +678,7 @@
 .set TASKPPC_SSPPC_RESERVE,800
 .set TASKPPC_PORT,832
 .set TASKPPC_NAME,932
+.set TASKPPC_ARGS,1024
 .set SYS_SIGALLOC,0xFFFF
 .set TC_FLAGS,14
 .set TC_STATE,15

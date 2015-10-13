@@ -294,7 +294,7 @@ MoveSon	move.l (a0)+,(a1)+
 	bsr MakeLibrary
 	
 	tst.l d0
-	beq.s NoLib
+	beq.s NoLib					;beq.s
 
 	move.l SonnetBase(pc),a1
 	move.l d0,PowerPCBase(a1)
@@ -564,9 +564,21 @@ Sig68k	move.l DosBase(pc),d6
 	move.l SonnetBase(pc),d6
 	move.l MN_PPSTRUCT+24(a1),d7
 	or.l d6,d7
-	move.l d7,MN_PPSTRUCT+24(a1)	
+	move.l d7,MN_PPSTRUCT+24(a1)
+	bra.s EndPtch
 	
-NoCNP	move.l ThisTask(a6),a0
+NoCNP	move.l #_LVODateStamp,d6
+	cmp.l d6,d7
+	bne.s NoDS
+	move.l SonnetBase(pc),d6
+	move.l MN_PPSTRUCT+24(a1),d7
+	or.l d6,d7
+	move.l d7,MN_PPSTRUCT+24(a1)
+	bra.s EndPtch
+
+
+NoDS
+EndPtch	move.l ThisTask(a6),a0
 	lea pr_MsgPort(a0),a0
 	move.l a0,MN_REPLYPORT(a1)
 	move.l MN_MIRROR(a1),a0
@@ -905,7 +917,7 @@ xProces	move.l d0,Port(a5)
 	move.l TC_SPLOWER(a1),d1
 	sub.l d1,d0
 	move.l d0,d7
-	add.l #1024,d0
+	add.l #2048,d0					;was 1024
 
 	move.l _PowerPCBase(pc),a6
 	jsr _LVOAllocVec32(a6)
@@ -927,8 +939,24 @@ CpName	move.b (a1)+,(a2)
 	dbf d0,CpName
 
 EndName	move.l #"_PPC",(a2)				;Check Alignment?
+
+	move.l ThisTask(a6),a1
+	cmp.b #NT_PROCESS,LN_TYPE(a1)
+	bne.s EndArgs
+	move.l pr_Arguments(a1),d0
+	beq.s EndArgs
+	move.l d0,a1
+
+	moveq.l #63,d0
+	move.l d6,a2
+	lea TASKPPC_ARGS(a2),a2
+CpArgs	move.b (a1)+,(a2)
+	tst.b (a2)
+	beq.s EndArgs
+	addq.l #1,a2
+	dbf d0,CpArgs
 							;Also push dcache
-	move.l EUMBAddr(pc),a2
+EndArgs	move.l EUMBAddr(pc),a2
 	move.l IFQPR(a2),a1
 	
 	moveq.l #47,d0					;MsgLen/4-1
