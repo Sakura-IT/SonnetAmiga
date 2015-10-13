@@ -31,7 +31,7 @@
 .set SemListSem,80				#Pointer
 .set PortListSem,84				#Pointer
 .set Ports,88					#MLH
-.set ViolationAddress,216			#Pointer
+.set L2STATE,100
 .set MCTask,104					#Pointer
 .set TaskException,108				#Pointer
 .set DState,112
@@ -60,6 +60,7 @@
 .set WaitListSem,204				#18150
 .set CPUInfo,208
 .set SysStackPointer,212
+.set ViolationAddress,216			#Pointer
 
 #LibBase:
 
@@ -184,6 +185,8 @@
 .set PPCINFO_CPUCLOCK,        	0x80102007		#PPC CPU clock
 .set PPCINFO_CPULOAD,         	0x80102008		#Total CPU usage *100 [%]
 .set PPCINFO_SYSTEMLOAD,      	0x80102009		#Total system load *100 [%]
+.set PPCINFO_L2CACHE,		0x8010200A		#State of L2 Cache (on/off)
+.set PPCINFO_L2STATE,		0x8010200B		#L2 in copyback or writethrough?
 
 .set HINFO_ALEXC_HIGH,		0x80103000		#For GetHALInfo
 .set HINFO_ALEXC_LOW,		0x80103001
@@ -306,6 +309,10 @@
 .set CACHE_ICACHEUNLOCK,9
 .set CACHE_ICACHEINV,10
 .set CACHE_DCACHEINV,11
+.set CACHE_L2CACHEON,12
+.set CACHE_L2CACHEOFF,13
+.set CACHE_L2WTON,14
+.set CACHE_L2WTOFF,15
 
 .set IMIMR,0x104		#Inbound Message Interrupt Mask Register
 .set IMISR,0x100		#Inbound Message Interrupt Status Register
