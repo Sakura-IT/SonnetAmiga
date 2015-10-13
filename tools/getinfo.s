@@ -9,6 +9,10 @@ FUNC_CNT	SET	FUNC_CNT-6	* Standard offset-6 bytes each
 		include powerpc/powerpc_lib.i
 		include exec/exec_lib.i
 		include dos/dos_lib.i
+		
+PPCINFO_L2CACHE	EQU	$8010200A		;State of L2 Cache (on/off)
+PPCINFO_L2STATE	EQU	$8010200B		;L2 in copyback or writethrough?
+
 
 ;************************************************************************************************
 
@@ -106,13 +110,13 @@ DCache		move.l 44(a2),d2
 		bne.s NoOU2
 		lea CACHE_ON_U-infotext(a4),a3
 		move.l a3,28(a1)
-		bra.s Done
+		bra.s L2Info
 		
 NoOU2		subq.l #1,d2
 		bne.s NoOL2
 		lea CACHE_ON_L-infotext(a4),a3
 		move.l a3,28(a1)
-		bra.s Done
+		bra.s L2Info
 
 NoOL2		subq.l #2,d2
 		bne.s NoOFU2
@@ -121,6 +125,24 @@ NoOL2		subq.l #2,d2
 
 NoOFU2		lea CACHE_OFF_L-infotext(a4),a3
 		move.l a3,28(a1)
+		
+L2Info		move.l 68(a2),d2
+		beq.s NoL2
+		lea L2CACHE_ON-infotext(a4),a3
+		move.l a3,64(a1)
+		bra.s L2State
+		
+NoL2		lea L2CACHE_OFF-infotext(a4),a3
+		move.l a3,64(a1)
+
+L2State		move.l 76(a2),d2
+		beq.s NoL2WT
+		lea L2WT-infotext(a4),a3
+		move.l a3,68(a1)
+		bra.s Done		
+		
+NoL2WT		lea L2CB-infotext(a4),a3
+		move.l a3,68(a1)
 		
 Done		move.l 52(a2),d2
 		move.l d2,32(a1)
@@ -149,6 +171,8 @@ infotext        dc.b    "CPU:                   %s   (PVR = %08lx)",10
 		dc.b    "PPC Uptime:            %ld.%06ld seconds",10
 		dc.b    "CPU load:              %ld.%02ld%%",10
 		dc.b    "System load:           %ld.%02ld%%",10
+		dc.b	"L2 Cache:              %s",10
+		dc.b	"L2 State:              %s",10
 		dc.b    0
 
 CPU_603         dc.b    "PPC 603",0
@@ -163,11 +187,16 @@ CACHE_ON_U      dc.b    "ON and UNLOCKED",0
 CACHE_OFF_U     dc.b    "OFF and UNLOCKED",0
 CACHE_ON_L      dc.b    "ON and LOCKED",0
 CACHE_OFF_L     dc.b    "OFF and LOCKED",0
+L2CACHE_ON	dc.b	"ENABLED",0
+L2CACHE_OFF	dc.b	"DISABLED",0
+L2WT		dc.b	"WRITE-THROUGH",0
+L2CB		dc.b	"COPY-BACK",0
 
 		cnop    0,4
 Args		dc.l	0,0,0,0,0,0,0,0,0,0
 Time		dc.l	0,0
 		dc.l	0,0,0,0,0,0
+		dc.l	0,0
 		
 DosBase		dc.l	0
 _PowerPCBase	dc.l	0
@@ -179,6 +208,7 @@ PowerPCLib	dc.b	"sonnet.library",0
 	
 Tags		dc.l	PPCINFO_CPU,0,PPCINFO_PVR,0,PPCINFO_CPUCLOCK,0,PPCINFO_BUSCLOCK,0
 		dc.l	PPCINFO_ICACHE,0,PPCINFO_DCACHE,0,PPCINFO_PAGETABLE,0,PPCINFO_TABLESIZE,0
+		dc.l	PPCINFO_L2CACHE,0,PPCINFO_L2STATE,0
 		dc.l	0,0
 	
 ;************************************************************************************************
