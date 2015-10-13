@@ -455,6 +455,8 @@ GetInfo:
 		stw	r3,CPUHID0(r0)
 		mfspr	r3,SDR1
 		stw	r3,CPUSDR1(r0)
+		mfl2cr	r3
+		stw	r3,L2STATE(r0)
 		
 		bl User	
 		
@@ -498,8 +500,20 @@ GetInfo:
 		beq	.INFO_BUSCLOCK
 		subf.	r7,r6,r7
 		beq	.INFO_CPUCLOCK
+		subf.	r7,r6,r7
+		beq	.INFO_CPULOAD
+		subf.	r7,r6,r7
+		beq	.INFO_SYSTEMLOAD
+		subf.	r7,r6,r7
+		beq	.INFO_L2CACHE
+		subf.	r7,r6,r7
+		beq	.INFO_L2WT
 		b	.NextInList
 		
+.INFO_CPULOAD:
+.INFO_SYSTEMLOAD:
+		b	.NextInList
+
 
 .INFO_CPU:	lwz	r7,CPUInfo(r0)
 		rlwinm	r7,r7,16,28,31
@@ -568,6 +582,14 @@ GetInfo:
 		b	.StoreTag
 .MHz400:	loadreg r7,400000000
 		b	.StoreTag		
+
+.INFO_L2CACHE:	lwz	r7,L2STATE(r0)
+		rlwinm	r7,r7,1,31,31
+		b	.StoreTag
+		
+.INFO_L2WT:	lwz	r7,L2STATE(r0)
+		rlwinm	r7,r7,13,31,31
+		b	.StoreTag
 
 #********************************************************************************************
 #
@@ -759,7 +781,7 @@ FlushL1DCache:
 		
 		li	r4,0x7000
 
-		li	r6,0x400
+		loadreg	r6,0x40400
 		mr	r5,r6
 		mtctr	r6
 	
@@ -1920,7 +1942,7 @@ WaitPortPPC:
 
 Super:
 		prolog 228,"TOC"
-		
+
 		li	r0,-1			#READ PVR (warp funcion -130)
 Violation:	mfspr	r3,PVR			#IF user then exception; r0/r3=0
 		mr	r3,r0			#IF super then r0/r3=-1
@@ -2057,6 +2079,7 @@ WaitFor68K:
 		sync
 
 		mtctr	r29
+
 		li	r3,0				#Needs proper status still
 
 		lwz	r27,0(r13)
@@ -2083,7 +2106,7 @@ Run68K:
 		stwu	r25,-4(r13)
 		stwu	r24,-4(r13)
 		stwu	r23,-4(r13)
-				
+
 		mr	r31,r4
 		
 		mfctr	r25
@@ -2495,6 +2518,60 @@ SetCache:
 		beq-	.DCACHELOCK
 		cmplwi	r4,CACHE_DCACHEINV
 		beq-	.DCACHEINV
+		cmplwi	r4,CACHE_L2CACHEON
+		beq-	.L2ENABLE
+		cmplwi	r4,CACHE_L2CACHEOFF
+		beq-	.L2DISABLE
+		cmplwi	r4,CACHE_L2WTON
+		beq-	.L2WTENABLE
+		cmplwi	r4,CACHE_L2WTOFF
+		beq-	.L2WTDISABLE
+		b	.DoneCache
+		
+.L2WTENABLE:	bl	Super
+
+		mfl2cr	r4
+		oris	r4,r4,L2CR_L2WT@h
+		mtl2cr	r4
+		
+		bl	User
+		
+		b	.DoneCache
+		
+.L2WTDISABLE:	bl	Super
+
+		mfl2cr	r4
+		oris	r4,r4,L2CR_L2WT@h
+		xoris	r4,r4,L2CR_L2WT@h
+		mtl2cr	r4
+		
+		bl	User
+		
+		b	.DoneCache
+
+
+.L2ENABLE:	bl	Super
+
+		mfl2cr	r4
+		oris	r4,r4,L2CR_L2E@h
+		mtl2cr	r4
+
+		bl	User
+		
+		b	.DoneCache
+
+
+.L2DISABLE:	bl FlushL1DCache
+
+		bl Super
+
+		mfl2cr	r4
+		oris	r4,r4,L2CR_L2E@h
+		xoris	r4,r4,L2CR_L2E@h
+		mtl2cr	r4
+		
+		bl User
+		
 		b	.DoneCache
 
 .DCACHEINV: 	mr.	r5,r5
@@ -2507,8 +2584,7 @@ SetCache:
 		bl Super
 
 		add	r5,r5,r4
-		lis	r0,-1
-		ori	r0,r0,0xffe0
+		loadreg	r0,0xffffffe0
 		and	r4,r4,r0
 		addi	r5,r5,31
 		and	r5,r5,r0
@@ -2552,7 +2628,7 @@ SetCache:
 		rlwinm	r5,r5,27,5,31
 		mtctr	r5
 .FillLoop:	lwz	r0,0(r4)
-		addi	r4,r4,32
+		addi	r4,r4,L1_CACHE_LINE_SIZE
 		bdnz+	.FillLoop
 		
 		bl Super
@@ -2578,6 +2654,7 @@ SetCache:
 		bne	.DoneCache
 		
 		bl FlushL1DCache
+		
 		bl Super
 		
 		mfspr	r0,HID0
@@ -2585,13 +2662,15 @@ SetCache:
 		xori	r0,r0,HID0_DCE
 		sync	
 		mtspr	HID0,r0
+		sync
+		
 		mr	r4,r3
-				
-		bl User
 		
 		li	r0,-1
 		stb	r0,DState(r0)
 		
+		bl User
+
 		b	.DoneCache
 
 .ICACHELOCK:	bl Super
@@ -2731,10 +2810,10 @@ SetCache:
 		lbz	r29,DLockState(r0)
 		mr.	r29,r29
 		bne	.DoneCache
-		
+
 		mr	r4,r5
 		mr	r5,r6
-		
+
 		add	r5,r5,r4
 		loadreg	r0,0xffffffe0
 		and	r4,r4,r0
@@ -2742,6 +2821,7 @@ SetCache:
 		and	r5,r5,r0
 		sub	r5,r5,r4
 		rlwinm	r5,r5,27,5,31
+		
 		mtctr	r5
 .Flush:		dcbf	r0,r4
 		addi	r4,r4,L1_CACHE_LINE_SIZE
@@ -5660,7 +5740,7 @@ FreePooledPPC:
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
-		
+
 		mr	r31,r4
 		mr	r30,r5
 		mr	r28,r6
@@ -5731,7 +5811,7 @@ FreePooledPPC:
 .ExitFreePool:	lwz	r4,MemSem(r0)
 		
 		bl ReleaseSemaphorePPC
-		
+
 		lwz	r28,0(r13)
 		lwz	r29,4(r13)
 		lwz	r30,8(r13)
