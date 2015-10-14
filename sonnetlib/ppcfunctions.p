@@ -5070,11 +5070,16 @@ DeleteTaskPPC:
 		bl ObtainSemaphorePPC
 
 		lwz	r4,TASKPPC_TASKPTR(r31)
+		
+		mr.	r4,r4				#STUB
+		beq	.NoTaskPtr			#STUB
+		
 		lwz	r3,0(r4)
 		lwz	r4,4(r4)
 		stw	r4,4(r3)
 		stw	r3,0(r4)
-		la	r4,NumAllTasks(r0)		#Tasks -1
+		
+.NoTaskPtr:	la	r4,NumAllTasks(r0)		#Tasks -1
 		lwz	r3,0(r4)
 		subi	r3,r3,1
 		stw	r3,0(r4)
