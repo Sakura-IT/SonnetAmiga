@@ -351,7 +351,9 @@ End:		mflr	r4
 				
 		bl	.SetupMsgFIFOs
 		
-		mfspr	r4,PVR
+#		mfspr	r4,PVR
+		
+		mfpvr	r4
 		stw	r4,CPUInfo(r0)
 
 		mfspr	r4,HID0
@@ -372,6 +374,9 @@ End:		mflr	r4
 		stw	r4,ViolationAddress(r0)
 
 		bl	Caches				#Setup the L1 and L2 cache
+
+		loadreg	r4,Quantum
+		mtdec	r4
 
 		rfi					#To user code
 		
@@ -610,16 +615,6 @@ Epic:		lis	r26,EUMB
 		add	r27,r26,r27
 		stwbrx	r28,0,r27			#Set MU interrupt, Pri = 5, Vector = 0x42
 
-		loadreg r28,Quantum			#Set Slice/Quantum
-		loadreg r27,EPIC_GTBCR0
-		add	r27,r26,r27
-		stwbrx	r28,0,r27
-	
-		loadreg r28,0x80040043
-		loadreg r27,EPIC_GTVPR0
-		add	r27,r26,r27
-		stwbrx	r28,0,r27
-
 		loadreg	r27,EPIC_EICR
 		add	r27,r26,r27
 		lwz	r28,0(r27)
@@ -627,12 +622,6 @@ Epic:		lis	r26,EUMB
 		stw	r28,0(r27)
 
 		loadreg	r27,EPIC_IIVPR3
-		add 	r27,r26,r27
-		lwz	r28,0(r27)
-		rlwinm	r28,r28,0,25,23			#Doc says Mask M bit now. Can maybe already at
-		stw	r28,0(r27)			#while setting the interrupt above?
-
-		loadreg	r27,EPIC_GTVPR0
 		add 	r27,r26,r27
 		lwz	r28,0(r27)
 		rlwinm	r28,r28,0,25,23			#Doc says Mask M bit now. Can maybe already at
@@ -706,32 +695,6 @@ Wait2:		mfl2cr	r3
 
 mmuSetup:	
 		mflr	r30
-		
-#		loadreg	r4,IBAT0L_VAL			#To be converted to tables (PTEGs)
-#		loadreg	r3,IBAT0U_VAL
-#		mtspr ibat0l,r4
-#		mtspr ibat0u,r3
-#		isync
-
-#		loadreg	r4,DBAT0L_VAL
-#		loadreg	r3,DBAT0U_VAL
-#		isync
-#		mtspr dbat0l,r4
-#		mtspr dbat0u,r3
-#		isync					#ROM
-
-#		loadreg r4,IBAT1L_VAL
-#		loadreg	r3,IBAT1U_VAL
-#		mtspr ibat1l,r4
-#		mtspr ibat1u,r3
-#		isync
-
-#		loadreg r4,DBAT1L_VAL
-#		loadreg r3,DBAT1U_VAL
-#		isync
-#		mtspr dbat1l,r4
-#		mtspr dbat1u,r3
-#		isync					#Sonnet RAM
 
 		loadreg r4,IBAT2L_VAL
 		loadreg r3,IBAT2U_VAL
@@ -746,21 +709,7 @@ mmuSetup:
 		isync
 		mtspr dbat2l,r4
 		mtspr dbat2u,r3
-		isync					#Sonnet RAM virtualized to Amiga RAM
-
-#		loadreg	r4,IBAT3L_VAL
-#		loadreg	r3,IBAT3U_VAL
-#		mtspr ibat3l,r4
-#		mtspr ibat3u,r3
-#		isync
-
-#		loadreg	r4,DBAT3L_VAL
-#		loadreg	r3,DBAT3U_VAL
-#		isync
-#		mtspr dbat3l,r4
-#		mtspr dbat3u,r3
-#		isync					#PCI memory ($80000000>)
-							#BATs are now set up
+		isync					#Sonnet RAM virtualized to Amiga RAM							#BATs are now set up
 							
 #********************************************************************************************
 
@@ -779,7 +728,7 @@ mmuSetup:
 		loadreg	r3,0x80000000			#PCI memory (EUMB)
 		loadreg	r4,0x80100000
 		mr	r5,r3
-		loadreg	r6,PTE_CACHE_INHIBITED
+		loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED
 		li	r7,2				#pp = 2 - Read/Write Access
 		
 		bl	.DoTBLs
@@ -862,7 +811,10 @@ mmuSetup:
 
 		lis	r8,0x6000			#set ks and kp
 .srx_set:	or	r5,r3,r8
-		bl	.set_srx
+
+		rlwinm	r13,r3,28,0,4
+		mtsrin	r5,r13
+
 		addi	r3,r3,1
 		cmpw	r3,r4
 		ble	.srx_set
@@ -874,7 +826,7 @@ mmuSetup:
 		bge	.ExitTBL
 		
 		rlwinm	r8,r3,4,28,31
-		bl	.get_srx
+		mfsrin	r13,r3
 
 		mr	r5,r20				#set WIMG
 		
@@ -928,175 +880,9 @@ mmuSetup:
 		
 .ExitTBL:	mtlr	r22
 		blr
-		
+
 #********************************************************************************************
 
-.set_srx:	cmpwi	r3,0
-		beq	.mtsr0
-		cmpwi	r3,1
-		beq	.mtsr1
-		cmpwi	r3,2
-		beq	.mtsr2
-		cmpwi	r3,3
-		beq	.mtsr3
-		cmpwi	r3,4
-		beq	.mtsr4
-		cmpwi	r3,5
-		beq	.mtsr5
-		cmpwi	r3,6
-		beq	.mtsr6
-		cmpwi	r3,7
-		beq	.mtsr7
-		cmpwi	r3,8
-		beq	.mtsr8
-		cmpwi	r3,9
-		beq	.mtsr9
-		cmpwi	r3,10
-		beq	.mtsr10
-		cmpwi	r3,11
-		beq	.mtsr11
-		cmpwi	r3,12
-		beq	.mtsr12
-		cmpwi	r3,13
-		beq	.mtsr13
-		cmpwi	r3,14
-		beq	.mtsr14
-		cmpwi	r3,15
-		beq	.mtsr15
-		
-.mtsr0:		mtsr	0,r5
-		blr
-		
-.mtsr1:		mtsr	1,r5
-		blr
-		
-.mtsr2:		mtsr	2,r5
-		blr
-		
-.mtsr3:		mtsr	3,r5
-		blr
-		
-.mtsr4:		mtsr	4,r5
-		blr
-		
-.mtsr5:		mtsr	5,r5
-		blr
-		
-.mtsr6:		mtsr	6,r5
-		blr
-		
-.mtsr7:		mtsr	7,r5
-		blr
-		
-.mtsr8:		mtsr	8,r5
-		blr
-		
-.mtsr9:		mtsr	9,r5
-		blr
-		
-.mtsr10:	mtsr	10,r5
-		blr
-		
-.mtsr11:	mtsr	11,r5
-		blr
-		
-.mtsr12:	mtsr	12,r5
-		blr
-		
-.mtsr13:	mtsr	13,r5
-		blr
-		
-.mtsr14:	mtsr	14,r5
-		blr
-		
-.mtsr15:	mtsr	15,r5
-		blr
-		
-#********************************************************************************************
-
-.get_srx:	cmpwi	r8,0
-		beq	.mfsr0
-		cmpwi	r8,1
-		beq	.mfsr1
-		cmpwi	r8,2
-		beq	.mfsr2
-		cmpwi	r8,3
-		beq	.mfsr3
-		cmpwi	r8,4
-		beq	.mfsr4
-		cmpwi	r8,5
-		beq	.mfsr5
-		cmpwi	r8,6
-		beq	.mfsr6
-		cmpwi	r8,7
-		beq	.mfsr7
-		cmpwi	r8,8
-		beq	.mfsr8
-		cmpwi	r8,9
-		beq	.mfsr9
-		cmpwi	r8,10
-		beq	.mfsr10
-		cmpwi	r8,11
-		beq	.mfsr11
-		cmpwi	r8,12
-		beq	.mfsr12
-		cmpwi	r8,13
-		beq	.mfsr13
-		cmpwi	r8,14
-		beq	.mfsr14
-		cmpwi	r8,15
-		beq	.mfsr15
-		
-.mfsr0:		mfsr	r13,0
-		blr
-		
-.mfsr1:		mfsr	r13,1
-		blr
-		
-.mfsr2:		mfsr	r13,2
-		blr
-		
-.mfsr3:		mfsr	r13,3
-		blr
-		
-.mfsr4:		mfsr	r13,4
-		blr
-		
-.mfsr5:		mfsr	r13,5
-		blr
-		
-.mfsr6:		mfsr	r13,6
-		blr
-		
-.mfsr7:		mfsr	r13,7
-		blr
-		
-.mfsr8:		mfsr	r13,8
-		blr
-		
-.mfsr9:		mfsr	r13,9
-		blr
-		
-.mfsr10:	mfsr	r13,10
-		blr
-		
-.mfsr11:	mfsr	r13,11
-		blr
-		
-.mfsr12:	mfsr	r13,12
-		blr
-		
-.mfsr13:	mfsr	r13,13
-		blr
-		
-.mfsr14:	mfsr	r13,14
-		blr
-		
-.mfsr15:	mfsr	r13,15
-		blr
-		
-#********************************************************************************************
-	
 ConfigWrite32:	lis	r20,CONFIG_ADDR			#Various PCI command routines
 		lis 	r21,CONFIG_DAT
 		stwbrx	r23,0,r20
@@ -1721,16 +1507,18 @@ FillEm:		addi	r17,r17,0x100
 
 #********************************************************************************************
 
-EInt:		b	.FPUnav
-		b	.Alignment
-		b	.ISI
-		b	.DSI
-		b	.Trace
-		b	.BreakPoint
-		b	.DecInt
-		b	.PrInt
+EInt:		b	.FPUnav				#0
+		b	.Alignment			#4
+		b	.ISI				#8
+		b	.DSI				#c
+		b	.Trace				#10
+		b	.BreakPoint			#14
+		b	.DecInt				#18
+		b	.PrInt				#1c
+		b	.MachCheck			#20
+		b	.SysCall			#24
 
-		mtsprg2	r0
+		mtsprg2	r0				#28
 		
 		li	r0,-1
 		stb	r0,ExceptionMode(r0)
@@ -1762,6 +1550,10 @@ EInt:		b	.FPUnav
 		stwu	r8,-4(r13)
 		stwu	r9,-4(r13)
 
+		loadreg	r3,"EXEX"
+		stw	r3,0xf4(r0)
+
+#.RDecInt:	
 		lis	r3,EUMBEPICPROC
 		lwz	r5,EPIC_IACK(r3)		#Read IACKR to acknowledge interrupt
 
@@ -1769,13 +1561,6 @@ EInt:		b	.FPUnav
 		cmpwi	r5,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
 		beq	.ReturnToUser
 		
-		cmpwi	r5,0x0042
-		beq	TestRoutine
-		
-		cmpwi	r5,0x0043
-		
-#		beq	Timer
-
 .IntReturn:	lis	r3,EUMB
 		li	r4,IMISR
 		lwbrx	r5,r4,r3
@@ -1875,10 +1660,7 @@ EInt:		b	.FPUnav
 .EndQueue:	clearreg r5
 		lis	r3,EUMBEPICPROC
 		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
-
-		loadreg	r3,"EXEX"
-		stw	r3,0xf4(r0)
-
+		
 .RDecInt:	lwz	r9,TaskException(r0)
 		mr.	r9,r9
 		bne	.TaskException
@@ -2099,6 +1881,9 @@ EInt:		b	.FPUnav
 .NoThrow:	mr	r7,r0
 		stb	r0,ExceptionMode(r0)
 
+		loadreg	r0,Quantum
+		mtdec	r0
+
 		loadreg	r0,"WARP"
 		
 		rfi
@@ -2136,14 +1921,13 @@ EInt:		b	.FPUnav
 		loadreg	r0,"USER"
 		stw	r0,0xf4(r0)
 		
+		loadreg	r0,Quantum
+		mtdec	r0
+		
 		mfsprg2	r0
 
 		rfi
 		
-#********************************************************************************************
-
-TestRoutine:	b	.IntReturn
-
 #********************************************************************************************
 
 .TaskException:	li	r9,0				#Will be starting point for TC_EXCEPTCODE
@@ -2427,8 +2211,13 @@ TestRoutine:	b	.IntReturn
 		li	r9,0
 		stb	r9,ExceptionMode(r0)
 		
+		loadreg	r9,Quantum
+		mtdec	r9
+		
 		mfsprg3	r9
 		rfi
+		
+#********************************************************************************************
 
 .GoToWait:	li	r4,TS_WAIT
 		stb	r4,TC_STATE(r9)
@@ -2477,6 +2266,9 @@ TestRoutine:	b	.IntReturn
 		
 		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
 		mtsrr1	r0		
+		
+		loadreg	r0,Quantum
+		mtdec	r0
 		
 		li	r0,0
 		stb	r0,ExceptionMode(r0)
@@ -2681,6 +2473,40 @@ TestRoutine:	b	.IntReturn
 		mfsrr1	r3
 		stw	r3,0xfc(r0)
 .HaltIABR:	b	.HaltIABR
+
+#********************************************************************************************
+
+.MachCheck:	mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		xori	r0,r0,HID0_DCE
+		sync	
+		mtspr	HID0,r0
+		isync
+		
+		loadreg	r3,"CHCK"
+		stw	r3,0xf4(r0)
+		mfsrr0	r3
+		stw	r3,0xf8(r0)
+		mfsrr1	r3
+		stw	r3,0xfc(r0)
+.HaltMCheck:	b	.HaltMCheck
+
+#********************************************************************************************
+
+.SysCall:	mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		xori	r0,r0,HID0_DCE
+		sync	
+		mtspr	HID0,r0
+		isync
+		
+		loadreg	r3,"SYSC"
+		stw	r3,0xf4(r0)
+		mfsrr0	r3
+		stw	r3,0xf8(r0)
+		mfsrr1	r3
+		stw	r3,0xfc(r0)
+.HaltSysCall:	b	.HaltSysCall
 
 #********************************************************************************************
 
@@ -3559,10 +3385,14 @@ TestRoutine:	b	.IntReturn
 	
 EIntEnd:
 		mflr	r4				#Setup a small jumptable for exceptions
-		loadreg r5,0x48002b20			#Program/Trap/Illegal
-		stw	r5,0x500(r0)
+		loadreg r5,0x48002b28
+		stw	r5,0x500(r0)			#External Interrupt
+		loadreg	r5,0x48002424
+		stw	r5,0xc00(r0)			#System Call
+		loadreg	r5,0x48002e20
+		stw	r5,0x200(r0)			#Machine Check
 		loadreg	r5,0x4800291c
-		stw	r5,0x700(r0)			#External Interrupt
+		stw	r5,0x700(r0)			#Program/Trap/Illegal
 		loadreg r5,0x48002718
 		stw	r5,0x900(r0)			#Decrementer
 		loadreg	r5,0x48001d14
