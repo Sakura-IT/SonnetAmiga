@@ -76,6 +76,8 @@ SetLen:		mr	r30,r28
 .Clear0:	stwu	r0,4(r3)
 		bdnz+	.Clear0				#Clear first part of zero page
 
+		stw	r8,MemSize(r0)
+
 		bl	mmuSetup			#Setup BATs. Needs to be changed to tables
 		bl	Epic				#Setup the EPIC controller
 
@@ -350,9 +352,7 @@ End:		mflr	r4
 		bl	.InitSem
 				
 		bl	.SetupMsgFIFOs
-		
-#		mfspr	r4,PVR
-		
+
 		mfpvr	r4
 		stw	r4,CPUInfo(r0)
 
@@ -669,8 +669,8 @@ Caches:		mfspr	r4,HID0
 		 	
 #		blr					#REMOVE ME FOR L2 CACHE		
 		 					# Set up on chip L2 cache controller.
-#		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_L2WT
-		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST
+#		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS|L2CR_L2WT
+		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS
 		mtl2cr	r4
 		sync
 		
@@ -686,6 +686,61 @@ Wait2:		mfl2cr	r3
 
 		oris	r4,r4,L2CR_L2E@h
 		mtl2cr	r4				#Enable L2 cache
+		sync
+		isync
+		
+		li	r0,0				#Determine size of L2 Cache
+		mr	r5,r0
+		mr	r30,r0
+		lis	r4,0
+		
+		lwz	r6,MemSize(r0)			#Address to start writing
+		loadreg	r5,0x400000			#Substract 4 MB
+		sub	r6,r6,r5
+
+		lis	r5,L2_SIZE_1M_U			#Size of memory to write to
+		
+.L2SzWriteLoop:	dcbz	r4,r6
+		stwx	r4,r4,r6
+		dcbf	r4,r6
+		addi	r4,r4,L2_ADR_INCR
+		cmpw	r4,r5
+		blt	.L2SzWriteLoop
+		
+		lis	r4,0
+		
+.L2SzReadLoop:	lwzx	r7,r4,r6
+		cmpw	r4,r7
+		bne	.L2SkipCount
+		addi	r30,r30,1			#Count cache lines
+		
+.L2SkipCount:	dcbi	r4,r6
+		addi	r4,r4,L2_ADR_INCR
+		cmpw	r4,r5
+		blt	.L2SzReadLoop
+		
+		lis	r7,L2CR_SIZE_1MB
+		cmpwi	r30,L2_SIZE_1M
+		beq	.L2SizeDone
+		
+		lis	r7,L2CR_SIZE_512KB
+		cmpwi	r30,L2_SIZE_HM
+		beq	.L2SizeDone
+		
+		lis	r7,L2CR_SIZE_256KB
+		cmpwi	r30,L2_SIZE_QM
+		beq	.L2SizeDone
+		
+		lis	r7,0
+		
+.L2SizeDone:	li	r4,8
+		slw	r30,r30,r4
+		stw	r30,L2Size(r0)
+		
+		mfl2cr	r4		
+		xoris	r4,r4,L2CR_SIZE_1MB|L2CR_TS_OFF
+		or	r4,r4,r7		
+		mtl2cr	r4				#Set correct size and switch Test off
 		sync
 		isync
 		
