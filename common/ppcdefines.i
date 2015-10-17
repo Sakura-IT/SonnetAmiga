@@ -61,6 +61,8 @@
 .set CPUInfo,208
 .set SysStackPointer,212
 .set ViolationAddress,216			#Pointer
+.set MemSize,220
+.set L2Size,224
 
 #LibBase:
 
@@ -356,8 +358,6 @@
 
 .set SRR1_TRAP,14
 
-.set PVR,287
-
 .set srr1,27
 .set srr0,26
 .set ibat0u,528
@@ -509,14 +509,22 @@
 .set L2CR_L2I,			0x00200000 		# bit 10 Global invalidate bit
 .set L2CR_TS,			0x00040000 		# bit 13 Test support on 
 .set L2CR_L2WT,			0x00080000		# bit 12 write-through
-.set L2CR_TS_OFF,		~L2CR_TS   		# bit 13 Test support off
 .set L2CR_L2OH_5,		0x00000000 		# bits 14-15 Output Hold time = 0.5ns*/
 .set L2CR_L2OH_1,		0x00010000 		# bits 14-15 Output Hold time = 1.0ns*/
 .set L2CR_L2OH_INV,		0x00020000 		# bits 14-15 Output Hold time = 1.0ns*/
 .set L2CR_L2IP,			0x00000001
 
-# first, set address ranges for the devices I’m mapping with the BATs. 
-# The memory model for my board has ROM at fff000000 and RAM at 0x00000000. 
+.set L2CR_SIZE_1MB,		0x3000
+.set L2CR_SIZE_512KB,		0x2000
+.set L2CR_SIZE_256KB,		0x1000
+.set L2CR_TS_OFF,		0x0004
+
+.set L2_ADR_INCR,		0x100
+.set L2_SIZE_1M,		0x1000
+.set L2_SIZE_HM,		0x800
+.set L2_SIZE_QM,		0x400
+
+.set L2_SIZE_1M_U,		0x0010
 
 .set PROM_BASE,0xFC000000	# IOSPACE and 'ROM'
 .set PRAM_BASE,0x00000000
