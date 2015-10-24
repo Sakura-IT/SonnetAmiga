@@ -369,7 +369,7 @@ End:		mflr	r4
 		lwz	r4,PowerPCBase(r0)
 		lwz	r5,SonnetBase(r0)
 		xor	r4,r4,r5
-		lwz	r4,_LVOSetExcMMU+2(r4)
+		lwz	r4,_LVOSetCache+2(r4)
 		addi	r4,r4,ViolationOS		
 		stw	r4,ViolationAddress(r0)
 
@@ -670,7 +670,7 @@ Caches:		mfspr	r4,HID0
 #		blr					#REMOVE ME FOR L2 CACHE		
 		 					# Set up on chip L2 cache controller.
 #		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS|L2CR_L2WT
-		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS
+		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS|L2CR_DO
 		mtl2cr	r4
 		sync
 		
@@ -1780,9 +1780,9 @@ EInt:		b	.FPUnav				#0
 .InvTask:	dcbi	r0,r6
 		addi	r6,r6,L1_CACHE_LINE_SIZE
 		bdnz	.InvTask
-		
-		isync		
-		
+
+		isync
+
 		li	r4,TS_RUN
 		stb	r4,TC_STATE(r8)
 		li	r4,NT_PPCTASK
@@ -1918,11 +1918,12 @@ EInt:		b	.FPUnav				#0
 		mtsrr1	r0		
 		mfsprg0	r0
 		mtsrr0	r0
-				
+
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
 		mtspr	HID0,r0
-		
+		isync
+
 		li	r0,0
 		
 		lwz	r7,PP_FLAGS(r7)
@@ -1976,6 +1977,11 @@ EInt:		b	.FPUnav				#0
 		loadreg	r0,"USER"
 		stw	r0,0xf4(r0)
 		
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_ICFI
+		mtspr	HID0,r0
+		isync
+
 		loadreg	r0,Quantum
 		mtdec	r0
 		
@@ -2266,6 +2272,11 @@ EInt:		b	.FPUnav				#0
 		li	r9,0
 		stb	r9,ExceptionMode(r0)
 		
+		mfspr	r9,HID0
+		ori	r9,r9,HID0_ICFI
+		mtspr	HID0,r9
+		isync
+
 		loadreg	r9,Quantum
 		mtdec	r9
 		
@@ -2320,8 +2331,13 @@ EInt:		b	.FPUnav				#0
 		stwu	r1,-284(r1)
 		
 		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
-		mtsrr1	r0		
+		mtsrr1	r0
 		
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_ICFI
+		mtspr	HID0,r0
+		isync
+
 		loadreg	r0,Quantum
 		mtdec	r0
 		
@@ -2569,10 +2585,11 @@ EInt:		b	.FPUnav				#0
 		
 		li	r0,-1
 		stb	r0,ExceptionMode(r0)
-		
+
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r0				#Reenable MMU & FPU
+		mtmsr	r0
+		sync				#Reenable MMU & FPU
 		isync
 
 		mr	r0,r1
@@ -2890,8 +2907,7 @@ EInt:		b	.FPUnav				#0
 		
 		b	.NextTExc
 		
-.LastTrHandler:	
-		lwz	r0,0(r13)
+.LastTrHandler:	lwz	r0,0(r13)
 		mtcr	r0
 		lwz	r0,4(r13)
 		mtsprg0	r0
@@ -2914,6 +2930,11 @@ EInt:		b	.FPUnav				#0
 		loadreg	r0,"USER"
 		stw	r0,0xf4(r0)
 		
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_ICFI
+		mtspr	HID0,r0
+		isync
+
 		mfsprg0	r0
 		
 		rfi
@@ -3029,6 +3050,12 @@ EInt:		b	.FPUnav				#0
 .Clutch:	mfsrr0	r7
 		addi	r7,r7,4
 		mtsrr0	r7
+		
+		mfspr	r7,HID0
+		ori	r7,r7,HID0_ICFI
+		mtspr	HID0,r7
+		isync		
+		
 		mfsprg0	r7
 		rfi
 
@@ -3052,11 +3079,12 @@ EInt:		b	.FPUnav				#0
 		mtsprg0	r0				#Program Exception
 		
 		li	r0,-1
-		stb	r0,ExceptionMode(r0)
+		stb	r0,ExceptionMode(r0)		
 		
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU & FPU
+		sync
 		isync
 
 		mr	r0,r1
@@ -3423,6 +3451,11 @@ EInt:		b	.FPUnav				#0
 		loadreg	r0,"USER"
 		stw	r0,0xf4(r0)
 		
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_ICFI
+		mtspr	HID0,r0
+		isync
+		
 		mfsprg0	r0
 		
 		rfi
@@ -3435,7 +3468,7 @@ EInt:		b	.FPUnav				#0
 		stw	r3,0xfc(r0)			#Original calling function
 
 .xxHaltErr2:	b .xxHaltErr2
-
+		
 #********************************************************************************************
 	
 EIntEnd:
