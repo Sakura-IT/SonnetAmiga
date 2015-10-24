@@ -278,8 +278,8 @@ Wait	move.l $6004(a1),d5
 NoPCILb	jsr _LVOEnqueue(a6)
 
 	move.l #FunctionsLen,d0
-	move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1
-	jsr _LVOAllocVec(a6)
+	bsr AllocVec32
+
 	tst.l d0
 	beq Clean
 	move.l d0,PPCCodeMem-Buffer(a4)
@@ -1202,7 +1202,7 @@ AllocVec32:
 	and.l #$ffffffe0,d0
 	move.l d0,a0
 	move.l d1,-4(a0)
-	move.l (A7)+,a6
+	move.l (a7)+,a6
 	rts
 
 ;********************************************************************************************
