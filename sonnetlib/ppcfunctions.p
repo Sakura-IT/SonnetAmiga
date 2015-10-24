@@ -2,8 +2,8 @@
 .include sonnet_libppc.i
 .include ppcmacros-std.i
 
-.set FunctionsLen,(EndFunctions-SetExcMMU)
-.set ViolationOS,(Violation-SetExcMMU)
+.set FunctionsLen,(EndFunctions-SetCache)
+.set ViolationOS,(Violation-SetCache)
 
 .global FunctionsLen
 .global ViolationOS
@@ -30,6 +30,389 @@
 .global AddUniqueSemaphorePPC,IsExceptionMode
 
 .section "LibBody","acrx"
+
+#********************************************************************************************
+#
+#	Void SetCache(cacheflags, start, length) // r4,r5,r6
+#
+#********************************************************************************************	
+		
+SetCache:
+		prolog 228,"TOC"
+
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		
+		mfctr	r28
+
+		cmplwi	r4,CACHE_DCACHEFLUSH
+		beq-	.DCACHEFLUSH
+		cmplwi	r4,CACHE_ICACHEINV
+		beq-	.ICACHEINV
+		cmplwi	r4,CACHE_ICACHEOFF
+		beq-	.ICACHEOFF
+		cmplwi	r4,CACHE_ICACHEON
+		beq-	.ICACHEON
+		cmplwi	r4,CACHE_ICACHEUNLOCK
+		beq-	.ICACHEUNLOCK
+		cmplwi	r4,CACHE_DCACHEON
+		beq-	.DCACHEON
+		cmplwi	r4,CACHE_DCACHEUNLOCK
+		beq-	.DCACHEUNLOCK
+		cmplwi	r4,CACHE_ICACHELOCK
+		beq-	.ICACHELOCK
+		cmplwi	r4,CACHE_DCACHEOFF
+		beq-	.DCACHEOFF
+		cmplwi	r4,CACHE_DCACHELOCK
+		beq-	.DCACHELOCK
+		cmplwi	r4,CACHE_DCACHEINV
+		beq-	.DCACHEINV
+		cmplwi	r4,CACHE_L2CACHEON
+		beq-	.L2ENABLE
+		cmplwi	r4,CACHE_L2CACHEOFF
+		beq-	.L2DISABLE
+		cmplwi	r4,CACHE_L2WTON
+		beq-	.L2WTENABLE
+		cmplwi	r4,CACHE_L2WTOFF
+		beq-	.L2WTDISABLE
+		b	.DoneCache
+		
+.L2WTENABLE:	bl	Super
+
+		mfl2cr	r4
+		oris	r4,r4,L2CR_L2WT@h
+		mtl2cr	r4
+		
+		mr	r4,r3
+		
+		bl	User
+		
+		b	.DoneCache
+		
+.L2WTDISABLE:	bl	Super
+
+		mfl2cr	r4
+		oris	r4,r4,L2CR_L2WT@h
+		xoris	r4,r4,L2CR_L2WT@h
+		mtl2cr	r4
+		
+		mr	r4,r3
+		
+		bl	User
+		
+		b	.DoneCache
+
+
+.L2ENABLE:	bl	Super
+
+		mfl2cr	r4
+		oris	r4,r4,L2CR_L2E@h
+		mtl2cr	r4
+
+		mr	r4,r3
+
+		bl	User
+		
+		b	.DoneCache
+
+
+.L2DISABLE:	bl FlushL1DCache
+
+		bl Super
+
+		mfl2cr	r4
+		oris	r4,r4,L2CR_L2E@h
+		xoris	r4,r4,L2CR_L2E@h
+		mtl2cr	r4
+		
+		mr	r4,r3
+		
+		bl User
+		
+		b	.DoneCache
+
+.DCACHEINV: 	mr.	r5,r5
+		beq-	.DoneCache
+		mr.	r6,r6
+		beq-	.DoneCache
+		mr	r4,r5
+		mr	r5,r6
+
+		bl Super
+
+		add	r5,r5,r4
+		loadreg	r0,0xffffffe0
+		and	r4,r4,r0
+		addi	r5,r5,31
+		and	r5,r5,r0
+		sub	r5,r5,r4
+		rlwinm	r5,r5,27,5,31
+		mtctr	r5
+.DInvalidate:	dcbi	r0,r4
+		addi	r4,r4,L1_CACHE_LINE_SIZE
+		bdnz+	.DInvalidate
+		sync
+		
+		mr	r4,r3
+		
+		bl User
+		
+		b	.DoneCache
+
+.DCACHELOCK:	mr.	r5,r5				#ExceptionMode should be Neg?
+		beq-	.DoneCache
+		mr.	r6,r6
+		beq-	.DoneCache
+
+		lbz	r29,DLockState(r0)
+		mr.	r29,r29
+		bne	.DoneCache
+
+		mr	r29,r5
+		mr	r31,r6
+		
+		bl FlushL1DCache
+		
+		mr	r4,r29
+		mr	r5,r31
+		
+		add	r5,r5,r4
+		loadreg r0,0xffffffe0
+		and	r4,r4,r0
+		addi	r5,r5,31
+		and	r5,r5,r0
+		sub	r5,r5,r4
+		rlwinm	r5,r5,27,5,31
+		mtctr	r5
+.FillLoop:	lwz	r0,0(r4)
+		addi	r4,r4,L1_CACHE_LINE_SIZE
+		bdnz+	.FillLoop
+		
+		bl Super
+		
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_DLOCK
+		sync	
+		mtspr	HID0,r0
+		sync	
+		isync		
+
+		mr	r4,r3
+
+		bl User
+		
+		li	r0,-1
+		stb	r0,DLockState(r0)
+
+		b	.DoneCache
+				
+.DCACHEOFF:	lbz	r29,DState(r0)			#ExceptionMode should be Neg?
+		mr.	r29,r29
+		bne	.DoneCache
+		
+		bl FlushL1DCache
+		
+		bl Super
+		
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		xori	r0,r0,HID0_DCE
+		sync	
+		mtspr	HID0,r0
+		sync
+		
+		mr	r4,r3
+		
+		li	r0,-1
+		stb	r0,DState(r0)
+		
+		bl User
+
+		b	.DoneCache
+
+.ICACHELOCK:	bl Super
+
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_ILOCK
+		isync	
+		mtspr	HID0,r0
+
+		mr	r4,r3
+
+		bl User
+
+		b	.DoneCache
+
+.DCACHEUNLOCK:	li	r0,0
+		stb	r0,DLockState(r0)
+		
+		bl Super
+
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_DLOCK
+		xori	r0,r0,HID0_DLOCK
+		mtspr	HID0,r0
+		sync	
+		isync		
+
+		mr	r4,r3
+
+		bl User
+		
+		b	.DoneCache
+
+.DCACHEON:	li	r0,0
+		stb	r0,DState(r0)		
+		
+		bl Super
+
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_DCE
+		mtspr	HID0,r0
+		isync
+		
+		mr	r4,r3
+		
+		bl User
+		
+		b	.DoneCache
+
+.ICACHEUNLOCK:	bl Super
+
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_ILOCK
+		xori	r0,r0,HID0_ILOCK
+		mtspr	HID0,r0
+		isync
+		
+		mr	r4,r3
+		
+		bl User
+
+		b	.DoneCache
+
+.ICACHEON:	bl Super
+
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_ICE
+		mtspr	HID0,r0
+		isync
+
+		mr	r4,r3
+
+		bl User
+		
+		b	.DoneCache
+
+.ICACHEOFF:	bl Super
+		
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_ICE
+		xori	r0,r0,HID0_ICE
+		isync	
+		mtspr	HID0,r0
+
+		mr	r4,r3
+
+		bl User
+
+		b	.DoneCache
+
+.ICACHEINV:	mr.	r5,r5		
+		beq-	.ICACHEINVALL
+		mr.	r6,r6
+		beq-	.ICACHEINVALL
+		mr	r4,r5
+		mr	r5,r6
+		
+		add	r5,r5,r4
+		loadreg	r0,0xffffffe0
+		and	r4,r4,r0
+		addi	r5,r5,31
+		and	r5,r5,r0
+		sub	r5,r5,r4
+		rlwinm	r5,r5,27,5,31
+		mtctr	r5
+.Invalidate:	icbi	r0,r4
+		addi	r4,r4,L1_CACHE_LINE_SIZE
+		bdnz+	.Invalidate
+		isync	
+		b	.DoneCache
+
+.ICACHEINVALL:  bl Super
+
+		b	.Mojo1					#Some L1 mojo
+		
+#		.balign 32					#Make sure it is cacheline aligned
+
+.Mojo2:		mfspr	r0,HID0
+		ori	r0,r0,HID0_ICFI
+		mtspr	HID0,r0
+		xori	r0,r0,HID0_ICFI
+		mtspr	HID0,r0
+		isync	
+		b 	.Mojo3
+.Mojo1:		b 	.Mojo2
+		
+#		.balign 32
+		
+.Mojo3:		mr	r4,r3
+		bl User
+		
+		b	.DoneCache
+
+.DCACHEFLUSH:	mr.	r5,r5
+		beq-	.DCACHEFLUSHALL
+		mr.	r6,r6
+		beq-	.DCACHEFLUSHALL
+		
+		lbz	r29,DState(r0)
+		mr.	r29,r29
+		bne	.DoneCache
+		lbz	r29,DLockState(r0)
+		mr.	r29,r29
+		bne	.DoneCache
+
+		mr	r4,r5
+		mr	r5,r6
+
+		add	r5,r5,r4
+		loadreg	r0,0xffffffe0
+		and	r4,r4,r0
+		addi	r5,r5,31
+		and	r5,r5,r0
+		sub	r5,r5,r4
+		rlwinm	r5,r5,27,5,31		
+		mtctr	r5
+		
+.Flush:		dcbf	r0,r4
+		addi	r4,r4,L1_CACHE_LINE_SIZE
+		bdnz+	.Flush
+		sync
+			
+		b	.DoneCache
+
+.DCACHEFLUSHALL:
+		lbz	r29,DState(r0)
+		mr.	r29,r29
+		bne	.DoneCache
+		lbz	r29,DLockState(r0)
+		mr.	r29,r29
+		bne	.DoneCache
+
+		bl FlushL1DCache
+
+.DoneCache:	mtctr	r28
+
+		lwz	r28,0(r13)
+		lwz	r29,4(r13)
+		lwz	r30,8(r13)
+		lwz	r31,12(r13)
+		addi	r13,r13,16
+		
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -777,13 +1160,25 @@ FindTagItemPPC:
 FlushL1DCache:
 		prolog 228,"TOC"
 		
-		mfctr	r3
+		mfctr	r7
 		
-		li	r4,0x7000
+		bl	Super
 
-		loadreg	r6,0x40400
+		mfmsr	r6
+		xori	r6,r6,PSL_EE			#Disable Interrupts
+		mtmsr	r6
+		sync
+		
+		loadreg	r6,0x400			#L1 Cache size/Cache line size
+		lwz	r5,L2Size(r0)
+		li	r4,5
+		srw	r5,r5,r4
+		or	r6,r6,r5			#Or with the L2 Cache size/Cache line size
 		mr	r5,r6
+		
 		mtctr	r6
+		li	r4,0x7000
+	
 	
 .Fl1:		lwz	r6,0(r4)
 		addi	r4,r4,L1_CACHE_LINE_SIZE
@@ -796,7 +1191,15 @@ FlushL1DCache:
 		addi	r4,r4,L1_CACHE_LINE_SIZE
 		bdnz+	.Fl2
 
-		mtctr	r3
+		mfmsr	r6
+		ori	r6,r6,PSL_EE			#Enable Interrupts
+		mtmsr	r6
+		sync
+
+		mr	r4,r3
+		bl	User
+
+		mtctr	r7
 		
 		epilog "TOC"
 
@@ -1944,7 +2347,7 @@ Super:
 		prolog 228,"TOC"
 
 		li	r0,-1			#READ PVR (warp funcion -130)
-Violation:	mfspr	r3,PVR			#IF user then exception; r0/r3=0
+Violation:	mfpvr	r3			#IF user then exception; r0/r3=0
 		mr	r3,r0			#IF super then r0/r3=-1
 
 		epilog "TOC"			#See Program Exception ($700)	
@@ -2224,6 +2627,9 @@ Signal68K:
 CopyMemPPC:
 		prolog 228,"TOC"
 
+		stwu	r31,-4(r13)
+		mfctr	r31
+
 		andi.	r3,r4,7
 		bne-	.NoSAlign8
 		andi.	r7,r5,7
@@ -2298,7 +2704,11 @@ CopyMemPPC:
 		stbu	r0,1(r5)
 		bdnz+	.SmallLoop8
 
-.ExitCopy:	epilog "TOC"
+.ExitCopy:	mtctr	r31
+		lwz	r31,0(r13)
+		addi	r13,r13,4
+
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -2481,369 +2891,6 @@ TrySemaphorePPC:
 		addi	r13,r13,4
 		mtctr	r0
 
-		epilog "TOC"
-
-#********************************************************************************************
-#
-#	Void SetCache(cacheflags, start, length) // r4,r5,r6
-#
-#********************************************************************************************	
-		
-SetCache:
-		prolog 228,"TOC"
-
-		stwu	r31,-4(r13)
-		stwu	r30,-4(r13)
-		stwu	r29,-4(r13)
-
-		cmplwi	r4,CACHE_DCACHEFLUSH
-		beq-	.DCACHEFLUSH
-		cmplwi	r4,CACHE_ICACHEINV
-		beq-	.ICACHEINV
-		cmplwi	r4,CACHE_ICACHEOFF
-		beq-	.ICACHEOFF
-		cmplwi	r4,CACHE_ICACHEON
-		beq-	.ICACHEON
-		cmplwi	r4,CACHE_ICACHEUNLOCK
-		beq-	.ICACHEUNLOCK
-		cmplwi	r4,CACHE_DCACHEON
-		beq-	.DCACHEON
-		cmplwi	r4,CACHE_DCACHEUNLOCK
-		beq-	.DCACHEUNLOCK
-		cmplwi	r4,CACHE_ICACHELOCK
-		beq-	.ICACHELOCK
-		cmplwi	r4,CACHE_DCACHEOFF
-		beq-	.DCACHEOFF
-		cmplwi	r4,CACHE_DCACHELOCK
-		beq-	.DCACHELOCK
-		cmplwi	r4,CACHE_DCACHEINV
-		beq-	.DCACHEINV
-		cmplwi	r4,CACHE_L2CACHEON
-		beq-	.L2ENABLE
-		cmplwi	r4,CACHE_L2CACHEOFF
-		beq-	.L2DISABLE
-		cmplwi	r4,CACHE_L2WTON
-		beq-	.L2WTENABLE
-		cmplwi	r4,CACHE_L2WTOFF
-		beq-	.L2WTDISABLE
-		b	.DoneCache
-		
-.L2WTENABLE:	bl	Super
-
-		mfl2cr	r4
-		oris	r4,r4,L2CR_L2WT@h
-		mtl2cr	r4
-		
-		bl	User
-		
-		b	.DoneCache
-		
-.L2WTDISABLE:	bl	Super
-
-		mfl2cr	r4
-		oris	r4,r4,L2CR_L2WT@h
-		xoris	r4,r4,L2CR_L2WT@h
-		mtl2cr	r4
-		
-		bl	User
-		
-		b	.DoneCache
-
-
-.L2ENABLE:	bl	Super
-
-		mfl2cr	r4
-		oris	r4,r4,L2CR_L2E@h
-		mtl2cr	r4
-
-		bl	User
-		
-		b	.DoneCache
-
-
-.L2DISABLE:	bl FlushL1DCache
-
-		bl Super
-
-		mfl2cr	r4
-		oris	r4,r4,L2CR_L2E@h
-		xoris	r4,r4,L2CR_L2E@h
-		mtl2cr	r4
-		
-		bl User
-		
-		b	.DoneCache
-
-.DCACHEINV: 	mr.	r5,r5
-		beq-	.DoneCache
-		mr.	r6,r6
-		beq-	.DoneCache
-		mr	r4,r5
-		mr	r5,r6
-
-		bl Super
-
-		add	r5,r5,r4
-		loadreg	r0,0xffffffe0
-		and	r4,r4,r0
-		addi	r5,r5,31
-		and	r5,r5,r0
-		sub	r5,r5,r4
-		rlwinm	r5,r5,27,5,31
-		mtctr	r5
-.DInvalidate:	dcbi	r0,r4
-		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz+	.DInvalidate
-		sync
-		
-		mr	r4,r3
-		
-		bl User
-		
-		b	.DoneCache
-
-.DCACHELOCK:	mr.	r5,r5				#ExceptionMode should be Neg?
-		beq-	.DoneCache
-		mr.	r6,r6
-		beq-	.DoneCache
-
-		lbz	r29,DLockState(r0)
-		mr.	r29,r29
-		bne	.DoneCache
-
-		mr	r29,r5
-		mr	r31,r6
-		
-		bl FlushL1DCache
-		
-		mr	r4,r29
-		mr	r5,r31
-		
-		add	r5,r5,r4
-		loadreg r0,0xffffffe0
-		and	r4,r4,r0
-		addi	r5,r5,31
-		and	r5,r5,r0
-		sub	r5,r5,r4
-		rlwinm	r5,r5,27,5,31
-		mtctr	r5
-.FillLoop:	lwz	r0,0(r4)
-		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz+	.FillLoop
-		
-		bl Super
-		
-		mfspr	r0,HID0
-		ori	r0,r0,HID0_DLOCK
-		sync	
-		mtspr	HID0,r0
-		sync	
-		isync		
-
-		mr	r4,r3
-
-		bl User
-		
-		li	r0,-1
-		stb	r0,DLockState(r0)
-
-		b	.DoneCache
-				
-.DCACHEOFF:	lbz	r29,DState(r0)			#ExceptionMode should be Neg?
-		mr.	r29,r29
-		bne	.DoneCache
-		
-		bl FlushL1DCache
-		
-		bl Super
-		
-		mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		xori	r0,r0,HID0_DCE
-		sync	
-		mtspr	HID0,r0
-		sync
-		
-		mr	r4,r3
-		
-		li	r0,-1
-		stb	r0,DState(r0)
-		
-		bl User
-
-		b	.DoneCache
-
-.ICACHELOCK:	bl Super
-
-		mfspr	r0,HID0
-		ori	r0,r0,HID0_ILOCK
-		isync	
-		mtspr	HID0,r0
-
-		mr	r4,r3
-
-		bl User
-
-		b	.DoneCache
-
-.DCACHEUNLOCK:	li	r0,0
-		stb	r0,DLockState(r0)
-		
-		bl Super
-
-		mfspr	r0,HID0
-		ori	r0,r0,HID0_DLOCK
-		xori	r0,r0,HID0_DLOCK
-		mtspr	HID0,r0
-		sync	
-		isync		
-
-		mr	r4,r3
-
-		bl User
-		
-		b	.DoneCache
-
-.DCACHEON:	li	r0,0
-		stb	r0,DState(r0)		
-		
-		bl Super
-
-		mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		mtspr	HID0,r0
-		isync
-		
-		mr	r4,r3
-		
-		bl User
-		
-		b	.DoneCache
-
-.ICACHEUNLOCK:	bl Super
-
-		mfspr	r0,HID0
-		ori	r0,r0,HID0_ILOCK
-		xori	r0,r0,HID0_ILOCK
-		mtspr	HID0,r0
-		isync
-		
-		mr	r4,r3
-		
-		bl User
-
-		b	.DoneCache
-
-.ICACHEON:	bl Super
-
-		mfspr	r0,HID0
-		ori	r0,r0,HID0_ICE
-		mtspr	HID0,r0
-		isync
-
-		mr	r4,r3
-
-		bl User
-		
-		b	.DoneCache
-
-.ICACHEOFF:	bl Super
-		
-		mfspr	r0,HID0
-		ori	r0,r0,HID0_ICE
-		xori	r0,r0,HID0_ICE
-		isync	
-		mtspr	HID0,r0
-
-		mr	r4,r3
-
-		bl User
-
-		b	.DoneCache
-
-.ICACHEINV:	mr.	r5,r5		
-		beq-	.ICACHEINVALL
-		mr.	r6,r6
-		beq-	.ICACHEINVALL
-		mr	r4,r5
-		mr	r5,r6
-		
-		add	r5,r5,r4
-		loadreg	r0,0xffffffe0
-		and	r4,r4,r0
-		addi	r5,r5,31
-		and	r5,r5,r0
-		sub	r5,r5,r4
-		rlwinm	r5,r5,27,5,31
-		mtctr	r5
-.Invalidate:	icbi	r0,r4
-		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz+	.Invalidate
-		isync	
-		b	.DoneCache
-
-.ICACHEINVALL:  
-		bl Super
-		
-		b	.Mojo1
-.Mojo2:		mfspr	r0,HID0
-		ori	r0,r0,HID0_ICFI
-		mtspr	HID0,r0
-		xori	r0,r0,HID0_ICFI
-		mtspr	HID0,r0
-		isync	
-		b 	.Mojo3
-.Mojo1:		b 	.Mojo2
-		
-.Mojo3:		mr	r4,r3
-		bl User
-		
-		b	.DoneCache
-
-.DCACHEFLUSH:	mr.	r5,r5
-		beq-	.DCACHEFLUSHALL
-		mr.	r6,r6
-		beq-	.DCACHEFLUSHALL
-		lbz	r29,DState(r0)
-		mr.	r29,r29
-		bne	.DoneCache
-		lbz	r29,DLockState(r0)
-		mr.	r29,r29
-		bne	.DoneCache
-
-		mr	r4,r5
-		mr	r5,r6
-
-		add	r5,r5,r4
-		loadreg	r0,0xffffffe0
-		and	r4,r4,r0
-		addi	r5,r5,31
-		and	r5,r5,r0
-		sub	r5,r5,r4
-		rlwinm	r5,r5,27,5,31
-		
-		mtctr	r5
-.Flush:		dcbf	r0,r4
-		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz+	.Flush
-		sync	
-		b	.DoneCache
-
-.DCACHEFLUSHALL:
-		lbz	r29,DState(r0)
-		mr.	r29,r29
-		bne	.DoneCache
-		lbz	r29,DLockState(r0)
-		mr.	r29,r29
-		bne	.DoneCache
-
-		bl FlushL1DCache
-
-.DoneCache:	lwz	r29,0(r13)
-		lwz	r30,4(r13)
-		lwz	r31,8(r13)
-		addi	r13,r13,12
-		
 		epilog "TOC"
 
 #********************************************************************************************
@@ -3983,7 +4030,7 @@ CreateTaskPPC:
 		
 		b	.Mojo4
 .Mojo5:		mfspr	r0,HID0				#Invalidate ICache
-		ori	r0,r0,HID0_ICFI
+		ori	r0,r0,HID0_ICFI			#Make sure code is in L1 Cache
 		mtspr	HID0,r0
 		xori	r0,r0,HID0_ICFI
 		mtspr	HID0,r0
@@ -5994,6 +6041,7 @@ Run68KLowLevel:
 		stwu	r25,-4(r13)
 		stwu	r24,-4(r13)
 		stwu	r23,-4(r13)
+		stwu	r22,-4(r13)
 		
 		mr	r31,r4
 		mr	r29,r5
@@ -6001,6 +6049,7 @@ Run68KLowLevel:
 		mr	r27,r7
 		mr	r26,r8
 		mr	r25,r9
+		mfctr	r22
 
 		lis	r3,EUMB
 		li	r24,OFTPR
@@ -6063,16 +6112,19 @@ Run68KLowLevel:
 		
 		mr	r3,r4					# return d0 - See WaitFor68K
 		
-		lwz	r23,0(r13)
-		lwz	r24,4(r13)
-		lwz	r25,8(r13)
-		lwz	r26,12(r13)
-		lwz	r27,16(r13)
-		lwz	r28,20(r13)
-		lwz	r29,24(r13)
-		lwz	r30,28(r13)
-		lwz	r31,32(r13)
-		addi	r13,r13,36
+		mtctr	r22
+		
+		lwz	r22,0(r13)
+		lwz	r23,4(r13)
+		lwz	r24,8(r13)
+		lwz	r25,12(r13)
+		lwz	r26,16(r13)
+		lwz	r27,20(r13)
+		lwz	r28,24(r13)
+		lwz	r29,28(r13)
+		lwz	r30,32(r13)
+		lwz	r31,36(r13)
+		addi	r13,r13,40
 		
 		epilog "TOC"
 
@@ -7970,6 +8022,9 @@ WaitTime:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
+		stwu	r25,-4(r13)
+		
+		mfctr	r25
 
 		mr	r30,r4
 		mr	r29,r3
@@ -8093,14 +8148,16 @@ WaitTime:
 		addi	r13,r13,4
 
 		mr	r3,r30
+		mtctr	r25
 		
-		lwz	r26,0(r13)
-		lwz	r27,4(r13)
-		lwz	r28,8(r13)
-		lwz	r29,12(r13)
-		lwz	r30,16(r13)
-		lwz	r31,20(r13)
-		addi	r13,r13,24
+		lwz	r25,0(r13)
+		lwz	r26,4(r13)
+		lwz	r27,8(r13)
+		lwz	r28,12(r13)
+		lwz	r29,16(r13)
+		lwz	r30,20(r13)
+		lwz	r31,24(r13)
+		addi	r13,r13,28
 
 		epilog "TOC"
 
