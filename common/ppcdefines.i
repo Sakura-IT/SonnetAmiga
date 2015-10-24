@@ -505,7 +505,7 @@
 .set L2CR_L2CLK_2_5,		0x0a000000 		# bits 4-6 Clock Ratio div 2.5
 .set L2CR_L2CLK_3,		0x0c000000 		# bits 4-6 Clock Ratio div 3
 .set L2CR_L2RAM_BURST,		0x01000000 		# bits 7-8 burst SRAM
-.set L2CR_DO,			0x00400000 		# bit 9 Enable caching of instr. in L2
+.set L2CR_DO,			0x00400000 		# bit 9 Disable caching of instr. in L2
 .set L2CR_L2I,			0x00200000 		# bit 10 Global invalidate bit
 .set L2CR_TS,			0x00040000 		# bit 13 Test support on 
 .set L2CR_L2WT,			0x00080000		# bit 12 write-through
