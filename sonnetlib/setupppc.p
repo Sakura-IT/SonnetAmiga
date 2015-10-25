@@ -11,10 +11,15 @@
 
 .section "PPCSetup","acrx"
 
-PPCCode:						#0x3000	System initialization
-		lis	r22,CMD_BASE
+PPCCode:	b	.SkipCom			#0x3000	System initialization
+
+.long		0					#Used for initial communication
+.long		0					#MemStart
+.long		0					#MemLen
+
+.SkipCom:	lis	r22,CMD_BASE
 		lis	r29,VEC_BASE			#0xfff00000
-		ori	r29,r29,0x6000			#For initial communication
+		ori	r29,r29,0x3000			#For initial communication
 
 		bl	Reset
 

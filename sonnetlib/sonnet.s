@@ -205,9 +205,9 @@ EndDrty	move.l #$48002f00,(a5)
 loop2	move.l (a2)+,(a5)+
 	dbf d6,loop2
 
-	move.l #$abcdabcd,$6004(a1)		;Code Word
-	move.l #$abcdabcd,$6008(a1)		;Sonnet Mem Start (Translated to PCI)
-	move.l #$abcdabcd,$600c(a1)		;Sonnet Mem Len
+	move.l #$abcdabcd,$3004(a1)		;Code Word
+	move.l #$abcdabcd,$3008(a1)		;Sonnet Mem Start (Translated to PCI)
+	move.l #$abcdabcd,$300c(a1)		;Sonnet Mem Len
 
 	jsr _LVOCacheClearU(a6)
 
@@ -220,15 +220,15 @@ loop2	move.l (a2)+,(a5)+
 
 NoCmm	move.l #WP_TRIG01,WP_CONTROL(a3)	;Negate HRESET
 
-Wait	move.l $6004(a1),d5
+Wait	move.l $3004(a1),d5
 	cmp.l #"Boon",d5
 	bne.s Wait
 
 	move.l #StackSize,d7			;Set stack
-	move.l $6008(a1),d5
+	move.l $3008(a1),d5
 	move.l d5,SonnetBase-Buffer(a4)
 	add.l d7,d5
-	move.l $600c(a1),d6
+	move.l $300c(a1),d6
 	sub.l d7,d6
 	add.l d6,d7
 
@@ -639,9 +639,9 @@ FunkyMMU
 	movem.l d1-a6,-(a7)			;Enable caches for PCI memory
 	move.l ROMMem(pc),a1
 	move.l #$10000,d7
-	move.l $6008(a1),d6			;MemStart
+	move.l $3008(a1),d6			;MemStart
 	add.l d7,d6
-	move.l $600c(a1),d5			;MemLen
+	move.l $300c(a1),d5			;MemLen
 	sub.l d7,d5
 	moveq.l #0,d0
 	lea mmulib(pc),a1
