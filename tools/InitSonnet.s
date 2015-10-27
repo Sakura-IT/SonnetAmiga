@@ -42,9 +42,11 @@ NoPatch	movem.l (a7)+,d0-a6
 	rts
 	
 NewAlloc:
+	tst.l d1
+	beq.s Best
 	btst #0,d1
 	beq.s NoFast
-	move.l d7,-(a7)
+Best	move.l d7,-(a7)
 	move.l a3,-(a7)
 	move.l a2,-(a7)
 	move.l ThisTask(a6),a3
