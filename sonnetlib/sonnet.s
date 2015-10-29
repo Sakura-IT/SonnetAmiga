@@ -554,12 +554,12 @@ ReUse	move.l a2,d7
 	bra.s NextMsg
 	
 Sig68k	move.l DosBase(pc),d6
-	move.l	MN_PPSTRUCT(a1),d7
-	cmp.l	d6,d7
-	bne.s NoCNP
-	move.l	#_LVOCreateNewProc,d6			;Start of compatibility patches
-	move.l	MN_PPSTRUCT+4(a1),d7
-	cmp.l	d6,d7
+	move.l MN_PPSTRUCT(a1),d7
+	cmp.l d6,d7
+	bne.s NoDosL
+	move.l #_LVOCreateNewProc,d6			;Start of compatibility patches
+	move.l MN_PPSTRUCT+4(a1),d7
+	cmp.l d6,d7
 	bne.s NoCNP	
 	move.l SonnetBase(pc),d6
 	move.l MN_PPSTRUCT+24(a1),d7
@@ -576,8 +576,11 @@ NoCNP	move.l #_LVODateStamp,d6
 	move.l d7,MN_PPSTRUCT+24(a1)
 	bra.s EndPtch
 
+NoDS	nop
+	bra.s EndPtch					;For more DOS functions
 
-NoDS
+NoDosL	nop
+
 EndPtch	move.l ThisTask(a6),a0
 	lea pr_MsgPort(a0),a0
 	move.l a0,MN_REPLYPORT(a1)
@@ -613,8 +616,8 @@ MsgLL68	move.l MN_PPSTRUCT+0*4(a1),a6
 RtnLL	move.l (a7)+,a1
 	move.l EUMBAddr(pc),a2
 	move.l IFQPR(a2),a2
-	move.l d0,MN_PPSTRUCT+6*4(a2)
-	move.l #"DONE",MN_IDENTIFIER(a2)
+	move.l d0,MN_PPSTRUCT+6*4(a2)	
+NoScrn	move.l #"DONE",MN_IDENTIFIER(a2)
 	move.l MN_PPC(a1),MN_PPC(a2)
 	bra ReUse
 	
@@ -699,7 +702,15 @@ SonInt:
 	move.l OMR0(a2),a0				;Port
 	move.l OMR1(a2),a1				;Message
 	
-	moveq.l #0,d4
+	cmp.l #"GETV",a0				;For getting values from Amiga RAM.
+	bne.s DoPMsg
+	move.l #"PUTV",a0
+	move.l (a1),a1
+	move.l a1,$7c000000+228
+	move.l a0,$7c000000+56
+	bra.s NoSingl
+	
+DoPMsg	moveq.l #0,d4
 	move.w MN_LENGTH(a1),d4				;PPC should make it 32 byte aligned
 	beq.s NoSingl
 	lsr.l #4,d4
