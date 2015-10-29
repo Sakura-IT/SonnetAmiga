@@ -63,6 +63,7 @@
 .set ViolationAddress,216			#Pointer
 .set MemSize,220
 .set L2Size,224
+.set AmigaValue,228
 
 #LibBase:
 
@@ -320,6 +321,7 @@
 .set IMISR,0x100		#Inbound Message Interrupt Status Register
 
 .set IMISR_IM0I,		0x00000001		#Inbound Message 0 Interrupt
+.set IMISR_IM1I,		0x00000002		#Inbound Message 1 Interrupt
 .set IMISR_IPQI,		0x00000020		#Inbound Post Queue Interrupt
 
 .set PCI_COMMAND,0x4
