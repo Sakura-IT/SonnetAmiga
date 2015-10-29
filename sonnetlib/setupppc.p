@@ -1627,9 +1627,11 @@ EInt:		b	.FPUnav				#0
 		andi.	r9,r5,IMISR_IM0I
 		beq	.CheckQueue
 
-		li	r5,IMISR_IM0I
-		stwbrx	r5,r4,r3			#Clear IM0 bit to clear interrupt
-		eieio
+		mr	r9,r5
+		li	r5,IMISR_IM0I|IMISR_IM1I
+		stwbrx	r5,r4,r3			#Clear IM0/IM1 bit to clear interrupt
+		eieio		
+		mr	r5,r9
 	
 .CheckQueue:	andi.	r9,r5,IMISR_IPQI
 		beq	.EndQueue
@@ -2993,75 +2995,433 @@ EInt:		b	.FPUnav				#0
 
 #********************************************************************************************
 
-.DSI:		mtsprg0	r7				#Now contains experimental Neuss
-		mfsrr0	r7				#code. Needs to be rewritten.
-		
+.DSI:		mtsprg0	r0
+		mtsprg1	r6
+		mtsprg2	r7
+		mtsprg3	r8
+
+		loadreg	r7,"DSI!"
+		stw	r7,0xf4(r0)
+
+		mfsrr0	r7
+		stw	r7,0xf8(r0)		
+							#code. Needs to be rewritten.
 		xoris	r7,r7,0x7c00			#dummy
-		lwz	r7,0(r7)
+		lwz	r7,0(r7)		
 		
-		loadreg	r0,0x881c0000
-		cmpw	r0,r7
-		bne	.NextC1
-		
-		lwz	r28,RunningTask(r0)
-		addi	r28,r28,TASKPPC_NAME
-		b	.Clutch
-		
-.NextC1:	lwz	r6,SysBase(r0)
+.wosdb:		lwz	r6,SysBase(r0)			#Special wosdb patch
 		cmpw	r6,r10
-		bne	.NextC2
+		bne	.Nowosdb
 
 		loadreg	r0,0x80ca0142			#MemList(sysbase)->r6
 		lwz	r6,PPCMemHeader(r0)		#dummy
+		mtsprg1	r6
 
 		cmpw	r0,r7
 		beq	.Clutch
+
+.Nowosdb:	lis	r0,0xd400
+		and.	r0,r7,r0
+		lis	r6,0x8000
+		cmpw	r6,r0		
+		bne	.NoLwLhLb
+
+		rlwinm	r6,r7,11,28,31			#Get Destination Reg
+		rlwinm	r8,r7,16,28,31			#Get Source Reg
+		rlwinm	r7,r7,0,16,31			#Displacement (halfword)
 		
-.NextC2:	loadreg	r0,0x881b0000
-		cmpw	r0,r7
-		bne	.NextC3
+		cmpwi	r8,0
+		bne	.Notr0
+		mfsprg0 r8
+		add	r7,r8,r7
+		b	.GotAmigaMemAd
 		
-		lwz	r27,RunningTask(r0)
-		addi	r27,r27,TASKPPC_ARGS
-		b	.Clutch
+.Notr0:		cmpwi	r8,1
+		bne	.Notr1
+		add	r7,r1,r7
+		b	.GotAmigaMemAd
 		
-.NextC3:	loadreg	r0,0x881d0000
-		cmpw	r0,r7
-		bne	.NextC4
+.Notr1:		cmpwi	r8,2
+		bne	.Notr2
+		add	r7,r2,r7
+		b	.GotAmigaMemAd
 		
-		lwz	r29,RunningTask(r0)
-		addi	r29,r29,TASKPPC_ARGS
-		b	.Clutch		
+.Notr2:		cmpwi	r8,3
+		bne	.Notr3
+		add	r7,r3,r7
+		b	.GotAmigaMemAd
 		
-.NextC4:	loadreg r0,0x881f0000
-		cmpw	r0,r7
-		bne	.NextC5
+.Notr3:		cmpwi	r8,4
+		bne	.Notr4
+		add	r7,r4,r7
+		b	.GotAmigaMemAd
 		
-		lwz	r31,RunningTask(r0)
-		addi	r31,r31,TASKPPC_ARGS
-		b	.Clutch			
+.Notr4:		cmpwi	r8,5
+		bne	.Notr5
+		add	r7,r5,r7
+		b	.GotAmigaMemAd
 		
-.NextC5:	loadreg r0,0x88030000
-		cmpw	r0,r7
-		bne	.NextC5
+.Notr5:		cmpwi	r8,6
+		bne	.Notr6
+		mfsprg1	r8
+		add	r7,r8,r7
+		b	.GotAmigaMemAd
 		
-		lwz	r3,RunningTask(r0)
-		addi	r3,r3,TASKPPC_ARGS
-		b	.Clutch		
+.Notr6:		cmpwi	r8,7
+		bne	.Notr7
+		mfsprg2	r8
+		add	r7,r8,r7
+		b	.GotAmigaMemAd
 		
-.NextC6:	nop
+.Notr7:		cmpwi	r8,8
+		bne	.Notr8
+		mfsprg3 r8
+		add	r7,r8,r7
+		b	.GotAmigaMemAd
+		
+.Notr8:		cmpwi	r8,9
+		bne	.Notr9
+		add	r7,r9,r7
+		b	.GotAmigaMemAd
+		
+.Notr9:		cmpwi	r8,10
+		bne	.Notr10
+		add	r7,r10,r7
+		b	.GotAmigaMemAd
+		
+.Notr10:	cmpwi	r8,11
+		bne	.Notr11
+		add	r7,r11,r7
+		b	.GotAmigaMemAd
+		
+.Notr11:	cmpwi	r8,12
+		bne	.Notr12
+		add	r7,r12,r7
+		b	.GotAmigaMemAd
+		
+.Notr12:	cmpwi	r8,13
+		bne	.Notr13
+		add	r7,r13,r7
+		b	.GotAmigaMemAd
+		
+.Notr13:	cmpwi	r8,14
+		bne	.Notr14
+		add	r7,r14,r7
+		b	.GotAmigaMemAd
+		
+.Notr14:	cmpwi	r8,15
+		bne	.Notr15
+		add	r7,r15,r7
+		b	.GotAmigaMemAd
+		
+.Notr15:	cmpwi	r8,16
+		bne	.Notr16
+		add	r7,r16,r7
+		b	.GotAmigaMemAd
+		
+.Notr16:	cmpwi	r8,17
+		bne	.Notr17
+		add	r7,r17,r7
+		b	.GotAmigaMemAd
+		
+.Notr17:	cmpwi	r8,18
+		bne	.Notr18
+		add	r7,r18,r7
+		b	.GotAmigaMemAd
+		
+.Notr18:	cmpwi	r8,19
+		bne	.Notr19
+		add	r7,r19,r7
+		b	.GotAmigaMemAd
+		
+.Notr19:	cmpwi	r8,20
+		bne	.Notr20
+		add	r7,r20,r7
+		b	.GotAmigaMemAd
+		
+.Notr20:	cmpwi	r8,21
+		bne	.Notr21
+		add	r7,r21,r7
+		b	.GotAmigaMemAd
+		
+.Notr21:	cmpwi	r8,22
+		bne	.Notr22
+		add	r7,r22,r7
+		b	.GotAmigaMemAd
+		
+.Notr22:	cmpwi	r8,23
+		bne	.Notr23
+		add	r7,r23,r7
+		b	.GotAmigaMemAd
+		
+.Notr23:	cmpwi	r8,24
+		bne	.Notr24
+		add	r7,r24,r7
+		b	.GotAmigaMemAd
+		
+.Notr24:	cmpwi	r8,25
+		bne	.Notr25
+		add	r7,r25,r7
+		b	.GotAmigaMemAd
+		
+.Notr25:	cmpwi	r8,26
+		bne	.Notr26
+		add	r7,r26,r7
+		b	.GotAmigaMemAd
+		
+.Notr26:	cmpwi	r8,27
+		bne	.Notr27
+		add	r7,r27,r7
+		b	.GotAmigaMemAd
+		
+.Notr27:	cmpwi	r8,28
+		bne	.Notr28
+		add	r7,r28,r7
+		b	.GotAmigaMemAd
+		
+.Notr28:	cmpwi	r8,29
+		bne	.Notr29
+		add	r7,r29,r7
+		b	.GotAmigaMemAd
+		
+.Notr29:	cmpwi	r8,30
+		bne	.Notr30
+		add	r7,r30,r7
+		b	.GotAmigaMemAd
+		
+.Notr30:	cmpwi	r8,31
+		bne	.HaltDSI				#Should not happen
+		add	r7,r31,r7
+
+.GotAmigaMemAd:	loadreg	r8,"GETV"
+
+		mr	r0,r6
+		
+		la	r6,Init(r0)
+		dcbf	r0,r6
+		la	r6,AmigaValue(r0)
+		dcbf	r0,r6
+		
+		lis	r6,EUMB		
+		stw	r8,0x58(r6)
+		sync
+		stw	r7,0x5c(r6)
+		sync				
+		
+		loadreg r8,"PUTV"
+		la	r7,Init(r0)
+		dcbi	r0,r7
+.WaitValueA:	lwz	r7,Init(r0)
+		cmpw	r7,r8
+		bne	.WaitValueA
+		
+		la	r8,AmigaValue(r0)
+		dcbi	r0,r8
+		lwz	r8,AmigaValue(r0)
+		stw	r6,Init(r0)				#Destroy PUTV value		
+		
+		mfsrr0	r6
+		xoris	r6,r6,0x7c00
+		lwz	r6,0(r6)
+		rlwinm	r6,r6,16,16,31
+		stw	r6,0x148(r0)
+		andi.	r6,r6,0xa800
+		oris	r6,r6,0xffff
+		cmpwi	r6,-32768				#lwz
+		beq	.FixedValue
+		rlwinm	r8,r8,16,16,31
+		cmpwi	r6,-24576				#lhz
+		beq	.FixedValue
+		cmpwi	r6,-22528				#lha
+		beq	.FixedValue
+		rlwinm	r8,r8,24,24,31
+		cmpwi	r6,-30720				#lbz
+		bne	.HaltDSI				#Should not happen
+		
+.FixedValue:	mr	r6,r0
+
+		cmpwi	r6,0
+		bne	.NotDr0
+		mtsprg0	r8
+		b	.GotAmigaValue
+		
+.NotDr0:	cmpwi	r6,1
+		bne	.NotDr1
+		mr	r1,r8
+		b	.GotAmigaValue
+		
+.NotDr1:	cmpwi	r6,2
+		bne	.NotDr2
+		mr	r2,r8
+		b	.GotAmigaValue
+		
+.NotDr2:	cmpwi	r6,3
+		bne	.NotDr3
+		mr	r3,r8
+		b	.GotAmigaValue
+		
+.NotDr3:	cmpwi	r6,4
+		bne	.NotDr4
+		mr	r4,r8
+		b	.GotAmigaValue		
+
+.NotDr4:	cmpwi	r6,5
+		bne	.NotDr5
+		mr	r5,r8
+		b	.GotAmigaValue
+		
+.NotDr5:	cmpwi	r6,6
+		bne	.NotDr6
+		mtsprg1	r8
+		b	.GotAmigaValue
+		
+.NotDr6:	cmpwi	r6,7
+		bne	.NotDr7
+		mtsprg2	r8
+		b	.GotAmigaValue
+		
+.NotDr7:	cmpwi	r6,8
+		bne	.NotDr8
+		mtsprg3	r8
+		b	.GotAmigaValue
+		
+.NotDr8:	cmpwi	r6,9
+		bne	.NotDr9
+		mr	r9,r8
+		b	.GotAmigaValue
+		
+.NotDr9:	cmpwi	r6,10
+		bne	.NotDr10
+		mr	r10,r8
+		b	.GotAmigaValue
+		
+.NotDr10:	cmpwi	r6,11
+		bne	.NotDr11
+		mr	r11,r8
+		b	.GotAmigaValue
+		
+.NotDr11:	cmpwi	r6,12
+		bne	.NotDr12
+		mr	r12,r8
+		b	.GotAmigaValue		
+
+.NotDr12:	cmpwi	r6,13
+		bne	.NotDr13
+		mr	r13,r8
+		b	.GotAmigaValue
+		
+.NotDr13:	cmpwi	r6,14
+		bne	.NotDr14
+		mr	r14,r8
+		b	.GotAmigaValue
+		
+.NotDr14:	cmpwi	r6,15
+		bne	.NotDr15
+		mr	r15,r8
+		b	.GotAmigaValue
+		
+.NotDr15:	cmpwi	r6,16
+		bne	.NotDr16
+		mr	r16,r8
+		b	.GotAmigaValue		
+
+.NotDr16:	cmpwi	r6,17
+		bne	.NotDr17
+		mr	r17,r8
+		b	.GotAmigaValue
+		
+.NotDr17:	cmpwi	r6,18
+		bne	.NotDr18
+		mr	r18,r8
+		b	.GotAmigaValue
+		
+.NotDr18:	cmpwi	r6,19
+		bne	.NotDr19
+		mr	r19,r8
+		b	.GotAmigaValue
+		
+.NotDr19:	cmpwi	r6,20
+		bne	.NotDr20
+		mr	r20,r8
+		b	.GotAmigaValue		
+
+.NotDr20:	cmpwi	r6,21
+		bne	.NotDr21
+		mr	r21,r8
+		b	.GotAmigaValue
+		
+.NotDr21:	cmpwi	r6,22
+		bne	.NotDr22
+		mr	r22,r8
+		b	.GotAmigaValue
+		
+.NotDr22:	cmpwi	r6,23
+		bne	.NotDr23
+		mr	r23,r8
+		b	.GotAmigaValue
+		
+.NotDr23:	cmpwi	r6,24
+		bne	.NotDr24
+		mr	r24,r8
+		b	.GotAmigaValue
+		
+.NotDr24:	cmpwi	r6,25
+		bne	.NotDr25
+		mr	r25,r8
+		b	.GotAmigaValue
+		
+.NotDr25:	cmpwi	r6,26
+		bne	.NotDr26
+		mr	r26,r8
+		b	.GotAmigaValue
+		
+.NotDr26:	cmpwi	r6,27
+		bne	.NotDr27
+		mr	r26,r7
+		b	.GotAmigaValue
+		
+.NotDr27:	cmpwi	r6,28
+		bne	.NotDr28
+		mr	r28,r8
+		b	.GotAmigaValue		
+
+.NotDr28:	cmpwi	r6,29
+		bne	.NotDr29
+		mr	r29,r8
+		b	.GotAmigaValue
+		
+.NotDr29:	cmpwi	r6,30
+		bne	.NotDr30
+		mr	r30,r8
+		b	.GotAmigaValue
+		
+.NotDr30:	cmpwi	r6,31
+		bne	.HaltDSI			#Should not happen
+		mr	r31,r8
+
+.GotAmigaValue:	b	.Clutch
+			
+							
+.NoLwLhLb:	nop
 		b	.NoClutch
 		
 .Clutch:	mfsrr0	r7
 		addi	r7,r7,4
 		mtsrr0	r7
 		
-		mfspr	r7,HID0
+.ClutchNoStep:	mfspr	r7,HID0
 		ori	r7,r7,HID0_ICFI
 		mtspr	HID0,r7
 		isync		
 		
-		mfsprg0	r7
+		loadreg	r7,"USER"
+		stw	r7,0xf4(r0)
+		
+		mfsprg0	r0
+		mfsprg1 r6
+		mfsprg2	r7
+		mfsprg3	r8
+		
 		rfi
 
 .NoClutch:	mfspr	r0,HID0
@@ -3071,11 +3431,6 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r0
 		isync
 		
-		loadreg	r3,"DSI!"
-		stw	r3,0xf4(r0)
-		mfsrr0	r3
-		stw	r3,0xf8(r0)
-		stw	r31,0xfc(r0)
 .HaltDSI:	b	.HaltDSI
 
 #********************************************************************************************
