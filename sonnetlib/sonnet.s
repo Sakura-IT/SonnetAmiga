@@ -697,17 +697,41 @@ SonInt:
 	move.l #$03000000,d2				;OMISR[OM0I|OM1I]
 	move.l OMISR(a2),d3
 	and.l d2,d3
-	beq.s NoSingl
+	beq NoSingl
 	
 	move.l OMR0(a2),a0				;Port
 	move.l OMR1(a2),a1				;Message
 	
 	cmp.l #"GETV",a0				;For getting values from Amiga RAM.
-	bne.s DoPMsg
-	move.l #"PUTV",a0
+	beq.s GetV
+	cmp.l #"PUTB",a0
+	beq.s PutB
+	cmp.l #"PUTH",a0
+	beq.s PutH
+	cmp.l #"PUTW",a0
+	beq.s PutW
+	bra.s DoPMsg
+	
+PutB	move.l #"DONE",a0
+	move.l SonnetBase(pc),a3
+	move.b AmigaValue+3(a3),(a1)
+	bra.s NoSingl
+	
+PutH	move.l #"DONE",a0
+	move.l SonnetBase(pc),a3
+	move.w AmigaValue+2(a3),(a1)
+	bra.s NoSingl
+	
+PutW	move.l #"DONE",a0
+	move.l SonnetBase(pc),a3
+	move.l AmigaValue(a3),(a1)
+	bra.s NoSingl	
+	
+GetV	move.l #"DONE",a0
 	move.l (a1),a1
-	move.l a1,$7c000000+228
-	move.l a0,$7c000000+56
+	move.l SonnetBase(pc),a3
+	move.l a1,AmigaValue(a3)
+	move.l a0,Init(a3)
 	bra.s NoSingl
 	
 DoPMsg	moveq.l #0,d4
