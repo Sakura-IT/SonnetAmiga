@@ -83,17 +83,8 @@ SetLen:		mr	r30,r28
 
 		stw	r8,MemSize(r0)
 
-		bl	mmuSetup			#Setup BATs. Needs to be changed to tables
+		bl	mmuSetup			#Setup the Memory Management Unit
 		bl	Epic				#Setup the EPIC controller
-
-		li	r3,IdleTask			#Start hardcoded at 0x7400
-		mr	r31,r3
-
-		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
-		
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
 
 		bl	End
 
@@ -168,22 +159,11 @@ ExitCode:	blrl
 		stw	r4,MN_MCTASK(r9)
 		
 		lwz	r4,RunningTask(r0)
-		lwz	r21,TC_SPLOWER(r4)
-		lwz	r4,SonnetBase(r0)
-		or	r4,r4,r21
+		lwz	r4,TC_SPLOWER(r4)
 		subi	r4,r4,2048
 		stw	r4,MN_ARG0(r9)
 		
-		mr	r24,r9
-		
-		li	r31,6					#MsgLen/Cache_Line
-		mtctr	r31
-.FlushMsg:	dcbf	r0,r24
-		addi	r24,r24,L1_CACHE_LINE_SIZE
-		bdnz	.FlushMsg
-		
-		sync
-		
+		mr	r24,r9		
 		lis	r3,EUMB					#Send Msg to 68K
 		li	r24,OPHPR
 		lwbrx	r31,r24,r3		
@@ -195,6 +175,8 @@ ExitCode:	blrl
 		sync
 
 		loadreg	r1,SysStack-0x20			#System stack in unused mem
+		lwz	r13,SonnetBase(r0)
+		or	r1,r1,r13
 		subi	r13,r1,4
 		stwu	r1,-284(r1)
 
@@ -218,11 +200,6 @@ Pause:		nop
 
 End:		mflr	r4
 		
-		addi	r5,r4,End-Start
-		subf	r5,r4,r5
-		li	r6,0
-		bl	copy_and_flush			#Put program in Sonnet Mem instead of PCI Mem
-
 		li	r14,0				#Reset
 		mtspr	285,r14				#Time Base Upper,
 		mtspr	284,r14				#Time Base Lower and
@@ -234,20 +211,28 @@ End:		mflr	r4
 		stw	r28,4(r29)			#Signal 68k that PPC is initialized
 
 		loadreg r6,"INIT"
-.WInit:		la	r28,Init(r0)
-		dcbi	r0,r28
-		lwz	r28,Init(r0)
+.WInit:		lwz	r28,Init(r0)
 		cmplw	r28,r6
 		bne	.WInit
 		
 		isync					#Wait for 68k to set up library
 		
-		li	r4,0
-		li	r3,8
-		mtctr	r3
-.InvBase:	dcbi	r0,r4
-		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz+	.InvBase			#Invalidate zero page
+		li	r3,IdleTask			#Start hardcoded at 0x7400
+		lwz	r31,SonnetBase(r0)
+		or	r3,r3,r31
+
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		or	r1,r1,r31
+		mr	r31,r3
+		
+		addi	r5,r4,End-Start
+		subf	r5,r4,r5
+		li	r6,0
+		bl	copy_and_flush			#Put program in Sonnet Mem instead of PCI Mem
+		
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-284(r1)		
 
 		la	r4,ReadyTasks(r0)
 		bl	.MakeList
@@ -271,8 +256,6 @@ End:		mflr	r4
 		bl	.MakeList
 		
 		lwz	r3,PowerPCBase(r0)
-		lwz	r4,SonnetBase(r0)
-		xor	r3,r3,r4
 		
 		la	r4,LIST_REMOVEDTASKS(r3)
 		bl	.MakeList
@@ -324,6 +307,9 @@ End:		mflr	r4
 		
 		li	r3,0x7000			#Put Semaphores at 0x7000
 		li	r6,0x7200			#Put Semaphores memory at 0x7200
+		lwz	r30,SonnetBase(r0)
+		or	r3,r3,r30
+		or	r6,r6,r30
 		
 		mr	r30,r3
 		mr	r29,r31
@@ -372,8 +358,6 @@ End:		mflr	r4
 		mtsrr1	r0				#load up user MSR. Also clears PSL_IP
 		
 		lwz	r4,PowerPCBase(r0)
-		lwz	r5,SonnetBase(r0)
-		xor	r4,r4,r5
 		lwz	r4,_LVOSetCache+2(r4)
 		addi	r4,r4,ViolationOS		
 		stw	r4,ViolationAddress(r0)
@@ -418,15 +402,16 @@ End:		mflr	r4
 		li	r5,MUCR
 		stwbrx	r4,r5,r14
 
+		lwz	r6,SonnetBase(r0)
 		loadreg	r4,0x100000
 		li	r5,QBAR
 		stwbrx	r4,r5,r14
 		
-		lwz	r14,SonnetBase(r0)
-		or	r5,r4,r14
+		mr	r5,r4
 		subi	r4,r4,4
 		
 		loadreg	r14,0x10000
+		or	r5,r5,r6
 		add	r5,r5,r14
 		
 		li	r6,4096
@@ -669,6 +654,7 @@ Caches:		mfspr	r4,HID0
 		mfspr	r4,HID0
 #		ori	r4,r4,HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
 		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
+		sync
 		mtspr	HID0,r4
 		sync
 		 	
@@ -698,10 +684,12 @@ Wait2:		mfl2cr	r3
 		mr	r5,r0
 		mr	r30,r0
 		lis	r4,0
-		
+
 		lwz	r6,MemSize(r0)			#Address to start writing
 		loadreg	r5,0x400000			#Substract 4 MB
 		sub	r6,r6,r5
+		lwz	r5,SonnetBase(r0)
+		or	r6,r6,r5
 
 		lis	r5,L2_SIZE_1M_U			#Size of memory to write to
 		
@@ -756,23 +744,6 @@ Wait2:		mfl2cr	r3
 mmuSetup:	
 		mflr	r30
 
-		loadreg r4,IBAT2L_VAL
-		loadreg r3,IBAT2U_VAL
-		or r3,r3,r27
-		mtspr ibat2l,r4
-		mtspr ibat2u,r3
-		isync
-
-		loadreg r4,DBAT2L_VAL
-		loadreg	r3,DBAT2U_VAL
-		or r3,r3,r27
-		isync
-		mtspr dbat2l,r4
-		mtspr dbat2u,r3
-		isync					#Sonnet RAM virtualized to Amiga RAM							#BATs are now set up
-							
-#********************************************************************************************
-
 		loadreg	r6,0x8000000			#Amount of memory to virtualize (128MB)
 
 		bl	.SetupPT
@@ -793,9 +764,66 @@ mmuSetup:
 		
 		bl	.DoTBLs
 		
-		li	r3,0				#Sonnet memory base
-		mr	r4,r23				#Sonnet memory size
+		loadreg	r3,0xfff00000			#Fake ROM (64k)
+		loadreg	r4,0xfff10000
 		mr	r5,r3
+		loadreg	r6,PTE_CACHE_INHIBITED
+		li	r7,2
+		
+		bl	.DoTBLs
+		
+		li	r3,0				#Zeropage (12K no cache)
+		li	r4,0x3000
+		mr	r5,r3
+		loadreg	r6,PTE_CACHE_INHIBITED
+		li	r7,2				#pp = 2 - Read/Write Access
+		
+		bl	.DoTBLs						
+		
+		
+		li	r3,0x3000			#Exception code (16K cached)
+		li	r4,0x7000
+		mr	r5,r3
+		li	r6,r0
+		li	r7,2
+		
+		bl	.DoTBLs
+		
+		
+		loadreg	r3,0x100000			#Message FIFOs (64k no cache)
+		loadreg	r4,0x110000
+		mr	r5,r3
+		li	r6,PTE_CACHE_INHIBITED
+		li	r7,2
+		
+		bl	.DoTBLs
+		
+		loadreg	r3,0x110000			#Message (1.5MB no cache)
+		loadreg	r4,0x290000
+		mr	r5,r3
+		or	r3,r3,r27
+		or	r4,r4,r27
+		li	r6,PTE_CACHE_INHIBITED
+		li	r7,2
+		
+		bl	.DoTBLs
+
+		
+		loadreg	r3,0x7000			#First free block (~1MB cached)
+		loadreg	r4,0x100000
+		mr	r5,r3
+		or	r3,r3,r27
+		or	r4,r4,r27
+		li	r6,0
+		li	r7,2
+		
+		bl	.DoTBLs
+		
+		loadreg	r3,0x290000			#Sonnet memory (Rest cached)
+		lwz	r4,MemSize(r0)
+		mr	r5,r3
+		or	r3,r3,r27
+		add	r4,r4,r27
 		li	r6,0
 		li	r7,2
 		
@@ -808,6 +836,11 @@ mmuSetup:
 		addi	r7,r7,0x1000
 		bdnz+	.tlblp
 		tlbsync
+
+		loadreg	r0,PSL_IR|PSL_DR|PSL_FP		#Turn on MMU
+		sync
+		mtmsr	r0		
+		sync
 
 		mtlr	r30
 
@@ -841,7 +874,9 @@ mmuSetup:
 		b	.htabmask
 		
 .Exithtab:	or	r15,r15,r9
+		sync
 		mtspr	SDR1,r15			#set SDR1
+		isync
 
 		rlwinm	r6,r6,30,0,31			#r6 = pt_size, r7 = pt_loc
 		mtctr	r6
@@ -924,7 +959,7 @@ mmuSetup:
 		bdnz	.next
 
 		rlwinm.	r16,r11,26,31,31
-		bne	.ExitTBL			#Should not happen (no room for Hash2)
+		bne	.ExitTBLErr			#Should not happen (no room for Hash2)
 		
 		xoris	r14,r14,0xffff
 		xori	r14,r14,0xffff
@@ -940,6 +975,10 @@ mmuSetup:
 		
 .ExitTBL:	mtlr	r22
 		blr
+
+.ExitTBLErr:	loadreg	r0,"TBL!"
+		stw	r0,0xf4(r0)
+		b	.ExitTBLErr
 
 #********************************************************************************************
 
@@ -1585,8 +1624,6 @@ EInt:		b	.FPUnav				#0
 		
 		mfsrr1	r0
 		mtsprg1	r0
-		mfxer	r0
-		mtsprg3	r0
 		mfsrr0	r0
 		mtsprg0	r0
 
@@ -1596,10 +1633,16 @@ EInt:		b	.FPUnav				#0
 		isync					#Also reenable FPU
 		sync
 
-		mr	r0,r1				#Store user stack pointer
+		mtsprg3	r1				
+		lwz	r0,SonnetBase(r0)		#Store user stack pointer
 		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		or	r1,r1,r0
+		mfsprg3 r0
 		stwu	r0,-4(r1)
 		
+		mfxer	r0
+		mtsprg3	r0
+
 		prolog	228,"TOC"
 
 		stwu	r3,-4(r13)
@@ -1649,17 +1692,7 @@ EInt:		b	.FPUnav				#0
 		and	r9,r9,r4			#Keep it 4000-7FFE		
 		sync
 		
-		lwz	r5,0(r5)
-		mr	r6,r5
-		
-		li	r4,6				#MsgLen/Cache_Line
-		mtctr	r4
-.InvMsg:	dcbi	r0,r6
-		addi	r6,r6,L1_CACHE_LINE_SIZE
-		bdnz	.InvMsg
-		
-		sync
-				
+		lwz	r5,0(r5)				
 		loadreg	r4,"TPPC"
 		lwz	r6,MN_IDENTIFIER(r5)
 		cmpw	r4,r6				#The one we want?
@@ -1779,16 +1812,7 @@ EInt:		b	.FPUnav				#0
 
 		mr	r3,r9
 		
-.Dispatch:	lwz	r8,MN_ARG0(r9)
-		
-		mr	r6,r8
-		li	r4,64				#TaskLen/Cache_Line
-		mtctr	r4
-.InvTask:	dcbi	r0,r6
-		addi	r6,r6,L1_CACHE_LINE_SIZE
-		bdnz	.InvTask
-
-		isync
+.Dispatch:	lwz	r8,MN_ARG0(r9)		
 
 		li	r4,TS_RUN
 		stb	r4,TC_STATE(r8)
@@ -1799,9 +1823,7 @@ EInt:		b	.FPUnav				#0
 		stw	r9,TASKPPC_STARTMSG(r8)
 		lwz	r31,MN_ARG1(r9)
 		stw	r31,TASKPPC_STACKSIZE(r8)
-		addi	r4,r8,2048
-		lwz	r6,SonnetBase(r0)
-		xor	r4,r4,r6		
+		addi	r4,r8,2048		
 		stw	r4,TC_SPLOWER(r8)
 		add	r4,r4,r31
 		stw	r4,TC_SPUPPER(r8)
@@ -1820,6 +1842,8 @@ EInt:		b	.FPUnav				#0
 		stwu	r1,-284(r1)		
 		
 		loadreg	r6,IdleTask+(ExitCode-Start)
+		lwz	r4,SonnetBase(r0)
+		or	r6,r6,r4
 		mtsprg0	r6
 
 		la	r6,TASKPPC_PORT(r8)		#Setup a Semaphore & MsgPort
@@ -2328,10 +2352,14 @@ EInt:		b	.FPUnav				#0
 		
 		b	.LoadContext
 
-.DoIdle:	loadreg	r0,IdleTask+(.StartX-Start)	#Start hardcoded at 0x7400
+.DoIdle:	loadreg	r0,IdleTask			#Start hardcoded at 0x7400
+		lwz	r1,SonnetBase(r0)
+		or	r0,r1,r0
 		mtsrr0	r0
 
 		loadreg	r1,SysStack-0x20		#System stack in unused mem
+		lwz	r0,SonnetBase(r0)
+		or	r1,r1,r0
 		
 		stw	r13,-4(r1)
 		subi	r13,r1,4
@@ -2364,17 +2392,21 @@ EInt:		b	.FPUnav				#0
 		mtsprg1	r0
 		mfsrr0	r0
 		mtsprg0	r0
-		mfxer	r0
-		mtsprg3	r0
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
 		isync					#Also reenable FPU
 		sync
 
-		mr	r0,r1				#Store user stack pointer
+		mtsprg3	r1				#Store user stack pointer
+		lwz	r0,SonnetBase(r0)
 		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		or	r1,r1,r0
+		mfsprg3	r0
 		stwu	r0,-4(r1)
+		
+		mfxer	r0
+		mtsprg3	r0
 		
 		prolog	228,"TOC"
 
@@ -2599,8 +2631,11 @@ EInt:		b	.FPUnav				#0
 		sync				#Reenable MMU & FPU
 		isync
 
-		mr	r0,r1
+		mtsprg3	r1
+		lwz	r0,SonnetBase(r0)
 		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		or	r1,r1,r0
+		mfsprg3	r0
 		stwu	r0,-4(r1)			#Store user stack
 		
 		mfsprg0	r0
@@ -3000,13 +3035,17 @@ EInt:		b	.FPUnav				#0
 		mtsprg2	r7
 		mtsprg3	r8
 
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0				#Reenable MMU & FPU
+		sync
+		isync
+
 		loadreg	r7,"DSI!"
 		stw	r7,0xf4(r0)
 
 		mfsrr0	r7
 		stw	r7,0xf8(r0)		
-							#code. Needs to be rewritten.
-		xoris	r7,r7,0x7c00			#dummy
 		lwz	r7,0(r7)		
 		
 .wosdb:		lwz	r6,SysBase(r0)			#Special wosdb patch
@@ -3197,11 +3236,6 @@ EInt:		b	.FPUnav				#0
 
 		mr	r0,r6
 		
-		la	r6,Init(r0)
-		dcbf	r0,r6
-		la	r6,AmigaValue(r0)
-		dcbf	r0,r6
-		
 		lis	r6,EUMB		
 		stw	r8,0x58(r6)
 		sync
@@ -3209,22 +3243,15 @@ EInt:		b	.FPUnav				#0
 		sync				
 		
 		loadreg r8,"PUTV"
-		la	r7,Init(r0)
-		dcbi	r0,r7
 .WaitValueA:	lwz	r7,Init(r0)
 		cmpw	r7,r8
 		bne	.WaitValueA
-		
-		la	r8,AmigaValue(r0)
-		dcbi	r0,r8
 		lwz	r8,AmigaValue(r0)
 		stw	r6,Init(r0)				#Destroy PUTV value		
 		
 		mfsrr0	r6
-		xoris	r6,r6,0x7c00
 		lwz	r6,0(r6)
 		rlwinm	r6,r6,16,16,31
-		stw	r6,0x148(r0)
 		andi.	r6,r6,0xa800
 		oris	r6,r6,0xffff
 		cmpwi	r6,-32768				#lwz
@@ -3447,8 +3474,11 @@ EInt:		b	.FPUnav				#0
 		sync
 		isync
 
-		mr	r0,r1
+		mtsprg3	r1
+		lwz	r0,SonnetBase(r0)
 		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		or	r1,r1,r0
+		mfsprg3	r0
 		stwu	r0,-4(r1)			#Store user stack
 		
 		mfsprg0	r0
@@ -3824,7 +3854,7 @@ EInt:		b	.FPUnav				#0
 		stw	r3,0xf4(r0)			#Error
 		mfsrr0	r3
 		stw	r3,0xf8(r0)			#Current PC
-		mflr	r3
+		mfsrr1	r3
 		stw	r3,0xfc(r0)			#Original calling function
 
 .xxHaltErr2:	b .xxHaltErr2
