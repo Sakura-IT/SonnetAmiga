@@ -744,23 +744,31 @@ Wait2:		mfl2cr	r3
 mmuSetup:	
 		mflr	r30
 
+		loadreg r4,IBAT3L_VAL
+		loadreg r3,IBAT3U_VAL
+		mtspr ibat3l,r4
+		mtspr ibat3u,r3
+		isync
+
+		loadreg r4,DBAT3L_VAL
+		loadreg	r3,DBAT3U_VAL
+		isync
+		mtspr dbat3l,r4
+		mtspr dbat3u,r3
+		isync					#Setup GFX Memory (256MB)							#BATs are now set up
+							
+#********************************************************************************************
+
+
 		loadreg	r6,0x8000000			#Amount of memory to virtualize (128MB)
 
 		bl	.SetupPT
 		
-		loadreg	r3,0x08000000			#dummy	start effective address
-		loadreg	r4,0x0c000000			#dummy	end effective address
-		mr	r5,r3				#dummy	start physical address
-		loadreg	r6,PTE_CACHE_INHIBITED		#dummy 	WIMG
-		li	r7,0				#pp = 0 - No Access
-	
-		bl	.DoTBLs
-		
-		loadreg	r3,0x80000000			#PCI memory (EUMB)
-		loadreg	r4,0x80100000
-		mr	r5,r3
-		loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED
-		li	r7,2				#pp = 2 - Read/Write Access
+		loadreg	r3,0x80000000				#PCI memory (EUMB) start effective address
+		loadreg	r4,0x80100000				#end effective address
+		mr	r5,r3					#start physical address
+		loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED	#WIMG
+		li	r7,2					#pp = 2 - Read/Write Access (0 = No Access)
 		
 		bl	.DoTBLs
 		
@@ -3040,6 +3048,9 @@ EInt:		b	.FPUnav				#0
 		mtmsr	r0				#Reenable MMU & FPU
 		sync
 		isync
+		
+		stw	r10,0x120(r0)
+		stw	r11,0x124(r0)
 
 		loadreg	r7,"DSI!"
 		stw	r7,0xf4(r0)
@@ -3259,6 +3270,7 @@ EInt:		b	.FPUnav				#0
 		rlwinm	r8,r8,16,16,31
 		cmpwi	r6,-24576				#lhz
 		beq	.FixedValue
+		extsh	r8,r8
 		cmpwi	r6,-22528				#lha
 		beq	.FixedValue
 		rlwinm	r8,r8,24,24,31
