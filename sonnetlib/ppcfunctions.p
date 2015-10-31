@@ -428,6 +428,7 @@ SetExcMMU:
 		ori	r4,r4,(PSL_IR|PSL_DR)
 		mtmsr	r4				#Reenable MMU
 		isync
+		sync
 		lwz	r4,-8(r1)
 		blr
 	
@@ -446,6 +447,7 @@ ClearExcMMU:
 		xori	r4,r4,(PSL_IR|PSL_DR)
 		mtmsr	r4				#Disable MMU
 		isync
+		sync
 		lwz	r4,-8(r1)		
 		blr	
 	
@@ -1160,6 +1162,8 @@ FindTagItemPPC:
 FlushL1DCache:
 		prolog 228,"TOC"
 		
+		stwu	r31,-4(r13)
+		
 		mfctr	r7
 		
 		bl	Super
@@ -1167,6 +1171,7 @@ FlushL1DCache:
 		mfmsr	r6
 		xori	r6,r6,PSL_EE			#Disable Interrupts
 		mtmsr	r6
+		isync
 		sync
 		
 		loadreg	r6,0x400			#L1 Cache size/Cache line size
@@ -1177,14 +1182,19 @@ FlushL1DCache:
 		mr	r5,r6
 		
 		mtctr	r6
-		li	r4,0x7000
-	
+		
+		lwz	r6,MemSize(r0)
+		loadreg	r4,0x400000
+		sub	r6,r6,r4
+		lwz	r4,SonnetBase(r0)
+		or	r4,r4,r6
+		mr	r31,r4
 	
 .Fl1:		lwz	r6,0(r4)
 		addi	r4,r4,L1_CACHE_LINE_SIZE
 		bdnz+	.Fl1
 	
-		li	r4,0x7000
+		mr	r4,r31
 		mtctr	r5
 		
 .Fl2:		dcbf	r0,r4
@@ -1194,12 +1204,16 @@ FlushL1DCache:
 		mfmsr	r6
 		ori	r6,r6,PSL_EE			#Enable Interrupts
 		mtmsr	r6
+		isync
 		sync
 
 		mr	r4,r3
 		bl	User
 
 		mtctr	r7
+		
+		lwz	r31,0(r13)
+		addi	r13,r13,4
 		
 		epilog "TOC"
 
@@ -2364,14 +2378,11 @@ User:
 		mr.	r4,r4
 		bne-	.WrongKey
 
-		lbz	r0,ExceptionMode(r0)
-		mr.	r0,r0
-		bne	.InException
-
 		mfmsr	r0
 		ori	r0,r0,PSL_PR		#SET Bit 17 (PR) To User
 		mtmsr	r0
-.InException:	isync
+		isync
+		sync
 
 .WrongKey:	epilog "TOC"
 
@@ -2424,6 +2435,7 @@ WaitFor68K:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
 
 		mr	r31,r4	
 
@@ -2447,19 +2459,7 @@ WaitFor68K:
 		cmpw	r4,r29
 		bne	.WasNoDone
 		
-		mfctr	r29
-
-		bl Super
-		
-		mr	r4,r3
-		
-		li	r28,6
-		mtctr	r28
-.PPInvalid:	dcbi	r0,r27
-		addi	r27,r27,L1_CACHE_LINE_SIZE
-		bdnz	.PPInvalid
-		
-		bl User
+		mfctr	r26
 
 		subi	r4,r31,4
 		addi	r29,r30,MN_PPSTRUCT-4		#r30 = new msg
@@ -2481,16 +2481,17 @@ WaitFor68K:
 		stwbrx	r28,r27,r3
 		sync
 
-		mtctr	r29
+		mtctr	r26
 
 		li	r3,0				#Needs proper status still
 
-		lwz	r27,0(r13)
-		lwz	r28,4(r13)
-		lwz	r29,8(r13)
-		lwz	r30,12(r13)
-		lwz	r31,16(r13)
-		addi	r13,r13,20
+		lwz	r26,0(r13)
+		lwz	r27,4(r13)
+		lwz	r28,8(r13)
+		lwz	r29,12(r13)
+		lwz	r30,16(r13)
+		lwz	r31,20(r13)
+		addi	r13,r13,24
 		
 		epilog "TOC"
 
@@ -2513,7 +2514,7 @@ Run68K:
 		mr	r31,r4
 		
 		mfctr	r25
-					
+			
 		lis	r3,EUMB
 		li	r24,OFTPR
 		lwbrx	r30,r24,r3			
@@ -2559,13 +2560,7 @@ Run68K:
 		
 		sync
 		
-		mr	r24,r30
 		mr	r29,r31
-		li	r31,6				#MsgLen/Cache_Line
-		mtctr	r31
-.FlushMsg:	dcbf	r0,r24
-		addi	r24,r24,L1_CACHE_LINE_SIZE
-		bdnz	.FlushMsg
 		
 		lis	r3,EUMB
 		li	r24,OPHPR
@@ -4184,7 +4179,13 @@ CreateTaskPPC:
 #********************************************************************************************
 
 SetDecInterrupt:
-		prolog 228,"TOC"
+		prolog 228,"TOC"		
+		
+		stwu	r31,-4(r13)
+		
+		bl Super
+		
+		mr	r31,r3
 		
 		loadreg	r5,Quantum
 		mr	r6,r4
@@ -4196,14 +4197,10 @@ SetDecInterrupt:
 		mr.	r3,r3
 		bne-	.NotZ
 		li	r3,10
-.NotZ:		stwu	r31,-4(r13)
-		mr	r31,r3
-
-		bl Super
 		
-		mr	r4,r3
-		mr	r3,r31
-		mtdec	r3
+.NotZ:		mtdec	r3
+
+		mr	r4,r31
 		
 		bl User
 
@@ -6089,13 +6086,6 @@ Run68KLowLevel:
 		stw	r5,MN_PPC(r30)
 				
 		sync
-
-		mr	r24,r30
-		li	r31,6					#MsgLen/Cache_Line
-		mtctr	r31
-.FlushMsg2:	dcbf	r0,r24
-		addi	r24,r24,L1_CACHE_LINE_SIZE
-		bdnz+	.FlushMsg2
 		
 		lis	r3,EUMB
 		li	r24,OPHPR
@@ -7176,7 +7166,6 @@ Warp43:
 		ori	r0,r29,48
 		xori	r0,r0,48
 		mtmsr	r0
-		
 		sync	
 		isync	
 		
