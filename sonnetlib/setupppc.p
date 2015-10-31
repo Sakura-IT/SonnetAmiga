@@ -3253,7 +3253,7 @@ EInt:		b	.FPUnav				#0
 		stw	r7,0x5c(r6)
 		sync				
 		
-		loadreg r8,"PUTV"
+		loadreg r8,"DONE"
 .WaitValueA:	lwz	r7,Init(r0)
 		cmpw	r7,r8
 		bne	.WaitValueA
