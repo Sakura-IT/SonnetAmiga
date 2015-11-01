@@ -3048,9 +3048,6 @@ EInt:		b	.FPUnav				#0
 		mtmsr	r0				#Reenable MMU & FPU
 		sync
 		isync
-		
-		stw	r10,0x120(r0)
-		stw	r11,0x124(r0)
 
 		loadreg	r7,"DSI!"
 		stw	r7,0xf4(r0)
@@ -3070,15 +3067,16 @@ EInt:		b	.FPUnav				#0
 		cmpw	r0,r7
 		beq	.Clutch
 
-.Nowosdb:	lis	r0,0xd400
+.Nowosdb:	lis	r0,0xc400			#check for load or store instruction
 		and.	r0,r7,r0
 		lis	r6,0x8000
-		cmpw	r6,r0		
-		bne	.NoLwLhLb
+		cmpw	r6,r0				
+		bne	.NoLoadStore
 
-		rlwinm	r6,r7,11,28,31			#Get Destination Reg
-		rlwinm	r8,r7,16,28,31			#Get Source Reg
+.DoInst:	rlwinm	r6,r7,11,27,31			#Get Destination Reg (l) or Source (s)
+		rlwinm	r8,r7,16,27,31			#Get Source Reg (l) or Destination (s)
 		rlwinm	r7,r7,0,16,31			#Displacement (halfword)
+		extsh	r7,r7				#Extend sign of displacement
 		
 		cmpwi	r8,0
 		bne	.Notr0
@@ -3243,7 +3241,200 @@ EInt:		b	.FPUnav				#0
 		bne	.HaltDSI				#Should not happen
 		add	r7,r31,r7
 
-.GotAmigaMemAd:	loadreg	r8,"GETV"
+.GotAmigaMemAd:	mfsrr0	r8
+		lwz	r8,0(r8)
+		rlwinm.	r0,r8,4,31,31				#Check load or store
+		beq	.LoadInstr
+		
+		mr	r0,r8
+		cmpwi	r6,0
+		bne	.NotSDr0
+		mfsprg0	r8
+		b	.GotStoreValue
+		
+.NotSDr0:	cmpwi	r6,1
+		bne	.NotSDr1
+		mr	r8,r1
+		b	.GotStoreValue
+		
+.NotSDr1:	cmpwi	r6,2
+		bne	.NotSDr2
+		mr	r8,r2
+		b	.GotStoreValue
+		
+.NotSDr2:	cmpwi	r6,3
+		bne	.NotSDr3
+		mr	r8,r3
+		b	.GotStoreValue
+		
+.NotSDr3:	cmpwi	r6,4
+		bne	.NotSDr4
+		mr	r8,r4
+		b	.GotStoreValue		
+
+.NotSDr4:	cmpwi	r6,5
+		bne	.NotSDr5
+		mr	r8,r5
+		b	.GotStoreValue
+		
+.NotSDr5:	cmpwi	r6,6
+		bne	.NotSDr6
+		mfsprg1	r8
+		b	.GotStoreValue
+		
+.NotSDr6:	cmpwi	r6,7
+		bne	.NotSDr7
+		mfsprg2	r8
+		b	.GotStoreValue
+		
+.NotSDr7:	cmpwi	r6,8
+		bne	.NotSDr8
+		mfsprg3	r8
+		b	.GotStoreValue
+		
+.NotSDr8:	cmpwi	r6,9
+		bne	.NotSDr9
+		mr	r8,r9
+		b	.GotStoreValue
+		
+.NotSDr9:	cmpwi	r6,10
+		bne	.NotSDr10
+		mr	r8,r10
+		b	.GotStoreValue
+		
+.NotSDr10:	cmpwi	r6,11
+		bne	.NotSDr11
+		mr	r8,r11
+		b	.GotStoreValue
+		
+.NotSDr11:	cmpwi	r6,12
+		bne	.NotSDr12
+		mr	r8,r12
+		b	.GotStoreValue		
+
+.NotSDr12:	cmpwi	r6,13
+		bne	.NotSDr13
+		mr	r8,r13
+		b	.GotStoreValue
+		
+.NotSDr13:	cmpwi	r6,14
+		bne	.NotSDr14
+		mr	r8,r14
+		b	.GotStoreValue
+		
+.NotSDr14:	cmpwi	r6,15
+		bne	.NotSDr15
+		mr	r8,r15
+		b	.GotStoreValue
+		
+.NotSDr15:	cmpwi	r6,16
+		bne	.NotSDr16
+		mr	r8,r16
+		b	.GotStoreValue		
+
+.NotSDr16:	cmpwi	r6,17
+		bne	.NotSDr17
+		mr	r8,r17
+		b	.GotStoreValue
+		
+.NotSDr17:	cmpwi	r6,18
+		bne	.NotSDr18
+		mr	r8,r18
+		b	.GotStoreValue
+		
+.NotSDr18:	cmpwi	r6,19
+		bne	.NotSDr19
+		mr	r8,r19
+		b	.GotStoreValue
+		
+.NotSDr19:	cmpwi	r6,20
+		bne	.NotSDr20
+		mr	r8,r20
+		b	.GotStoreValue		
+
+.NotSDr20:	cmpwi	r6,21
+		bne	.NotSDr21
+		mr	r8,r21
+		b	.GotStoreValue
+		
+.NotSDr21:	cmpwi	r6,22
+		bne	.NotSDr22
+		mr	r8,r22
+		b	.GotStoreValue
+		
+.NotSDr22:	cmpwi	r6,23
+		bne	.NotSDr23
+		mr	r8,r23
+		b	.GotStoreValue
+		
+.NotSDr23:	cmpwi	r6,24
+		bne	.NotSDr24
+		mr	r8,r24
+		b	.GotStoreValue
+		
+.NotSDr24:	cmpwi	r6,25
+		bne	.NotSDr25
+		mr	r8,r25
+		b	.GotStoreValue
+		
+.NotSDr25:	cmpwi	r6,26
+		bne	.NotSDr26
+		mr	r8,r26
+		b	.GotStoreValue
+		
+.NotSDr26:	cmpwi	r6,27
+		bne	.NotSDr27
+		mr	r8,r27
+		b	.GotStoreValue
+		
+.NotSDr27:	cmpwi	r6,28
+		bne	.NotSDr28
+		mr	r8,r28
+		b	.GotStoreValue		
+
+.NotSDr28:	cmpwi	r6,29
+		bne	.NotSDr29
+		mr	r8,r29
+		b	.GotStoreValue
+		
+.NotSDr29:	cmpwi	r6,30
+		bne	.NotSDr30
+		mr	r8,r30
+		b	.GotStoreValue
+		
+.NotSDr30:	cmpwi	r6,31
+		bne	.HaltDSI			#Should not happen
+		mr	r8,r31
+	
+.GotStoreValue:	mr	r6,r8
+		mr	r8,r0
+		rlwinm.	r0,r8,3,31,31
+		bne	.StoreHalf
+		rlwinm. r0,r8,5,31,31
+		bne	.StoreByte
+		loadreg	r8,"PUTW"
+		stw	r6,AmigaValue(r0)
+		b	.DoStore
+.StoreHalf:	loadreg	r8,"PUTH"
+		sth	r6,AmigaValue(r0)
+		b	.DoStore
+.StoreByte:	loadreg	r8,"PUTB"
+		stb	r6,AmigaValue(r0)
+		
+.DoStore:	lis	r6,EUMB
+		stw	r8,0x58(r6)
+		sync
+		stw	r7,0x5c(r6)
+		sync
+		
+		loadreg	r8,"DONE"
+.WaitValueAS:	lwz	r7,Init(r0)
+		cmpw	r7,r8
+		bne	.WaitValueAS
+		stw	r6,Init(r0)				#Destroy DONE value		
+		b	.GotAmigaValue				#Maybe this all could be
+								#faster with FIFOs
+.LoadInstr:	loadreg	r8,"GETV"
 
 		mr	r0,r6
 		
@@ -3258,7 +3449,7 @@ EInt:		b	.FPUnav				#0
 		cmpw	r7,r8
 		bne	.WaitValueA
 		lwz	r8,AmigaValue(r0)
-		stw	r6,Init(r0)				#Destroy PUTV value		
+		stw	r6,Init(r0)				#Destroy DONE value		
 		
 		mfsrr0	r6
 		lwz	r6,0(r6)
@@ -3441,7 +3632,7 @@ EInt:		b	.FPUnav				#0
 .GotAmigaValue:	b	.Clutch
 			
 							
-.NoLwLhLb:	nop
+.NoLoadStore:	nop
 		b	.NoClutch
 		
 .Clutch:	mfsrr0	r7
