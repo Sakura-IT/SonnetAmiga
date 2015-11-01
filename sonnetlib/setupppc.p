@@ -3067,181 +3067,280 @@ EInt:		b	.FPUnav				#0
 		cmpw	r0,r7
 		beq	.Clutch
 
-.Nowosdb:	lis	r0,0xc400			#check for load or store instruction
+.Nowosdb:	lis	r0,0xc000			#check for load or store instruction
 		and.	r0,r7,r0
 		lis	r6,0x8000
 		cmpw	r6,r0				
 		bne	.NoLoadStore
 
 .DoInst:	rlwinm	r6,r7,11,27,31			#Get Destination Reg (l) or Source (s)
-		rlwinm	r8,r7,16,27,31			#Get Source Reg (l) or Destination (s)
+		rlwinm	r8,r7,16,27,31			#Get Source Reg (l) or Destination (s)		
+		mr	r0,r6
+		rlwinm	r6,r7,6,31,31			#Check for update bit
 		rlwinm	r7,r7,0,16,31			#Displacement (halfword)
 		extsh	r7,r7				#Extend sign of displacement
-		
+
 		cmpwi	r8,0
 		bne	.Notr0
 		mfsprg0 r8
 		add	r7,r8,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mtsprg0	r7
 		b	.GotAmigaMemAd
 		
 .Notr0:		cmpwi	r8,1
 		bne	.Notr1
 		add	r7,r1,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r1,r7
 		b	.GotAmigaMemAd
 		
 .Notr1:		cmpwi	r8,2
 		bne	.Notr2
 		add	r7,r2,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r2,r7
 		b	.GotAmigaMemAd
 		
 .Notr2:		cmpwi	r8,3
 		bne	.Notr3
 		add	r7,r3,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r3,r7
 		b	.GotAmigaMemAd
 		
 .Notr3:		cmpwi	r8,4
 		bne	.Notr4
 		add	r7,r4,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r4,r7
 		b	.GotAmigaMemAd
 		
 .Notr4:		cmpwi	r8,5
 		bne	.Notr5
 		add	r7,r5,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r5,r7
 		b	.GotAmigaMemAd
 		
 .Notr5:		cmpwi	r8,6
 		bne	.Notr6
 		mfsprg1	r8
 		add	r7,r8,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mtsprg1	r7
 		b	.GotAmigaMemAd
 		
 .Notr6:		cmpwi	r8,7
 		bne	.Notr7
 		mfsprg2	r8
 		add	r7,r8,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mtsprg2	r7
 		b	.GotAmigaMemAd
 		
 .Notr7:		cmpwi	r8,8
 		bne	.Notr8
 		mfsprg3 r8
 		add	r7,r8,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mtsprg3	r7
 		b	.GotAmigaMemAd
 		
 .Notr8:		cmpwi	r8,9
 		bne	.Notr9
 		add	r7,r9,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r9,r7
 		b	.GotAmigaMemAd
 		
 .Notr9:		cmpwi	r8,10
 		bne	.Notr10
 		add	r7,r10,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r10,r7
 		b	.GotAmigaMemAd
 		
 .Notr10:	cmpwi	r8,11
 		bne	.Notr11
 		add	r7,r11,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r11,r7
 		b	.GotAmigaMemAd
 		
 .Notr11:	cmpwi	r8,12
 		bne	.Notr12
 		add	r7,r12,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r12,r7
 		b	.GotAmigaMemAd
 		
 .Notr12:	cmpwi	r8,13
 		bne	.Notr13
 		add	r7,r13,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r13,r7
 		b	.GotAmigaMemAd
 		
 .Notr13:	cmpwi	r8,14
 		bne	.Notr14
 		add	r7,r14,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r14,r7
 		b	.GotAmigaMemAd
 		
 .Notr14:	cmpwi	r8,15
 		bne	.Notr15
 		add	r7,r15,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r15,r7
 		b	.GotAmigaMemAd
 		
 .Notr15:	cmpwi	r8,16
 		bne	.Notr16
 		add	r7,r16,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r16,r7
 		b	.GotAmigaMemAd
 		
 .Notr16:	cmpwi	r8,17
 		bne	.Notr17
 		add	r7,r17,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r17,r7
 		b	.GotAmigaMemAd
 		
 .Notr17:	cmpwi	r8,18
 		bne	.Notr18
 		add	r7,r18,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r18,r7
 		b	.GotAmigaMemAd
 		
 .Notr18:	cmpwi	r8,19
 		bne	.Notr19
 		add	r7,r19,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r19,r7
 		b	.GotAmigaMemAd
 		
 .Notr19:	cmpwi	r8,20
 		bne	.Notr20
 		add	r7,r20,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r20,r7
 		b	.GotAmigaMemAd
 		
 .Notr20:	cmpwi	r8,21
 		bne	.Notr21
 		add	r7,r21,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r21,r7
 		b	.GotAmigaMemAd
 		
 .Notr21:	cmpwi	r8,22
 		bne	.Notr22
 		add	r7,r22,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r22,r7
 		b	.GotAmigaMemAd
 		
 .Notr22:	cmpwi	r8,23
 		bne	.Notr23
 		add	r7,r23,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r23,r7
 		b	.GotAmigaMemAd
 		
 .Notr23:	cmpwi	r8,24
 		bne	.Notr24
 		add	r7,r24,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r24,r7
 		b	.GotAmigaMemAd
 		
 .Notr24:	cmpwi	r8,25
 		bne	.Notr25
 		add	r7,r25,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r25,r7
 		b	.GotAmigaMemAd
 		
 .Notr25:	cmpwi	r8,26
 		bne	.Notr26
 		add	r7,r26,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r26,r7
 		b	.GotAmigaMemAd
 		
 .Notr26:	cmpwi	r8,27
 		bne	.Notr27
 		add	r7,r27,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r27,r7
 		b	.GotAmigaMemAd
 		
 .Notr27:	cmpwi	r8,28
 		bne	.Notr28
 		add	r7,r28,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r28,r7
 		b	.GotAmigaMemAd
 		
 .Notr28:	cmpwi	r8,29
 		bne	.Notr29
 		add	r7,r29,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r29,r7
 		b	.GotAmigaMemAd
 		
 .Notr29:	cmpwi	r8,30
 		bne	.Notr30
 		add	r7,r30,r7
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r30,r7
 		b	.GotAmigaMemAd
 		
 .Notr30:	cmpwi	r8,31
-		bne	.HaltDSI				#Should not happen
-		add	r7,r31,r7
+		bne	.HaltDSI
+		add	r7,r31,r7				#Should not happen
+		mr.	r6,r6
+		beq	.GotAmigaMemAd
+		mr	r31,r7
 
-.GotAmigaMemAd:	mfsrr0	r8
+.GotAmigaMemAd:	mr	r6,r0
+		mfsrr0	r8
 		lwz	r8,0(r8)
 		rlwinm.	r0,r8,4,31,31				#Check load or store
 		beq	.LoadInstr
@@ -3456,16 +3555,16 @@ EInt:		b	.FPUnav				#0
 		rlwinm	r6,r6,16,16,31
 		andi.	r6,r6,0xa800
 		oris	r6,r6,0xffff
-		cmpwi	r6,-32768				#lwz
+		cmpwi	r6,-32768				#lwz/lwzu 0x8000
 		beq	.FixedValue
 		rlwinm	r8,r8,16,16,31
-		cmpwi	r6,-24576				#lhz
+		cmpwi	r6,-24576				#lhz/lhzu 0xa000
 		beq	.FixedValue
 		extsh	r8,r8
-		cmpwi	r6,-22528				#lha
+		cmpwi	r6,-22528				#lha/lhau 0xa800
 		beq	.FixedValue
 		rlwinm	r8,r8,24,24,31
-		cmpwi	r6,-30720				#lbz
+		cmpwi	r6,-30720				#lbz/lbzu
 		bne	.HaltDSI				#Should not happen
 		
 .FixedValue:	mr	r6,r0
@@ -4057,7 +4156,7 @@ EInt:		b	.FPUnav				#0
 		stw	r3,0xf4(r0)			#Error
 		mfsrr0	r3
 		stw	r3,0xf8(r0)			#Current PC
-		mfsrr1	r3
+		mflr	r3
 		stw	r3,0xfc(r0)			#Original calling function
 
 .xxHaltErr2:	b .xxHaltErr2
