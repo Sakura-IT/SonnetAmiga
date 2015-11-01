@@ -513,13 +513,18 @@ MasterControl:
 	move.l ThisTask(a6),d0
 	move.l d0,MCTask(a4)
 	move.l d6,Init(a4)
-	lea Buffer(pc),a4	
 	jsr _LVOCacheClearU(a6)
 	
 NextMsg	move.l ThisTask(a6),a0
 	lea pr_MsgPort(a0),a0
 	move.l a0,d6
-	jsr _LVOWaitPort(a6)
+	move.l #$100,d0
+	jsr _LVOWait(a6)
+	move.l Init(a4),d7
+	
+	and.l #$ffffff00,d7
+	cmp.l #$50555400,d7
+	beq StoreD
 GetLoop	move.l d6,a0
 	jsr _LVOGetMsg(a6)
 	
@@ -551,7 +556,7 @@ ReUse	move.l a2,d7
 	move.l EUMBAddr(pc),a2
 	move.l a1,OFQPR(a2)				;Return Message Frame
 	move.l d7,IFQPR(a2)				;Message the PPC
-	bra.s NextMsg
+	bra NextMsg
 	
 Sig68k	move.l DosBase(pc),d6
 	move.l MN_PPSTRUCT(a1),d7
@@ -627,6 +632,28 @@ PshMsg	cpushl dc,(a2)
 	lea L1_CACHE_LINE_SIZE_040(a2),a2		;Cache_Line 040/060 = 16 bytes
 	dbf d4,PshMsg
 	rte
+
+StoreD	move.l Init(a4),d7
+	move.l AmigaValue(a4),d0
+	move.l AmigaAddress(a4),a0
+	cmp.l #"PUTB",d7
+	beq.s PutB
+	cmp.l #"PUTH",d7
+	beq.s PutH
+	cmp.l #"PUTW",d7
+	bne GetLoop
+	move.l d0,(a0)
+Putted	move.l #"DONE",d7
+	move.l d7,Init(a4)
+	bra GetLoop
+	
+PutB	rol.l #8,d0
+	move.b d0,(a0)
+	bra.s Putted
+	
+PutH	swap d0
+	move.w d0,(a0)
+	bra.s Putted	
 
 	cnop 0,4
 
@@ -705,28 +732,23 @@ SonInt:
 	cmp.l #"GETV",a0				;For getting values from Amiga RAM.
 	beq.s GetV
 	cmp.l #"PUTB",a0
-	beq.s PutB
+	beq.s PutIt
 	cmp.l #"PUTH",a0
-	beq.s PutH
+	beq.s PutIt
 	cmp.l #"PUTW",a0
-	beq.s PutW
+	beq.s PutIt
 	bra.s DoPMsg
 	
-PutB	move.l #"DONE",a0
+PutIt	movem.l d0-a6,-(a7)
 	move.l SonnetBase(pc),a3
-	move.b AmigaValue+3(a3),(a1)
+	move.l a0,Init(a3)
+	move.l a1,AmigaAddress(a3)
+	move.l MCTask(a3),a1
+	move.l #$100,d0	
+	jsr _LVOSignal(a6)
+	movem.l (a7)+,d0-a6
 	bra.s NoSingl
-	
-PutH	move.l #"DONE",a0
-	move.l SonnetBase(pc),a3
-	move.w AmigaValue+2(a3),(a1)
-	bra.s NoSingl
-	
-PutW	move.l #"DONE",a0
-	move.l SonnetBase(pc),a3
-	move.l AmigaValue(a3),(a1)
-	bra.s NoSingl	
-	
+		
 GetV	move.l #"DONE",a0
 	move.l (a1),a1
 	move.l SonnetBase(pc),a3
