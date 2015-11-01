@@ -56,6 +56,11 @@ Best	move.l d7,-(a7)
 	move.l (a2),d7
 	cmp.l #"Shel",d7
 	beq.s IsHell
+FindEnd	move.b (a2)+,d7
+	bne.s FindEnd
+	move.l -5(a2),d7
+	cmp.l #"1005",d7
+	beq.s DoBit
 	bra.s NoBit
 	
 IsHell	move.l pr_CLI(a3),d7
