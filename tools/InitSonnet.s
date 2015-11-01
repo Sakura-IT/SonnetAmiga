@@ -46,6 +46,8 @@ NewAlloc:
 	beq.s Best
 	btst #0,d1
 	beq.s NoFast
+	btst #1,d1
+	bne.s NoFast
 Best	move.l d7,-(a7)
 	move.l a3,-(a7)
 	move.l a2,-(a7)
