@@ -1627,6 +1627,6 @@ EndFlag	dc.l	-1
 LibName
 	dc.b	"sonnet.library",0,0
 IDString
-	dc.b	"$VER: sonnet.library 1.0 (01-Oct-15)",0
+	dc.b	"$VER: sonnet.library 1.0 (01-Nov-15)",0
 	cnop	0,4
 EndCP	end
