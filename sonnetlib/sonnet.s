@@ -344,10 +344,10 @@ PPCInit	move.l SonnetBase(pc),a1
 	cmp.l #"REDY",d0
 	bne.s PPCInit
 
-	move.l #$60000000,d0			;Amiga PCI Memory (Hard-coded)
+	move.l #$62000000,d0			;Amiga PCI Memory (Hard-coded)
 	move.l SonAddr(pc),a2
 	move.l PCI_SPACE1(a2),a3		;PCSRBAR Sonnet
-	or.b #27,d0				;256MB
+	or.b #24,d0				;64MB
 	rol.w #8,d0
 	swap d0
 	rol.w #8,d0
@@ -534,13 +534,8 @@ MasterControl:
 NextMsg	move.l ThisTask(a6),a0
 	lea pr_MsgPort(a0),a0
 	move.l a0,d6
-	move.l #$100,d0
-	jsr _LVOWait(a6)
-	move.l Init(a4),d7
+	jsr _LVOWaitPort(a6)
 	
-	and.l #$ffffff00,d7
-	cmp.l #$50555400,d7
-	beq StoreD
 GetLoop	move.l d6,a0
 	jsr _LVOGetMsg(a6)
 	
@@ -556,6 +551,11 @@ GetLoop	move.l d6,a0
 	beq MsgF68k
 	cmp.l #"LL68",d0
 	beq MsgLL68
+	cmp.l #"GETV",d0
+	beq LoadD
+	and.l #$ffffff00,d0
+	cmp.l #$50555400,d0
+	beq StoreD
 	bra.s GetLoop
 
 MsgT68k	move.b LN_TYPE(a1),d7
@@ -649,9 +649,9 @@ PshMsg	cpushl dc,(a2)
 	dbf d4,PshMsg
 	rte
 
-StoreD	move.l Init(a4),d7
-	move.l AmigaValue(a4),d0
-	move.l AmigaAddress(a4),a0
+StoreD	move.l MN_IDENTIFIER(a1),d7
+	move.l MN_IDENTIFIER+4(a1),d0
+	move.l MN_IDENTIFIER+8(a1),a0
 	cmp.l #"PUTB",d7
 	beq.s PutB
 	cmp.l #"PUTH",d7
@@ -660,16 +660,24 @@ StoreD	move.l Init(a4),d7
 	bne GetLoop
 	move.l d0,(a0)
 Putted	move.l #"DONE",d7
-	move.l d7,Init(a4)
+	move.l d7,MN_IDENTIFIER(a1)
+	move.l EUMBAddr(pc),a2
+	move.l a1,OFQPR(a2)				;Return Message Frame
 	bra GetLoop
 	
-PutB	rol.l #8,d0
-	move.b d0,(a0)
+PutB	move.b d0,(a0)
 	bra.s Putted
 	
-PutH	swap d0
-	move.w d0,(a0)
+PutH	move.w d0,(a0)
 	bra.s Putted	
+
+LoadD	move.l #"DONE",d0
+	move.l MN_IDENTIFIER+8(a1),a3
+	move.l (a3),MN_IDENTIFIER+4(a1)
+	move.l d0,MN_IDENTIFIER(a1)
+	move.l EUMBAddr(pc),a2
+	move.l a1,OFQPR(a2)				;Return Message Frame
+	bra GetLoop
 
 	cnop 0,4
 
@@ -744,33 +752,10 @@ SonInt:
 	
 	move.l OMR0(a2),a0				;Port
 	move.l OMR1(a2),a1				;Message
-	
-	cmp.l #"GETV",a0				;For getting values from Amiga RAM.
-	beq.s GetV
-	cmp.l #"PUTB",a0
-	beq.s PutIt
-	cmp.l #"PUTH",a0
-	beq.s PutIt
-	cmp.l #"PUTW",a0
-	beq.s PutIt
-	bra.s DoPMsg
-	
-PutIt	movem.l d0-a6,-(a7)
-	move.l SonnetBase(pc),a3
-	move.l a0,Init(a3)
-	move.l a1,AmigaAddress(a3)
-	move.l MCTask(a3),a1
-	move.l #$100,d0	
-	jsr _LVOSignal(a6)
-	movem.l (a7)+,d0-a6
-	bra.s NoSingl
 		
-GetV	move.l #"DONE",a0
-	move.l (a1),a1
-	move.l SonnetBase(pc),a3
-	move.l a1,AmigaValue(a3)
-	move.l a0,Init(a3)
-	bra.s NoSingl
+	move.l #$ffffffff,OMR0(a2)			;Destroy value
+	cmp.l #$ffffffff,a0
+	beq.s NoSingl
 	
 DoPMsg	moveq.l #0,d4
 	move.w MN_LENGTH(a1),d4				;PPC should make it 32 byte aligned

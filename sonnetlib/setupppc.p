@@ -3515,43 +3515,125 @@ EInt:		b	.FPUnav				#0
 		rlwinm. r0,r8,5,31,31
 		bne	.StoreByte
 		loadreg	r8,"PUTW"
-		stw	r6,AmigaValue(r0)
 		b	.DoStore
 .StoreHalf:	loadreg	r8,"PUTH"
-		sth	r6,AmigaValue(r0)
 		b	.DoStore
 .StoreByte:	loadreg	r8,"PUTB"
-		stb	r6,AmigaValue(r0)
 		
-.DoStore:	lis	r6,EUMB
-		stw	r8,0x58(r6)
-		sync
-		stw	r7,0x5c(r6)
-		sync
+.DoStore:	mr	r0,r6
+		mr	r6,r1				#r13?
+		stwu	r3,-4(r6)
+		stwu	r4,-4(r6)
+		stwu	r23,-4(r6)
+		stwu	r24,-4(r6)
+		stwu	r30,-4(r6)
+		stwu	r31,-4(r6)
+								
+		lis	r3,EUMB
+		li	r24,OFTPR
+		lwbrx	r30,r24,r3			
+		addi	r23,r30,4
+		loadreg	r4,0xc000
+		or	r23,r23,r4
+		loadreg r4,0xffff
+		and	r23,r23,r4			#Keep it C000-FFFE		
+		stwbrx	r23,r24,r3
+		lwz	r30,0(r30)
+			
+		stw	r8,MN_IDENTIFIER(r30)
+		stw	r0,MN_IDENTIFIER+4(r30)		#AmigaValue
+		stw	r7,MN_IDENTIFIER+8(r30)		#AmigaAddress
 		
+		lwz	r4,MCTask(r0)
+		la	r4,pr_MsgPort(r4)
+		stw	r4,MN_MCTASK(r30)
+		li	r4,NT_MESSAGE
+		stb	r4,LN_TYPE(r30)
+		li	r4,192
+		sth	r4,MN_LENGTH(r30)
+
+		sync
+
+		lis	r3,EUMB
+		li	r24,OPHPR
+		lwbrx	r31,r24,r3		
+		stw	r30,0(r31)		
+		addi	r23,r31,4
+		loadreg	r4,0xbfff
+		and	r23,r23,r4			#Keep it 8000-BFFE
+		stwbrx	r23,r24,r3			#triggers Interrupt
+
 		loadreg	r8,"DONE"
-.WaitValueAS:	lwz	r7,Init(r0)
+.WaitPFIFO:	lwz	r7,MN_IDENTIFIER(r30)
 		cmpw	r7,r8
-		bne	.WaitValueAS
-		stw	r6,Init(r0)				#Destroy DONE value		
-		b	.GotAmigaValue				#Maybe this all could be
-								#faster with FIFOs
+		bne	.WaitPFIFO
+
+		lwz	r31,0(r6)
+		lwz	r30,4(r6)
+		lwz	r24,8(r6)
+		lwz	r23,12(r6)
+		lwz	r4,16(r6)
+		lwz	r3,20(r6)
+		
+		b	.GotAmigaValue
+								
 .LoadInstr:	loadreg	r8,"GETV"
 
 		mr	r0,r6
-		
-		lis	r6,EUMB		
-		stw	r8,0x58(r6)
+		mr	r6,r1
+		stwu	r3,-4(r6)
+		stwu	r4,-4(r6)
+		stwu	r23,-4(r6)
+		stwu	r24,-4(r6)
+		stwu	r30,-4(r6)
+		stwu	r31,-4(r6)
+								
+		lis	r3,EUMB
+		li	r24,OFTPR
+		lwbrx	r30,r24,r3			
+		addi	r23,r30,4
+		loadreg	r4,0xc000
+		or	r23,r23,r4
+		loadreg r4,0xffff
+		and	r23,r23,r4			#Keep it C000-FFFE		
+		stwbrx	r23,r24,r3
+		lwz	r30,0(r30)
+
+		stw	r8,MN_IDENTIFIER(r30)
+		stw	r7,MN_IDENTIFIER+8(r30)		#AmigaAddress
+
+		lwz	r4,MCTask(r0)
+		la	r4,pr_MsgPort(r4)
+		stw	r4,MN_MCTASK(r30)
+		li	r4,NT_MESSAGE
+		stb	r4,LN_TYPE(r30)
+		li	r4,192
+		sth	r4,MN_LENGTH(r30)
+
 		sync
-		stw	r7,0x5c(r6)
-		sync				
+
+		lis	r3,EUMB
+		li	r24,OPHPR
+		lwbrx	r31,r24,r3		
+		stw	r30,0(r31)		
+		addi	r23,r31,4
+		loadreg	r4,0xbfff
+		and	r23,r23,r4			#Keep it 8000-BFFE
+		stwbrx	r23,r24,r3			#triggers Interrupt
 		
-		loadreg r8,"DONE"
-.WaitValueA:	lwz	r7,Init(r0)
+		loadreg	r8,"DONE"		
+.WaitGFIFO:	lwz	r7,MN_IDENTIFIER(r30)
 		cmpw	r7,r8
-		bne	.WaitValueA
-		lwz	r8,AmigaValue(r0)
-		stw	r6,Init(r0)				#Destroy DONE value		
+		bne	.WaitGFIFO
+		
+		lwz	r8,MN_IDENTIFIER+4(r30)
+		
+		lwz	r31,0(r6)
+		lwz	r30,4(r6)
+		lwz	r24,8(r6)
+		lwz	r23,12(r6)
+		lwz	r4,16(r6)
+		lwz	r3,20(r6)		
 		
 		mfsrr0	r6
 		lwz	r6,0(r6)
