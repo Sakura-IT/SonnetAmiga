@@ -170,7 +170,8 @@ Loop1	move.l LN_SUCC(a2),d6
 	move.l d6,a2
 	bra.s Loop1
 
-Sonnet	move.l d7,a0
+Sonnet	move.l a2,SonAddr-Buffer(a4)
+	move.l d7,a0
 	move.l MH_UPPER(a0),d1
 	sub.l #$10000,d1
 	and.w #0,d1
@@ -338,6 +339,21 @@ NoLib	jsr _LVOEnable(a6)
 	bsr FunkyMMU
 	ENDC
 	
+PPCInit	move.l SonnetBase(pc),a1
+	move.l Init(a1),d0
+	cmp.l #"REDY",d0
+	bne.s PPCInit
+
+	move.l #$60000000,d0			;Amiga PCI Memory (Hard-coded)
+	move.l SonAddr(pc),a2
+	move.l PCI_SPACE1(a2),a3		;PCSRBAR Sonnet
+	or.b #27,d0				;256MB
+	rol.w #8,d0
+	swap d0
+	rol.w #8,d0
+	move.l d0,OTWR(a3)
+	move.l #$000000A0,OMBAR(a3)		;Translated to PPC $A0000000	
+
 	jsr _LVOCacheClearU(a6)	
 	bra Clean
 
@@ -1627,6 +1643,6 @@ EndFlag	dc.l	-1
 LibName
 	dc.b	"sonnet.library",0,0
 IDString
-	dc.b	"$VER: sonnet.library 1.0 (01-Nov-15)",0
+	dc.b	"$VER: sonnet.library 17.0 (02-Nov-15)",0
 	cnop	0,4
 EndCP	end
