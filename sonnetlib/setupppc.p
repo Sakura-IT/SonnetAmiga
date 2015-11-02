@@ -88,11 +88,12 @@ SetLen:		mr	r30,r28
 
 		bl	End
 
-Start:		nop					#Dummy entry at absolute 0x7400
-.StartX:	nop					#IdleTask
+Start:		loadreg	r0,"REDY"			#Dummy entry at absolute 0x7400
+		stw	r0,Init(r0)
+.IdleLoop:	nop					#IdleTask
 		nop
 		nop
-		b	.StartX
+		b	.IdleLoop
 	
 		trap					#For PP_THROW
 	
@@ -2360,7 +2361,7 @@ EInt:		b	.FPUnav				#0
 		
 		b	.LoadContext
 
-.DoIdle:	loadreg	r0,IdleTask			#Start hardcoded at 0x7400
+.DoIdle:	loadreg	r0,IdleTask+(.IdleLoop-Start)	#Switch to idle task
 		lwz	r1,SonnetBase(r0)
 		or	r0,r1,r0
 		mtsrr0	r0
@@ -3034,6 +3035,8 @@ EInt:		b	.FPUnav				#0
 		stw	r3,0xf4(r0)
 		mfsrr0	r3
 		stw	r3,0xf8(r0)
+		mflr	r3
+		stw	r3,0xfc(r0)
 .HaltISI:	b	.HaltISI
 
 #********************************************************************************************
