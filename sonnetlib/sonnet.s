@@ -347,12 +347,12 @@ PPCInit	move.l SonnetBase(pc),a1
 	move.l #$62000000,d0			;Amiga PCI Memory (Hard-coded)
 	move.l SonAddr(pc),a2
 	move.l PCI_SPACE1(a2),a3		;PCSRBAR Sonnet
-	or.b #24,d0				;64MB
+	or.b #22,d0				;8MB
 	rol.w #8,d0
 	swap d0
 	rol.w #8,d0
 	move.l d0,OTWR(a3)
-	move.l #$000000A0,OMBAR(a3)		;Translated to PPC $A0000000	
+	move.l #$000000A2,OMBAR(a3)		;Translated to PPC $A0000000	
 
 	jsr _LVOCacheClearU(a6)	
 	bra Clean

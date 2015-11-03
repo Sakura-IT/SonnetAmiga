@@ -745,22 +745,6 @@ Wait2:		mfl2cr	r3
 mmuSetup:	
 		mflr	r30
 
-		loadreg r4,IBAT3L_VAL
-		loadreg r3,IBAT3U_VAL
-		mtspr ibat3l,r4
-		mtspr ibat3u,r3
-		isync
-
-		loadreg r4,DBAT3L_VAL
-		loadreg	r3,DBAT3U_VAL
-		isync
-		mtspr dbat3l,r4
-		mtspr dbat3u,r3
-		isync					#Setup GFX Memory (256MB)							#BATs are now set up
-							
-#********************************************************************************************
-
-
 		loadreg	r6,0x8000000			#Amount of memory to virtualize (128MB)
 
 		bl	.SetupPT
@@ -770,6 +754,14 @@ mmuSetup:
 		mr	r5,r3					#start physical address
 		loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED	#WIMG
 		li	r7,2					#pp = 2 - Read/Write Access (0 = No Access)
+		
+		bl	.DoTBLs
+		
+		loadreg	r3,0x62000000				#8MB Video RAM
+		loadreg	r4,0x62800000
+		addis	r5,r3,0x4000
+		li	r6,0
+		li	r7,2
 		
 		bl	.DoTBLs
 		
@@ -1765,7 +1757,15 @@ EInt:		b	.FPUnav				#0
 		lis	r3,EUMBEPICPROC
 		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
 		
-.RDecInt:	lwz	r9,TaskException(r0)
+.RDecInt:	
+		loadreg	r9,0x62000000
+		loadreg r4,0x62800000
+.flushgfx:	dcbf	r0,r9
+		addi	r9,r9,32
+		cmpw	r9,r4
+		bne	.flushgfx
+		
+		lwz	r9,TaskException(r0)
 		mr.	r9,r9
 		bne	.TaskException
 
@@ -3051,6 +3051,14 @@ EInt:		b	.FPUnav				#0
 		mtmsr	r0				#Reenable MMU & FPU
 		sync
 		isync
+
+		stw	r3,0x140(r0)
+		stw	r4,0x144(r0)
+		stw	r5,0x148(r0)
+		stw	r6,0x14c(r0)
+		stw	r7,0x150(r0)
+		stw	r8,0x154(r0)
+		stw	r9,0x158(r0)
 
 		loadreg	r7,"DSI!"
 		stw	r7,0xf4(r0)
