@@ -8571,7 +8571,34 @@ RawDoFmtPPC:	prolog 228,"TOC"
 		stb	r0,0(r24)
 		addi	r24,r24,1
 		neg	r21,r21
-.OutputNum:	li	r3,"0"
+		
+.OutputNum:	mflr	r3
+		bl	.GetTable
+
+.long		0x3b9aca00,0x05f5e100,0x00989680,0x000f4240,0x000186a0
+.long		0x00002710,0x000003e8,0x00000064,0x0000000a,0x00000000
+
+.GetTable:	mflr	r28
+		mtlr	r3
+		li	r3,"0"
+.NumLoop:	lwz	r27,0(r28)
+		addi	r28,r28,4
+		mr.	r27,r27
+		beq-	.NormalNum
+		li	r19,47
+.SmallNLoop:	addi	r19,r19,1
+		cmplw	r21,r27
+		sub	r21,r21,r27
+		bge+	.SmallNLoop
+		add	r21,r21,r27
+		cmplw	r3,r19
+		beq+	.NumLoop
+		li	r3,0
+		stb	r19,0(r24)
+		addi	r24,r24,1
+		b	.NumLoop
+
+.NormalNum:	li	r3,"0"
 
 		add	r21,r21,r3
 		stb	r21,0(r24)
@@ -8581,7 +8608,7 @@ RawDoFmtPPC:	prolog 228,"TOC"
 #********************************************************************************************
 
 .MakeHex:	mr.	r21,r21
-		beq+	.OutputNum
+		beq+	.NormalNum
 
 		xor	r27,r27,r27
 		andi.	r0,r20,4
@@ -8614,6 +8641,6 @@ RawDoFmtPPC:	prolog 228,"TOC"
 .SkipToNext:	bdnz+	.NextHex
 
 		blr	
-		
+				
 #********************************************************************************************
 EndFunctions:
