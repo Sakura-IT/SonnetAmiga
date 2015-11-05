@@ -52,6 +52,9 @@ Best	move.l d7,-(a7)
 	move.l a3,-(a7)
 	move.l a2,-(a7)
 	move.l ThisTask(a6),a3
+	move.b TC_FLAGS(a3),d7
+	btst #2,d7
+	bne.s DoBit
 	move.l LN_NAME(a3),d7
 	beq.s NoBit
 	move.l d7,a2
