@@ -16,6 +16,8 @@ PPCCode:	b	.SkipCom			#0x3000	System initialization
 .long		0					#Used for initial communication
 .long		0					#MemStart
 .long		0					#MemLen
+.long		0					#RTGBase
+.long		0					#RTGType
 
 .SkipCom:	lis	r22,CMD_BASE
 		lis	r29,VEC_BASE			#0xfff00000
@@ -81,7 +83,11 @@ SetLen:		mr	r30,r28
 .Clear0:	stwu	r0,4(r3)
 		bdnz+	.Clear0				#Clear first part of zero page
 
-		stw	r8,MemSize(r0)
+		lwz	r3,16(r29)
+		stw	r3,RTGBase(r0)
+		lwz	r3,20(r29)
+		sth	r3,RTGType(r0)
+		stw	r8,MemSize(r0)		
 
 		bl	mmuSetup			#Setup the Memory Management Unit
 		bl	Epic				#Setup the EPIC controller
@@ -217,7 +223,7 @@ End:		mflr	r4
 		bne	.WInit
 		
 		isync					#Wait for 68k to set up library
-		
+
 		li	r3,IdleTask			#Start hardcoded at 0x7400
 		lwz	r31,SonnetBase(r0)
 		or	r3,r3,r31
@@ -756,19 +762,19 @@ mmuSetup:
 		li	r7,2					#pp = 2 - Read/Write Access (0 = No Access)
 		
 		bl	.DoTBLs
-		
-		loadreg	r3,0x62000000				#8MB Video RAM
-		loadreg	r4,0x62800000
-		addis	r5,r3,0x4000
-		li	r6,0
-		li	r7,2
-		
-		bl	.DoTBLs
-		
+						
 		loadreg	r3,0xfff00000			#Fake ROM (64k)
 		loadreg	r4,0xfff10000
 		mr	r5,r3
 		loadreg	r6,PTE_CACHE_INHIBITED
+		li	r7,2
+		
+		bl	.DoTBLs
+		
+		lwz	r3,RTGBase(r0)			#8MB Video RAM
+		addis	r4,r3,0x80
+		addis	r5,r3,0x4000
+		li	r6,0
 		li	r7,2
 		
 		bl	.DoTBLs
@@ -845,6 +851,15 @@ mmuSetup:
 
 		mtlr	r30
 
+		blr
+		
+#********************************************************************************************
+
+.SetupMMU2:	mflr	r30
+
+
+		mtlr	r30
+		
 		blr
 
 #********************************************************************************************	
@@ -1758,8 +1773,8 @@ EInt:		b	.FPUnav				#0
 		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
 		
 .RDecInt:	
-		loadreg	r9,0x62000000
-		loadreg r4,0x62800000
+		lwz	r9,RTGBase(r0)
+		addis	r4,r9,0x80
 .flushgfx:	dcbf	r0,r9
 		addi	r9,r9,32
 		cmpw	r9,r4

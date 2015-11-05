@@ -161,16 +161,36 @@ FndMem	move.l d0,d7
 	beq.s Clean
 	move.l d0,a2
 
+	moveq.l #0,d0
 	move.l PCI_List(a2),a2
 Loop1	move.l LN_SUCC(a2),d6
-	beq.s Clean
+	beq.s Sonnet
 	move.l PCI_VENDORID(a2),d1
 	cmp.l #$10570004,d1
-	beq.s Sonnet
-	move.l d6,a2
+	beq.s SonnetF
+	cmp.l #$121a0005,d1
+	beq.s Avenger
+	cmp.l #$10025964,d1
+	beq.s ATI92SE
+GfxLoop	move.l d6,a2
 	bra.s Loop1
 
-Sonnet	move.l a2,SonAddr-Buffer(a4)
+SonnetF	move.l a2,d0
+	bra.s GfxLoop
+
+ATI92SE	move.l PCI_SPACE0(a2),d4
+	bra.s GfxR
+
+Avenger	move.l PCI_SPACE1(a2),d4
+GfxR	move.l d4,GfxMem-Buffer(a4)
+	swap d1
+	move.w d1,GfxType-Buffer(a4)
+	bra.s GfxLoop	
+
+Sonnet	tst.l d0
+	beq Clean
+	move.l d0,a2
+	move.l a2,SonAddr-Buffer(a4)
 	move.l d7,a0
 	move.l MH_UPPER(a0),d1
 	sub.l #$10000,d1
@@ -179,7 +199,7 @@ Sonnet	move.l a2,SonAddr-Buffer(a4)
 	move.l #$10000,d0
 	jsr _LVOAllocAbs(a6)			;Allocate fake ROM in VGA Mem
 	tst.l d0
-	beq.s Clean
+	beq Clean
 
 	move.l d0,ROMMem-Buffer(a4)
 	move.l d0,a5
@@ -209,6 +229,8 @@ loop2	move.l (a2)+,(a5)+
 	move.l #$abcdabcd,$3004(a1)		;Code Word
 	move.l #$abcdabcd,$3008(a1)		;Sonnet Mem Start (Translated to PCI)
 	move.l #$abcdabcd,$300c(a1)		;Sonnet Mem Len
+	move.l GfxMem(pc),$3010(a1)
+	move.l GfxType(pc),$3014(a1)
 
 	jsr _LVOCacheClearU(a6)
 
@@ -295,7 +317,7 @@ MoveSon	move.l (a0)+,(a1)+
 	bsr MakeLibrary
 	
 	tst.l d0
-	beq.s NoLib					;beq.s
+	beq NoLib					;beq.s
 
 	move.l SonnetBase(pc),a1
 	move.l d0,PowerPCBase(a1)
@@ -344,7 +366,7 @@ PPCInit	move.l SonnetBase(pc),a1
 	cmp.l #"REDY",d0
 	bne.s PPCInit
 
-	move.l #$62000000,d0			;Amiga PCI Memory (Hard-coded)
+	move.l GfxMem(pc),d0			;Amiga PCI Memory
 	move.l SonAddr(pc),a2
 	move.l PCI_SPACE1(a2),a3		;PCSRBAR Sonnet
 	or.b #22,d0				;8MB
@@ -352,7 +374,8 @@ PPCInit	move.l SonnetBase(pc),a1
 	swap d0
 	rol.w #8,d0
 	move.l d0,OTWR(a3)
-	move.l #$000000A2,OMBAR(a3)		;Translated to PPC $A0000000	
+	add.b #$40,d0				;Translated to PPC PCI Memory
+	move.l d0,OMBAR(a3)
 
 	jsr _LVOCacheClearU(a6)	
 	bra Clean
@@ -1460,6 +1483,8 @@ DosBase		ds.l	1
 ExpBase		ds.l	1
 PCIBase		ds.l	1
 ROMMem		ds.l	1
+GfxMem		ds.l	1
+GfxType		ds.l	1
 ComProc		ds.l	1
 SonAddr		ds.l	1
 EUMBAddr	ds.l	1

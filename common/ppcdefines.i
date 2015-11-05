@@ -53,7 +53,7 @@
 .set LowActivityPrioOffset,188			#670
 .set PortInUse,192				#628	; See CurrentPort
 .set PowerDebugMode,193				#18737
-.set UNUSED,194
+.set RTGType,194
 .set UNUSED,195
 .set AlignmentExcHigh,196
 .set AlignmentExcLow,200
@@ -63,6 +63,7 @@
 .set ViolationAddress,216			#Pointer
 .set MemSize,220
 .set L2Size,224
+.set RTGBase,228
 
 #LibBase:
 
@@ -550,8 +551,9 @@
 #.set DBAT3U_VAL,(PCI_BASE | BAT_BL_256M | BAT_VALID_SUPERVISOR | BAT_VALID_USER)
 
 .set GFX_BASE,0x62000000
-.set GFX_PCI,0xa0000000
-.set IBAT3L_VAL,(GFX_PCI | BAT_CACHE_INHIBITED | BAT_READ_WRITE)
+.set GFX_PCI,0xa2000000
+#.set IBAT3L_VAL,(GFX_PCI | BAT_CACHE_INHIBITED | BAT_READ_WRITE)
+.set IBAT3L_VAL,(GFX_PCI | BAT_READ_WRITE)
 .set IBAT3U_VAL,(GFX_BASE | BAT_BL_32M | BAT_VALID_SUPERVISOR | BAT_VALID_USER)
 .set DBAT3L_VAL,IBAT3L_VAL
 .set DBAT3U_VAL,IBAT3U_VAL
