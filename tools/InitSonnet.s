@@ -83,11 +83,11 @@ IsHell	move.l pr_CLI(a3),d7
 	move.l 1(a3,d7.l),d7	
 	cmp.l #"nnet",d7
 	beq.s DoBit
-	cmp.l #"1005",d7
+	cmp.l #"2005",d7
 	beq.s DoBit
 	bra.s NoBit	
 	
-DoBit	bset #12,d1
+DoBit	bset #13,d1
 NoBit	move.l (a7)+,a2
 	move.l (a7)+,a3
 	move.l (a7)+,d7	
