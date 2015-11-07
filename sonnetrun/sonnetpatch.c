@@ -76,7 +76,7 @@ typedef uint8_t bool;
 #define MEMF_CHIP	0x1	/* << 30 */
 #define MEMF_FAST	0x2	/* << 30 */
 
-#define SONNET_MEM_ID	0x00001005
+#define SONNET_MEM_ID	0x00002005
 /*
  * These structs do not correspond to binary format of hunk files, they are
  * used only as internal representation of hunk/patch parameters inside of
