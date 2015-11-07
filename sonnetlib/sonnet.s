@@ -166,24 +166,24 @@ FndMem	move.l d0,d7
 Loop1	move.l LN_SUCC(a2),d6
 	beq.s Sonnet
 	move.l PCI_VENDORID(a2),d1
-	cmp.l #$10570004,d1
+	swap d1
+	cmp.l #$00041057,d1
 	beq.s SonnetF
-	cmp.l #$121a0005,d1
+	cmp.l #$0005121a,d1
 	beq.s Avenger
-	cmp.l #$10025964,d1
-	beq.s ATI92SE
+	cmp.w #$1002,d1				;Very slow context switch, very fast gfx...
+	beq.s ATIGen
 GfxLoop	move.l d6,a2
 	bra.s Loop1
 
 SonnetF	move.l a2,d0
 	bra.s GfxLoop
 
-ATI92SE	move.l PCI_SPACE0(a2),d4
+ATIGen	move.l PCI_SPACE0(a2),d4
 	bra.s GfxR
 
 Avenger	move.l PCI_SPACE1(a2),d4
 GfxR	move.l d4,GfxMem-Buffer(a4)
-	swap d1
 	move.w d1,GfxType-Buffer(a4)
 	bra.s GfxLoop	
 
@@ -342,7 +342,7 @@ MoveSon	move.l (a0)+,(a1)+
 	move.l a2,IS_DATA(a1)
 	lea IntName(pc),a2
 	move.l a2,LN_NAME(a1)
-	moveq.l #15,d0
+	moveq.l #121,d0					;Was 15
 	move.b d0,LN_PRI(a1)
 	moveq.l #NT_INTERRUPT,d0
 	move.b d0,LN_TYPE(a1)

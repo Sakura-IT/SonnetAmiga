@@ -85,7 +85,7 @@ SetLen:		mr	r30,r28
 
 		lwz	r3,16(r29)
 		stw	r3,RTGBase(r0)
-		lwz	r3,20(r29)
+		lhz	r3,20(r29)
 		sth	r3,RTGType(r0)
 		stw	r8,MemSize(r0)		
 
@@ -774,8 +774,12 @@ mmuSetup:
 		lwz	r3,RTGBase(r0)			#8MB Video RAM
 		addis	r4,r3,0x80
 		addis	r5,r3,0x4000
+		loadreg	r6,PTE_CACHE_INHIBITED
+		lhz	r7,RTGType(r0)
+		cmpwi	r7,0x1002
+		beq	.ATI
 		li	r6,0
-		li	r7,2
+.ATI:		li	r7,2
 		
 		bl	.DoTBLs
 		
@@ -1773,6 +1777,9 @@ EInt:		b	.FPUnav				#0
 		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
 		
 .RDecInt:	
+		lhz	r9,RTGType(r0)
+		cmpwi	r9,0x1002
+		beq	.ATI2
 		lwz	r9,RTGBase(r0)
 		addis	r4,r9,0x80
 .flushgfx:	dcbf	r0,r9
@@ -1780,7 +1787,7 @@ EInt:		b	.FPUnav				#0
 		cmpw	r9,r4
 		bne	.flushgfx
 		
-		lwz	r9,TaskException(r0)
+.ATI2:		lwz	r9,TaskException(r0)
 		mr.	r9,r9
 		bne	.TaskException
 
