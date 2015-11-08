@@ -342,7 +342,7 @@ MoveSon	move.l (a0)+,(a1)+
 	move.l a2,IS_DATA(a1)
 	lea IntName(pc),a2
 	move.l a2,LN_NAME(a1)
-	moveq.l #121,d0					;Was 15
+	moveq.l #15,d0
 	move.b d0,LN_PRI(a1)
 	moveq.l #NT_INTERRUPT,d0
 	move.b d0,LN_TYPE(a1)
@@ -369,7 +369,7 @@ PPCInit	move.l SonnetBase(pc),a1
 	move.l GfxMem(pc),d0			;Amiga PCI Memory
 	move.l SonAddr(pc),a2
 	move.l PCI_SPACE1(a2),a3		;PCSRBAR Sonnet
-	or.b #22,d0				;8MB
+	or.b #27,d0				;256MB
 	rol.w #8,d0
 	swap d0
 	rol.w #8,d0
@@ -1001,7 +1001,7 @@ xProces	move.l d0,Port(a5)
 	move.l TC_SPLOWER(a1),d1
 	sub.l d1,d0
 	move.l d0,d7
-	add.l #2048,d0					;was 1024
+	add.l #1024,d0
 
 	move.l _PowerPCBase(pc),a6
 	jsr _LVOAllocVec32(a6)
@@ -1024,21 +1024,21 @@ CpName	move.b (a1)+,(a2)
 
 EndName	move.l #"_PPC",(a2)				;Check Alignment?
 
-	move.l ThisTask(a6),a1
-	cmp.b #NT_PROCESS,LN_TYPE(a1)
-	bne.s EndArgs
-	move.l pr_Arguments(a1),d0
-	beq.s EndArgs
-	move.l d0,a1
-
-	moveq.l #63,d0
-	move.l d6,a2
-	lea TASKPPC_ARGS(a2),a2
-CpArgs	move.b (a1)+,(a2)
-	tst.b (a2)
-	beq.s EndArgs
-	addq.l #1,a2
-	dbf d0,CpArgs
+;	move.l ThisTask(a6),a1
+;	cmp.b #NT_PROCESS,LN_TYPE(a1)
+;	bne.s EndArgs
+;	move.l pr_Arguments(a1),d0
+;	beq.s EndArgs
+;	move.l d0,a1
+;
+;	moveq.l #63,d0
+;	move.l d6,a2
+;	lea TASKPPC_ARGS(a2),a2
+;CpArgs	move.b (a1)+,(a2)
+;	tst.b (a2)
+;	beq.s EndArgs
+;	addq.l #1,a2
+;	dbf d0,CpArgs
 							;Also push dcache
 EndArgs	move.l EUMBAddr(pc),a2
 	move.l IFQPR(a2),a1

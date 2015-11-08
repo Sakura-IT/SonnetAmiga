@@ -3458,6 +3458,9 @@ CreateTaskPPC:
 		stwu	r17,-4(r13) 
 		stwu	r16,-4(r13) 
  
+ 		loadreg	r17,"CRTT"
+ 		stw	r17,0x130(r0)
+ 
 		mr	r17,r2 
 		mr	r30,r4 
 		
@@ -4182,6 +4185,9 @@ SetDecInterrupt:
 		prolog 228,"TOC"		
 		
 		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		
+		mfctr	r30
 		
 		bl Super
 		
@@ -4198,14 +4204,18 @@ SetDecInterrupt:
 		bne-	.NotZ
 		li	r3,10
 		
-.NotZ:		mtdec	r3
+.NotZ:		isync
+		mtdec	r3
 
 		mr	r4,r31
 		
 		bl User
+		
+		mtctr	r30
 
-		lwz	r31,0(r13)
-		addi	r13,r13,4
+		lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
 		
 		epilog "TOC"
 
@@ -4251,7 +4261,7 @@ ChangeStack:
 
 		lwz	r3,RunningTask(r0)
 		mr	r28,r3
-		lwz	r5,TASKPPC_STACKSIZE(r3)
+		lwz	r5,TASKPPC_STACKSIZE(r3)		
 		cmplw	r4,r5
 		blt-	.SomeError
 
@@ -5016,6 +5026,9 @@ DeleteTaskPPC:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
+
+		loadreg	r5,"DELT"
+ 		stw	r5,0x134(r0)
 
 		lwz	r5,RunningTask(r0)		#ThisTask
 		li	r29,0

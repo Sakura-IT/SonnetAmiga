@@ -167,7 +167,7 @@ ExitCode:	blrl
 		
 		lwz	r4,RunningTask(r0)
 		lwz	r4,TC_SPLOWER(r4)
-		subi	r4,r4,2048
+		subi	r4,r4,1024
 		stw	r4,MN_ARG0(r9)
 		
 		mr	r24,r9		
@@ -855,15 +855,6 @@ mmuSetup:
 
 		mtlr	r30
 
-		blr
-		
-#********************************************************************************************
-
-.SetupMMU2:	mflr	r30
-
-
-		mtlr	r30
-		
 		blr
 
 #********************************************************************************************	
@@ -1852,9 +1843,11 @@ EInt:		b	.FPUnav				#0
 		la	r4,TASKPPC_CTMEM(r8)
 		stw	r4,TASKPPC_CONTEXTMEM(r8)
 		stw	r9,TASKPPC_STARTMSG(r8)
+		la	r31,TASKPPC_NAME(r8)
+		stw	r31,LN_NAME(r8)
 		lwz	r31,MN_ARG1(r9)
 		stw	r31,TASKPPC_STACKSIZE(r8)
-		addi	r4,r8,2048		
+		addi	r4,r8,1024		
 		stw	r4,TC_SPLOWER(r8)
 		add	r4,r4,r31
 		stw	r4,TC_SPUPPER(r8)
@@ -2254,10 +2247,12 @@ EInt:		b	.FPUnav				#0
 			
 .LoadContext:	lwz	r9,TASKPPC_CONTEXTMEM(r9)
 		lwz	r0,0(r9)
+		stw	r9,0x180(r0)
 		mtsrr0	r0
 		lwzu	r0,4(r9)
 		mtsrr1	r0
 		lwzu	r0,4(r9)
+		stw	r0,0x184(r0)
 		mtlr	r0
 		lwzu	r0,4(r9)
 		mtcr	r0
@@ -2670,7 +2665,7 @@ EInt:		b	.FPUnav				#0
 		stwu	r0,-4(r1)			#Store user stack
 		
 		mfsprg0	r0
-		
+
 		stw	r13,-4(r1)
 		subi	r13,r1,4
 		stwu	r1,-1080(r1)				
@@ -3074,14 +3069,6 @@ EInt:		b	.FPUnav				#0
 		sync
 		isync
 
-		stw	r3,0x140(r0)
-		stw	r4,0x144(r0)
-		stw	r5,0x148(r0)
-		stw	r6,0x14c(r0)
-		stw	r7,0x150(r0)
-		stw	r8,0x154(r0)
-		stw	r9,0x158(r0)
-
 		loadreg	r7,"DSI!"
 		stw	r7,0xf4(r0)
 
@@ -3107,12 +3094,180 @@ EInt:		b	.FPUnav				#0
 		bne	.NoLoadStore
 
 .DoInst:	rlwinm	r6,r7,11,27,31			#Get Destination Reg (l) or Source (s)
-		rlwinm	r8,r7,16,27,31			#Get Source Reg (l) or Destination (s)		
-		mr	r0,r6
-		rlwinm	r6,r7,6,31,31			#Check for update bit
+		rlwinm	r8,r7,16,27,31			#Get Source Reg (l) or Destination (s)
+		rlwinm.	r0,r7,4,31,31			#Check load or store
+		rlwinm	r0,r7,6,31,31			#Check for update bit
 		rlwinm	r7,r7,0,16,31			#Displacement (halfword)
 		extsh	r7,r7				#Extend sign of displacement
 
+		beq	.GetAddr
+
+		cmpwi	r6,0
+		bne	.NotSDr0
+		mfsprg0	r8
+		b	.GetAddr
+		
+.NotSDr0:	cmpwi	r6,1
+		bne	.NotSDr1
+		mr	r8,r1
+		b	.GetAddr
+		
+.NotSDr1:	cmpwi	r6,2
+		bne	.NotSDr2
+		mr	r8,r2
+		b	.GetAddr
+		
+.NotSDr2:	cmpwi	r6,3
+		bne	.NotSDr3
+		mr	r8,r3
+		b	.GetAddr
+		
+.NotSDr3:	cmpwi	r6,4
+		bne	.NotSDr4
+		mr	r8,r4
+		b	.GetAddr		
+
+.NotSDr4:	cmpwi	r6,5
+		bne	.NotSDr5
+		mr	r8,r5
+		b	.GetAddr
+		
+.NotSDr5:	cmpwi	r6,6
+		bne	.NotSDr6
+		mfsprg1	r8
+		b	.GetAddr
+		
+.NotSDr6:	cmpwi	r6,7
+		bne	.NotSDr7
+		mfsprg2	r8
+		b	.GetAddr
+		
+.NotSDr7:	cmpwi	r6,8
+		bne	.NotSDr8
+		mfsprg3	r8
+		b	.GetAddr
+		
+.NotSDr8:	cmpwi	r6,9
+		bne	.NotSDr9
+		mr	r8,r9
+		b	.GetAddr
+		
+.NotSDr9:	cmpwi	r6,10
+		bne	.NotSDr10
+		mr	r8,r10
+		b	.GetAddr
+		
+.NotSDr10:	cmpwi	r6,11
+		bne	.NotSDr11
+		mr	r8,r11
+		b	.GetAddr
+		
+.NotSDr11:	cmpwi	r6,12
+		bne	.NotSDr12
+		mr	r8,r12
+		b	.GetAddr		
+
+.NotSDr12:	cmpwi	r6,13
+		bne	.NotSDr13
+		mr	r8,r13
+		b	.GetAddr
+		
+.NotSDr13:	cmpwi	r6,14
+		bne	.NotSDr14
+		mr	r8,r14
+		b	.GetAddr
+		
+.NotSDr14:	cmpwi	r6,15
+		bne	.NotSDr15
+		mr	r8,r15
+		b	.GetAddr
+		
+.NotSDr15:	cmpwi	r6,16
+		bne	.NotSDr16
+		mr	r8,r16
+		b	.GetAddr		
+
+.NotSDr16:	cmpwi	r6,17
+		bne	.NotSDr17
+		mr	r8,r17
+		b	.GetAddr
+		
+.NotSDr17:	cmpwi	r6,18
+		bne	.NotSDr18
+		mr	r8,r18
+		b	.GetAddr
+		
+.NotSDr18:	cmpwi	r6,19
+		bne	.NotSDr19
+		mr	r8,r19
+		b	.GetAddr
+		
+.NotSDr19:	cmpwi	r6,20
+		bne	.NotSDr20
+		mr	r8,r20
+		b	.GetAddr		
+
+.NotSDr20:	cmpwi	r6,21
+		bne	.NotSDr21
+		mr	r8,r21
+		b	.GetAddr
+		
+.NotSDr21:	cmpwi	r6,22
+		bne	.NotSDr22
+		mr	r8,r22
+		b	.GetAddr
+		
+.NotSDr22:	cmpwi	r6,23
+		bne	.NotSDr23
+		mr	r8,r23
+		b	.GetAddr
+		
+.NotSDr23:	cmpwi	r6,24
+		bne	.NotSDr24
+		mr	r8,r24
+		b	.GetAddr
+		
+.NotSDr24:	cmpwi	r6,25
+		bne	.NotSDr25
+		mr	r8,r25
+		b	.GetAddr
+		
+.NotSDr25:	cmpwi	r6,26
+		bne	.NotSDr26
+		mr	r8,r26
+		b	.GetAddr
+		
+.NotSDr26:	cmpwi	r6,27
+		bne	.NotSDr27
+		mr	r8,r27
+		b	.GetAddr
+		
+.NotSDr27:	cmpwi	r6,28
+		bne	.NotSDr28
+		mr	r8,r28
+		b	.GetAddr		
+
+.NotSDr28:	cmpwi	r6,29
+		bne	.NotSDr29
+		mr	r8,r29
+		b	.GetAddr
+		
+.NotSDr29:	cmpwi	r6,30
+		bne	.NotSDr30
+		mr	r8,r30
+		b	.GetAddr
+		
+.NotSDr30:	cmpwi	r6,31
+		bne	.HaltDSI			#Should not happen
+		mr	r8,r31
+
+.GetAddr:	mr	r6,r0
+		mr	r0,r8
+		
+		mfsrr0	r8
+		lwz	r8,0(r8)
+		rlwinm	r8,r8,16,27,31			#Get Source Reg (l) or Destination (s)
+		
 		cmpwi	r8,0
 		bne	.Notr0
 		mfsprg0 r8
@@ -3372,174 +3527,12 @@ EInt:		b	.FPUnav				#0
 		beq	.GotAmigaMemAd
 		mr	r31,r7
 
-.GotAmigaMemAd:	mr	r6,r0
-		mfsrr0	r8
+.GotAmigaMemAd:	mfsrr0	r8
 		lwz	r8,0(r8)
-		rlwinm.	r0,r8,4,31,31				#Check load or store
+		mr	r6,r0
+		rlwinm.	r0,r8,4,31,31				#Check load or store		
 		beq	.LoadInstr
-		
-		mr	r0,r8
-		cmpwi	r6,0
-		bne	.NotSDr0
-		mfsprg0	r8
-		b	.GotStoreValue
-		
-.NotSDr0:	cmpwi	r6,1
-		bne	.NotSDr1
-		mr	r8,r1
-		b	.GotStoreValue
-		
-.NotSDr1:	cmpwi	r6,2
-		bne	.NotSDr2
-		mr	r8,r2
-		b	.GotStoreValue
-		
-.NotSDr2:	cmpwi	r6,3
-		bne	.NotSDr3
-		mr	r8,r3
-		b	.GotStoreValue
-		
-.NotSDr3:	cmpwi	r6,4
-		bne	.NotSDr4
-		mr	r8,r4
-		b	.GotStoreValue		
-
-.NotSDr4:	cmpwi	r6,5
-		bne	.NotSDr5
-		mr	r8,r5
-		b	.GotStoreValue
-		
-.NotSDr5:	cmpwi	r6,6
-		bne	.NotSDr6
-		mfsprg1	r8
-		b	.GotStoreValue
-		
-.NotSDr6:	cmpwi	r6,7
-		bne	.NotSDr7
-		mfsprg2	r8
-		b	.GotStoreValue
-		
-.NotSDr7:	cmpwi	r6,8
-		bne	.NotSDr8
-		mfsprg3	r8
-		b	.GotStoreValue
-		
-.NotSDr8:	cmpwi	r6,9
-		bne	.NotSDr9
-		mr	r8,r9
-		b	.GotStoreValue
-		
-.NotSDr9:	cmpwi	r6,10
-		bne	.NotSDr10
-		mr	r8,r10
-		b	.GotStoreValue
-		
-.NotSDr10:	cmpwi	r6,11
-		bne	.NotSDr11
-		mr	r8,r11
-		b	.GotStoreValue
-		
-.NotSDr11:	cmpwi	r6,12
-		bne	.NotSDr12
-		mr	r8,r12
-		b	.GotStoreValue		
-
-.NotSDr12:	cmpwi	r6,13
-		bne	.NotSDr13
-		mr	r8,r13
-		b	.GotStoreValue
-		
-.NotSDr13:	cmpwi	r6,14
-		bne	.NotSDr14
-		mr	r8,r14
-		b	.GotStoreValue
-		
-.NotSDr14:	cmpwi	r6,15
-		bne	.NotSDr15
-		mr	r8,r15
-		b	.GotStoreValue
-		
-.NotSDr15:	cmpwi	r6,16
-		bne	.NotSDr16
-		mr	r8,r16
-		b	.GotStoreValue		
-
-.NotSDr16:	cmpwi	r6,17
-		bne	.NotSDr17
-		mr	r8,r17
-		b	.GotStoreValue
-		
-.NotSDr17:	cmpwi	r6,18
-		bne	.NotSDr18
-		mr	r8,r18
-		b	.GotStoreValue
-		
-.NotSDr18:	cmpwi	r6,19
-		bne	.NotSDr19
-		mr	r8,r19
-		b	.GotStoreValue
-		
-.NotSDr19:	cmpwi	r6,20
-		bne	.NotSDr20
-		mr	r8,r20
-		b	.GotStoreValue		
-
-.NotSDr20:	cmpwi	r6,21
-		bne	.NotSDr21
-		mr	r8,r21
-		b	.GotStoreValue
-		
-.NotSDr21:	cmpwi	r6,22
-		bne	.NotSDr22
-		mr	r8,r22
-		b	.GotStoreValue
-		
-.NotSDr22:	cmpwi	r6,23
-		bne	.NotSDr23
-		mr	r8,r23
-		b	.GotStoreValue
-		
-.NotSDr23:	cmpwi	r6,24
-		bne	.NotSDr24
-		mr	r8,r24
-		b	.GotStoreValue
-		
-.NotSDr24:	cmpwi	r6,25
-		bne	.NotSDr25
-		mr	r8,r25
-		b	.GotStoreValue
-		
-.NotSDr25:	cmpwi	r6,26
-		bne	.NotSDr26
-		mr	r8,r26
-		b	.GotStoreValue
-		
-.NotSDr26:	cmpwi	r6,27
-		bne	.NotSDr27
-		mr	r8,r27
-		b	.GotStoreValue
-		
-.NotSDr27:	cmpwi	r6,28
-		bne	.NotSDr28
-		mr	r8,r28
-		b	.GotStoreValue		
-
-.NotSDr28:	cmpwi	r6,29
-		bne	.NotSDr29
-		mr	r8,r29
-		b	.GotStoreValue
-		
-.NotSDr29:	cmpwi	r6,30
-		bne	.NotSDr30
-		mr	r8,r30
-		b	.GotStoreValue
-		
-.NotSDr30:	cmpwi	r6,31
-		bne	.HaltDSI			#Should not happen
-		mr	r8,r31
 	
-.GotStoreValue:	mr	r6,r8
-		mr	r8,r0
 		rlwinm.	r0,r8,3,31,31
 		bne	.StoreHalf
 		rlwinm. r0,r8,5,31,31
@@ -3569,7 +3562,7 @@ EInt:		b	.FPUnav				#0
 		and	r23,r23,r4			#Keep it C000-FFFE		
 		stwbrx	r23,r24,r3
 		lwz	r30,0(r30)
-			
+
 		stw	r8,MN_IDENTIFIER(r30)
 		stw	r0,MN_IDENTIFIER+4(r30)		#AmigaValue
 		stw	r7,MN_IDENTIFIER+8(r30)		#AmigaAddress
@@ -3604,12 +3597,13 @@ EInt:		b	.FPUnav				#0
 		lwz	r23,12(r6)
 		lwz	r4,16(r6)
 		lwz	r3,20(r6)
-		
+
 		b	.GotAmigaValue
 								
-.LoadInstr:	loadreg	r8,"GETV"
-
-		mr	r0,r6
+.LoadInstr:	mfsrr0	r8
+		lwz	r8,0(r8)
+		rlwinm	r0,r8,11,27,31			#Get Destination Reg (l) or Source (s)
+		loadreg	r8,"GETV"
 		mr	r6,r1
 		stwu	r3,-4(r6)
 		stwu	r4,-4(r6)
