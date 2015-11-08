@@ -1023,24 +1023,8 @@ CpName	move.b (a1)+,(a2)
 	dbf d0,CpName
 
 EndName	move.l #"_PPC",(a2)				;Check Alignment?
-
-;	move.l ThisTask(a6),a1
-;	cmp.b #NT_PROCESS,LN_TYPE(a1)
-;	bne.s EndArgs
-;	move.l pr_Arguments(a1),d0
-;	beq.s EndArgs
-;	move.l d0,a1
-;
-;	moveq.l #63,d0
-;	move.l d6,a2
-;	lea TASKPPC_ARGS(a2),a2
-;CpArgs	move.b (a1)+,(a2)
-;	tst.b (a2)
-;	beq.s EndArgs
-;	addq.l #1,a2
-;	dbf d0,CpArgs
 							;Also push dcache
-EndArgs	move.l EUMBAddr(pc),a2
+	move.l EUMBAddr(pc),a2
 	move.l IFQPR(a2),a1
 	
 	moveq.l #47,d0					;MsgLen/4-1

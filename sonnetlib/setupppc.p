@@ -2116,7 +2116,7 @@ EInt:		b	.FPUnav				#0
 		
 		b	.ReturnToUser
 	
-.SwitchOld:	la	r4,ReadyTasks(r0)		#Old = Context, New = PPStruct		
+.SwitchOld:	la	r4,ReadyTasks(r0)		#Old = Context, New = PPStruct
 		lwz	r5,RunningTask(r0)
 		stw	r9,RunningTask(r0)
 		
@@ -2137,7 +2137,7 @@ EInt:		b	.FPUnav				#0
 		b	.LoadContext
 	
 .SwitchNew:	
-		la	r4,ReadyTasks(r0)
+		la	r4,ReadyTasks(r0)		
 		lwz	r5,RunningTask(r0)
 		stw	r9,RunningTask(r0)
 		
@@ -2161,7 +2161,7 @@ EInt:		b	.FPUnav				#0
 		mfsprg1 r3
 		stwu	r3,4(r6)
 		lwz	r3,0(r1)
-		lwz	r3,0(r3)			#User stack
+#		lwz	r3,0(r3)			#User stack
 		lwz	r0,8(r3)			#lr
 		stwu	r0,4(r6)
 		lwz	r0,4(r3)			#cr
@@ -2172,7 +2172,8 @@ EInt:		b	.FPUnav				#0
 		stwu	r0,4(r6)			#xer
 		mfsprg2	r0
 		stwu	r0,4(r6)
-		stwu	r3,4(r6)
+		lwz	r0,0(r3)
+		stwu	r0,4(r6)			#r1
 		stwu	r2,4(r6)
 		lwz	r0,24(r13)
 		stwu	r0,4(r6)
@@ -2247,12 +2248,10 @@ EInt:		b	.FPUnav				#0
 			
 .LoadContext:	lwz	r9,TASKPPC_CONTEXTMEM(r9)
 		lwz	r0,0(r9)
-		stw	r9,0x180(r0)
 		mtsrr0	r0
 		lwzu	r0,4(r9)
 		mtsrr1	r0
 		lwzu	r0,4(r9)
-		stw	r0,0x184(r0)
 		mtlr	r0
 		lwzu	r0,4(r9)
 		mtcr	r0
