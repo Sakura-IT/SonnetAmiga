@@ -774,11 +774,14 @@ mmuSetup:
 		lwz	r3,RTGBase(r0)			#8MB Video RAM
 		addis	r4,r3,0x80
 		addis	r5,r3,0x4000
-		loadreg	r6,PTE_CACHE_INHIBITED
 		lhz	r7,RTGType(r0)
 		cmpwi	r7,0x1002
-		beq	.ATI
-		li	r6,0
+		bne	.NoATI
+		loadreg	r6,PTE_WRITE_THROUGH
+		addis	r4,r4,0x80			#16 MB
+		b	.ATI
+		
+.NoATI:		li	r6,0
 .ATI:		li	r7,2
 		
 		bl	.DoTBLs
