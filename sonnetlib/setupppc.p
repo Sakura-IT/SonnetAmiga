@@ -771,14 +771,14 @@ mmuSetup:
 		
 		bl	.DoTBLs
 		
-		lwz	r3,RTGBase(r0)			#8MB Video RAM
-		addis	r4,r3,0x80
+		lwz	r3,RTGBase(r0)			#16MB Video RAM
+		addis	r4,r3,0x100
 		addis	r5,r3,0x4000
 		lhz	r7,RTGType(r0)
 		cmpwi	r7,0x1002
 		bne	.NoATI
 		loadreg	r6,PTE_WRITE_THROUGH
-		addis	r4,r4,0x80			#16 MB
+#		addis	r4,r4,0x80
 		b	.ATI
 		
 .NoATI:		li	r6,0

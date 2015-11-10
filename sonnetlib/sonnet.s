@@ -1,6 +1,4 @@
 
-;MMU	EQU	1
-
 	include 68kdefines.i
 	include	exec/exec_lib.i
 	include exec/initializers.i
@@ -21,14 +19,6 @@
 	include hardware/intbits.i
 	include	exec/tasks.i
 	include sonnet_lib.i
-	
-	IFD	MMU
-	
-	include mmu/mmutags.i
-	include mmu/context.i
-	include	mmu/mmu_lvo.i
-
-	ENDC
 
 	XREF	FunctionsLen
 
@@ -131,7 +121,6 @@ INIT:
 	jsr _LVOFindName(a6)
 	tst.l d0
 	bne.s FndMem
-	bra Dirty				;No initialized VGA found
 
 Clean	move.l ROMMem(pc),d0
 	beq.s NoROM
@@ -171,7 +160,7 @@ Loop1	move.l LN_SUCC(a2),d6
 	beq.s SonnetF
 	cmp.l #$0005121a,d1
 	beq.s Avenger
-	cmp.w #$1002,d1				;Very slow context switch, very fast gfx...
+	cmp.w #$1002,d1
 	beq.s ATIGen
 GfxLoop	move.l d6,a2
 	bra.s Loop1
@@ -208,7 +197,7 @@ Sonnet	tst.l d0
 
 	move.l PCI_SPACE1(a2),a3		;PCSRBAR Sonnet
 	move.l a3,EUMBAddr-Buffer(a4)
-	or.b #15,d0				;64kb
+	or.b #15,d0				;64kb ROM
 	rol.w #8,d0
 	swap d0
 	rol.w #8,d0
@@ -277,11 +266,11 @@ Wait	move.l $3004(a1),d5
 	clr.l (a1)
 
 	move.l d6,d1
-	sub.l #PageTableSize+32,d1			;for pagetable
+	sub.l #PageTableSize+32,d1		;for pagetable
 	move.l d1,MC_BYTES(a1)
 	move.l a1,MH_LOWER(a0)
 	add.l a0,d6
-	sub.l #PageTableSize,d6				;for pagetable
+	sub.l #PageTableSize,d6			;for pagetable
 	move.l d6,MH_UPPER(a0)
 	move.l d1,MH_FREE(a0)
 	move.l a0,a1
@@ -317,12 +306,12 @@ MoveSon	move.l (a0)+,(a1)+
 	bsr MakeLibrary
 	
 	tst.l d0
-	beq NoLib					;beq.s
+	beq NoLib
 
 	move.l SonnetBase(pc),a1
 	move.l d0,PowerPCBase(a1)
-	move.l a5,PPCMemHeader(a1)			;Memheader at $8
-	move.l a1,(a1)					;Sonnet relocated mem at $0
+	move.l a5,PPCMemHeader(a1)		;Memheader at $8
+	move.l a1,(a1)				;Sonnet relocated mem at $0
 	move.l d0,_PowerPCBase-Buffer(a4)
 	move.l a6,SysBase(a1)
 	move.l DosBase(pc),DOSBase(a1)
@@ -335,6 +324,13 @@ MoveSon	move.l (a0)+,(a1)+
 	move.l #$190000,d0	
 	jsr _LVOAllocAbs(a6)	
 
+
+	lea ciabres(pc),a1
+	jsr _LVOOpenResource(a6)
+	tst.l d0
+	beq Clean
+	move.l d0,a6
+	
 	lea MyInterrupt(pc),a1
 	lea SonInt(pc),a2
 	move.l a2,IS_CODE(a1)
@@ -346,9 +342,14 @@ MoveSon	move.l (a0)+,(a1)+
 	move.b d0,LN_PRI(a1)
 	moveq.l #NT_INTERRUPT,d0
 	move.b d0,LN_TYPE(a1)
-	moveq.l #INTB_PORTS,d0
-	jsr _LVOAddIntServer(a6)
-
+	
+	move.l PCIBase(pc),a6
+	move.l SonAddr(pc),a0
+	jsr _LVOAddPCICardIntServer(a6)		;Attach Sonnet card to PCI Interrupt Chain
+	
+	move.l SonAddr(pc),a0
+	jsr _LVOEnablePCICardInt(a6)		;Enable interrupt
+	
 	lea PrcTags(pc),a1
 	move.l a1,d1
 	move.l DosBase(pc),a6
@@ -356,11 +357,7 @@ MoveSon	move.l (a0)+,(a1)+
 	move.l 4.w,a6
 
 NoLib	jsr _LVOEnable(a6)
-	
-	IFD	MMU
-	bsr FunkyMMU
-	ENDC
-	
+		
 PPCInit	move.l SonnetBase(pc),a1
 	move.l Init(a1),d0
 	cmp.l #"REDY",d0
@@ -442,93 +439,6 @@ NoFun	movem.l (a7)+,d1-a6
 	rts
 	
 ;********************************************************************************************	
-	
-Dirty	move.l MediatorBase(pc),a0		;WARNING!!!! : EUMB register gets redefined
-	moveq.l #0,d2				;after pci.library initiation!!!
-	moveq.l #$3f,d1				;This affects the INT2 interrupt!!
-	move.b #$60,(a0)			;Start address PCI Mem ($60000000)
-CpLoop	move.l a0,a5
-	add.l #$800000,a5			;Start address PCI config
-	move.l d2,d0
-	lsl.l #3,d0
-	lsl.l #8,d0
-	add.l d0,a5
-	move.l (a5),d6
-	cmp.l #$FFFFFFFF,d6
-	beq Clean
-	rol.w #8,d6
-	swap d6
-	rol.w #8,d6
-	cmp.l #$00041057,d6
-	beq.s MPC107
-	cmp.l #$0005121a,d6
-	beq VooDoo3
-VooDone	addq.l #1,d2
-	dbf d1,CpLoop
-	bra Clean
-
-MPC107	move.l #$62b00000,a1
-	move.l PCIBase(pc),d5
-	beq.s HardCr
-	nop					;Insert code
-
-	move.l PCSRBAR(a5),d5
-	rol.w #8,d5
-	swap d5
-	rol.w #8,d5
-	move.l d5,a3
-	bra.s SoftCr
-
-HardCr	move.l #$00300064,d5			;EUMB at $64003000
-	move.l d5,PCSRBAR(a5)
-	move.l COMMAND(a5),d5
-	bset #25,d5				;Set PCI Memory bit
-	move.l d5,COMMAND(a5)
-	
-	move.l #$64003000,a3			;EUMB at $64003000
-SoftCr	move.l a3,EUMBAddr-Buffer(a4)
-
-	move.l PCIBase(pc),d5
-	beq.s HC2
-	move.l d5,a1
-	move.l PCI_List(a1),a1
-Loop12	move.l LN_SUCC(a1),d5
-	beq Clean
-	move.l PCI_VENDORID(a1),d1
-	cmp.l #$121a0005,d1
-	beq.s Voodoo2
-	move.l d5,a1
-	bra.s Loop12
-
-Voodoo2	move.l PCI_SPACE1(a1),d1
-	add.l #$b00000,d1
-	move.l d1,a1
-	or.l #$f,d1
-	rol.w #8,d1
-	swap d1
-	rol.w #8,d1
-	move.l d1,OTWR(a3)
-	bra.s SC2
-
-HC2	move.l #$0F00B062,OTWR(a3)		;Host outbound PCI mem at $62B00000, 64kb (Code in GFXMem?)
-SC2	move.l #$0000F0FF,OMBAR(a3)		;Processor outbound mem at $FFF00000
-
-	moveq.l #0,d4
-	move.l a5,d5
-	lea $100(a1),a5
-	bra EndDrty
-
-VooDoo3	movem.l d0-a6,-(a7)
-	move.l PCIBase(pc),d5
-	bne.s V3SC
-	moveq.l	#$62,d5				;Set BAR Voodoo at $62000000
-	move.l d5,$14(a5)
-V3SC	move.l COMMAND(a5),d5
-	or.l #$07000000,d5
-;	bset #25,d5				;Set PCI Memory bit (Voodoo3)
-	move.l d5,COMMAND(a5)
-	movem.l (a7)+,d0-a6
-	bra VooDone
 
 DosLib	dc.b "dos.library",0
 	cnop 	0,2
@@ -536,6 +446,8 @@ ExpLib	dc.b "expansion.library",0
 	cnop	0,2
 pcilib	dc.b "pci.library",0
 	cnop	0,2
+ciabres	dc.b "ciab.resource",0
+	cnop	0,2	
 MemName	dc.b "Sonnet memory",0
 	cnop	0,2
 PCIMem	dc.b "pcidma memory",0
@@ -584,7 +496,7 @@ GetLoop	move.l d6,a0
 MsgT68k	move.b LN_TYPE(a1),d7
 	cmp.b #NT_MESSAGE,d7
 	beq.s Sig68k
-	cmp.b #NT_REPLYMSG,d7				;signal PPC that 68k is done
+	cmp.b #NT_REPLYMSG,d7			;signal PPC that 68k is done
 	bne.s NextMsg
 
 	move.l MN_ARG2(a1),a2
@@ -593,15 +505,15 @@ ReUse	move.l a2,d7
 	lea PushMsg(pc),a5
 	jsr _LVOSupervisor(a6)
 	move.l EUMBAddr(pc),a2
-	move.l a1,OFQPR(a2)				;Return Message Frame
-	move.l d7,IFQPR(a2)				;Message the PPC
+	move.l a1,OFQPR(a2)			;Return Message Frame
+	move.l d7,IFQPR(a2)			;Message the PPC
 	bra NextMsg
 	
 Sig68k	move.l DosBase(pc),d6
 	move.l MN_PPSTRUCT(a1),d7
 	cmp.l d6,d7
 	bne.s NoDosL
-	move.l #_LVOCreateNewProc,d6			;Start of compatibility patches
+	move.l #_LVOCreateNewProc,d6		;Start of compatibility patches
 	move.l MN_PPSTRUCT+4(a1),d7
 	cmp.l d6,d7
 	bne.s NoCNP	
@@ -621,7 +533,7 @@ NoCNP	move.l #_LVODateStamp,d6
 	bra.s EndPtch
 
 NoDS	nop
-	bra.s EndPtch					;For more DOS functions
+	bra.s EndPtch				;For more DOS functions
 
 NoDosL	nop
 
@@ -629,7 +541,7 @@ EndPtch	move.l ThisTask(a6),a0
 	lea pr_MsgPort(a0),a0
 	move.l a0,MN_REPLYPORT(a1)
 	move.l MN_MIRROR(a1),a0
-	jsr _LVOPutMsg(a6)				;move message to waiting 68k task
+	jsr _LVOPutMsg(a6)			;move message to waiting 68k task
 	bra NextMsg
 
 MsgF68k	move.l d7,a1
@@ -668,7 +580,7 @@ NoScrn	move.l #"DONE",MN_IDENTIFIER(a2)
 PushMsg	moveq.l #11,d4
 	move.l a1,a2
 PshMsg	cpushl dc,(a2)
-	lea L1_CACHE_LINE_SIZE_040(a2),a2		;Cache_Line 040/060 = 16 bytes
+	lea L1_CACHE_LINE_SIZE_040(a2),a2	;Cache_Line 040/060 = 16 bytes
 	dbf d4,PshMsg
 	rte
 
@@ -685,7 +597,7 @@ StoreD	move.l MN_IDENTIFIER(a1),d7
 Putted	move.l #"DONE",d7
 	move.l d7,MN_IDENTIFIER(a1)
 	move.l EUMBAddr(pc),a2
-	move.l a1,OFQPR(a2)				;Return Message Frame
+	move.l a1,OFQPR(a2)			;Return Message Frame
 	bra GetLoop
 	
 PutB	move.b d0,(a0)
@@ -699,7 +611,7 @@ LoadD	move.l #"DONE",d0
 	move.l (a3),MN_IDENTIFIER+4(a1)
 	move.l d0,MN_IDENTIFIER(a1)
 	move.l EUMBAddr(pc),a2
-	move.l a1,OFQPR(a2)				;Return Message Frame
+	move.l a1,OFQPR(a2)			;Return Message Frame
 	bra GetLoop
 
 	cnop 0,4
@@ -708,115 +620,62 @@ PrcTags	dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,125,0,0
 PrcName	dc.b "MasterControl",0
 
 	cnop 0,4
-
-;********************************************************************************************
-	IFD MMU
-
-FunkyMMU
-	movem.l d1-a6,-(a7)			;Enable caches for PCI memory
-	move.l ROMMem(pc),a1
-	move.l #$10000,d7
-	move.l $3008(a1),d6			;MemStart
-	add.l d7,d6
-	move.l $300c(a1),d5			;MemLen
-	sub.l d7,d5
-	moveq.l #0,d0
-	lea mmulib(pc),a1
-	jsr _LVOOpenLibrary(a6)
-	move.l d0,d7
-	beq.s NoMMU
-	move.l d0,a6
-	jsr _LVODefaultContext(a6)
-	move.l d0,d4
-	beq.s NoMMU2
-	move.l d0,a0				;Context
-	moveq.l #0,d1
-;	move.l #MAPP_COPYBACK,d1		;flags
-	moveq.l #-1,d2				;Mask
-	move.l d6,a1				;Logical
-	move.l d5,d0				;Size
-	lea MMUTags(pc),a2
-	jsr _LVOSetPropertiesA(a6)
-	tst.l d0
-	beq.s NoMMU2
-	move.l d4,a0
-	jsr _LVORebuildTree(a6)
-	move.l d7,a1
-	move.l 4.w,a6
-	jsr _LVOCloseLibrary(a6)
-	movem.l (a7)+,d1-a6
-	rts	
-	
-NoMMU2	move.l d7,a1
-	move.l 4.w,a6
-	jsr _LVOCloseLibrary(a6)
-NoMMU	movem.l (a7)+,d1-a6
-	rts	
-
-;********************************************************************************************
-
-MMUTags	dc.l TAG_DONE,0
-
-mmulib	dc.b "mmu.library",0
-	cnop	0,2
-	
-	ENDC
 	
 ;********************************************************************************************
 	
-SonInt:
-	movem.l d1-a6,-(a7)
+SonInt:	movem.l d0-a6,-(a7)
 	move.l 4.w,a6
+	
 	move.l EUMBAddr(pc),a2
-	move.l #$03000000,d2				;OMISR[OM0I|OM1I]
+	move.l #$03000000,d2			;OMISR[OM0I|OM1I]
 	move.l OMISR(a2),d3
 	and.l d2,d3
 	beq NoSingl
 	
-	move.l OMR0(a2),a0				;Port
-	move.l OMR1(a2),a1				;Message
+	move.l OMR0(a2),a0			;Port
+	move.l OMR1(a2),a1			;Message
 		
-	move.l #$ffffffff,OMR0(a2)			;Destroy value
+	move.l #$ffffffff,OMR0(a2)		;Destroy value
 	cmp.l #$ffffffff,a0
 	beq.s NoSingl
 	
 DoPMsg	moveq.l #0,d4
-	move.w MN_LENGTH(a1),d4				;PPC should make it 32 byte aligned
+	move.w MN_LENGTH(a1),d4			;PPC should make it 32 byte aligned
 	beq.s NoSingl
 	lsr.l #4,d4
 	subq.l #1,d4
 	move.l a1,d3
-	bsr.s InvMsg
-	move.l d3,a1
-	
+;	bsr.s InvMsg				;PCI memory is cache inhibited for 68k
+	move.l d3,a1	
 	jsr _LVOPutMsg(a6)
 
 NoSingl move.l OMISR(a2),d3
 	move.l d2,OMISR(a2)
 
-	move.l #$20000000,d4				;OMISR[OPQI]
+	move.l #$20000000,d4			;OMISR[OPQI]
 	and.l d4,d3
-	beq.s NoInt
-NxtMsg	move.l OFQPR(a2),d3				;Get Message Frame
-	bmi.s NoInt
+	beq.s DidInt
+
+NxtMsg	move.l OFQPR(a2),d3			;Get Message Frame
+	bmi.s DidInt
 	
 	move.l d3,a1	
 	moveq.l #11,d4
-	bsr.s InvMsg	
+;	bsr.s InvMsg				;PCI memory is cache inhibited for 68k
 	move.l d3,a1
-	move.l MN_MCTASK(a1),a0				;MN_MCTASK
+	move.l MN_MCTASK(a1),a0			;MN_MCTASK
 	
 	jsr _LVOPutMsg(a6)
 	
 	bra.s NxtMsg
 	
-NoInt	movem.l (a7)+,d1-a6
-	moveq.l #0,d0
+DidInt	moveq.l #0,d7	
+	movem.l (a7)+,d0-a6
 	rts
 
 InvMsg	cinvl dc,(a1)
-	lea L1_CACHE_LINE_SIZE_040(a1),a1		;Cache_Line 040/060 = 16 bytes
-	dbf d4,InvMsg					;12x16 = MsgLen (192 bytes)
+	lea L1_CACHE_LINE_SIZE_040(a1),a1	;Cache_Line 040/060 = 16 bytes
+	dbf d4,InvMsg				;12x16 = MsgLen (192 bytes)
 	rts
 
 IntData	dc.l 0
@@ -1014,7 +873,7 @@ xProces	move.l d0,Port(a5)
 	move.l d6,a2
 	lea TASKPPC_NAME(a2),a2
 	
-	move.l #1019-TASKPPC_NAME,d0			;Name len limit
+	move.l #1019-TASKPPC_NAME,d0		;Name len limit
 	move.l LN_NAME(a1),a1
 CpName	move.b (a1)+,(a2)
 	tst.b (a2)
@@ -1022,12 +881,12 @@ CpName	move.b (a1)+,(a2)
 	addq.l #1,a2
 	dbf d0,CpName
 
-EndName	move.l #"_PPC",(a2)				;Check Alignment?
-							;Also push dcache
+EndName	move.l #"_PPC",(a2)			;Check Alignment?
+						;Also push dcache
 	move.l EUMBAddr(pc),a2
 	move.l IFQPR(a2),a1
 	
-	moveq.l #47,d0					;MsgLen/4-1
+	moveq.l #47,d0				;MsgLen/4-1
 	move.l a1,a2
 ClrMsg	clr.l (a2)+
 	dbf d0,ClrMsg
@@ -1038,8 +897,8 @@ ClrMsg	clr.l (a2)+
 	move.l Port(a5),d1
 	move.l d1,MN_REPLYPORT(a1)
 	move.l d1,MN_MIRROR(a1)
-	move.l d6,MN_ARG0(a1)				;Mem
-	move.l d7,MN_ARG1(a1)				;Len
+	move.l d6,MN_ARG0(a1)			;Mem
+	move.l d7,MN_ARG1(a1)			;Len
 	
 	lea MN_PPSTRUCT(a1),a2
 	moveq.l #PP_SIZE/4-1,d0
@@ -1105,7 +964,7 @@ CpBck	move.l (a0)+,(a1)+
 	dbf d0,CpBck
 	moveq.l #PPERR_SUCCESS,d7	
 	move.l EUMBAddr(pc),a1
-	move.l a2,OFQPR(a1)				;Return Message Frame
+	move.l a2,OFQPR(a1)			;Return Message Frame
 	bra.s Success
 
 Cannot	moveq.l #-1,d7	
@@ -1135,7 +994,7 @@ Runk86
 	fmove.d fp5,-(a7)
 	fmove.d fp6,-(a7)
 	fmove.d fp7,-(a7)
-NoFPU	movem.l d0-a6,-(a7)				;68k routines called from PPC
+NoFPU	movem.l d0-a6,-(a7)			;68k routines called from PPC
 	move.l a0,-(a7)
 	lea MN_PPSTRUCT(a0),a1
 	pea xBack(pc)
@@ -1154,7 +1013,7 @@ NoFPU	movem.l d0-a6,-(a7)				;68k routines called from PPC
 	fmove.d (a6)+,fp5
 	fmove.d (a6)+,fp6
 	fmove.d (a6)+,fp7
-NoFPU3	lea PP_REGS(a1),a6				;PP_STACKSIZE & PP_STACKPTR to be done
+NoFPU3	lea PP_REGS(a1),a6			;PP_STACKSIZE & PP_STACKPTR to be done
 	movem.l (a6)+,d0-a5
 	move.l (a6),a6
 	rts
@@ -1227,7 +1086,7 @@ NoFPU2	jsr _LVOReplyMsg(a6)
 GetPPCState:
 	move.l a0,-(a7)
 	move.l d1,-(a7)
-	moveq.l #PPCSTATEF_POWERSAVE,d0			;If no waiting then POWERSAVE
+	moveq.l #PPCSTATEF_POWERSAVE,d0		;If no waiting then POWERSAVE
 	move.l SonnetBase(pc),a0
 	move.l WaitingTasks(a0),d1
 	beq.s NoWait
@@ -1475,6 +1334,11 @@ GfxType		ds.l	1
 ComProc		ds.l	1
 SonAddr		ds.l	1
 EUMBAddr	ds.l	1
+StartMask	ds.b	1
+StopMask	ds.b	3
+CIAControl	ds.l	1
+CIALow		ds.l	1
+CIAHigh		ds.l	1
 MyInterrupt	ds.b	IS_SIZE
 
 	cnop	0,4
@@ -1538,9 +1402,9 @@ FUNCTABLE:
 	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved
-	dc.l	Reserved				;49 68K Functions
+	dc.l	Reserved			;49 68K Functions
 
-	dc.l	Run68K					;PPC
+	dc.l	Run68K				;PPC
 	dc.l	WaitFor68K
 	dc.l	SPrintF
 	dc.l	Run68KLowLevel
@@ -1640,6 +1504,6 @@ EndFlag	dc.l	-1
 LibName
 	dc.b	"sonnet.library",0,0
 IDString
-	dc.b	"$VER: sonnet.library 17.0 (02-Nov-15)",0
+	dc.b	"$VER: sonnet.library 17.0 (10-Nov-15)",0
 	cnop	0,4
 EndCP	end
