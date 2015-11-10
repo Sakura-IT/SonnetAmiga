@@ -5,7 +5,12 @@
 *----------------------------------------------------------------
 
 PCI_List	EQU	100
-PCI_MemType	EQU	0		;EQ=MEM NE=IO	
+PCI_MemType	EQU	0		;EQ=MEM NE=IO
+
+_LVOEnablePCICardInt		=	-48
+_LVODisablePCICardInt		=	-54
+_LVOAddPCICardIntServer		=	-78
+_LVORemovePCICardIntServer	=	-84
 
  STRUCTURE  	PCI,LN_SIZE
     UWORD   	PCI_VENDORID		;Vendor ID		(14)
@@ -29,9 +34,12 @@ PCI_MemType	EQU	0		;EQ=MEM NE=IO
     ULONG	PCI_SPACELEN5		;Length of IO/Memory	(72)
     APTR	PCI_ROMSPACE		;ROM Space		(76)
     ULONG	PCI_ROMLEN		;Length of EOM		(80)
-    ULONG	PCI_UNKNOWN		;Unknown		(84)
+    APTR	PCI_CARDBUS		;Cardbus CIS Pointer	(84)
     APTR	PCI_VENDOR		;Vendor Name		(88)
     APTR	PCI_DEVICE		;Vendor Device		(92)
+    ULONG	PCI_UNKNOWN1		;Unknown		(96)
+    ULONG	PCI_UNKNOWN2		;Unknown		(100)
+    ULONG	PCI_LATGRANTPINLINE	;Max latency etc.	(104)
     LABEL   	PCI_SIZE
 
 
