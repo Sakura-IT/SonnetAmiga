@@ -323,13 +323,6 @@ MoveSon	move.l (a0)+,(a1)+
 	add.l #$100000,a1
 	move.l #$190000,d0	
 	jsr _LVOAllocAbs(a6)	
-
-
-	lea ciabres(pc),a1
-	jsr _LVOOpenResource(a6)
-	tst.l d0
-	beq Clean
-	move.l d0,a6
 	
 	lea MyInterrupt(pc),a1
 	lea SonInt(pc),a2
@@ -446,8 +439,6 @@ ExpLib	dc.b "expansion.library",0
 	cnop	0,2
 pcilib	dc.b "pci.library",0
 	cnop	0,2
-ciabres	dc.b "ciab.resource",0
-	cnop	0,2	
 MemName	dc.b "Sonnet memory",0
 	cnop	0,2
 PCIMem	dc.b "pcidma memory",0
