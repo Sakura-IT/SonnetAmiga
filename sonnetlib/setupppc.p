@@ -648,7 +648,6 @@ ClearInts:	lwz	r27,0xa0(r26)			#IACKR
 		blr
 
 #********************************************************************************************
-
 							#Invalidatem then enable L1 caches
 Caches:		mfspr	r4,HID0
 		ori	r4,r4,HID0_ICFI|HID0_DCFI
@@ -773,20 +772,31 @@ mmuSetup:
 		
 		lwz	r3,RTGBase(r0)			#16MB Video RAM
 		addis	r4,r3,0x100
+		mr	r24,r4
 		addis	r5,r3,0x4000
 		lhz	r7,RTGType(r0)
 		cmpwi	r7,0x1002
 		bne	.NoATI
 		loadreg	r6,PTE_WRITE_THROUGH
-#		addis	r4,r4,0x80
-		b	.ATI
-		
+		b	.ATI		
 .NoATI:		li	r6,0
 .ATI:		li	r7,2
 		
 		bl	.DoTBLs
 		
-		li	r3,0				#Zeropage (12K no cache)
+		lhz	r3,RTGType(r0)
+		cmpwi	r3,0x1002
+		bne	.NoATI2
+		mr	r3,r24
+		addis	r5,r3,0x4000
+		mr	r4,r3
+		addis	r4,r4,0xf00
+		li	r6,0
+		li	r7,2
+		
+		bl	.DoTBLs		
+		
+.NoATI2:	li	r3,0				#Zeropage (12K no cache)
 		li	r4,0x3000
 		mr	r5,r3
 		loadreg	r6,PTE_CACHE_INHIBITED
