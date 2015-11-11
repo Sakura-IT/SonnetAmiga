@@ -774,19 +774,14 @@ mmuSetup:
 		addis	r4,r3,0x100
 		mr	r24,r4
 		addis	r5,r3,0x4000
-		lhz	r7,RTGType(r0)
-		cmpwi	r7,0x1002
-		bne	.NoATI
 		loadreg	r6,PTE_WRITE_THROUGH
-		b	.ATI		
-.NoATI:		li	r6,0
-.ATI:		li	r7,2
+		li	r7,2
 		
 		bl	.DoTBLs
 		
 		lhz	r3,RTGType(r0)
 		cmpwi	r3,0x1002
-		bne	.NoATI2
+		bne	.NoATI
 		mr	r3,r24
 		addis	r5,r3,0x4000
 		mr	r4,r3
@@ -796,14 +791,13 @@ mmuSetup:
 		
 		bl	.DoTBLs		
 		
-.NoATI2:	li	r3,0				#Zeropage (12K no cache)
+.NoATI:		li	r3,0				#Zeropage (12K no cache)
 		li	r4,0x3000
 		mr	r5,r3
 		loadreg	r6,PTE_CACHE_INHIBITED
 		li	r7,2				#pp = 2 - Read/Write Access
 		
 		bl	.DoTBLs						
-		
 		
 		li	r3,0x3000			#Exception code (16K cached)
 		li	r4,0x7000
@@ -812,7 +806,6 @@ mmuSetup:
 		li	r7,2
 		
 		bl	.DoTBLs
-		
 		
 		loadreg	r3,0x100000			#Message FIFOs (64k no cache)
 		loadreg	r4,0x110000
@@ -1780,18 +1773,7 @@ EInt:		b	.FPUnav				#0
 		lis	r3,EUMBEPICPROC
 		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
 		
-.RDecInt:	
-		lhz	r9,RTGType(r0)
-		cmpwi	r9,0x1002
-		beq	.ATI2
-		lwz	r9,RTGBase(r0)
-		addis	r4,r9,0x80
-.flushgfx:	dcbf	r0,r9
-		addi	r9,r9,32
-		cmpw	r9,r4
-		bne	.flushgfx
-		
-.ATI2:		lwz	r9,TaskException(r0)
+.RDecInt:	lwz	r9,TaskException(r0)
 		mr.	r9,r9
 		bne	.TaskException
 
