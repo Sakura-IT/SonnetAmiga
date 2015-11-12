@@ -2026,7 +2026,7 @@ AddSemaphorePPC:
 		
 		bl ObtainSemaphorePPC
 		
-		lwz	r4,Semaphores(r0)
+		la	r4,Semaphores(r0)
 		mr	r5,r30
 		
 		bl EnqueuePPC
@@ -2093,7 +2093,7 @@ FindSemaphorePPC:
 
 		bl ObtainSemaphorePPC
 
-		lwz	r4,Semaphores(r0)
+		la	r4,Semaphores(r0)
 		mr	r5,r30
 
 		bl FindNamePPC
@@ -2134,7 +2134,7 @@ AddPortPPC:
 
 		bl ObtainSemaphorePPC
 
-		lwz	r4,Ports(r0)
+		la	r4,Ports(r0)
 		mr	r5,r30
 
 		bl EnqueuePPC
@@ -2197,7 +2197,7 @@ FindPortPPC:
 
 		bl ObtainSemaphorePPC
 
-		lwz	r4,Ports(r0)		
+		la	r4,Ports(r0)		
 
 		bl FindNamePPC
 
@@ -4618,7 +4618,7 @@ SnoopTask:
 		
 		bl ObtainSemaphorePPC
 
-		lwz	r4,SnoopList(r0)
+		la	r4,SnoopList(r0)
 		mr	r5,r31
 
 		bl AddHeadPPC
