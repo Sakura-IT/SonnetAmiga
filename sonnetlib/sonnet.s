@@ -553,7 +553,7 @@ MsgLL68	move.l MN_PPSTRUCT+0*4(a1),a6
 	add.l a6,a0
 	move.l a1,-(a7)
 	pea RtnLL(pc)
-	move.l a0,-(a7)
+	move.l a0,-(a7)	
 	move.l MN_PPSTRUCT+2*4(a1),a0
 	move.l MN_PPSTRUCT+4*4(a1),d0
 	move.l MN_PPSTRUCT+5*4(a1),d1
@@ -566,6 +566,7 @@ RtnLL	move.l (a7)+,a1
 	move.l d0,MN_PPSTRUCT+6*4(a2)	
 NoScrn	move.l #"DONE",MN_IDENTIFIER(a2)
 	move.l MN_PPC(a1),MN_PPC(a2)
+	move.l 4.w,a6
 	bra ReUse
 	
 PushMsg	moveq.l #11,d4
@@ -1263,7 +1264,7 @@ PowerDebugMode:
 ;********************************************************************************************	
 
 SPrintF68K:
-	movem.l a2,-(a7)
+	movem.l a2,-(a7)	
 	lea PutChProc(pc),a2
 	move.l a6,-(a7)
 	move.l 4.w,a6
@@ -1325,11 +1326,6 @@ GfxType		ds.l	1
 ComProc		ds.l	1
 SonAddr		ds.l	1
 EUMBAddr	ds.l	1
-StartMask	ds.b	1
-StopMask	ds.b	3
-CIAControl	ds.l	1
-CIALow		ds.l	1
-CIAHigh		ds.l	1
 MyInterrupt	ds.b	IS_SIZE
 
 	cnop	0,4
