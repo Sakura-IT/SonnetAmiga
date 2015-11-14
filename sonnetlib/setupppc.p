@@ -1672,8 +1672,7 @@ EInt:		b	.FPUnav				#0
 
 		loadreg	r3,"EXEX"
 		stw	r3,0xf4(r0)
-
-#.RDecInt:	
+	
 		lis	r3,EUMBEPICPROC
 		lwz	r5,EPIC_IACK(r3)		#Read IACKR to acknowledge interrupt
 
@@ -1986,6 +1985,7 @@ EInt:		b	.FPUnav				#0
 
 .NoThrow:	mr	r7,r0
 		stb	r0,ExceptionMode(r0)
+		stb	r0,PortInUse(r0)
 
 		loadreg	r0,Quantum
 		mtdec	r0
@@ -2023,6 +2023,7 @@ EInt:		b	.FPUnav				#0
 		
 		li	r0,0
 		stb	r0,ExceptionMode(r0)
+		stb	r0,PortInUse(r0)
 		
 		loadreg	r0,"USER"
 		stw	r0,0xf4(r0)
@@ -2155,8 +2156,7 @@ EInt:		b	.FPUnav				#0
 		stw	r3,0(r6)
 		mfsprg1 r3
 		stwu	r3,4(r6)
-		lwz	r3,0(r1)
-#		lwz	r3,0(r3)			#User stack
+		lwz	r3,0(r1)			#User stack
 		lwz	r0,8(r3)			#lr
 		stwu	r0,4(r6)
 		lwz	r0,4(r3)			#cr
@@ -2322,6 +2322,7 @@ EInt:		b	.FPUnav				#0
 		
 		li	r9,0
 		stb	r9,ExceptionMode(r0)
+		stb	r9,PortInUse(r0)
 		
 		mfspr	r9,HID0
 		ori	r9,r9,HID0_ICFI
@@ -2398,6 +2399,7 @@ EInt:		b	.FPUnav				#0
 		
 		li	r0,0
 		stb	r0,ExceptionMode(r0)
+		stb	r0,PortInUse(r0)
 		
 		rfi
 
@@ -3539,6 +3541,9 @@ EInt:		b	.FPUnav				#0
 		
 .DoStore:	mr	r0,r6
 		mr	r6,r1				#r13?
+		
+		loadreg	r6,0x7e000000
+		
 		stwu	r3,-4(r6)
 		stwu	r4,-4(r6)
 		stwu	r23,-4(r6)
@@ -3599,6 +3604,9 @@ EInt:		b	.FPUnav				#0
 		rlwinm	r0,r8,11,27,31			#Get Destination Reg (l) or Source (s)
 		loadreg	r8,"GETV"
 		mr	r6,r1
+		
+		loadreg	r6,0x7e000000
+		
 		stwu	r3,-4(r6)
 		stwu	r4,-4(r6)
 		stwu	r23,-4(r6)

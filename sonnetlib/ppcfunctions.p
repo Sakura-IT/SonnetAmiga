@@ -7,6 +7,7 @@
 
 .global FunctionsLen
 .global ViolationOS
+.global LibFunctions
 
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
@@ -36,7 +37,8 @@
 #	Void SetCache(cacheflags, start, length) // r4,r5,r6
 #
 #********************************************************************************************	
-		
+
+LibFunctions:		
 SetCache:
 		prolog 228,"TOC"
 
@@ -601,7 +603,7 @@ EnqueuePPC:
 		cmpw	r3,r7
 		ble+	.Loop1
 .Link1:		lwz	r3,4(r4)
-		stw	r5,4(r4)
+		stw	r5,4(r4)		
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
@@ -628,6 +630,7 @@ FindNamePPC:
 		b	.E4
 		
 .ZorroIIISpace:	lwz	r3,0(r4)
+		lwz	r3,0(r3)				#???
 		mr.	r3,r3
 		beq-	.E4
 		subi	r8,r5,1
@@ -759,6 +762,7 @@ AllocVecPPC:	prolog 228,"TOC"
 
 		mr.	r3,r4
 		beq	.AllocErr
+
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC		#Fixed for now
 		
 		addi	r8,r4,0x38					#d0
@@ -820,13 +824,21 @@ FreeVecPPC:
 GetInfo:	
 		prolog 228,"TOC"
 
+		stwu	r31,-4(r13)
 		stwu	r8,-4(r13)
 		stwu	r7,-4(r13)
 		stwu	r6,-4(r13)
 		stwu	r5,-4(r13)
 		stwu	r4,-4(r13)
 
-		li	r6,1
+		lbz	r31,PowerDebugMode(r0)
+		mr.	r31,r31
+		beq	.NoDebug01
+		
+		li	r31,FGetInfo-FRun68K
+		bl	DebugStartFunction
+
+.NoDebug01:	li	r6,1
 		
 		mr	r5,r4
 		
@@ -858,11 +870,19 @@ GetInfo:
 .NextInList:	addi	r4,r4,8
 		b	.TagLoop
 		
-.NoTags:	lwz	r4,0(r13)
+.NoTags:	lbz	r31,PowerDebugMode(r0)
+		mr.	r31,r31
+		beq	.NoDebug02
+
+		li	r31,FGetInfo-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug02:	lwz	r4,0(r13)
 		lwzu	r5,4(r13)
 		lwzu	r6,4(r13)
 		lwzu	r7,4(r13)
 		lwzu	r8,4(r13)
+		lwzu	r31,4(r13)
 		addi	r13,r13,4
 		
 		epilog "TOC"
@@ -2190,6 +2210,7 @@ FindPortPPC:
 		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
+		
 		mr	r31,r3
 		mr	r5,r4
 
@@ -2207,6 +2228,7 @@ FindPortPPC:
 		bl ReleaseSemaphorePPC
 
 		mr	r3,r31
+		
 		lwz	r31,0(r13)
 		addi	r13,r13,4
 		
@@ -8653,7 +8675,192 @@ RawDoFmtPPC:	prolog 228,"TOC"
 		addi	r24,r24,1
 .SkipToNext:	bdnz+	.NextHex
 
-		blr	
-				
+		blr
+
+#********************************************************************************************
+#
+#	void DebugStartFunction(FunctionString, r4, r5, r6, r7) // r31
+#
+#********************************************************************************************
+
+DebugStartFunction:
+
+		prolog 228,"TOC"
+		
+		stwu	r3,-4(r13)
+		stwu	r4,-4(r13)
+		stwu	r5,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r30,-4(r13)		
+
+		mr	r30,r4
+		mr	r29,r5
+		
+		bl	.GetText
+.FText:		
+.byte		"Function:  %s   r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
+		.align 4
+.FArgs:		
+.long		0,0,0,0,0
+
+.GetText:	mflr	r4
+		addi	r5,r4,FRun68K-.FText
+		add	r31,r5,r31
+		addi	r5,r4,.FArgs-.FText
+
+		stw	r31,0(r5)
+		stw	r30,4(r5)
+		stw	r29,8(r5)
+		stw	r6,12(r5)
+		stw	r7,16(r5)
+			
+		bl	SPrintF
+
+		lwz	r30,0(r13)
+		lwz	r29,4(r13)
+		lwz	r5,8(r13)
+		lwz	r4,12(r13)
+		lwz	r3,16(r13)
+		addi	r13,r13,20
+
+		epilog "TOC"
+		
+#********************************************************************************************
+#
+#	void DebugEndFunction(FunctionString, r3) // r31
+#
+#********************************************************************************************
+
+DebugEndFunction:
+
+		prolog 228,"TOC"
+		
+		stwu	r3,-4(r13)
+		stwu	r4,-4(r13)
+		stwu	r5,-4(r13)
+
+		bl	.GetText2
+		
+.FText2:		
+.byte		"Function:  %s   r3 = %08lx",10,0
+		.align 4
+.FArgs2:		
+.long		0,0
+
+.GetText2:	mflr	r4
+		addi	r5,r4,FRun68K-.FText2
+		add	r31,r5,r31
+		addi	r5,r4,.FArgs2-.FText2
+
+		stw	r31,0(r5)
+		stw	r3,4(r5)
+			
+		bl	SPrintF
+
+		lwz	r5,0(r13)
+		lwz	r4,4(r13)
+		lwz	r3,8(r13)
+		addi	r13,r13,12
+
+		epilog "TOC"
+
+FRun68K:		.byte	"Run68K",0
+FWaitFor68K:		.byte	"WaitFor68K",0
+FSPrintF:		.byte	"SPrintF",0
+FRun68KLowLevel:	.byte	"Run68KLowLevel",0
+FAllocVecPPC:		.byte	"AllocVecPPC",0
+FFreeVecPPC:		.byte	"FreeVecPPC",0
+FCreateTaskPPC:		.byte	"CreateTaskPPC",0
+FDeleteTaskPPC:		.byte	"DeleteTaskPPC",0
+FFindTaskPPC:		.byte	"FindTaskPPC",0
+FInitSemaphorePPC:	.byte	"InitSemaphorePPC",0
+FFreeSemaphorePPC:	.byte	"FreeSemaphorePPC",0
+FAddSemaphorePPC:	.byte	"AddSemaphorePPC",0
+FRemSemaphorePPC:	.byte	"RemSemaphorePPC",0
+FObtainSemaphorePPC:	.byte	"ObtainSemaphorePPC",0
+FAttemptSemaphorePPC:	.byte	"AttemptSemaphorePPC",0
+FReleaseSemaphorePPC:	.byte	"ReleaseSemaphorePPC",0
+FFindSemaphorePPC:	.byte	"FindSemaphorePPC",0
+FInsertPPC:		.byte	"InsertPPC",0
+FAddHeadPPC:		.byte	"AddHeadPPC",0
+FAddTailPPC:		.byte	"AddtailPPC",0
+FRemovePPC:		.byte	"RemovePPC",0
+FRemHeadPPC:		.byte	"RemHeadPPC",0
+FRemTailPPC:		.byte	"RemTailPPC",0
+FEnqueuePPC:		.byte	"EnqueuePPC",0
+FFindNamePPC:		.byte	"FindNamePPC",0
+FFindTagItemPPC:	.byte	"FindTagItemPPC",0
+FGetTagDataPPC:		.byte	"GetTagItemPPC",0
+FNextTagItemPPC:	.byte	"NextTagItemPPC",0
+FAllocSignalPPC:	.byte	"AllocSignalPPC",0
+FFreeSignalPPC:		.byte	"FreeSignalPPC",0
+FSetSignalPPC:		.byte	"SetSignalPPC",0
+FSignalPPC:		.byte	"SignalPPC",0
+FWaitPPC:		.byte	"WaitPPC",0
+FSetTaskPriPPC:		.byte	"SetTaskPriPPC",0
+FSignal68K:		.byte	"Signal68K",0
+FSetCache:		.byte	"SetCache",0
+FSetExcHandler:		.byte	"SetExcHandler",0
+FRemExcHandler:		.byte	"RemExcHandler",0
+FSuper:			.byte	"Super",0
+FUser:			.byte	"User",0
+FSetHardware:		.byte	"SetHardware",0
+FModifyFPExc:		.byte	"ModifyFPExc",0
+FWaitTime:		.byte	"WaitTime",0
+FChangeStack:		.byte	"ChangeStack",0
+FLockTaskList:		.byte	"LockTaskList",0
+FUnLockTaskList:	.byte	"UnlockTaskList",0
+FSetExcMMU:		.byte	"SetExcMMU",0
+FClearExcMMU:		.byte	"ClearExcMMU",0
+FChangeMMU:		.byte	"ChangeMMU",0
+FGetInfo:		.byte	"GetInfo",0
+FCreateMsgPortPPC:	.byte	"CreateNsgPortPPC",0
+FDeleteMsgPortPPC:	.byte	"DeleteMsgPortPPC",0
+FAddPortPPC:		.byte	"AddPortPPC",0
+FRemPortPPC:		.byte	"RemPortPPC",0
+FFindPortPPC:		.byte	"FindPortPPC",0
+FWaitPortPPC:		.byte	"WaitPortPPC",0
+FPutMsgPPC:		.byte	"PutMsgPPC",0
+FGetMsgPPC:		.byte	"GetMsgPPC",0
+FReplyMsgPPC:		.byte	"ReplyMsgPPC",0
+FFreeAllMem:		.byte	"FreeAllMem",0
+FCopyMemPPC:		.byte	"CopyMemPPC",0
+FAllocXMsgPPC:		.byte	"AllocXMsgPPC",0
+FFreeXMsgPPC:		.byte	"FreeXMsgPPC",0
+FPutXMsgPPC:		.byte	"PutXMsgPPC",0
+FGetSysTimePPC:		.byte	"GetSysTimePPC",0
+FAddTimePPC:		.byte	"AddTimePPC",0
+FSubTimePPC:		.byte	"SubTimePPC",0
+FCmpTimePPC:		.byte	"CmpTimePPC",0
+FSetReplyPortPPC:	.byte	"SetReplyPortPPC",0
+FSnoopTask:		.byte	"SnoopTask",0
+FEndSnoopTask:		.byte	"EndSnoopTask",0
+FGetHALInfo:		.byte	"GetHALInfo",0
+FSetScheduling:		.byte	"SetScheduling",0
+FFindTaskByID:		.byte	"FindTaskByID",0
+FSetNiceValue:		.byte	"SetNiceValue",0
+FTrySemaphorePPC:	.byte	"TrySemaphorePPC",0
+FAllocPrivateMem:	.byte	"AllocPrivateMem",0
+FFreePrivateMem:	.byte	"FreePrivateMem",0
+FResetPPC:		.byte	"ResetPPC",0
+FNewListPPC:		.byte	"NewListPPC",0
+FSetExceptPPC:			.byte	"SetExceptPPC",0
+FObtainSemaphoreSharedPPC:	.byte	"ObtainSemaphoreSharedPPC",0
+FAttemptSemaphoreSharedPPC:	.byte	"AttemptSempahoreSharedPPC",0
+FProcurePPC:		.byte	"ProcurePPC",0
+FVacatePPC:		.byte	"VacatePPC",0
+FCauseInterrupt:	.byte	"CauseInterrupt",0
+FCreatePoolPPC:		.byte	"CreatePoolPPC",0
+FDeletePoolPPC:		.byte	"DeletePoolPPC",0
+FAllocPooledPPC:	.byte	"AllocPooledPPC",0
+FFreePooledPPC:		.byte	"FreePooledPPC",0
+FRawDoFmtPPC:		.byte	"RawDoFmtPPC",0
+FPutPublicMsgPPC:	.byte	"PutPublicMsgPPC",0
+FAddUniquePortPPC:	.byte	"AddUniquePortPPC",0
+FAddUniqueSemaphorePPC:	.byte	"AddUniqueSemaphorePPC",0
+FIsExceptionMode:	.byte	"IsExceptionMode",0
+
+			.align	4
+
 #********************************************************************************************
 EndFunctions:

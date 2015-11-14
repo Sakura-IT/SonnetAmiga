@@ -20,7 +20,7 @@
 	include	exec/tasks.i
 	include sonnet_lib.i
 
-	XREF	FunctionsLen
+	XREF	FunctionsLen,LibFunctions
 
 	XREF	SetExcMMU,ClearExcMMU,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
@@ -296,7 +296,7 @@ NoPCILb	jsr _LVOEnqueue(a6)
 	beq Clean
 	move.l d0,PPCCodeMem-Buffer(a4)
 	move.l d0,a1
-	lea EndCP(pc),a0
+	lea LibFunctions(pc),a0
 	move.l #FunctionsLen,d1
 	lsr.l #2,d1
 	subq.l #1,d1

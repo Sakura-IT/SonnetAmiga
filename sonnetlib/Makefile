@@ -1,5 +1,5 @@
 OBJECTS68K=sonnet.o
-OBJECTSPPC=ppcfunctions.o setupppc.o
+OBJECTSPPC=setupppc.o ppcfunctions.o
 
 EXECUTABLE=sonnet.library
 EXECUTABLE_RS=sonnet.library.rs
