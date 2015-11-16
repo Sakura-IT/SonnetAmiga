@@ -30,7 +30,7 @@
 .set Semaphores,68				#MLH
 .set SemListSem,80				#Pointer
 .set PortListSem,84				#Pointer
-.set Ports,88					#MLH
+.set SnoopList,88					#MLH
 .set L2STATE,100
 .set MCTask,104					#Pointer
 .set TaskException,108				#Pointer
@@ -41,7 +41,7 @@
 .set AllTasks,116				#MLH
 .set NewTasks,128				#MLH, Shared, 32 aligned
 .set SnoopSem,140				#Pointer
-.set SnoopList,144				#MLH (424)
+.set Ports,144				#MLH (424)
 .set CurrentPort,156				#610
 .set NumAllTasks,160				#630
 .set IdSysTasks,164				#662
@@ -52,7 +52,7 @@
 .set LowActivityPrio,184			#658
 .set LowActivityPrioOffset,188			#670
 .set PortInUse,192				#628	; See CurrentPort
-.set PowerDebugMode,193				#18737
+.set DebugLevel,193				#18737
 .set RTGType,194
 .set UNUSED,195
 .set AlignmentExcHigh,196
