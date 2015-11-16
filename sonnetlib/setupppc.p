@@ -3,7 +3,7 @@
 .include ppcmacros-std.i
 
 .global PPCCode,PPCLen,RunningTask,WaitingTasks,Init,ViolationAddress
-.global MCTask,SysBase,PowerPCBase,DOSBase
+.global MCTask,SysBase,PowerPCBase,DOSBase,DebugLevel
 
 .set	PPCLen,(PPCEnd-PPCCode)
 
