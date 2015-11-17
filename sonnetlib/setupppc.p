@@ -114,18 +114,18 @@ ExitCode:	blrl
 		addi	r10,r9,4		
 		loadreg	r11,0xc000
 		or	r10,r10,r11
-		loadreg r11,0xffff
+		loadreg r11,0xffff				#0xfffeffff?
 		and	r10,r10,r11				#Keep it C000-FFFE		
 		stwbrx	r10,r8,r7
 		sync
-		lwz	r9,0(r9)
-				
+		
+		lwz	r9,0(r9)				
 		subi	r10,r9,4		
 		li	r11,48
 		li	r7,0
 		mtctr	r11
 .ClearLLMsg:	stwu	r7,4(r10)
-		bdnz	.ClearLLMsg		
+		bdnz	.ClearLLMsg
 		
 		loadreg r7,"FPPC"
 		stw	r7,MN_IDENTIFIER(r9)
@@ -1933,6 +1933,7 @@ EInt:		b	.FPUnav				#0
 		lfd	f6,PP_FREGS+6*8(r8)
 		lfd	f7,PP_FREGS+7*8(r8)
 		lwz	r9,PP_OFFSET(r8)
+		
 		mr	r7,r8
 		lwz	r8,PP_CODE(r8)
 		add	r8,r8,r9
@@ -2000,7 +2001,7 @@ EInt:		b	.FPUnav				#0
 		lwz	r9,0xf0(r0)				#Debug counter to check
 		addi	r9,r9,1					#Whether exception is still
 		stw	r9,0xf0(r0)				#running
-		
+
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
 		lwzu	r7,4(r13)

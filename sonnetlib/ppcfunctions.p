@@ -760,7 +760,14 @@ AllocVecPPC:	prolog 228,"TOC"
 		stwu	r9,-4(r13)
 		stwu	r8,-4(r13)
 
-		mr.	r3,r4
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug05
+		
+		li	r31,FAllocVecPPC-FRun68K
+		bl	DebugStartFunction
+
+.NoDebug05:	mr.	r3,r4
 		beq	.AllocErr
 
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC		#Fixed for now
@@ -783,7 +790,14 @@ AllocVecPPC:	prolog 228,"TOC"
 		stw	r4,-4(r3)
 		stw	r31,-8(r3)
 		
-.AllocErr:	lwz	r8,0(r13)
+.AllocErr:	lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug06
+
+		li	r31,FAllocVecPPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug06:	lwz	r8,0(r13)
 		lwz	r9,4(r13)
 		lwz	r31,8(r13)
 		addi	r13,r13,12
@@ -799,19 +813,35 @@ AllocVecPPC:	prolog 228,"TOC"
 FreeVecPPC:
 		prolog 228,"TOC"
 		
+		stwu	r31,-4(r13)
 		stwu	r8,-4(r13)
 		stwu	r7,-4(r13)
 		
-		lwz	r7,-4(r4)					#a1
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug07
+		
+		li	r31,FFreeVecPPC-FRun68K
+		bl	DebugStartFunction
+
+.NoDebug07:	lwz	r7,-4(r4)					#a1
 		lwz	r8,-8(r4)					#d0
 		lwz	r4,SysBase(r0)
 		li	r5,_LVOFreeMem
 
 		bl 	Run68KLowLevel
 		
-		lwz	r7,0(r13)
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug08
+
+		li	r31,FFreeVecPPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug08:	lwz	r7,0(r13)
 		lwz	r8,4(r13)
-		addi	r13,r13,8
+		lwz	r31,8(r13)
+		addi	r13,r13,12
 		
 		epilog "TOC"
 
@@ -831,7 +861,7 @@ GetInfo:
 		stwu	r5,-4(r13)
 		stwu	r4,-4(r13)
 
-		lbz	r31,PowerDebugMode(r0)
+		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug01
 		
@@ -870,7 +900,7 @@ GetInfo:
 .NextInList:	addi	r4,r4,8
 		b	.TagLoop
 		
-.NoTags:	lbz	r31,PowerDebugMode(r0)
+.NoTags:	lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug02
 
@@ -1293,8 +1323,15 @@ CreateMsgPortPPC:
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
+		
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug23
+		
+		li	r31,FCreateMsgPortPPC-FRun68K
+		bl	DebugStartFunction
 
-		li	r4,100
+.NoDebug23:	li	r4,100
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,32
 		
@@ -1345,7 +1382,15 @@ CreateMsgPortPPC:
 	
 .NoMsgMem:  	li	r4,0
 .HaveAll:	mr	r3,r4
-		lwz	r30,0(r13)
+
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug24
+
+		li	r31,FCreateMsgPortPPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug24:	lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 		
@@ -1361,7 +1406,15 @@ DeleteMsgPortPPC:
 		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
-		mr.	r31,r4
+		
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug25
+		
+		li	r31,FDeleteMsgPortPPC-FRun68K
+		bl	DebugStartFunction
+
+.NoDebug25:	mr.	r31,r4
 		beq-	.NoPortDef
 
 		addi	r4,r31,MP_PPC_SEM
@@ -1376,7 +1429,14 @@ DeleteMsgPortPPC:
 		
 		bl FreeVecPPC
 
-.NoPortDef:	lwz	r31,0(r13)
+.NoPortDef:	lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug26
+
+		li	r31,FDeleteMsgPortPPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug26:	lwz	r31,0(r13)
 		addi	r13,r13,4
 
 		epilog "TOC"
@@ -1509,7 +1569,14 @@ SetSignalPPC:
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 
-		lwz	r6,RunningTask(r0)
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug17
+		
+		li	r31,FSetSignalPPC-FRun68K
+		bl	DebugStartFunction
+
+.NoDebug17:	lwz	r6,RunningTask(r0)
 
 		mr	r30,r4
 		
@@ -1533,7 +1600,15 @@ SetSignalPPC:
 		bl CheckExcSignal
 
 		mr	r3,r31
-		lwz	r30,0(r13)
+		
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug18
+
+		li	r31,FSetSignalPPC-FRun68K
+		bl	DebugEndFunction
+		
+.NoDebug18:	lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 		
@@ -1586,7 +1661,15 @@ InitSemaphorePPC:
 		prolog 228,"TOC"
 				
 		stwu	r31,-4(r13)
-		mr	r31,r4
+		
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug11
+		
+		li	r31,FInitSemaphorePPC-FRun68K
+		bl	DebugStartFunction
+
+.NoDebug11:	mr	r31,r4
 
 		addi	r5,r31,SS_WAITQUEUE
 		stw	r5,8(r5)
@@ -1609,7 +1692,14 @@ InitSemaphorePPC:
 		stw	r3,SSPPC_RESERVE(r31)
 		li	r3,-1
 
-.SemDone:	lwz	r31,0(r13)
+.SemDone:	lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug12
+
+		li	r31,FInitSemaphorePPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug12:	lwz	r31,0(r13)
 		addi	r13,r13,4
 		
 		epilog "TOC"
@@ -1658,7 +1748,16 @@ ObtainSemaphorePPC:
 		stwu	r4,-4(r13)
 		stwu	r3,-4(r13)
 
-		mr	r30,r4
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug13
+		
+		li	r31,0
+		stb	r31,DebugLevel(r0)
+		li	r31,FObtainSemaphorePPC-FRun68K
+#		bl	DebugStartFunction
+
+.NoDebug13:	mr	r30,r4
 
 .WaitRes:	li	r4,Atomic
 		bl AtomicTest
@@ -1723,7 +1822,14 @@ ObtainSemaphorePPC:
 		addi	r5,r5,1
 		sth	r5,SS_NESTCOUNT(r30)
 		
-.DoneWait:	lwz	r3,0(r13)
+.DoneWait:	lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug14
+
+		li	r31,FObtainSemaphorePPC-FRun68K
+#		bl	DebugEndFunction
+
+.NoDebug14:	lwz	r3,0(r13)
 		lwz	r4,4(r13)
 		lwz	r5,8(r13)
 		lwz	r6,12(r13)
@@ -1839,7 +1945,14 @@ ReleaseSemaphorePPC:
 		stwu	r4,-4(r13)
 		stwu	r3,-4(r13)
 
-		mr	r31,r4
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug15
+		
+		li	r31,FReleaseSemaphorePPC-FRun68K
+#		bl	DebugStartFunction
+
+.NoDebug15:	mr	r31,r4
 
 .WaitRes3:	li	r4,Atomic
 		bl AtomicTest
@@ -1996,7 +2109,14 @@ ReleaseSemaphorePPC:
 .NoneFurther:	li	r0,0
 		sth	r0,SSPPC_LOCK(r31)
 
-.Released:	lwz	r3,0(r13)
+.Released:	lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug16
+
+		li	r31,FReleaseSemaphorePPC-FRun68K
+#		bl	DebugEndFunction
+
+.NoDebug16:	lwz	r3,0(r13)
 		lwz	r4,4(r13)
 		lwz	r5,8(r13)
 		lwz	r6,12(r13)
@@ -2142,8 +2262,15 @@ AddPortPPC:
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
+		
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug27
+		
+		li	r31,FAddPortPPC-FRun68K
+		bl	DebugStartFunction
 
-		mr	r30,r4
+.NoDebug27:	mr	r30,r4
 		addi	r3,r30,MP_MSGLIST
 		stw	r3,8(r3)
 		li	r0,0
@@ -2162,8 +2289,15 @@ AddPortPPC:
 		lwz	r4,PortListSem(r0)
 		
 		bl ReleaseSemaphorePPC
+		
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug28
 
-		lwz	r30,0(r13)
+		li	r31,FAddPortPPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug28:	lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 		
@@ -2181,7 +2315,14 @@ RemPortPPC:
 		stwu	r31,-4(r13)
 		mr	r31,r4
 
-		lwz	r4,PortListSem(r0)
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug29
+		
+		li	r31,FGetInfo-FRun68K
+		bl	DebugStartFunction
+
+.NoDebug29:	lwz	r4,PortListSem(r0)
 
 		bl ObtainSemaphorePPC
 
@@ -2195,7 +2336,14 @@ RemPortPPC:
 		
 		bl ReleaseSemaphorePPC
 
-		lwz	r31,0(r13)
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug30
+
+		li	r31,FRemPortPPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug30:	lwz	r31,0(r13)
 		addi	r13,r13,4
 		
 		epilog "TOC"	
@@ -2211,7 +2359,14 @@ FindPortPPC:
 		
 		stwu	r31,-4(r13)
 		
-		mr	r31,r3
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug31
+		
+		li	r31,FFindPortPPC-FRun68K
+		bl	DebugStartFunction
+		
+.NoDebug31:	mr	r31,r3
 		mr	r5,r4
 
 		lwz	r4,PortListSem(r0)
@@ -2229,7 +2384,14 @@ FindPortPPC:
 
 		mr	r3,r31
 		
-		lwz	r31,0(r13)
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug32
+
+		li	r31,FFindPortPPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug32:	lwz	r31,0(r13)
 		addi	r13,r13,4
 		
 		epilog "TOC"
@@ -2249,7 +2411,14 @@ WaitPortPPC:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		
-		mr	r28,r3
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug33
+		
+		li	r31,FWaitPortPPC-FRun68K
+#		bl	DebugStartFunction
+		
+.NoDebug33:	mr	r28,r3
 		mr	r31,r4
 
 		addi	r4,r31,MP_PPC_SEM
@@ -2364,7 +2533,15 @@ WaitPortPPC:
 		bl ReleaseSemaphorePPC
 
 		mr	r3,r5
-		lwz	r27,0(r13)
+		
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug34
+
+		li	r31,FWaitPortPPC-FRun68K
+#		bl	DebugEndFunction
+		
+.NoDebug34:	lwz	r27,0(r13)
 		lwz	r28,4(r13)
 		lwz	r29,8(r13)
 		lwz	r30,12(r13)
@@ -2498,7 +2675,7 @@ WaitFor68K:
 		lwbrx	r31,r27,r3		
 		stw	r30,0(r31)		
 		addi	r28,r31,4
-		loadreg	r31,0x3fff
+		loadreg	r31,0x3fff			#ffff3fff?
 		and	r28,r28,r31			#Keep it 0000-3FFE
 		stwbrx	r28,r27,r3
 		sync
@@ -2533,7 +2710,14 @@ Run68K:
 		stwu	r24,-4(r13)
 		stwu	r23,-4(r13)
 
-		mr	r31,r4
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug03
+		
+		li	r31,FRun68K-FRun68K
+		bl	DebugStartFunction
+
+.NoDebug03:	mr	r31,r4
 		
 		mfctr	r25
 			
@@ -2543,7 +2727,7 @@ Run68K:
 		addi	r23,r30,4
 		loadreg	r4,0xc000
 		or	r23,r23,r4
-		loadreg r4,0xffff
+		loadreg r4,0xffff			#fffeffff?
 		and	r23,r23,r4			#Keep it C000-FFFE		
 		stwbrx	r23,r24,r3
 		lwz	r30,0(r30)			
@@ -2589,7 +2773,7 @@ Run68K:
 		lwbrx	r31,r24,r3		
 		stw	r30,0(r31)		
 		addi	r23,r31,4
-		loadreg	r4,0xbfff
+		loadreg	r4,0xbfff			#ffffbfff?
 		and	r23,r23,r4			#Keep it 8000-BFFE
 		stwbrx	r23,r24,r3			#triggers Interrupt
 
@@ -2597,7 +2781,14 @@ Run68K:
 
 		bl 	WaitFor68K
 		
-		mtctr	r25
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug04
+
+		li	r31,FRun68K-FRun68K
+		bl	DebugEndFunction
+		
+.NoDebug04:	mtctr	r25
 		li	r3,0
 		
 		lwz	r23,0(r13)
@@ -4372,15 +4563,23 @@ ChangeStack:
 
 FindTaskPPC:
 		prolog 228,"TOC"
+		
+		stwu	r31,-4(r13)
+		
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug09
+		
+		li	r31,FFindTaskPPC-FRun68K
+		bl	DebugStartFunction
 
-		mr.	r4,r4
+.NoDebug09:	mr.	r4,r4
 		bne-	.NotOwnTask
 
 		lwz	r3,RunningTask(r0)
 		b	.ExitFind
 
-.NotOwnTask:	stwu	r31,-4(r13)
-		mr	r31,r3
+.NotOwnTask:	mr	r31,r3
 		mr	r5,r4
 
 		lwz	r4,TaskListSem(r0)
@@ -4403,10 +4602,17 @@ FindTaskPPC:
 
 		mr	r3,r31
 
-		lwz	r31,0(r13)
+.ExitFind:	lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug10
+
+		li	r31,FFindTaskPPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug10:	lwz	r31,0(r13)
 		addi	r13,r13,4
 
-.ExitFind:	epilog "TOC"
+		epilog "TOC"
 
 #********************************************************************************************
 #
@@ -5743,7 +5949,7 @@ DeallocatePPC:
 		b	.LinkNewMC
 		
 .NextMemChunk:	cmplw	r27,r30
-		
+
 		bgt	.CorrectMC
 		beq	.GuruTime
 		
@@ -5759,7 +5965,7 @@ DeallocatePPC:
 		lwz	r28,MC_BYTES(r27)
 		add	r28,r28,r27
 		cmplw	r30,r28
-		
+
 		beq	.JoinThem
 		bgt	.GuruTime			#bgt correct?
 		
@@ -5781,8 +5987,8 @@ DeallocatePPC:
 		
 		lwz	r4,MC_BYTES(r30)
 		add	r4,r4,r30
-		cmplw	r5,r4
-		
+		cmplw	r5,r4				#dnetc crashes on this spot...
+
 		bgt	.GuruTime			#bgt check
 		bne	.UpdateFree
 		
@@ -5809,7 +6015,13 @@ DeallocatePPC:
 		
 #********************************************************************************************
 
-.GuruTime:	b	.GuruTime		#STUB
+.GuruTime:	stw	r4,0x130(r0)
+		stw	r5,0x134(r0)
+		stw	r27,0x138(r0)
+		stw	r28,0x13c(r0)
+		stw	r30,0x140(r0)
+
+		b	.GuruTime		#STUB
 
 #********************************************************************************************
 #
@@ -6089,7 +6301,7 @@ Run68KLowLevel:
 		addi	r23,r30,4		
 		loadreg	r4,0xc000
 		or	r23,r23,r4
-		loadreg r4,0xffff
+		loadreg r4,0xffff				#fffeffff?
 		and	r23,r23,r4				#Keep it C000-FFFE		
 		stwbrx	r23,r24,r3
 		lwz	r30,0(r30)
@@ -6127,7 +6339,7 @@ Run68KLowLevel:
 		lwbrx	r31,r24,r3		
 		stw	r30,0(r31)						
 		addi	r23,r31,4
-		loadreg	r4,0xbfff
+		loadreg	r4,0xbfff				#ffffbfff?
 		and	r23,r23,r4				#Keep it 8000-BFFE		
 		stwbrx	r23,r24,r3				#triggers Interrupt
 
@@ -6166,7 +6378,14 @@ SignalPPC:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 
-		mr	r31,r4
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug19
+		
+		li	r31,FSignalPPC-FRun68K
+#		bl	DebugStartFunction
+
+.NoDebug19:	mr	r31,r4
 		mr	r30,r5
 		mr	r29,r3
 
@@ -6262,7 +6481,14 @@ SignalPPC:
 
 		bl CauseInterrupt
 
-.SigExit:	lwz	r28,0(r13)
+.SigExit:	lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug20
+
+		li	r31,FSignalPPC-FRun68K
+#		bl	DebugEndFunction
+
+.NoDebug20:	lwz	r28,0(r13)
 		lwz	r29,4(r13)
 		lwz	r30,8(r13)
 		lwz	r31,12(r13)
@@ -6621,8 +6847,38 @@ SetScheduling:
 SPrintF:
 		prolog 228,"TOC"
 
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
+		stwu	r25,-4(r13)
+		stwu	r24,-4(r13)
+		stwu	r23,-4(r13)		
+		stwu	r22,-4(r13)
+		stwu	r21,-4(r13)
+		stwu	r20,-4(r13)
+		stwu	r19,-4(r13)		
+		stwu	r18,-4(r13)
+		stwu	r17,-4(r13)
+		stwu	r16,-4(r13)
+		stwu	r15,-4(r13)		
+		stwu	r14,-4(r13)
+		stwu	r12,-4(r13)
+		stwu	r11,-4(r13)
+		stwu	r10,-4(r13)		
+		stwu	r9,-4(r13)
+		stwu	r8,-4(r13)
 		stwu	r7,-4(r13)
-		stwu	r6,-4(r13)
+		stwu	r6,-4(r13)		
+		stwu	r5,-4(r13)
+		stwu	r4,-4(r13)
+		stwu	r3,-4(r13)
+		
+		lbz	r31,DebugLevel(r0)
+		li	r6,0
+		stb	r6,DebugLevel(r0)
 
 		mr	r6,r4						#a0
 		mr	r7,r5						#a1
@@ -6631,9 +6887,37 @@ SPrintF:
 
 		bl 	Run68KLowLevel
 		
-		lwz	r6,0(r13)
-		lwz	r7,4(r13)
-		addi	r13,r13,8
+		stb	r31,DebugLevel(r0)
+		
+		lwz	r3,0(r13)
+		lwz	r4,4(r13)
+		lwz	r5,8(r13)
+		lwz	r6,12(r13)
+		lwz	r7,16(r13)
+		lwz	r8,20(r13)		
+		lwz	r9,24(r13)
+		lwz	r10,28(r13)
+		lwz	r11,32(r13)		
+		lwz	r12,36(r13)
+		lwz	r14,40(r13)
+		lwz	r15,44(r13)		
+		lwz	r16,48(r13)
+		lwz	r17,52(r13)
+		lwz	r18,56(r13)		
+		lwz	r19,60(r13)
+		lwz	r20,64(r13)
+		lwz	r21,68(r13)		
+		lwz	r22,72(r13)
+		lwz	r23,76(r13)
+		lwz	r24,80(r13)		
+		lwz	r25,84(r13)
+		lwz	r26,88(r13)
+		lwz	r27,92(r13)
+		lwz	r28,96(r13)
+		lwz	r29,100(r13)
+		lwz	r30,104(r13)		
+		lwz	r31,108(r13)
+		addi	r13,r13,112
 
 		epilog "TOC"
 
@@ -8050,7 +8334,14 @@ WaitTime:
 		
 		mfctr	r25
 
-		mr	r30,r4
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug21
+		
+		li	r31,FWaitTime-FRun68K
+#		bl	DebugStartFunction
+
+.NoDebug21:	mr	r30,r4
 		mr	r29,r3
 		lwz	r26,RunningTask(r0)
 		
@@ -8172,7 +8463,15 @@ WaitTime:
 		addi	r13,r13,4
 
 		mr	r3,r30
-		mtctr	r25
+		
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug22
+
+		li	r31,FWaitTime-FRun68K
+#		bl	DebugEndFunction
+
+.NoDebug22:	mtctr	r25
 		
 		lwz	r25,0(r13)
 		lwz	r26,4(r13)
@@ -8698,21 +8997,26 @@ DebugStartFunction:
 		
 		bl	.GetText
 .FText:		
-.byte		"Function:  %s   r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
+.byte		"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 		.align 4
 .FArgs:		
-.long		0,0,0,0,0
+.long		0,0,0,0,0,0
 
 .GetText:	mflr	r4
 		addi	r5,r4,FRun68K-.FText
 		add	r31,r5,r31
 		addi	r5,r4,.FArgs-.FText
 
+		stw	r31,4(r5)
+		
+		lwz	r31,RunningTask(r0)
+		lwz	r31,LN_NAME(r31)
 		stw	r31,0(r5)
-		stw	r30,4(r5)
-		stw	r29,8(r5)
-		stw	r6,12(r5)
-		stw	r7,16(r5)
+		
+		stw	r30,8(r5)
+		stw	r29,12(r5)
+		stw	r6,16(r5)
+		stw	r7,20(r5)
 			
 		bl	SPrintF
 
@@ -8742,18 +9046,23 @@ DebugEndFunction:
 		bl	.GetText2
 		
 .FText2:		
-.byte		"Function:  %s   r3 = %08lx",10,0
+.byte		"Process: %s Function: %s r3 = %08lx",10,0
 		.align 4
 .FArgs2:		
-.long		0,0
+.long		0,0,0
 
 .GetText2:	mflr	r4
 		addi	r5,r4,FRun68K-.FText2
 		add	r31,r5,r31
 		addi	r5,r4,.FArgs2-.FText2
 
+		stw	r31,4(r5)
+		
+		lwz	r31,RunningTask(r0)
+		lwz	r31,LN_NAME(r31)
 		stw	r31,0(r5)
-		stw	r3,4(r5)
+		
+		stw	r3,8(r5)
 			
 		bl	SPrintF
 
