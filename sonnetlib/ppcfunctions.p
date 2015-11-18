@@ -1752,8 +1752,8 @@ ObtainSemaphorePPC:
 		mr.	r31,r31
 		beq	.NoDebug13
 		
-		li	r31,0
-		stb	r31,DebugLevel(r0)
+#		li	r31,0
+#		stb	r31,DebugLevel(r0)
 		li	r31,FObtainSemaphorePPC-FRun68K
 #		bl	DebugStartFunction
 
@@ -1822,7 +1822,10 @@ ObtainSemaphorePPC:
 		addi	r5,r5,1
 		sth	r5,SS_NESTCOUNT(r30)
 		
-.DoneWait:	lbz	r31,DebugLevel(r0)
+.DoneWait:	
+#		lbz	r31,DebugMode(r0)
+#		stb	r31,DebugLevel(r0)
+		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug14
 
@@ -5612,7 +5615,14 @@ CreatePoolPPC:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 		
-		li	r31,0
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug41
+		
+		li	r31,FCreatePoolPPC-FRun68K
+		bl	DebugStartFunction
+		
+.NoDebug41:	li	r31,0
 		
 		cmplw	r5,r6
 		blt	.NoCreatePool
@@ -5646,8 +5656,15 @@ CreatePoolPPC:
 		stw	r28,POOL_TRESHSIZE(r31)
 		
 .NoCreatePool:	mr	r3,r31
-		
-		lwz	r28,0(r13)
+
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug42
+
+		li	r31,FCreatePoolPPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug42:	lwz	r28,0(r13)
 		lwz	r29,4(r13)
 		lwz	r30,8(r13)
 		lwz	r31,12(r13)
@@ -5722,7 +5739,14 @@ AllocPooledPPC:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 		
-		mr	r31,r4
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug43
+		
+		li	r31,FAllocPooledPPC-FRun68K
+		bl	DebugStartFunction
+
+.NoDebug43:	mr	r31,r4
 		mr	r30,r5
 		
 		lwz	r4,MemSem(r0)
@@ -5819,7 +5843,14 @@ AllocPooledPPC:
 		
 		bl ReleaseSemaphorePPC
 		
-		lwz	r28,0(r13)
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug44
+
+		li	r31,FAllocPooledPPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug44:	lwz	r28,0(r13)
 		lwz	r29,4(r13)
 		lwz	r30,8(r13)
 		lwz	r31,12(r13)
@@ -5841,7 +5872,14 @@ AllocatePPC:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 		
-		mr.	r3,r5
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug37
+		
+		li	r31,FAllocatePPC-FRun68K
+		bl	DebugStartFunction
+
+.NoDebug37:	mr.	r3,r5
 		beq-	.ExitAlloc
 		
 		mr	r31,r5
@@ -5900,7 +5938,14 @@ AllocatePPC:
 		sub	r29,r29,r31
 		stw	r29,MH_FREE(r30)
 		
-.ExitAlloc:	lwz	r28,0(r13)
+.ExitAlloc:	lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug38
+
+		li	r31,FAllocatePPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug38:	lwz	r28,0(r13)
 		lwz	r29,4(r13)
 		lwz	r30,8(r13)
 		lwz	r31,12(r13)
@@ -5922,9 +5967,17 @@ DeallocatePPC:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
 		
-		mr.	r31,r6
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug35
 		
+		li	r31,FDeallocatePPC-FRun68K
+		bl	DebugStartFunction
+		
+.NoDebug35:	mr.	r31,r6
+
 		beq 	.ExitDealloc
 		
 		mr	r29,r4
@@ -5942,74 +5995,74 @@ DeallocatePPC:
 		lwz	r27,MC_NEXT(r28)
 		mr.	r27,r27
 		
-		bne	.NextMemChunk
-		
-		mr	r27,r28
-		
-		b	.LinkNewMC
+		beq	.LinkNewMC
 		
 .NextMemChunk:	cmplw	r27,r30
 
 		bgt	.CorrectMC
 		beq	.GuruTime
 		
-		lwz	r27,MC_NEXT(r27)
+		mr	r28,r27
+		lwz	r27,MC_NEXT(r28)
+		mr.	r27,r27
 		
 		bne	.NextMemChunk
 		
-.CorrectMC:	la	r28,MH_FIRST(r29)
-		cmpw	r27,r29
+.CorrectMC:	la	r26,MH_FIRST(r29)
+		cmplw	r28,r26
 		
 		beq	.LinkNewMC
 		
-		lwz	r28,MC_BYTES(r27)
-		add	r28,r28,r27
-		cmplw	r30,r28
+		lwz	r27,MC_BYTES(r28)
+		add	r27,r27,r28
+		cmplw	r30,r27
 
 		beq	.JoinThem
-		bgt	.GuruTime			#bgt correct?
+		blt	.GuruTime
 		
-.LinkNewMC:	lwz	r28,MC_NEXT(r27)
-		stw	r28,MC_NEXT(r30)
-		stw	r30,MC_NEXT(r27)		
+.LinkNewMC:	lwz	r27,MC_NEXT(r28)
+		stw	r27,MC_NEXT(r30)
+		stw	r30,MC_NEXT(r28)		
 		stw	r6,MC_BYTES(r30)
 		
 		b	.DoNextMC
 		
-.JoinThem:	lwz	r28,MC_BYTES(r30)
-		add	r28,r28,r6
-		stw	r28,MC_BYTES(r30)
+.JoinThem:	lwz	r27,MC_BYTES(r28)
+		add	r27,r27,r6
+		stw	r27,MC_BYTES(r28)
+		mr	r30,r28
 				
-.DoNextMC:	lwz	r5,MC_NEXT(r30)
-		mr.	r5,r5
+.DoNextMC:	lwz	r26,MC_NEXT(r30)
+		mr.	r26,r26
 		
 		beq	.UpdateFree
 		
-		lwz	r4,MC_BYTES(r30)
-		add	r4,r4,r30
-		cmplw	r5,r4				#dnetc crashes on this spot...
-
-		bgt	.GuruTime			#bgt check
+		lwz	r27,MC_BYTES(r30)
+		add	r27,r27,r30
+		cmplw	r26,r27
+		
+		blt	.GuruTime
 		bne	.UpdateFree
 		
-		lwz	r4,MC_NEXT(r5)
-		lwz	r27,MC_NEXT(r4)
-		stw	r27,MC_NEXT(r5)
-		lwz	r27,MC_BYTES(r4)
-		lwz	r28,MC_BYTES(r5)
-		add	r28,r28,r27
-		stw	r28,MC_BYTES(r5)
-				
-.UpdateFree:	lwz	r5,MH_FREE(r29)
-		add	r5,r5,r6
-		stw	r5,MH_FREE(r29)		
+		mr	r28,r26
+		lwz	r27,MC_NEXT(r28)
+		stw	r27,MC_NEXT(r30)
+		lwz	r27,MC_BYTES(r28)
+		lwz	r26,MC_BYTES(r30)
+		add	r27,r27,r26
+		stw	r27,MC_BYTES(r30)
+						
+.UpdateFree:	lwz	r27,MH_FREE(r29)
+		add	r27,r27,r6
+		stw	r27,MH_FREE(r29)		
 		
-.ExitDealloc:	lwz	r27,0(r13)
-		lwz	r28,4(r13)
-		lwz	r29,8(r13)
-		lwz	r30,12(r13)
-		lwz	r31,16(r13)
-		addi	r13,r13,20
+.ExitDealloc:	lwz	r26,0(r13)
+		lwz	r27,4(r13)
+		lwz	r28,8(r13)
+		lwz	r29,12(r13)
+		lwz	r30,16(r13)
+		lwz	r31,20(r13)
+		addi	r13,r13,24
 		
 		epilog "TOC"
 		
@@ -6037,7 +6090,14 @@ FreePooledPPC:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 
-		mr	r31,r4
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug45
+		
+		li	r31,FFreePooledPPC-FRun68K
+		bl	DebugStartFunction
+
+.NoDebug45:	mr	r31,r4
 		mr	r30,r5
 		mr	r28,r6
 		
@@ -6108,7 +6168,14 @@ FreePooledPPC:
 		
 		bl ReleaseSemaphorePPC
 
-		lwz	r28,0(r13)
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug46
+
+		li	r31,FFreePooledPPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug46:	lwz	r28,0(r13)
 		lwz	r29,4(r13)
 		lwz	r30,8(r13)
 		lwz	r31,12(r13)
@@ -9168,6 +9235,8 @@ FPutPublicMsgPPC:	.byte	"PutPublicMsgPPC",0
 FAddUniquePortPPC:	.byte	"AddUniquePortPPC",0
 FAddUniqueSemaphorePPC:	.byte	"AddUniqueSemaphorePPC",0
 FIsExceptionMode:	.byte	"IsExceptionMode",0
+FAllocatePPC:		.byte	"AllocatePPC",0
+FDeallocatePPC:		.byte	"DeallocatePPC",0
 
 			.align	4
 
