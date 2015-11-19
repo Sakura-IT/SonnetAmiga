@@ -312,6 +312,9 @@ End:		mflr	r4
 		la	r4,LIST_EXCINTERRUPT(r3)
 		bl	.MakeList
 		
+		la	r4,LIST_WAITTIME(r3)
+		bl	.MakeList
+		
 		li	r3,0x7000			#Put Semaphores at 0x7000
 		li	r6,0x7200			#Put Semaphores memory at 0x7200
 		lwz	r30,SonnetBase(r0)
@@ -1776,27 +1779,65 @@ EInt:		b	.FPUnav				#0
 		mr.	r9,r9
 		bne	.TaskException
 
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_WAITTIME(r4)
+		lwz	r4,MLH_HEAD(r4)
+.NextWaitList:	lwz	r5,LN_SUCC(r4)
+
+		mr.	r5,r5
+		beq	.NoWaitTime
+
+		mftbu	r9
+		lwz	r6,WAITTIME_TIME1(r4)
+		cmplw	r6,r9
+		blt	.NotDoneYet
+		mftbl	r9
+		lwz	r6,WAITTIME_TIME2(r4)
+		cmplw	r6,r9
+		blt	.NotDoneYet		
+		lwz	r6,WAITTIME_TASK(r4)
+		lwz	r9,RunningTask(r0)
+		cmpw	r6,r9
+		beq	.SetSig	
+
 		li	r9,TS_READY
+		stb	r9,TC_STATE(r6)	
+.SetSig:	lwz	r9,TC_SIGRECVD(r6)
+		ori	r9,r9,SIGF_WAIT
+		stw	r9,TC_SIGRECVD(r6)
+		
+		lwz	r3,0(r4)			#RemovePPC
+		lwz	r4,4(r4)
+		stw	r4,4(r3)
+		stw	r3,0(r4)
+	
+.NotDoneYet:	mr	r4,r5
+		b	.NextWaitList
+
+.NoWaitTime:	li	r9,TS_READY
 		la	r4,WaitingTasks(r0)
 		lwz	r4,MLH_HEAD(r4)
 .NextOnList:	lwz	r5,LN_SUCC(r4)
 		mr.	r5,r5
 		beq	.EndOfWaitList
-		lbz	r6,TC_STATE(r4)
+		lwz	r6,TC_SIGRECVD(r4)
+		mr	r6,r6
+		beq	.NoSigs
+		stb	r9,TC_STATE(r4)
+.NoSigs:	lbz	r6,TC_STATE(r4)
 		cmpw	r9,r6
 		beq	.GotOneWait
 		
 		mr	r4,r5		
 		b	.NextOnList
 
-.GotOneWait:			
-		mr	r6,r4
+.GotOneWait:	mr	r6,r4
 		
 		lwz	r3,0(r4)			#RemovePPC
 		lwz	r4,4(r4)
 		stw	r4,4(r3)
 		stw	r3,0(r4)
-		
+				
 		mr	r5,r6
 		la	r4,ReadyTasks(r0)
 		
@@ -2021,7 +2062,7 @@ EInt:		b	.FPUnav				#0
 		mtsrr1	r0
 		mfsprg0	r0
 		mtsrr0	r0
-		
+
 		li	r0,0
 		stb	r0,ExceptionMode(r0)
 		stb	r0,PortInUse(r0)

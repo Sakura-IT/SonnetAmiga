@@ -3673,10 +3673,17 @@ CreateTaskPPC:
 		stwu	r18,-4(r13) 
 		stwu	r17,-4(r13) 
 		stwu	r16,-4(r13) 
- 
- 		loadreg	r17,"CRTT"
- 		stw	r17,0x130(r0)
- 
+ 		
+ 		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug51
+		
+		li	r31,FCreateTaskPPC-FRun68K
+#		bl	DebugStartFunction
+
+.NoDebug51:	loadreg	r17,"CRTT"
+		stw	r17,0x130(r0)
+
 		mr	r17,r2 
 		mr	r30,r4 
 		
@@ -4371,7 +4378,14 @@ CreateTaskPPC:
  
 		mr	r3,r5				#Exit with task in r3 (or not) 
  
-		lwz	r16,0(r13) 
+ 		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug52
+
+		li	r31,FCreateTaskPPC-FRun68K
+		bl	DebugEndFunction
+ 
+.NoDebug52:	lwz	r16,0(r13) 
 		lwz	r17,4(r13) 
 		lwz	r18,8(r13) 
 		lwz	r19,12(r13) 
@@ -4568,6 +4582,9 @@ FindTaskPPC:
 		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
+		
+		mflr	r31
+		stw	r31,0x140(r0)
 		
 		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
@@ -5258,10 +5275,14 @@ DeleteTaskPPC:
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
 
-		loadreg	r5,"DELT"
- 		stw	r5,0x134(r0)
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug53
+		
+		li	r31,FDeleteTaskPPC-FRun68K
+		bl	DebugStartFunction
 
-		lwz	r5,RunningTask(r0)		#ThisTask
+.NoDebug53:	lwz	r5,RunningTask(r0)		#ThisTask
 		li	r29,0
 		cmpw	r4,r5				#To be deleted?
 		beq-	.DelOwnTask			#Yes: then r29=-1
@@ -5423,7 +5444,14 @@ DeleteTaskPPC:
 		
 		bl AtomicDone
 
-		lwz	r26,0(r13)
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug54
+
+		li	r31,FDeleteTaskPPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug54:	lwz	r26,0(r13)
 		lwz	r27,4(r13)
 		lwz	r28,8(r13)
 		lwz	r29,12(r13)
@@ -8384,7 +8412,7 @@ SetExcHandler:
 		
 #********************************************************************************************
 #
-#	signals = WaitTime(signalSet, Time) // r3=r4,r5	*NEEDS FUNCTIONALITY IN INTERRUPT
+#	signals = WaitTime(signalSet, Time) // r3=r4,r5
 #
 #********************************************************************************************
 
@@ -8406,7 +8434,7 @@ WaitTime:
 		beq	.NoDebug21
 		
 		li	r31,FWaitTime-FRun68K
-#		bl	DebugStartFunction
+		bl	DebugStartFunction
 
 .NoDebug21:	mr	r30,r4
 		mr	r29,r3
@@ -8445,15 +8473,16 @@ WaitTime:
 
 		mtctr	r27
 		mr.	r27,r27
-		beq-	.TimeIsUp
+		beq-	.TimeCalced
 
-.WaitLoop:	addc	r5,r5,r28
+.CalcLoop:	addc	r5,r5,r28
 		addze	r4,r4
-		bdnz+	.WaitLoop
+		bdnz+	.CalcLoop
 
-.TimeIsUp:	addc	r5,r5,r3
+.TimeCalced:	addc	r5,r5,r3
 		addze	r4,r4
 		li	r9,0
+
 		stw	r4,WAITTIME_TIME1(r31)
 		stw	r5,WAITTIME_TIME2(r31)
 		stw	r26,WAITTIME_TASK(r31)
@@ -8499,8 +8528,8 @@ WaitTime:
 		lwz	r26,RunningTask(r0)
 		lwz	r4,TC_SIGRECVD(r26)
 		or	r5,r6,r4
-		rlwinm.	r0,r5,22,31,31
-		bne-	.WrongSignal
+		rlwinm.	r0,r5,22,31,31		
+		bne-	.TimeOut
 
 		mr	r4,r31
 		
@@ -8509,13 +8538,13 @@ WaitTime:
 		stw	r4,4(r3)
 		stw	r3,0(r4)
 		
-		b	.CorrectSignal
+		b	.SigBeforeTime
 
-.WrongSignal:	ori	r4,r4,SIGF_WAIT
+.TimeOut:	ori	r4,r4,SIGF_WAIT
 		xori	r4,r4,SIGF_WAIT
 		stw	r4,TC_SIGRECVD(r26)
 
-.CorrectSignal:	li	r4,Atomic
+.SigBeforeTime:	li	r4,Atomic
 
 		bl AtomicDone
 
@@ -8530,7 +8559,7 @@ WaitTime:
 		addi	r13,r13,4
 
 		mr	r3,r30
-		
+
 		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug22
