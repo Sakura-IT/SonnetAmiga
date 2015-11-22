@@ -1812,6 +1812,7 @@ EInt:		b	.FPUnav				#0
 		stw	r3,0(r4)
 	
 .NotDoneYet:	mr	r4,r5
+
 		b	.NextWaitList
 
 .NoWaitTime:	li	r9,TS_READY
@@ -1822,6 +1823,8 @@ EInt:		b	.FPUnav				#0
 		beq	.EndOfWaitList
 		lwz	r6,TC_SIGRECVD(r4)
 		mr	r6,r6
+		beq	.NoSigs
+		rlwinm.	r0,r6,22,31,31
 		beq	.NoSigs
 		stb	r9,TC_STATE(r4)
 .NoSigs:	lbz	r6,TC_STATE(r4)
@@ -1848,8 +1851,7 @@ EInt:		b	.FPUnav				#0
 		stw	r3,4(r5)
 		stw	r5,0(r3)
 
-.EndOfWaitList:	
-		lwz	r9,RunningTask(r0)
+.EndOfWaitList:	lwz	r9,RunningTask(r0)
 
 		b	.TrySwitch
 
@@ -2092,7 +2094,7 @@ EInt:		b	.FPUnav				#0
 
 .TrySwitch:	mr.	r9,r9
 		bne	.CheckWait
-		
+
 		la	r4,ReadyTasks(r0)
 		
 		lwz	r5,0(r4)			#RemHeadPPC
@@ -2112,8 +2114,7 @@ EInt:		b	.FPUnav				#0
 		stw	r9,RunningTask(r0)		
 		b	.LoadContext
 
-.CheckWait:	
-		li	r4,TS_REMOVED
+.CheckWait:	li	r4,TS_REMOVED
 		lbz	r3,TC_STATE(r9)
 		cmpw	r3,r4
 		
@@ -2423,13 +2424,15 @@ EInt:		b	.FPUnav				#0
 		loadreg	r1,SysStack-0x20		#System stack in unused mem
 		lwz	r0,SonnetBase(r0)
 		or	r1,r1,r0
-		
+
 		stw	r13,-4(r1)
 		subi	r13,r1,4
 		stwu	r1,-284(r1)
 		
 		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
 		mtsrr1	r0
+		
+		stw	r0,0x118(r0)
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
@@ -2438,6 +2441,9 @@ EInt:		b	.FPUnav				#0
 
 		loadreg	r0,Quantum
 		mtdec	r0
+
+		loadreg	r0,"IDLE"
+		stw	r0,0xf4(r0)
 		
 		li	r0,0
 		stb	r0,ExceptionMode(r0)
@@ -2481,10 +2487,10 @@ EInt:		b	.FPUnav				#0
 		stwu	r7,-4(r13)
 		stwu	r8,-4(r13)
 		stwu	r9,-4(r13)
-
-		loadreg r5,"DECI"
-		stw	r5,0xf4(r0)
-		
+			
+		loadreg r0,"DECI"
+		stw	r0,0xf4(r0)			
+				
 .ListLoop:	lwz	r9,PowerPCBase(r0)
 		la	r4,LIST_READYEXC(r9)
 
@@ -2494,7 +2500,7 @@ EInt:		b	.FPUnav				#0
 		beq-	.NoExcHandlers
 		stw	r3,0(r4)
 		stw	r4,4(r3)
-			
+
 		lwz	r8,EXCDATA_EXCID(r5)
 		
 		rlwinm.	r0,r8,(32-EXC_MCHECK),31,31
@@ -2619,7 +2625,7 @@ EInt:		b	.FPUnav				#0
 		stw	r3,0(r4)
 		
 .NotInstalled:	bdnz+	.NextExc
-		
+
 		mtctr	r0
 		lwz	r6,EXCDATA_LASTEXC(r7)
 		lwz	r7,EXCDATA_FLAGS(r6)

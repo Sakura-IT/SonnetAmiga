@@ -4583,9 +4583,6 @@ FindTaskPPC:
 		
 		stwu	r31,-4(r13)
 		
-		mflr	r31
-		stw	r31,0x140(r0)
-		
 		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug09
@@ -7065,6 +7062,8 @@ GetHALInfo:
 #********************************************************************************************
 
 ChangeMMU:
+		blr
+		
 		prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
@@ -7358,6 +7357,7 @@ MoveFromBAT:
 #********************************************************************************************		
 
 FreeAllMem:	blr
+
 		prolog 228,"TOC"
 
 		lwz	r4,MemSem(r0)
