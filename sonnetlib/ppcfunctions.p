@@ -630,8 +630,8 @@ FindNamePPC:
 		b	.E4
 		
 .ZorroIIISpace:	lwz	r3,0(r4)
-		lwz	r3,0(r3)				#???
-		mr.	r3,r3
+		lwz	r8,0(r3)				#???
+		mr.	r8,r8
 		beq-	.E4
 		subi	r8,r5,1
 .Loop2:		mr	r6,r3
@@ -2292,7 +2292,7 @@ AddPortPPC:
 		lwz	r4,PortListSem(r0)
 		
 		bl ReleaseSemaphorePPC
-		
+
 		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug28
@@ -2322,7 +2322,7 @@ RemPortPPC:
 		mr.	r31,r31
 		beq	.NoDebug29
 		
-		li	r31,FGetInfo-FRun68K
+		li	r31,FRemPortPPC-FRun68K
 		bl	DebugStartFunction
 
 .NoDebug29:	lwz	r4,PortListSem(r0)
@@ -9219,7 +9219,7 @@ FSetExcMMU:		.byte	"SetExcMMU",0
 FClearExcMMU:		.byte	"ClearExcMMU",0
 FChangeMMU:		.byte	"ChangeMMU",0
 FGetInfo:		.byte	"GetInfo",0
-FCreateMsgPortPPC:	.byte	"CreateNsgPortPPC",0
+FCreateMsgPortPPC:	.byte	"CreateMsgPortPPC",0
 FDeleteMsgPortPPC:	.byte	"DeleteMsgPortPPC",0
 FAddPortPPC:		.byte	"AddPortPPC",0
 FRemPortPPC:		.byte	"RemPortPPC",0
