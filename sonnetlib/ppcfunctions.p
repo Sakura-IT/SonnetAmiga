@@ -2316,7 +2316,6 @@ RemPortPPC:
 		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
-		mr	r31,r4
 
 		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
@@ -2325,7 +2324,9 @@ RemPortPPC:
 		li	r31,FRemPortPPC-FRun68K
 		bl	DebugStartFunction
 
-.NoDebug29:	lwz	r4,PortListSem(r0)
+.NoDebug29:	mr	r31,r4
+
+		lwz	r4,PortListSem(r0)
 
 		bl ObtainSemaphorePPC
 
