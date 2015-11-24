@@ -103,8 +103,8 @@ Start:		loadreg	r0,"REDY"			#Dummy entry at absolute 0x7400
 	
 		trap					#For PP_THROW
 	
-ExitCode:	blrl
-		li	r7,TS_REMOVED
+StartCode:	blrl
+ExitCode:	li	r7,TS_REMOVED
 		lwz	r9,RunningTask(r0)
 		stb	r7,TC_STATE(r9)
 		
@@ -371,6 +371,11 @@ End:		mflr	r4
 		lwz	r4,_LVOSetCache+2(r4)
 		addi	r4,r4,ViolationOS		
 		stw	r4,ViolationAddress(r0)
+
+		loadreg	r4,IdleTask+(ExitCode-Start)
+		lwz	r6,SonnetBase(r0)
+		or	r4,r4,r6
+		stw	r4,DefExitCode(r0)
 
 		bl	Caches				#Setup the L1 and L2 cache
 
@@ -1902,7 +1907,7 @@ EInt:		b	.FPUnav				#0
 		subi	r13,r1,4
 		stwu	r1,-284(r1)		
 		
-		loadreg	r6,IdleTask+(ExitCode-Start)
+		loadreg	r6,IdleTask+(StartCode-Start)
 		lwz	r4,SonnetBase(r0)
 		or	r6,r6,r4
 		mtsprg0	r6
@@ -2431,9 +2436,7 @@ EInt:		b	.FPUnav				#0
 		
 		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
 		mtsrr1	r0
-		
-		stw	r0,0x118(r0)
-		
+
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
 		mtspr	HID0,r0
@@ -3112,6 +3115,9 @@ EInt:		b	.FPUnav				#0
 		mtmsr	r0				#Reenable MMU & FPU
 		sync
 		isync
+
+		stw	r7,0x120(r0)
+		stw	r8,0x124(r0)
 
 		loadreg	r7,"DSI!"
 		stw	r7,0xf4(r0)

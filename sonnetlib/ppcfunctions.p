@@ -3674,7 +3674,7 @@ CreateTaskPPC:
 		stwu	r18,-4(r13) 
 		stwu	r17,-4(r13) 
 		stwu	r16,-4(r13) 
- 		
+ 
  		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug51
@@ -3682,10 +3682,7 @@ CreateTaskPPC:
 		li	r31,FCreateTaskPPC-FRun68K
 #		bl	DebugStartFunction
 
-.NoDebug51:	loadreg	r17,"CRTT"
-		stw	r17,0x130(r0)
-
-		mr	r17,r2 
+.NoDebug51:	mr	r17,r2 
 		mr	r30,r4 
 		
 		lwz	r3,RunningTask(r0)
@@ -3938,7 +3935,7 @@ CreateTaskPPC:
 		stw	r4,LH_TAIL(r5) 
 		stw	r5,LH_TAIL(r3) 
  
-		li	r4,544
+		li	r4,CONTEXT_LENGTH
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
@@ -3950,7 +3947,7 @@ CreateTaskPPC:
 		stw	r3,TASKPPC_CONTEXTMEM(r31)
 		mr	r26,r3
 		lwz	r0,TC_SPREG(r31)
-		stw	r0,36(r26)			#To location 9 of ContextMem??
+		stw	r0,CONTEXT_STACK(r26)		#r1 in context
  
 		li	r4,24
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
@@ -3966,7 +3963,7 @@ CreateTaskPPC:
 		sth	r0,ML_NUMENTRIES(r3) 
 		stw	r26,ML_SIZE+ME_ADDR(r3) 
 		lis	r0,0 
-		ori	r0,r0,544 
+		ori	r0,r0,CONTEXT_LENGTH 
 		stw	r0,ML_SIZE+ME_LENGTH(r3) 
 		mr	r5,r3 
 		addi	r4,r31,TC_MEMENTRY
@@ -3976,12 +3973,10 @@ CreateTaskPPC:
 		stw	r4,LH_TAIL(r5) 
 		stw	r5,LH_TAIL(r3) 
  
-		loadreg	r0,0xf070
-		stw	r0,4(r26)			#f070 to location 1?? 
-		stw	r25,148(r26)			#Code to location 37 
-		stw	r2,40(r26)			#TOC to location 10 
-#		lwz	r3,8000(r2) 
-#		stw	r3,0(r26)			#8000(TOC) to location 0?? 
+		loadreg	r0,MACHINESTATE_DEFAULT
+		stw	r0,CONTEXT_SRR1(r26)		#f070 to srr1
+		stw	r25,CONTEXT_CODE(r26)		#Code to srr0
+		stw	r2,CONTEXT_TOC(r26)		#Mother r2 to TOC 
  
  		loadreg	r4,TASKATTR_BAT
 		lis	r5,0 
@@ -3990,7 +3985,7 @@ CreateTaskPPC:
  
  		bl GetTagDataPPC
  
-		addi	r4,r26,412 
+		addi	r4,r26,CONTEXT_BATS 
 		li	r0,16 
 		mtctr	r0 
  
@@ -4017,10 +4012,8 @@ CreateTaskPPC:
 .ToStorage:	lwzu	r0,4(r5) 
 		stwu	r0,4(r4) 
 		bdnz+	.ToStorage 
- 
-#		lwz	r3,18720(r2)			#? 
-#		stw	r3,64(r20)			#4 bytes at end of BATSTORAGE? 
-		addi	r4,r26,480			#480 in ContextMem (Segment Regs)
+  
+		addi	r4,r26,CONTEXT_SEGMENTS		#480 in ContextMem (Segment Regs)
  
  		bl Super
  		mr	r6,r3
@@ -4039,12 +4032,12 @@ CreateTaskPPC:
  		bl User
  
  		loadreg	r4,TASKATTR_EXITCODE
-		li	r5,0 
+		lwz	r5,DefExitCode(r0)
 		mr	r6,r30 
  
  		bl GetTagDataPPC
  
-		stw	r3,152(r26)			#152 in ContextMem; Default=0 
+		stw	r3,CONTEXT_LR(r26)		#Exit code. Default=0 
  
  		loadreg r4,TASKATTR_PRIVATE
 		li	r5,0 
@@ -4073,7 +4066,7 @@ CreateTaskPPC:
 		mr.	r3,r3 
 		beq-	.NoInherit			#No Inherit 
  
-		stw	r17,156(r26)			#Mother r2 to ContextMem 156 
+		stw	r17,CONTEXT_TOC(r26)		#Mother r2 is originally 156
 		b	.DoInherit 
  
 .NoInherit:	loadreg	r4,TASKATTR_R2
@@ -4082,7 +4075,7 @@ CreateTaskPPC:
  
  		bl GetTagDataPPC
  
-		stw	r3,156(r26)			#r2 to ContextMem 156 
+		stw	r3,CONTEXT_TOC(r26)		#r2 is originally 156
  
 .DoInherit:	loadreg	r4,TASKATTR_R3
 		li	r5,0 
@@ -4090,7 +4083,7 @@ CreateTaskPPC:
  
  		bl GetTagDataPPC
  
-		stw	r3,44(r26)			#r3 to ContextMem 44 
+		stw	r3,CONTEXT_R3(r26)		#r3 to ContextMem 44 orig 
  
  		loadreg	r4,TASKATTR_R4
 		li	r5,0 
@@ -4098,7 +4091,7 @@ CreateTaskPPC:
  
  		bl GetTagDataPPC
  
-		stw	r3,48(r26)			#r4 to ContextMem 48 
+		stw	r3,CONTEXT_R4(r26)		#r4 to ContextMem 48 orig
  		
  		loadreg	r4,TASKATTR_R5
 		li	r5,0 
@@ -4106,7 +4099,7 @@ CreateTaskPPC:
  
  		bl GetTagDataPPC
  
-		stw	r3,52(r26)			#r5 to ContextMem 52 
+		stw	r3,CONTEXT_R5(r26)		#r5 to ContextMem 52 orig
   
   		loadreg	r4,TASKATTR_R6
 		li	r5,0 
@@ -4114,7 +4107,7 @@ CreateTaskPPC:
  
  		bl GetTagDataPPC
  
-		stw	r3,56(r26)			#r6 to ContextMem 56 
+		stw	r3,CONTEXT_R6(r26)		#r6 to ContextMem 56 orig
  
  		loadreg	r4,TASKATTR_R7
 		li	r5,0 
@@ -4122,7 +4115,7 @@ CreateTaskPPC:
  
  		bl GetTagDataPPC
  
-		stw	r3,60(r26)			#r7 to ContextMem 60 
+		stw	r3,CONTEXT_R7(r26)		#r7 to ContextMem 60 orig
  
  		loadreg	r4,TASKATTR_R8
 		li	r5,0 
@@ -4130,7 +4123,7 @@ CreateTaskPPC:
 		
 		bl GetTagDataPPC
  
-		stw	r3,64(r26)			#r8 to ContextMem 64 
+		stw	r3,CONTEXT_R8(r26)		#r8 to ContextMem 64 orig
  
  		loadreg	r4,TASKATTR_R9
 		li	r5,0 
@@ -4138,7 +4131,7 @@ CreateTaskPPC:
  
 		bl GetTagDataPPC
 	 
-		stw	r3,68(r26)			#r9 to ContextMem 68 
+		stw	r3,CONTEXT_R9(r26)		#r9 to ContextMem 68 orig
  
  		loadreg	r4,TASKATTR_R10
 		li	r5,0 
@@ -4146,7 +4139,7 @@ CreateTaskPPC:
  
 		bl GetTagDataPPC 
  
-		stw	r3,72(r26)			#r10 to ContextMem 72 
+		stw	r3,CONTEXT_R10(r26)		#r10 to ContextMem 72 orig
  
 		li	r4,100
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
@@ -4262,12 +4255,7 @@ CreateTaskPPC:
 		
 .Mojo6:		mr	r4,r3
 		bl User
-  
-#		lwz	r3,17652(r2)			#WARP! #4 (Zero datacache (dcbz))
-#		lwz	r0,-52(r3) 
-#		mtlr	r0 
-#		blrl	 
- 
+   
 .WaitAtomic01:	li	r4,Atomic
 		
 		bl AtomicTest
@@ -4293,18 +4281,18 @@ CreateTaskPPC:
 		stb	r0,TC_STATE(r31)
 		la	r4,ReadyTasks(r0)
 		mr	r5,r31				#Task
-		loadreg	r0,0x000186a0
+		loadreg	r0,Quantum
 		stw	r0,TASKPPC_QUANTUM(r31)
-		lwz	r7,TASKPPC_NICE(r31)
-		addi	r8,r7,20 
-		rlwinm	r8,r8,2,0,29 
-		lwz	r7,654(r23) 
-		lwzx	r8,r7,r8 
-		rlwinm	r8,r8,24,8,31 
-		lis	r7,2000 
-		ori	r7,r7,0 
-		divwu	r0,r7,r8 
-		stw	r0,TASKPPC_DESIRED(r31)
+#		lwz	r7,TASKPPC_NICE(r31)		#Pending finding out what this means
+#		addi	r8,r7,20 
+#		rlwinm	r8,r8,2,0,29 
+#		lwz	r7,654(r23) 			#654(PowerPCBase)
+#		lwzx	r8,r7,r8 
+#		rlwinm	r8,r8,24,8,31 
+#		lis	r7,2000 
+#		ori	r7,r7,0 
+#		divwu	r0,r7,r8 
+#		stw	r0,TASKPPC_DESIRED(r31)
 		
 		bl InsertOnPri
 		
@@ -4377,7 +4365,9 @@ CreateTaskPPC:
 		xori	r4,r4,TASKPPC_CHOWN
 		stw	r4,TASKPPC_FLAGS(r3) 
  
-		mr	r3,r5				#Exit with task in r3 (or not) 
+		mr	r3,r5				#Exit with task in r3 (or not)
+		
+		stw	r3,0x144(r0)
  
  		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
@@ -6094,13 +6084,7 @@ DeallocatePPC:
 		
 #********************************************************************************************
 
-.GuruTime:	stw	r4,0x130(r0)
-		stw	r5,0x134(r0)
-		stw	r27,0x138(r0)
-		stw	r28,0x13c(r0)
-		stw	r30,0x140(r0)
-
-		b	.GuruTime		#STUB
+.GuruTime:	b	.GuruTime		#STUB
 
 #********************************************************************************************
 #
