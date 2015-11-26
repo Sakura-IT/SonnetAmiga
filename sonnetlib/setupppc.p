@@ -41,7 +41,17 @@ PPCCode:	b	.SkipCom			#0x3000	System initialization
 		bl	ConfigMem			#Result = Sonnet Mem Len in r8
 		bl	InstallExceptions		#Put exceptions in place
 
-		lis	r27,0x8000			#Upper boundary PCI Memory Mediator
+		lhz	r3,20(r29)
+		cmpwi	r3,0x1002			#Check for ATI Gfx Card
+		bne	.NoMaxRam	
+
+		lis	r4,0x800			#Max 128MB RAM on Sonnet when ATI present
+		cmplw	r8,r4
+		ble	.NoMaxRam
+
+		mr	r8,r4	
+
+.NoMaxRam:	lis	r27,0x8000			#Upper boundary PCI Memory Mediator
 		mr	r26,r8				#This is hardcoded at the moment
 
 		li	r28,17
@@ -73,9 +83,6 @@ SetLen:		mr	r30,r28
 		ori	r25,r25,8			#debug = 0x7c000008
 		bl	ConfigWrite32
 
-		stw	r27,8(r29)			#MemStart
-		stw	r8,12(r29)			#MemLen
-
 		li	r3,0
 		li	r4,63
 		mtctr	r4
@@ -86,8 +93,11 @@ SetLen:		mr	r30,r28
 		lwz	r3,16(r29)
 		stw	r3,RTGBase(r0)
 		lhz	r3,20(r29)
-		sth	r3,RTGType(r0)
+		sth	r3,RTGType(r0)		
 		stw	r8,MemSize(r0)		
+
+		stw	r27,8(r29)			#MemStart
+		stw	r8,12(r29)			#MemLen
 
 		bl	mmuSetup			#Setup the Memory Management Unit
 		bl	Epic				#Setup the EPIC controller
@@ -793,7 +803,7 @@ mmuSetup:
 		mr	r3,r24
 		addis	r5,r3,0x4000
 		mr	r4,r3
-		addis	r4,r4,0xf00
+		addis	r4,r4,0xf00			#256MB max Video RAM (ATI)
 		li	r6,0
 		li	r7,2
 		
@@ -3115,9 +3125,6 @@ EInt:		b	.FPUnav				#0
 		mtmsr	r0				#Reenable MMU & FPU
 		sync
 		isync
-
-		stw	r7,0x120(r0)
-		stw	r8,0x124(r0)
 
 		loadreg	r7,"DSI!"
 		stw	r7,0xf4(r0)
