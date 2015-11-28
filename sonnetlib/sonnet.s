@@ -347,6 +347,16 @@ MoveSon		move.l (a0)+,(a1)+
 		move.l a1,d1
 		move.l DosBase(pc),a6
 		jsr _LVOCreateNewProc(a6)
+		
+		lea Prc2Tags(pc),a1
+		move.l a1,d1
+		jsr _LVOCreateNewProc(a6)
+		
+		move.l d0,a2
+		lea pr_MsgPort(a2),a2		
+		lea JProcPort(pc),a1
+		move.l a2,(a1)
+		
 		move.l 4.w,a6
 
 NoLib		jsr _LVOEnable(a6)
@@ -532,6 +542,8 @@ EndPtch		move.l ThisTask(a6),a0
 		lea pr_MsgPort(a0),a0
 		move.l a0,MN_REPLYPORT(a1)
 		move.l MN_MIRROR(a1),a0
+		move.l a0,d0
+		beq NoMirror68		
 		jsr _LVOPutMsg(a6)			;move message to waiting 68k task
 		bra NextMsg
 
@@ -606,12 +618,44 @@ LoadD		move.l #"DONE",d0
 		move.l a1,OFQPR(a2)			;Return Message Frame
 		bra GetLoop
 
+NoMirror68	move.l JProcPort(pc),a0
+		move.l a0,MN_MIRROR(a1)
+		jsr _LVOPutMsg(a6)			;move message to waiting 68k task
+		bra NextMsg
+		
+;********************************************************************************************
+
+Joshua		move.l 4.w,a6				;Fake Mirror task for PPC task
+		move.l ThisTask(a6),a0
+		lea pr_MsgPort(a0),a0
+		move.l a0,d7
+		jsr _LVOWaitPort(a6)
+GtLoop2		move.l d7,a0
+		jsr _LVOGetMsg(a6)
+		tst.l d0
+		beq.s Joshua
+		move.l d0,a0
+		move.l MN_IDENTIFIER(a0),d0
+		cmp.l #"T68K",d0
+		bne.s GtLoop2
+		bsr Runk86
+		bra.s GtLoop2
+		
+;********************************************************************************************
+
 		cnop 0,4
 
 PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,125,0,0
 PrcName		dc.b "MasterControl",0
 
 		cnop 0,4
+		
+Prc2Tags	dc.l NP_Entry,Joshua,NP_Name,Prc2Name,NP_Priority,5,0,0
+Prc2Name	dc.b "Joshua",0
+
+		cnop 0,4		
+
+JProcPort	dc.l 0
 
 ;********************************************************************************************
 
@@ -945,7 +989,8 @@ GtLoop		move.l Port(a5),a0
 		cmp.l #"FPPC",d0
 		beq.s DizDone
 		cmp.l #"T68K",d0
-		beq.s Runk86
+		bne.s GtLoop
+		bsr.s Runk86
 		bra.s GtLoop
 
 DizDone		move.l PStruct(a5),a1
@@ -975,8 +1020,7 @@ EndIt		move.l d7,d0
 FreePrt		move.l d0,a0
 		jmp _LVODeleteMsgPort(a6)
 
-Runk86	
-		btst #AFB_FPU40,AttnFlags+1(a6)
+Runk86		btst #AFB_FPU40,AttnFlags+1(a6)
 		beq.s NoFPU
 		fmove.d fp0,-(a7)
 		fmove.d fp1,-(a7)
@@ -1066,8 +1110,7 @@ DoReslt		move.l (a1)+,(a2)+
 		fmove.d (a7)+,fp2
 		fmove.d (a7)+,fp1
 		fmove.d (a7)+,fp0
-NoFPU2		jsr _LVOReplyMsg(a6)
-		bra GtLoop
+NoFPU2		jmp _LVOReplyMsg(a6)
 
 ;********************************************************************************************
 ;
