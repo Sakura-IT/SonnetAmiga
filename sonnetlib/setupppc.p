@@ -382,13 +382,10 @@ End:		mflr	r4
 		
 		lwz	r4,PowerPCBase(r0)
 		lwz	r4,_LVOSetCache+2(r4)
-		addi	r4,r4,ViolationOS		
-		stw	r4,ViolationAddress(r0)
-
-		loadreg	r4,IdleTask+(ExitCode-Start)
-		lwz	r6,SonnetBase(r0)
-		or	r4,r4,r6
-		stw	r4,DefExitCode(r0)
+		addi	r6,r4,ViolationOS		
+		stw	r6,ViolationAddress(r0)
+		addi	r6,r4,TaskExit
+		stw	r6,TaskExitCode(r0)
 
 		bl	Caches				#Setup the L1 and L2 cache
 
@@ -2149,15 +2146,19 @@ EInt:		b	.FPUnav				#0
 		lbz	r3,TC_STATE(r9)
 		cmpw	r3,r4
 		
-		beq	.ReturnToUser
+		bne	.NotDeleted
 
-		li	r4,TS_CHANGING
+		li	r9,0
+		stw	r9,RunningTask(r0)
+		b	.ReturnToUser		
+
+.NotDeleted:	li	r4,TS_CHANGING
 		lbz	r3,TC_STATE(r9)
 		cmpw	r3,r4
 		
 		beq	.GoToWait
 		
-		la	r4,NewTasks(r0)
+.Deleted:	la	r4,NewTasks(r0)
 		mr	r6,r4
 		
 		lwz	r5,0(r4)			#RemHeadPPC
