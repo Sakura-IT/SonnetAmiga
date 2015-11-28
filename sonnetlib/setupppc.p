@@ -325,6 +325,9 @@ End:		mflr	r4
 		la	r4,LIST_WAITTIME(r3)
 		bl	.MakeList
 		
+		li	r6,0
+		stb	r6,FLAG_WAIT(r3)
+		
 		li	r3,0x7000			#Put Semaphores at 0x7000
 		li	r6,0x7200			#Put Semaphores memory at 0x7200
 		lwz	r30,SonnetBase(r0)
@@ -1794,7 +1797,11 @@ EInt:		b	.FPUnav				#0
 		mr.	r9,r9
 		bne	.TaskException
 
-		lwz	r4,PowerPCBase(r0)
+		lwz	r4,PowerPCBase(r0)		
+		lbz	r5,FLAG_WAIT(r4)
+		mr.	r5,r5
+		bne	.NoWaitTime
+		
 		la	r4,LIST_WAITTIME(r4)
 		lwz	r4,MLH_HEAD(r4)
 .NextWaitList:	lwz	r5,LN_SUCC(r4)
@@ -1802,18 +1809,27 @@ EInt:		b	.FPUnav				#0
 		mr.	r5,r5
 		beq	.NoWaitTime
 
+#		li	r9,TS_CHANGING
+#		lwz	r6,WAITTIME_TASK(r4)
+#		lbz	r6,TC_STATE(r6)
+#		cmpw	r6,r9
+#		beq	.NotDoneYet
+
 		mftbu	r9
 		lwz	r6,WAITTIME_TIME1(r4)
 		cmplw	r6,r9
+		bgt	.DoneWaiting
 		blt	.NotDoneYet
+		
 		mftbl	r9
 		lwz	r6,WAITTIME_TIME2(r4)
 		cmplw	r6,r9
-		blt	.NotDoneYet		
-		lwz	r6,WAITTIME_TASK(r4)
+		blt	.NotDoneYet
+				
+.DoneWaiting:	lwz	r6,WAITTIME_TASK(r4)
 		lwz	r9,RunningTask(r0)
 		cmpw	r6,r9
-		beq	.SetSig	
+		beq	.SetSig
 
 		li	r9,TS_READY
 		stb	r9,TC_STATE(r6)	
