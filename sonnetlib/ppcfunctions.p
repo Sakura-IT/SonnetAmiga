@@ -779,7 +779,7 @@ AllocVecPPC:	prolog 228,"TOC"
 		li	r5,_LVOAllocMem
 			
 		bl 	Run68KLowLevel
-				
+										
 		mr.	r4,r3
 		beq	.AllocErr
 		
@@ -1822,10 +1822,7 @@ ObtainSemaphorePPC:
 		addi	r5,r5,1
 		sth	r5,SS_NESTCOUNT(r30)
 		
-.DoneWait:	
-#		lbz	r31,DebugMode(r0)
-#		stb	r31,DebugLevel(r0)
-		lbz	r31,DebugLevel(r0)
+.DoneWait:	lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug14
 
@@ -2652,8 +2649,7 @@ WaitFor68K:
 		
 		bl GetMsgPPC
 				
-		mr	r30,r3
-		mr.	r27,r30
+		mr.	r30,r3
 		
 		beq	.WasNoMsg
 		
@@ -2663,7 +2659,6 @@ WaitFor68K:
 		bne	.WasNoDone
 		
 		mfctr	r26
-
 		subi	r4,r31,4
 		addi	r29,r30,MN_PPSTRUCT-4		#r30 = new msg
 		li	r6,PP_SIZE/4
@@ -2757,10 +2752,13 @@ Run68K:
 		stw	r5,MN_PPC(r30)
 		
 		lwz	r5,TASKPPC_STARTMSG(r5)
+		mr.	r5,r5				#Task made by CreateTaskPPC?
+		beq	.NotCreated
+		
 		lwz	r5,MN_MIRROR(r5)
 		stw	r5,MN_MIRROR(r30)
 		
-		lwz	r4,MCTask(r0)
+.NotCreated:	lwz	r4,MCTask(r0)
 		la	r4,pr_MsgPort(r4)
 		stw	r4,MN_MCTASK(r30)
 		li	r5,NT_MESSAGE
@@ -4366,8 +4364,6 @@ CreateTaskPPC:
 		stw	r4,TASKPPC_FLAGS(r3) 
  
 		mr	r3,r5				#Exit with task in r3 (or not)
-		
-		stw	r3,0x144(r0)
  
  		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
@@ -5309,8 +5305,8 @@ DeleteTaskPPC:
 
 		b	.NotTwo				#STUB
 
-		mr	r3,r31
-		bl	0x13354				#? Check for mirror task?
+#		mr	r3,r31
+#		bl	0x13354				#? Check for mirror task?
 
 		mr.	r3,r3
 		beq-	.NotTwo
@@ -8553,7 +8549,7 @@ WaitTime:
 #		bl	DebugEndFunction
 
 .NoDebug22:	mtctr	r25
-		
+
 		lwz	r25,0(r13)
 		lwz	r26,4(r13)
 		lwz	r27,8(r13)
@@ -9073,9 +9069,16 @@ DebugStartFunction:
 		stwu	r29,-4(r13)
 		stwu	r30,-4(r13)		
 
+		loadreg r30,"dnet"
+		lwz	r29,RunningTask(r0)
+		lwz	r29,LN_NAME(r29)
+		lwz	r29,0(r29)
+		cmpw	r29,r30
+		bne	.NoDNET	
+
 		mr	r30,r4
 		mr	r29,r5
-		
+
 		bl	.GetText
 .FText:		
 .byte		"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
@@ -9101,7 +9104,7 @@ DebugStartFunction:
 			
 		bl	SPrintF
 
-		lwz	r30,0(r13)
+.NoDNET:	lwz	r30,0(r13)
 		lwz	r29,4(r13)
 		lwz	r5,8(r13)
 		lwz	r4,12(r13)
@@ -9123,6 +9126,13 @@ DebugEndFunction:
 		stwu	r3,-4(r13)
 		stwu	r4,-4(r13)
 		stwu	r5,-4(r13)
+
+		loadreg r5,"dnet"
+		lwz	r4,RunningTask(r0)
+		lwz	r4,LN_NAME(r4)
+		lwz	r4,0(r4)
+		cmpw	r4,r5
+		bne	.NoDNET2
 
 		bl	.GetText2
 		
@@ -9147,7 +9157,7 @@ DebugEndFunction:
 			
 		bl	SPrintF
 
-		lwz	r5,0(r13)
+.NoDNET2:	lwz	r5,0(r13)
 		lwz	r4,4(r13)
 		lwz	r3,8(r13)
 		addi	r13,r13,12
