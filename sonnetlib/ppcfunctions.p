@@ -4,10 +4,12 @@
 
 .set FunctionsLen,(EndFunctions-SetCache)
 .set ViolationOS,(Violation-SetCache)
+.set TaskExit,(DeleteTaskPPC-SetCache)
 
 .global FunctionsLen
 .global ViolationOS
 .global LibFunctions
+.global TaskExit
 
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
@@ -831,6 +833,8 @@ FreeVecPPC:
 
 		bl 	Run68KLowLevel
 		
+		li	r3,0
+		
 		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug08
@@ -1629,7 +1633,7 @@ LockTaskList:
 
 		bl ObtainSemaphorePPC
 
-		li	r3,AllTasks
+		la	r3,AllTasks(r0)
 		
 		lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -4030,7 +4034,7 @@ CreateTaskPPC:
  		bl User
  
  		loadreg	r4,TASKATTR_EXITCODE
-		lwz	r5,DefExitCode(r0)
+		lwz	r5,TaskExitCode(r0)
 		mr	r6,r30 
  
  		bl GetTagDataPPC
@@ -4220,60 +4224,60 @@ CreateTaskPPC:
  
  		bl ObtainSemaphorePPC
 	 
-		li	r4,AllTasks
+		la	r4,AllTasks(r0)
 		addi	r4,r4,4
-		lwz	r3,4(r4) 
+		lwz	r3,4(r4) 			#AddTailPPC
 		stw	r5,4(r4)			#Insert dummy task in list 
-		stw	r4,0(r5) 
-		stw	r3,4(r5) 
-		stw	r5,0(r3) 
- 
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
+
  		la	r4,NumAllTasks(r0)
-		lwz	r3,0(r4) 
+		lwz	r3,0(r4)
 		addi	r3,r3,1				#Set number of tasks
-		stw	r3,0(r4) 
+		stw	r3,0(r4)
  
-		dcbst	r0,r4				#Cache 
- 
+		dcbst	r0,r4				#Cache
+
  		lwz	r4,TaskListSem(r0)
-		
+
 		bl ReleaseSemaphorePPC
- 
+
  		bl Super
-		
+
 		b	.Mojo4
 .Mojo5:		mfspr	r0,HID0				#Invalidate ICache
 		ori	r0,r0,HID0_ICFI			#Make sure code is in L1 Cache
 		mtspr	HID0,r0
 		xori	r0,r0,HID0_ICFI
 		mtspr	HID0,r0
-		isync	
+		isync
 		b 	.Mojo6
 .Mojo4:		b 	.Mojo5
-		
+
 .Mojo6:		mr	r4,r3
 		bl User
-   
+
 .WaitAtomic01:	li	r4,Atomic
-		
+
 		bl AtomicTest
- 
-		mr.	r3,r3 
-		beq+	.WaitAtomic01			#Wait for Atomic 
- 
+
+		mr.	r3,r3
+		beq+	.WaitAtomic01			#Wait for Atomic
+
 		lwz	r3,TASKPPC_FLAGS(r31)
 		andi.	r0,r3,TASKPPC_SYSTEM
-		bne-	.SystemTask			#Yes -> Skip next 
- 
+		bne-	.SystemTask			#Yes -> Skip next
+
 		lwz	r5,IdDefTasks(r0)		#Normal Tasks +1
-		addi	r5,r5,1 
-		stw	r5,IdDefTasks(r0) 
-		b	.SkipSystem 
- 
+		addi	r5,r5,1
+		stw	r5,IdDefTasks(r0)
+		b	.SkipSystem
+
 .SystemTask:	lwz	r5,IdSysTasks(r0)		#System Tasks +1
 		addi	r5,r5,1
 		stw	r5,IdSysTasks(r0)
- 
+
 .SkipSystem:	stw	r5,TASKPPC_ID(r31)
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r31)
@@ -4282,37 +4286,37 @@ CreateTaskPPC:
 		loadreg	r0,Quantum
 		stw	r0,TASKPPC_QUANTUM(r31)
 #		lwz	r7,TASKPPC_NICE(r31)		#Pending finding out what this means
-#		addi	r8,r7,20 
-#		rlwinm	r8,r8,2,0,29 
+#		addi	r8,r7,20
+#		rlwinm	r8,r8,2,0,29
 #		lwz	r7,654(r23) 			#654(PowerPCBase)
-#		lwzx	r8,r7,r8 
-#		rlwinm	r8,r8,24,8,31 
-#		lis	r7,2000 
-#		ori	r7,r7,0 
-#		divwu	r0,r7,r8 
+#		lwzx	r8,r7,r8
+#		rlwinm	r8,r8,24,8,31
+#		lis	r7,2000
+#		ori	r7,r7,0
+#		divwu	r0,r7,r8
 #		stw	r0,TASKPPC_DESIRED(r31)
-		
+
 		bl InsertOnPri
-		
+
 		li	r0,-1 
 		stb	r0,RescheduleFlag(r0)		#Reschedule flag 
  		li	r4,Atomic
- 		
+
  		bl AtomicDone
- 
+
 		bl CauseInterrupt
- 
-		mr	r3,r31 
-		b	.SkipToEnd			#All good, go to exit 
-							#Error handling: 
+
+		mr	r3,r31
+		b	.SkipToEnd			#All good, go to exit
+							#Error handling:
 .Error13:	mr	r4,r16
 
 		bl FreeVecPPC
- 
+
 .Error12:	addi	r4,r18,48
 
 		bl FreeSemaphorePPC
- 
+
 .Error11:	mr	r4,r18
 
 		bl FreeVecPPC
@@ -4352,26 +4356,26 @@ CreateTaskPPC:
 .Error02:	mr	r4,r31
 
 		bl FreeVecPPC
- 
+
 .Error01:	li	r3,0				#Error flag in r3 
- 
+
 .SkipToEnd:	mr	r5,r3
 		lwz	r3,RunningTask(r0)
- 
+
 		lwz	r4,TASKPPC_FLAGS(r3)
 		ori	r4,r4,TASKPPC_CHOWN 
 		xori	r4,r4,TASKPPC_CHOWN
 		stw	r4,TASKPPC_FLAGS(r3) 
- 
+
 		mr	r3,r5				#Exit with task in r3 (or not)
- 
+
  		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug52
 
 		li	r31,FCreateTaskPPC-FRun68K
 		bl	DebugEndFunction
- 
+
 .NoDebug52:	lwz	r16,0(r13) 
 		lwz	r17,4(r13) 
 		lwz	r18,8(r13) 
@@ -4389,7 +4393,7 @@ CreateTaskPPC:
 		lwz	r30,56(r13) 
 		lwz	r31,60(r13) 
 		addi	r13,r13,64 
-		
+
 		epilog "TOC"
 
 #********************************************************************************************
@@ -4458,7 +4462,7 @@ SetDecInterrupt:
 .NoSubAdd:	bdnz+	.NextCtr
 		mr	r3,r6
 		blr
-		
+
 #********************************************************************************************
 #
 #	Status = ChangeStack(NewStackSize) // r3=r4
@@ -4569,7 +4573,7 @@ FindTaskPPC:
 		prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
-		
+
 		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug09
@@ -4590,7 +4594,7 @@ FindTaskPPC:
 
 		bl ObtainSemaphorePPC
 
-		li	r4,AllTasks
+		la	r4,AllTasks(r0)
 		
 		bl FindNamePPC
 
@@ -5259,7 +5263,15 @@ DeleteTaskPPC:
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
 
-		lbz	r31,DebugLevel(r0)
+		mflr	r31				#This needs to be done in setup.p
+		loadreg r5,0x4e800020			#using the normal exitcode
+		lwz	r31,-4(r31)			#But first PPC tasks started from
+		cmpw	r5,r31				#68K need to be the same as tasks
+		bne	.ExitKludge			#started by the PPC. Which they aren't yet
+		
+		li	r4,0				#Fake task exit code. Remove own task.
+		
+.ExitKludge:	lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug53
 		
@@ -5303,50 +5315,7 @@ DeleteTaskPPC:
 		
 		bl ReleaseSemaphorePPC
 
-		b	.NotTwo				#STUB
-
-#		mr	r3,r31
-#		bl	0x13354				#? Check for mirror task?
-
-		mr.	r3,r3
-		beq-	.NotTwo
-
-		mr	r27,r3
-		lbz	r4,54(r27)
-		cmplwi	r4,2
-		bne-	.NotTwo
-
-		lwz	r28,14(r27)
-		lis	r0,0
-		nop	
-		stw	r0,0(r28)
-
-		li	r4,CACHE_DCACHEFLUSH
-		li	r5,0
-		li	r6,0
-
-		bl SetCache
-
-		lwz	r4,22(r27)			#Task
-		lwz	r5,26(r27)			#Signals
-
-		bl Signal68K
-
-		addi	r4,r2,18202			#? Some list Semaphore
-		
-		bl ObtainSemaphorePPC
-
-		mr	r4,r27				#RemovePPC
-		lwz	r3,0(r4)
-		lwz	r4,4(r4)
-		stw	r4,4(r3)
-		stw	r3,0(r4)
-
-		addi	r4,r2,18202			#? Some list Semaphore
-		
-		bl ReleaseSemaphorePPC
-
-.NotTwo:	lwz	r4,TASKPPC_MSGPORT(r31)
+		lwz	r4,TASKPPC_MSGPORT(r31)
 		mr.	r27,r4
 		beq-	.NoMsgPort
 
@@ -5363,7 +5332,7 @@ DeleteTaskPPC:
 		bl ObtainSemaphorePPC
 
 		lwz	r4,TASKPPC_TASKPTR(r31)
-		
+
 		mr.	r4,r4				#STUB
 		beq	.NoTaskPtr			#STUB
 		
@@ -5381,11 +5350,6 @@ DeleteTaskPPC:
 		lwz	r4,TaskListSem(r0)
 		
 		bl ReleaseSemaphorePPC
-	
-#		lwz	r4,17740(r2)			#Task	(Voyager or Babylon 5?)
-#		lwz	r5,17736(r2)			#Signal
-		
-#		bl SignalPPC
 
 		mr.	r29,r29				#This task?
 		beq-	.NotOwnTask2			#no? Skip next
@@ -9069,13 +9033,6 @@ DebugStartFunction:
 		stwu	r29,-4(r13)
 		stwu	r30,-4(r13)		
 
-		loadreg r30,"dnet"
-		lwz	r29,RunningTask(r0)
-		lwz	r29,LN_NAME(r29)
-		lwz	r29,0(r29)
-		cmpw	r29,r30
-		bne	.NoDNET	
-
 		mr	r30,r4
 		mr	r29,r5
 
@@ -9104,7 +9061,7 @@ DebugStartFunction:
 			
 		bl	SPrintF
 
-.NoDNET:	lwz	r30,0(r13)
+		lwz	r30,0(r13)
 		lwz	r29,4(r13)
 		lwz	r5,8(r13)
 		lwz	r4,12(r13)
