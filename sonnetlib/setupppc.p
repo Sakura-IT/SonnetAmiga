@@ -1732,7 +1732,36 @@ EInt:		b	.FPUnav				#0
 		cmpw	r4,r6				#The one we want?
 		beq	.MsgTPPC
 		
-		loadreg	r4,"DONE"
+		loadreg	r4,"LLPP"			#Cross-signaling
+		cmpw	r4,r6				#CTRL-C for now
+		bne	.NoXSignal 			#(Restriction is in sonnet.s)
+	
+		lwz	r3,MN_ARG1(r5)			#68K mirror task's port
+		lwz	r4,RunningTask(r0)		#Check for it in the running task
+		lwz	r8,TASKPPC_STARTMSG(r4)
+		lwz	r8,MN_REPLYPORT(r8)
+		cmpw	r8,r3
+		bne	.ChkWait
+	
+.ReUseLoop:	lwz	r3,MN_ARG0(r5)			#Signals received by the 68K task
+		lwz	r8,TC_SIGRECVD(r4)		#Copy to PPC task
+		or	r8,r8,r3
+		stw	r8,TC_SIGRECVD(r4)
+		b	.NoXSignal
+		
+.ChkWait:	la	r4,WaitingTasks(r0)		#Check for it in the waiting tasks
+		lwz	r4,0(r4)
+.ChkNextSig:	lwz	r31,0(r4)
+		mr.	r31,r31				#Check for the end of the list
+		beq	.NoXSignal
+		lwz	r8,TASKPPC_STARTMSG(r4)
+		lwz	r8,MN_REPLYPORT(r8)
+		cmpw	r8,r3
+		beq	.ReUseLoop
+		mr	r4,r31
+		b	.ChkNextSig	
+		
+.NoXSignal:	loadreg	r4,"DONE"
 		cmpw	r4,r6
 		bne	.NxtInQ
 		
@@ -1805,12 +1834,6 @@ EInt:		b	.FPUnav				#0
 
 		mr.	r5,r5
 		beq	.NoWaitTime
-
-#		li	r9,TS_CHANGING
-#		lwz	r6,WAITTIME_TASK(r4)
-#		lbz	r6,TC_STATE(r6)
-#		cmpw	r6,r9
-#		beq	.NotDoneYet
 
 		mftbu	r9
 		lwz	r6,WAITTIME_TIME1(r4)

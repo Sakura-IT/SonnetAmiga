@@ -970,7 +970,7 @@ WaitForPPC:
 		bne.s FndPort
 
 		moveq.l #PPERR_WAITERR,d7
-		bra.s EndIt
+		bra EndIt
 
 FndPort		move.l d0,Port(a5)
 		bra.s Stacker
@@ -979,7 +979,18 @@ yProces		lea pr_MsgPort(a1),a1
 		move.l a1,Port(a5)
 
 Stacker		move.l Port(a5),a0
-		jsr _LVOWaitPort(a6)
+		moveq.l #0,d1
+		move.b MP_SIGBIT(a0),d1
+		moveq.l #1,d0
+		lsl.l d1,d0
+		or.w #SIGBREAKF_CTRL_C,d0		;Check for CTRL-C signals
+		jsr _LVOWait(a6)
+
+		and.w #SIGBREAKF_CTRL_C,d0
+		beq.s GtLoop
+		
+		bsr CrossSignals		
+		
 GtLoop		move.l Port(a5),a0
 		jsr _LVOGetMsg(a6)
 		tst.l d0
@@ -1111,6 +1122,27 @@ DoReslt		move.l (a1)+,(a2)+
 		fmove.d (a7)+,fp1
 		fmove.d (a7)+,fp0
 NoFPU2		jmp _LVOReplyMsg(a6)
+
+CrossSignals	move.l EUMBAddr(pc),a2			;Get Frame
+		move.l IFQPR(a2),a1
+
+		moveq.l #47,d1				;MsgLen/4-1
+		move.l a1,a2
+ClearMsg	clr.l (a2)+
+		dbf d1,ClearMsg
+
+		move.l #"LLPP",MN_IDENTIFIER(a1)
+		move.l d0,MN_ARG0(a1)
+		move.l ThisTask(a6),a2
+		lea pr_MsgPort(a2),a2
+		move.l a2,d0
+		move.l d0,MN_ARG1(a1)
+		
+		move.l EUMBAddr(pc),a2
+		move.l a1,IFQPR(a2)			;Signal PPC with Frame
+		move.l a1,OFQPR(a1)			;Release Frame
+
+		rts
 
 ;********************************************************************************************
 ;
