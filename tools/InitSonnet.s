@@ -42,7 +42,7 @@ NoPatch	movem.l (a7)+,d0-a6
 	rts
 	
 NewAlloc:
-	tst.l d1
+	tst.w d1
 	beq.s Best
 	btst #0,d1
 	beq.s NoFast
@@ -61,10 +61,11 @@ Best	move.l d7,-(a7)
 	move.l (a2),d7
 	cmp.l #"Shel",d7
 	beq.s IsHell
+	cmp.l #"Back",d7
 FindEnd	move.b (a2)+,d7
 	bne.s FindEnd
 	move.l -5(a2),d7
-	cmp.l #"1005",d7
+	cmp.l #"2005",d7
 	beq.s DoBit
 	bra.s NoBit
 	
@@ -80,9 +81,7 @@ IsHell	move.l pr_CLI(a3),d7
 	move.b (a3),d7
 	subq.l #4,d7
 	bmi.s NoBit
-	move.l 1(a3,d7.l),d7	
-	cmp.l #"nnet",d7
-	beq.s DoBit
+	move.l 1(a3,d7.l),d7
 	cmp.l #"2005",d7
 	beq.s DoBit
 	bra.s NoBit	
