@@ -54,16 +54,15 @@
 .set PortInUse,192				#628	; See CurrentPort
 .set DebugLevel,193				#18737
 .set RTGType,194
-.set AlignmentExcHigh,196
-.set AlignmentExcLow,200
+.set RTGBase,196
+.set TaskExitCode,200
 .set WaitListSem,204				#18150
 .set CPUInfo,208
 .set SysStackPointer,212
 .set ViolationAddress,216			#Pointer
 .set MemSize,220
 .set L2Size,224
-.set RTGBase,228
-.set DefExitCode,232
+.set AlignStore,228
 
 #LibBase:
 
@@ -84,6 +83,10 @@
 .set LIST_EXCDACCESS,224
 .set LIST_EXCMCHECK,212
 .set LIST_WAITTIME,396
+.set AlignmentExcHigh,600
+.set AlignmentExcLow,604
+.set DataExcHigh,608
+.set DataExcLow,612
 .set FLAG_WAIT,627
 
 .set EXCDATA_TYPE,8				#Always NT_INTERRUPT
@@ -217,6 +220,8 @@
 
 .set HINFO_ALEXC_HIGH,		0x80103000		#For GetHALInfo
 .set HINFO_ALEXC_LOW,		0x80103001
+.set HINFO_DSEXC_HIGH,		0x80103002
+.set HINFO_DSEXC_LOW,		0x80103003
 
 .set SCHED_REACTION,		0x80104000		#Reaction time of low-activity tasks
 			

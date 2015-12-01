@@ -327,6 +327,11 @@ End:		mflr	r4
 		
 		li	r6,0
 		stb	r6,FLAG_WAIT(r3)
+		stw	r6,AlignmentExcHigh(r3)
+		stw	r6,AlignmentExcLow(r3)
+		stw	r6,DataExcHigh(r3)
+		stw	r6,DataExcLow(r3)		#Should put code in place to clear
+							#lib_base instead of individual clearing
 		
 		li	r3,0x7000			#Put Semaphores at 0x7000
 		li	r6,0x7200			#Put Semaphores memory at 0x7200
@@ -2065,6 +2070,7 @@ EInt:		b	.FPUnav				#0
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
+		isync
 		mtspr	HID0,r0
 		isync
 
@@ -2125,6 +2131,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
+		isync
 		mtspr	HID0,r0
 		isync
 
@@ -2424,6 +2431,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfspr	r9,HID0
 		ori	r9,r9,HID0_ICFI
+		isync
 		mtspr	HID0,r9
 		isync
 
@@ -2489,6 +2497,7 @@ EInt:		b	.FPUnav				#0
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
+		isync
 		mtspr	HID0,r0
 		isync
 
@@ -3097,6 +3106,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
+		isync
 		mtspr	HID0,r0
 		isync
 
@@ -3123,14 +3133,195 @@ EInt:		b	.FPUnav				#0
 
 #********************************************************************************************
 
-.Alignment:	mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		xori	r0,r0,HID0_DCE
-		sync	
-		mtspr	HID0,r0
+.Alignment:	mtsprg0	r0
+		mtsprg1	r1
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0				#Reenable MMU & FPU
+		sync
 		isync
+
+		lwz	r0,SonnetBase(r0)
+		loadreg	r1,SysStack-0x20		#System stack in unused mem
+		or	r1,r1,r0
 		
-		loadreg	r3,"ALIG"
+		stwu	r4,-4(r1)
+		mflr	r4
+		stwu	r4,-4(r1)
+		stwu	r5,-4(r1)
+		stwu	r6,-4(r1)
+
+		mfsrr0	r5
+		lwz	r5,0(r5)
+		rlwinm	r0,r5,6,26,31
+		cmpwi	r0,0x34				#test for stfs
+		beq	.stfs
+		cmpwi	r0,0x30
+		beq	.lfs
+		cmpwi	r0,0x1f
+		beq	.stfsx
+		b	.HaltIt
+
+.stfs:		bl	.GetEmStAddr
+		
+.StEmu:		lwz	r6,0(r1)
+		lwz	r5,4(r1)
+		lwz	r4,8(r1)
+		mtlr	r4
+		lwz	r4,12(r1)
+		mfsrr0	r1
+		addi	r1,r1,4				#Exit beyond offending instruction
+		mtsrr0	r1
+		mfsprg1	r1
+
+		.align 1				#Align on 16 bit boundary
+
+.StMod:		
+.long		0xd0000000|AlignStore			#Store offending using stfs
+		lwz	r0,AlignStore(r0)		#Get offending using lwz
+.long		0x90000000				#Store it correctly using stw
+		
+		mfsprg0	r0
+		
+		rfi					#Yes....It's selfmodifying code...
+							#Maybe apply to DSI too for speed?
+
+.GetEmStAddr:	mflr	r4
+		addi	r4,r4,.StMod-.StEmu
+		loadreg	r5,0xd0000000|AlignStore	#reset instructions
+		stw	r5,0(r4)
+		lis	r5,0x9000
+		stw	r5,8(r4)
+
+		mfsrr0	r5
+		lwz	r5,0(r5)			#get instruction
+		
+		lwz	r6,0(r4)			#first instruction
+		rlwimi	r6,r5,0,6,10
+		stw	r6,0(r4)
+
+		lwz	r6,8(r4)			#third instruction
+		rlwimi	r6,r5,0,11,31
+		stw	r6,8(r4)		
+		
+		dcbf	r0,r4				#Flush datacache
+		sync
+		
+		mfspr	r0,HID0				#Clear instruction cache
+		ori	r0,r0,HID0_ICFI
+		isync
+		mtspr	HID0,r0
+		sync
+				
+		blr					#Execute emulation
+
+.lfs:		bl	.GetEmLAddr
+		
+.LEmu:		lwz	r6,0(r1)
+		lwz	r5,4(r1)
+		lwz	r4,8(r1)
+		mtlr	r4
+		lwz	r4,12(r1)
+		mfsrr0	r1
+		addi	r1,r1,4				#Exit beyond offending instruction
+		mtsrr0	r1
+		mfsprg1	r1
+
+		.align 1				#Align on 16 bit boundary
+
+.LMod:		
+.long		0x80000000				#Load offending using lwz
+		stw	r0,AlignStore(r0)		#Store offending using stw
+.long		0xc0000000|AlignStore			#load it correctly using lfs
+		
+		mfsprg0	r0
+		
+		rfi					#Yes....It's selfmodifying code...
+							#Maybe apply to DSI too for speed?
+
+.GetEmLAddr:	mflr	r4
+		addi	r4,r4,.LMod-.LEmu
+		lis	r5,0x8000			#reset instructions
+		stw	r5,0(r4)
+		loadreg	r5,0xc0000000|AlignStore
+		stw	r5,8(r4)
+
+		mfsrr0	r5
+		lwz	r5,0(r5)			#get instruction
+		
+		lwz	r6,0(r4)			#first instruction
+		rlwimi	r6,r5,0,11,31
+		stw	r6,0(r4)
+
+		lwz	r6,8(r4)			#third instruction
+		rlwimi	r6,r5,0,6,10
+		stw	r6,8(r4)		
+		
+		dcbf	r0,r4				#Flush datacache
+		sync
+		
+		mfspr	r0,HID0				#Clear instruction cache
+		ori	r0,r0,HID0_ICFI
+		isync
+		mtspr	HID0,r0
+		sync
+				
+		blr
+		
+.stfsx:		bl	.GetEmStxAddr
+		
+.StxEmu:	lwz	r6,0(r1)
+		lwz	r5,4(r1)
+		lwz	r4,8(r1)
+		mtlr	r4
+		lwz	r4,12(r1)
+		mfsrr0	r1
+		addi	r1,r1,4				#Exit beyond offending instruction
+		mtsrr0	r1
+		mfsprg1	r1
+
+		.align 1				#Align on 16 bit boundary
+
+.StxMod:		
+.long		0xd0000000|AlignStore			#Store offending using stfs
+		lwz	r0,AlignStore(r0)		#Get offending using lwz
+.long		0x7c00012e				#Store it correctly using stwx 
+		
+		mfsprg0	r0
+		
+		rfi					#Yes....It's selfmodifying code...
+							#Maybe apply to DSI too for speed?
+
+.GetEmStxAddr:	mflr	r4
+		addi	r4,r4,.StxMod-.StxEmu
+		loadreg	r5,0xd0000000|AlignStore	#reset instructions
+		stw	r5,0(r4)
+		loadreg	r5,0x7c00012e
+		stw	r5,8(r4)
+
+		mfsrr0	r5
+		lwz	r5,0(r5)			#get instruction
+		
+		lwz	r6,0(r4)			#first instruction
+		rlwimi	r6,r5,0,6,10
+		stw	r6,0(r4)
+
+		lwz	r6,8(r4)			#third instruction
+		rlwimi	r6,r5,0,11,20
+		stw	r6,8(r4)		
+		
+		dcbf	r0,r4				#Flush datacache
+		sync
+		
+		mfspr	r0,HID0				#Clear instruction cache
+		ori	r0,r0,HID0_ICFI
+		isync
+		mtspr	HID0,r0
+		sync
+
+		blr					#Execute emulation
+
+.HaltIt:	loadreg	r3,"ALIG"
 		stw	r3,0xf4(r0)
 		mfsrr0	r3
 		stw	r3,0xf8(r0)
@@ -3171,7 +3362,7 @@ EInt:		b	.FPUnav				#0
 
 		mfsrr0	r7
 		stw	r7,0xf8(r0)		
-		lwz	r7,0(r7)		
+		lwz	r7,0(r7)
 		
 .wosdb:		lwz	r6,SysBase(r0)			#Special wosdb patch
 		cmpw	r6,r10

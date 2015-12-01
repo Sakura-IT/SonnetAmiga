@@ -6971,6 +6971,7 @@ GetHALInfo:
 		stwu	r30,-4(r13)
 
 		mr	r31,r4
+		mr	r30,r3
 
 		loadreg	r4,HINFO_ALEXC_HIGH
 		mr	r5,r31
@@ -6980,7 +6981,7 @@ GetHALInfo:
 		mr.	r3,r3
 		beq-	.NoHALTag1
 
-		lwz	r4,AlignmentExcHigh(r0)
+		lwz	r4,AlignmentExcHigh(r30)
 		stw	r4,4(r3)
 		
 .NoHALTag1:	loadreg	r4,HINFO_ALEXC_LOW
@@ -6991,10 +6992,32 @@ GetHALInfo:
 		mr.	r3,r3
 		beq-	.NoHALTag2
 
-		lwz	r4,AlignmentExcLow(r0)
+		lwz	r4,AlignmentExcLow(r30)
+		stw	r4,4(r3)
+		
+.NoHALTag2:	loadreg	r4,HINFO_DSEXC_HIGH
+		mr	r5,r31
+		
+		bl FindTagItemPPC
+		
+		mr.	r3,r3
+		beq	.NoHALTag3
+		
+		lwz	r4,DataExcHigh(r30)
+		stw	r4,4(r3)
+		
+.NoHALTag3:	loadreg	r4,HINFO_DSEXC_HIGH
+		mr	r5,r31
+		
+		bl FindTagItemPPC
+		
+		mr.	r3,r3
+		beq	.NoHALTag4		
+		
+		lwz	r4,DataExcLow(r30)
 		stw	r4,4(r3)
 
-.NoHALTag2:	lwz	r30,0(r13)
+.NoHALTag4:	lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 
