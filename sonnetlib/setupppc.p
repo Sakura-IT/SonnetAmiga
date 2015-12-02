@@ -3173,10 +3173,11 @@ EInt:		b	.FPUnav				#0
 		addi	r1,r1,4				#Exit beyond offending instruction
 		mtsrr0	r1
 		mfsprg1	r1
-
-		.align 1				#Align on 16 bit boundary
-
-.StMod:		
+		b	.StMod
+		
+		.align 4				#Align on 16 byte boundary
+		
+.StMod:
 .long		0xd0000000|AlignStore			#Store offending using stfs
 		lwz	r0,AlignStore(r0)		#Get offending using lwz
 .long		0x90000000				#Store it correctly using stw
@@ -3226,10 +3227,11 @@ EInt:		b	.FPUnav				#0
 		addi	r1,r1,4				#Exit beyond offending instruction
 		mtsrr0	r1
 		mfsprg1	r1
+		b	.LMod
 
-		.align 1				#Align on 16 bit boundary
+		.align 4				#Align on 16 byte boundary
 
-.LMod:		
+.LMod:
 .long		0x80000000				#Load offending using lwz
 		stw	r0,AlignStore(r0)		#Store offending using stw
 .long		0xc0000000|AlignStore			#load it correctly using lfs
@@ -3279,10 +3281,10 @@ EInt:		b	.FPUnav				#0
 		addi	r1,r1,4				#Exit beyond offending instruction
 		mtsrr0	r1
 		mfsprg1	r1
+		b	.StxMod
 
-		.align 1				#Align on 16 bit boundary
-
-.StxMod:		
+		.align 4				#Align on 16 byte boundary
+.StxMod:
 .long		0xd0000000|AlignStore			#Store offending using stfs
 		lwz	r0,AlignStore(r0)		#Get offending using lwz
 .long		0x7c00012e				#Store it correctly using stwx 
