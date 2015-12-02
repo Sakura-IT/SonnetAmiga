@@ -1,0 +1,12 @@
+The TO-DO list (01NOV15):
+
+PPC -> 68K Communication	99%	PutXMsg needs rewrite
+68K -> PPC Communication	99%	PutXMsgPPC needs rewrite
+Scheduler			50%	Multitasking is implemented and working in a simple preemptive round-robin system
+MMU Table Setup			95%	Needs testing. One BAT now in use for PCI Memory/Gfx Memory
+PPC -> PPC Communication	99%	Needs testing
+Library Functionality		95%	5% of the functions not working or not implemented. Mostly memory and debug related
+Cache Coherency			95%	Needs testing
+WarpOS Compatibility		40%	More complex programs/games work after patching. Patching will be mandetory or recompilation.
+AmigaOS Patcher			50%	Semi-integrated in Hardware emulator
+Hardware emulator		50%	Library catches some loads and stores to Amiga Hardware. Not all yet implemented
