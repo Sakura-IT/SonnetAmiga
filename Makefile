@@ -8,7 +8,7 @@ LHA=lha
 IRA=ira
 
 LOCAL_INC_DIR=../common
-LOCAL_INCS=$(LOCAL_INC_DIR)/ppcdefines.i $(LOCAL_INC_DIR)/ppcmacros-std.i
+LOCAL_INCS=$(LOCAL_INC_DIR)/ppcdefines.i $(LOCAL_INC_DIR)/ppcmacros-std.i $(LOCAL_INC_DIR)/pci.i $(LOCAL_INC_DIR)/sonnet_lib.i $(LOCAL_INC_DIR)/sonnet_libppc.i
 
 POSIXLIB_CCPARAM=-I$(POSIXLIB)/include
 POSIXLIB_LDPARAM=$(POSIXLIB)/AmigaOS3/posix.lib

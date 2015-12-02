@@ -8,7 +8,7 @@
 ;********************************************************************************************
 
 		include 68kdefines.i
-		include	../sonnetlib/sonnet_lib.i
+		include	sonnet_lib.i
 
 		include	exec/exec_lib.i
 		include exec/execbase.i

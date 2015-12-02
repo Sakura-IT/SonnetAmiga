@@ -11,10 +11,10 @@ disasm68k : $(EXECUTABLE_RS)
 $(EXECUTABLE) : $(OBJECTS68K) $(OBJECTSPPC)
 	$(LD) -s $(OBJECTS68K) $(OBJECTSPPC) -o $(EXECUTABLE)
 
-%.o : %.p $(LOCAL_INCS) sonnet_libppc.i
+%.o : %.p $(LOCAL_INCS) 
 	$(ASMPPC) $(ASMPPCPARAM) -o $@ $< 
 
-%.o : %.s $(LOCAL_INCS) pci.i sonnet_lib.i
+%.o : %.s $(LOCAL_INCS)
 	$(ASM68K) $(ASM68KPARAM) -o $@ $<
 
 %.rs : %
