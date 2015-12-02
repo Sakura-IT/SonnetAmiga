@@ -7,8 +7,10 @@
 ;	installed by the Mediator, this code could be actually integrated into sonnet.library.
 ;********************************************************************************************
 
+		include 68kdefines.i
+		include	../sonnetlib/sonnet_lib.i
+
 		include	exec/exec_lib.i
-		include	sonnet_lib.i
 		include exec/execbase.i
 		include dos/dosextens.i
 
