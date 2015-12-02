@@ -3207,13 +3207,10 @@ EInt:		b	.FPUnav				#0
 		
 		dcbf	r0,r4				#Flush datacache
 		sync
-		
-		mfspr	r0,HID0				#Clear instruction cache
-		ori	r0,r0,HID0_ICFI
+		icbi	r0,r4				#Invalidate instruction cache
 		isync
-		mtspr	HID0,r0
 		sync
-				
+
 		blr					#Execute emulation
 
 .lfs:		bl	.GetEmLAddr
@@ -3260,14 +3257,11 @@ EInt:		b	.FPUnav				#0
 		stw	r6,8(r4)		
 		
 		dcbf	r0,r4				#Flush datacache
+		sync		
+		icbi	r0,r4				#Invalidate instruction cache
+		isync
 		sync
 		
-		mfspr	r0,HID0				#Clear instruction cache
-		ori	r0,r0,HID0_ICFI
-		isync
-		mtspr	HID0,r0
-		sync
-				
 		blr
 		
 .stfsx:		bl	.GetEmStxAddr
@@ -3313,12 +3307,9 @@ EInt:		b	.FPUnav				#0
 		stw	r6,8(r4)		
 		
 		dcbf	r0,r4				#Flush datacache
-		sync
-		
-		mfspr	r0,HID0				#Clear instruction cache
-		ori	r0,r0,HID0_ICFI
+		sync		
+		icbi	r0,r4				#Invalidate instruction cache
 		isync
-		mtspr	HID0,r0
 		sync
 
 		blr					#Execute emulation
