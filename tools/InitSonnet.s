@@ -11,6 +11,7 @@
 		include	sonnet_lib.i
 		include exec/execbase.i
 		include dos/dosextens.i
+		include 68kdefines.i
 
 ;********************************************************************************************
 
