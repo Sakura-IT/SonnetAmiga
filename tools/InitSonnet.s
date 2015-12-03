@@ -7,10 +7,8 @@
 ;	installed by the Mediator, this code could be actually integrated into sonnet.library.
 ;********************************************************************************************
 
-		include 68kdefines.i
-		include	sonnet_lib.i
-
 		include	exec/exec_lib.i
+		include	sonnet_lib.i
 		include exec/execbase.i
 		include dos/dosextens.i
 
@@ -97,6 +95,7 @@ IsHell		move.l pr_CLI(a3),d7
 		bra.s NoBit	
 
 DoBit		bset #13,d1					;Set attribute $2000
+		bset #18,d1					;MEMF_REVERSE
 NoBit		move.l (a7)+,a2
 		move.l (a7)+,a3
 		move.l (a7)+,d7	
