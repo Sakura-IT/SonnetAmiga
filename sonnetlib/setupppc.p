@@ -719,7 +719,6 @@ Wait2:		mfl2cr	r3
 		sub	r6,r6,r5
 		lwz	r5,SonnetBase(r0)
 		or	r6,r6,r5
-
 		lis	r5,L2_SIZE_1M_U			#Size of memory to write to
 		
 .L2SzWriteLoop:	dcbz	r4,r6
@@ -864,6 +863,10 @@ mmuSetup:
 		mr	r5,r3
 		or	r3,r3,r27
 		add	r4,r4,r27
+		
+		stw	r3,0x160(r0)
+		stw	r4,0x164(r0)
+		
 		li	r6,0
 		li	r7,2
 		
@@ -951,13 +954,13 @@ mmuSetup:
 		mtsrin	r5,r13
 
 		addi	r3,r3,1
-		cmpw	r3,r4
+		cmplw	r3,r4
 		ble	.srx_set
 
 		mr	r3,r17
 		mr	r4,r18
 		
-.load_PTEs:	cmpw	r3,r4
+.load_PTEs:	cmplw	r3,r4
 		bge	.ExitTBL
 		
 		rlwinm	r8,r3,4,28,31
