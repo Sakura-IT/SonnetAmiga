@@ -772,7 +772,7 @@ AllocVecPPC:	prolog 228,"TOC"
 .NoDebug05:	mr.	r3,r4
 		beq	.AllocErr
 
-		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC		#Fixed for now
+		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC|MEMF_REVERSE	#Fixed for now
 		
 		addi	r8,r4,0x38					#d0
 		mr	r31,r8

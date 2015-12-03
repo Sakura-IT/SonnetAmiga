@@ -864,9 +864,6 @@ mmuSetup:
 		or	r3,r3,r27
 		add	r4,r4,r27
 		
-		stw	r3,0x160(r0)
-		stw	r4,0x164(r0)
-		
 		li	r6,0
 		li	r7,2
 		

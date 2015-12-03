@@ -1189,14 +1189,15 @@ AllocVec32:
 		move.l a6,-(a7)
 		add.l #$38,d0
 		move.l 4.w,a6
-		move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1	;attributes are FIXED to Sonnet mem
+		move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC|MEMF_REVERSE,d1	;attributes are FIXED to Sonnet mem
 		jsr _LVOAllocVec(a6)
 		move.l d0,d1
+		beq.s MemErr
 		add.l #$27,d0
 		and.l #$ffffffe0,d0
 		move.l d0,a0
 		move.l d1,-4(a0)
-		move.l (a7)+,a6
+MemErr		move.l (a7)+,a6
 		rts
 
 ;********************************************************************************************
