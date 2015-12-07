@@ -52,7 +52,15 @@ PPCCode:	b	.SkipCom			#0x3000	System initialization
 		mr	r8,r4	
 
 .NoMaxRam:	lis	r27,0x8000			#Upper boundary PCI Memory Mediator
-		mr	r26,r8				#This is hardcoded at the moment
+		lwz	r26,16(r29)			#Get gfx mem
+		cmplw	r26,r27
+		blt	.ZorroX				#Is Zorro3
+		lis	r27,0x9000			#Zorro2 plus 256MB ATI
+		cmplw	r26,r27
+		beq	.ZorroX
+		lis	r27,0x9800			#Zorro2 plus 128MB (or less) ATI
+		
+.ZorroX:	mr	r26,r8
 
 		li	r28,17
 		mtctr	r28
@@ -75,12 +83,12 @@ SetLen:		mr	r30,r28
 		subf	r27,r30,r27
 		lis	r26,EUMB
 		ori	r26,r26,ITWR
-		stwbrx	r25,0,r26			#debug = 0x19 (=48MB, Development system)
+		stwbrx	r25,0,r26			#Set size of Inbound Translate Window
 		sync
 
 		setpcireg LMBAR
 		mr	r25,r27
-		ori	r25,r25,8			#debug = 0x7c000008
+		ori	r25,r25,8			#Set LMBAR to Base of memory plus size
 		bl	ConfigWrite32
 
 		li	r3,0
@@ -101,7 +109,6 @@ SetLen:		mr	r30,r28
 
 		bl	mmuSetup			#Setup the Memory Management Unit
 		bl	Epic				#Setup the EPIC controller
-
 		bl	End
 
 Start:		loadreg	r0,"REDY"			#Dummy entry at absolute 0x7400
@@ -208,6 +215,7 @@ ExitCode:	li	r7,TS_REMOVED
 		and	r23,r23,r4				#Keep it 0000-3FFE
 		stwbrx	r23,r24,r3
 		sync
+
 		li	r0,0
 		stw	r0,RunningTask(r0)
 
@@ -1731,7 +1739,12 @@ EInt:		b	.FPUnav				#0
 		and	r9,r9,r4			#Keep it 4000-7FFE		
 		sync
 		
-		lwz	r5,0(r5)				
+		stw	r5,0x130(r0)
+
+		lwz	r5,0(r5)
+
+		stw	r5,0x134(r0)
+		
 		loadreg	r4,"TPPC"
 		lwz	r6,MN_IDENTIFIER(r5)
 		cmpw	r4,r6				#The one we want?

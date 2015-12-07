@@ -82,7 +82,7 @@ INIT:
 		moveq.l #37,d0
 		jsr _LVOOpenLibrary(a6)
 		tst.l d0
-		beq.s Clean				;Open dos.library
+		beq Clean				;Open dos.library
 		move.l d0,DosBase-Buffer(a4)
 
 		lea ExpLib(pc),a1
@@ -94,13 +94,21 @@ INIT:
 
 		move.l d0,a6
 		sub.l a0,a0
-		move.l #$89e,d0				;ELBOX
+		move.l #VENDOR_ELBOX,d0			;ELBOX
 		moveq.l #33,d1				;Mediator MKII
-		jsr _LVOFindConfigDev(a6)		;Find A3000/A4000 mediator (for now)
+		jsr _LVOFindConfigDev(a6)		;Find A3000/A4000 mediator
+		tst.l d0
+		bne.s FoundMed
+
+		sub.l a0,a0
+		move.l #VENDOR_ELBOX,d0			;ELBOX
+		moveq.l #60,d1				;Mediator 1200TX
+		jsr _LVOFindConfigDev(a6)		;Find 1200TX mediator
 		move.l 4.w,a6
 		tst.l d0
 		beq.s Clean
 
+FoundMed	move.l 4.w,a6
 		move.l d0,a1
 		move.l cd_BoardAddr(a1),d0		;Start address Configspace Mediator
 		move.l d0,MediatorBase-Buffer(a4)
@@ -122,7 +130,8 @@ INIT:
 		tst.l d0
 		bne.s FndMem
 
-Clean		move.l ROMMem(pc),d0
+Clean		move.l 4.w,a6
+		move.l ROMMem(pc),d0
 		beq.s NoROM
 		bsr.s FreeROM
 NoROM		move.l PCIBase(pc),d0
@@ -145,40 +154,53 @@ FreeROM		move.l d0,a1
 		jmp _LVOFreeMem(a6)
 
 FndMem		move.l d0,d7
-
 		move.l PCIBase(pc),d0
 		beq.s Clean
+		move.l d0,a6
+
+		move.w #VENDOR_MOTOROLA,d0
+		move.w #DEVICE_MPC107,d1
+		moveq.l #0,d2
+		jsr _LVOPCIFindCard(a6)
+		move.l d0,d6
+		beq.s Clean
+		
+		move.w #VENDOR_3DFX,d0
+		move.w d0,d5
+		move.w #DEVICE_VOODOO3,d1
+		moveq.l #0,d2
+		jsr _LVOPCIFindCard(a6)
+		tst.l d0		
+		beq.s Not3DFX
 		move.l d0,a2
-
-		moveq.l #0,d0
-		move.l PCI_List(a2),a2
-Loop1		move.l LN_SUCC(a2),d6
-		beq.s Sonnet
-		move.l PCI_VENDORID(a2),d1
-		swap d1
-		cmp.l #$00041057,d1
-		beq.s SonnetF
-		cmp.l #$0005121a,d1
-		beq.s Avenger
-		cmp.w #$1002,d1
-		beq.s ATIGen
-GfxLoop		move.l d6,a2
-		bra.s Loop1
-
-SonnetF		move.l a2,d0
-		bra.s GfxLoop
-
-ATIGen		move.l PCI_SPACE0(a2),d4
-		bra.s GfxR
-
-Avenger		move.l PCI_SPACE1(a2),d4
-GfxR		move.l d4,GfxMem-Buffer(a4)
-		move.w d1,GfxType-Buffer(a4)
-		bra.s GfxLoop
-
-Sonnet		tst.l d0
+		move.l PCI_SPACE1(a2),d4
+		bra.s FoundGfx
+		
+Not3DFX		move.w #VENDOR_ATI,d0			;Need more pciinfo
+		move.w d0,d5
+		move.w #DEVICE_RV280PRO,d1
+		moveq.l #0,d2
+		jsr _LVOPCIFindCard(a6)
+		tst.l d0
+		beq NxtATI
+		move.l d0,a2
+		move.l PCI_SPACE0(a2),d4
+		bra.s FoundGfx
+				
+NxtATI		move.w #VENDOR_ATI,d0
+		move.w d0,d5
+		move.w #DEVICE_RV280MOB,d1
+		moveq.l #0,d2
+		jsr _LVOPCIFindCard(a6)
+		tst.l d0
 		beq Clean
 		move.l d0,a2
+		move.l PCI_SPACE0(a2),d4
+		
+FoundGfx	move.l 4.w,a6
+		move.l d4,GfxMem-Buffer(a4)
+		move.w d5,GfxType-Buffer(a4)
+		move.l d6,a2
 		move.l a2,SonAddr-Buffer(a4)
 		move.l d7,a0
 		move.l MH_UPPER(a0),d1
@@ -304,7 +326,6 @@ MoveSon		move.l (a0)+,(a1)+
 		dbf d1,MoveSon
 
 		bsr MakeLibrary
-
 		tst.l d0
 		beq NoLib
 
@@ -331,17 +352,17 @@ MoveSon		move.l (a0)+,(a1)+
 		move.l a2,IS_DATA(a1)
 		lea IntName(pc),a2
 		move.l a2,LN_NAME(a1)
-		moveq.l #15,d0
+		moveq.l #100,d0
 		move.b d0,LN_PRI(a1)
 		moveq.l #NT_INTERRUPT,d0
 		move.b d0,LN_TYPE(a1)
 
 		move.l PCIBase(pc),a6
 		move.l SonAddr(pc),a0
-		jsr _LVOAddPCICardIntServer(a6)		;Attach Sonnet card to PCI Interrupt Chain
+		jsr _LVOPCIAddIntServer(a6)		;Attach Sonnet card to PCI Interrupt Chain
 
 		move.l SonAddr(pc),a0
-		jsr _LVOEnablePCICardInt(a6)		;Enable interrupt
+		jsr _LVOPCIEnableInterupt(a6)		;Enable interrupt
 
 		lea PrcTags(pc),a1
 		move.l a1,d1
@@ -661,7 +682,6 @@ JProcPort	dc.l 0
 
 SonInt:		movem.l d0-a6,-(a7)
 		move.l 4.w,a6
-
 		move.l EUMBAddr(pc),a2
 		move.l #$03000000,d2			;OMISR[OM0I|OM1I]
 		move.l OMISR(a2),d3
@@ -670,7 +690,6 @@ SonInt:		movem.l d0-a6,-(a7)
 
 		move.l OMR0(a2),a0			;Port
 		move.l OMR1(a2),a1			;Message
-
 		move.l #$ffffffff,OMR0(a2)		;Destroy value
 		cmp.l #$ffffffff,a0
 		beq.s NoSingl
@@ -687,20 +706,19 @@ DoPMsg		moveq.l #0,d4
 
 NoSingl 	move.l OMISR(a2),d3
 		move.l d2,OMISR(a2)
-
 		move.l #$20000000,d4			;OMISR[OPQI]
 		and.l d4,d3
 		beq.s DidInt
 
 NxtMsg		move.l OFQPR(a2),d3			;Get Message Frame
-		bmi.s DidInt
+		cmp.l #-1,d3
+		beq.s DidInt
 
 		move.l d3,a1
 		moveq.l #11,d4
 ;		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
 		move.l d3,a1
 		move.l MN_MCTASK(a1),a0			;MN_MCTASK
-
 		jsr _LVOPutMsg(a6)
 
 		bra.s NxtMsg
@@ -777,54 +795,8 @@ Reserved:
 		rts
 
 ;********************************************************************************************
-
-DoPPCInterrupt:
-		movem.l d1-a6,-(a7)
-		jsr _LVOCacheClearU(a6)
-		move.l #"HEAR",d5
-StrtPPC		lea Buffer(pc),a4
-		move.l SonAddr(pc),d0
-		beq.s First
-		move.l d0,a5
-		bra.s NoFirst
-
-First		bsr.s FindSonnet
-		move.l a5,SonAddr-Buffer(a4)
-NoFirst		addq.l #1,d1
-		beq.s Error
-		move.l PCSRBAR(a5),d0
-		rol.w #8,d0
-		swap d0
-		rol.w #8,d0
-		move.l d0,a5
-		move.l d5,IMR0(a5)
-Error		movem.l (a7)+,d1-a6
-		rts
-
-;********************************************************************************************
-
-FindSonnet:
-		moveq.l #0,d2
-		moveq.l #$3f,d1
-CpxLoop		move.l MediatorBase(pc),a5
-		add.l #$800000,a5
-		move.l d2,d0
-		lsl.l #3,d0
-		lsl.l #8,d0
-		add.l d0,a5
-		move.l (a5),d4
-		cmp.l #$FFFFFFFF,d4
-		beq.s Error2
-		cmp.l #$57100400,d4
-		beq.s xSonnet
-		addq.l #1,d2
-		dbf d1,CpxLoop
-Error2		move.l d4,d1
-xSonnet		rts
-
-;********************************************************************************************
 ;
-;	CPUTyoe = GetCPU(void) // d0
+;	CPUType = GetCPU(void) // d0
 ;
 ;********************************************************************************************
 
@@ -900,7 +872,6 @@ xProces		move.l d0,Port(a5)
 
 		move.l _PowerPCBase(pc),a6
 		jsr _LVOAllocVec32(a6)
-
 		move.l d0,d6
 		beq Stacker
 
@@ -944,7 +915,6 @@ CpMsg2		move.l (a0)+,(a2)+
 
 		move.l EUMBAddr(pc),a2
 		move.l a1,IFQPR(a2)
-
 		bra.s Stacker
 
 ;********************************************************************************************
@@ -1029,6 +999,8 @@ EndIt		move.l d7,d0
 		rts
 
 FreePrt		move.l d0,a0
+		rts
+
 		jmp _LVODeleteMsgPort(a6)
 
 Runk86		btst #AFB_FPU40,AttnFlags+1(a6)
@@ -1573,6 +1545,6 @@ FUNCTABLE:
 
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0,0
-IDString	dc.b	"$VER: sonnet.library 17.0 (10-Nov-15)",0
+IDString	dc.b	"$VER: sonnet.library 17.0 (07-Dec-15)",0
 		cnop	0,4
 EndCP		end

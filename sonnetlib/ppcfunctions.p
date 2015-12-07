@@ -812,8 +812,7 @@ AllocVecPPC:	prolog 228,"TOC"
 #
 #********************************************************************************************		
 
-FreeVecPPC:
-		prolog 228,"TOC"
+FreeVecPPC:	prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r8,-4(r13)
