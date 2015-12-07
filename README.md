@@ -13,12 +13,14 @@ anything useful (yet).
 # Hardware
 
 SonnetAmiga has the following hardware requirements:
-- Amiga 3000/3000T/4000/4000T.
+- Amiga 1200/3000/3000T/4000/4000T.
 - ELBOX Mediator for one of the above Amiga models. 3.3V PCI power rail is 
   necessary. Note that among big box Mediators, only 3000Di is equipped with 
-  it by default. We're investigating if it's possible to mod the other models.
-- Sonnet Crescendo 7200 with local memory installed.
-- 3Dfx Voodoo 3 or ATI Radeon 92xx graphics card.
+  it by default. For the A1200, this is the 1200TX model. We're
+  investigating if it's possible to mod the other models.
+- Sonnet Crescendo 7200 with local memory installed (up to 128 or 256MB
+  depending on installed graphics card).
+- 3Dfx Voodoo 3 or ATI Radeon 9200 (ID $5960 and $5C63) graphics card.
 
 # Building
 
