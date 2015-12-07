@@ -7,10 +7,26 @@
 PCI_List	EQU	100
 PCI_MemType	EQU	0		;EQ=MEM NE=IO
 
-_LVOEnablePCICardInt		=	-48
-_LVODisablePCICardInt		=	-54
-_LVOAddPCICardIntServer		=	-78
-_LVORemovePCICardIntServer	=	-84
+_LVOPCIFindCard			=	-30
+_LVOPCIFindCardbyClass		=	-36
+_LVOPCIFindCardbyNumber		=	-42
+_LVOPCIEnableInterupt		=	-48
+_LVOPCIDisableInterrupt		=	-54
+_LVOPCICheckInterrupt		=	-60
+_LVOPCIGetZorroWindow		=	-66
+_LVOPCISetZorroWindow		=	-72
+_LVOPCIAddIntServer		=	-78
+_LVOPCIRemoveIntServer		=	-84
+_LVOPCIConfigReadByte		=	-90
+_LVOPCIConfigReadWord		=	-96
+_LVOPCIConfigReadLong		=	-102
+_LVOPCIConfigWriteByte		=	-108
+_LVOPCIConfigWriteWord		=	-114
+_LVOPCIConfigWriteLong		=	-120
+_LVOPCIEnablePPCInterrupt	=	-126			;Uncertain. Checks ppc.library and f60020
+_LVOPCIDisablePPCInterrupt	=	-132			;Uncertain. Checks ppc.library and f60020
+_LVOPCIShutDown			=	-138			;Only works on TX (ID 60) and SX (ID 40)
+_LVOPCIInstallVGARAM		=	-144
 
  STRUCTURE  	PCI,LN_SIZE
     UWORD   	PCI_VENDORID		;Vendor ID		(14)

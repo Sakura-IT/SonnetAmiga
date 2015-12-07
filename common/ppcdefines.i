@@ -452,6 +452,7 @@
 .set VEC_BASE,0xFFF0
 .set EUMBBAR,0x78			#At 0x80000000 (Sonnet side)
 .set EUMB,0x8000
+.set PCIM,0xa000
 .set EUMBEPICPROC,0x8006
 .set EPIC_IACK,0xa0
 .set EPIC_EOI,0xb0

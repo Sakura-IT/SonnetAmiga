@@ -1,0 +1,27 @@
+##abi M68k
+##bias 30
+##public
+PCIFindCard(VendorID,DeviceID,CardNr)(d0,d1,d2)
+PCIFindCardbyClass(ClassCode,CardNr)(d0,d1)
+PCIFindCardbyNumber(Number)(d0)				##byte : xxxxxyyy where x = main card y = sub card
+PCIEnableInterupt(Card)(a0)
+PCIDisableInterrupt(Card)(a0)
+PCICheckInterrupt(Card)(a0)				##result (d0) 0 = disabled; 1 = enabled
+PCIGetZorroWindow()
+PCISetZorroWindow(address)(d0)
+PCIAddIntServer(Card)(a0)
+PCIRemoveIntServer(Card)(a0)
+PCIConfigReadByte(ConfigBase,Offset)(d0,d1)
+PCIConfigReadWord(ConfigBase,Offset)(d0,d1)
+PCIConfigReadLong(ConfigBase,Offset)(d0,d1)
+PCIConfigWriteByte(ConfigBase,Offset)(d0,d1)
+PCIConfigWriteWord(ConfigBase,Offset)(d0,d1)
+PCIConfigWriteLong(ConfigBase,Offset)(d0,d1)
+PCIEnablePPCInterrupt()					##?? depends on ppc.library (does f60020)
+PCIDisablePPCInterrupt()				##??
+PCIShutDown()						##Only 60 (TX) and 40 (SX)
+PCIInstallVGARAM(address,length)(a0,d0)
+Reserved()
+Reserved()
+##end
+
