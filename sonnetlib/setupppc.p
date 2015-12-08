@@ -1738,13 +1738,8 @@ EInt:		b	.FPUnav				#0
 		loadreg r4,0x7fff
 		and	r9,r9,r4			#Keep it 4000-7FFE		
 		sync
-		
-		stw	r5,0x130(r0)
 
 		lwz	r5,0(r5)
-
-		stw	r5,0x134(r0)
-		
 		loadreg	r4,"TPPC"
 		lwz	r6,MN_IDENTIFIER(r5)
 		cmpw	r4,r6				#The one we want?

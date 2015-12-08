@@ -999,8 +999,6 @@ EndIt		move.l d7,d0
 		rts
 
 FreePrt		move.l d0,a0
-		rts
-
 		jmp _LVODeleteMsgPort(a6)
 
 Runk86		btst #AFB_FPU40,AttnFlags+1(a6)
