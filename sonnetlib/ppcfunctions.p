@@ -10,6 +10,7 @@
 .global ViolationOS
 .global LibFunctions
 .global TaskExit
+.global CPUInfo
 
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
@@ -618,14 +619,14 @@ EnqueuePPC:
 #********************************************************************************************
 
 FindNamePPC:
-	
-		rlwinm.	r3,r4,2,31,31
-		beq+	.ZorroIIISpace
+		lis	r3,0x7000
+		cmplw	r3,r4
+		blt	.ZorroIIISpace
 		
-		lwz	r4,SysBase(r0)
-		li	r5,_LVOFindName
 		mr	r6,r4					#a0
 		mr	r7,r5					#a1
+		lwz	r4,SysBase(r0)
+		li	r5,_LVOFindName
 		
 		bl	Run68KLowLevel
 		
@@ -9105,13 +9106,6 @@ DebugEndFunction:
 		stwu	r3,-4(r13)
 		stwu	r4,-4(r13)
 		stwu	r5,-4(r13)
-
-		loadreg r5,"dnet"
-		lwz	r4,RunningTask(r0)
-		lwz	r4,LN_NAME(r4)
-		lwz	r4,0(r4)
-		cmpw	r4,r5
-		bne	.NoDNET2
 
 		bl	.GetText2
 		
