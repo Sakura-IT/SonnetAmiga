@@ -20,7 +20,7 @@
 	include	exec/tasks.i
 	include sonnet_lib.i
 
-	XREF	FunctionsLen,LibFunctions,DebugLevel
+	XREF	FunctionsLen,LibFunctions,DebugLevel,CPUInfo
 
 	XREF	SetExcMMU,ClearExcMMU,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
@@ -426,7 +426,7 @@ NumFunc		cmp.l (a3)+,d0
 		move.l #1024,d0				;PosSize
 		move.l d0,d2
 		add.w d3,d0
-		move.l #MEMF_PUBLIC|MEMF_FAST|MEMF_PPC,d1
+		move.l #MEMF_PUBLIC|MEMF_FAST|MEMF_PPC|MEMF_REVERSE,d1
 		jsr _LVOAllocMem(a6)
 		tst.l d0
 		beq.s NoFun
@@ -742,7 +742,7 @@ Open:
 		beq.s NoA6
 		move.l 4.w,a6
 		move.l ThisTask(a6),a6
-		or.b #TF_PPC,TC_FLAGS(a6)
+;		or.b #TF_PPC,TC_FLAGS(a6)
 		move.l d0,a6
 		move.l a1,-(a7)
 		lea _PowerPCBase(pc),a1
@@ -803,7 +803,7 @@ Reserved:
 GetCPU:
 		movem.l d1-a6,-(a7)
 		move.l SonnetBase(pc),a1
-		move.l 12(a1),d0
+		move.l CPUInfo(a1),d0
 		and.w #$0,d0
 		swap d0
 		subq.l #8,d0
@@ -833,8 +833,7 @@ MN_PPSTRUCT	EQU MN_PPC+4
 PStruct	EQU -4
 Port	EQU -8
 
-RunPPC:	
-		link a5,#-8
+RunPPC:		link a5,#-8
 		movem.l d1-a6,-(a7)
 		moveq.l #0,d0
 		move.l d0,Port(a5)
@@ -1160,6 +1159,7 @@ AllocVec32:
 		add.l #$38,d0
 		move.l 4.w,a6
 		move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC|MEMF_REVERSE,d1	;attributes are FIXED to Sonnet mem
+;		move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC,d1		;attributes are FIXED to Sonnet mem
 		jsr _LVOAllocVec(a6)
 		move.l d0,d1
 		beq.s MemErr
