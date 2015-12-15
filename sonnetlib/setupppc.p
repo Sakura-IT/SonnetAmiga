@@ -19,7 +19,8 @@ PPCCode:	b	.SkipCom			#0x3000	System initialization
 .long		0					#RTGBase
 .long		0					#RTGType
 
-.SkipCom:	lis	r22,CMD_BASE
+.SkipCom:	
+		lis	r22,CMD_BASE			#Used in setpcireg macro
 		lis	r29,VEC_BASE			#0xfff00000
 		ori	r29,r29,0x3000			#For initial communication
 
@@ -784,14 +785,17 @@ mmuSetup:
 
 		bl	.SetupPT
 		
-		loadreg	r3,0x80000000				#PCI memory (EUMB) start effective address
-		loadreg	r4,0x80100000				#end effective address
+		lis	r3,EUMB
+		addis	r4,r3,0x10
+		
+#		loadreg	r3,0x80000000				#PCI memory (EUMB) start effective address
+#		loadreg	r4,0x80100000				#end effective address
 		mr	r5,r3					#start physical address
 		loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED	#WIMG
 		li	r7,2					#pp = 2 - Read/Write Access (0 = No Access)
 		
 		bl	.DoTBLs
-						
+
 		loadreg	r3,0xfff00000			#Fake ROM (64k)
 		loadreg	r4,0xfff10000
 		mr	r5,r3
@@ -3834,6 +3838,13 @@ EInt:		b	.FPUnav				#0
 		
 .DoStore:	mr	r0,r6
 		mr	r6,r1				#r13?
+			
+		stwu	r3,-4(r6)
+		stwu	r4,-4(r6)
+		stwu	r23,-4(r6)
+		stwu	r24,-4(r6)
+		stwu	r30,-4(r6)
+		stwu	r31,-4(r6)
 								
 		lis	r3,EUMB
 		li	r24,OFTPR
@@ -3888,8 +3899,6 @@ EInt:		b	.FPUnav				#0
 		rlwinm	r0,r8,11,27,31			#Get Destination Reg (l) or Source (s)
 		loadreg	r8,"GETV"
 		mr	r6,r1
-		
-		loadreg	r6,0x7e000000
 		
 		stwu	r3,-4(r6)
 		stwu	r4,-4(r6)
