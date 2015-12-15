@@ -3834,15 +3834,6 @@ EInt:		b	.FPUnav				#0
 		
 .DoStore:	mr	r0,r6
 		mr	r6,r1				#r13?
-		
-		loadreg	r6,0x7e000000
-		
-		stwu	r3,-4(r6)
-		stwu	r4,-4(r6)
-		stwu	r23,-4(r6)
-		stwu	r24,-4(r6)
-		stwu	r30,-4(r6)
-		stwu	r31,-4(r6)
 								
 		lis	r3,EUMB
 		li	r24,OFTPR

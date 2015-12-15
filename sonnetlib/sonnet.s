@@ -742,7 +742,7 @@ Open:
 		beq.s NoA6
 		move.l 4.w,a6
 		move.l ThisTask(a6),a6
-;		or.b #TF_PPC,TC_FLAGS(a6)
+		or.b #TF_PPC,TC_FLAGS(a6)
 		move.l d0,a6
 		move.l a1,-(a7)
 		lea _PowerPCBase(pc),a1
