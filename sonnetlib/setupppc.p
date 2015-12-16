@@ -2048,8 +2048,12 @@ EInt:		b	.FPUnav				#0
 		mr	r7,r8
 		lwz	r8,PP_CODE(r8)
 		add	r8,r8,r9
+		mr.	r9,r9					#Check if it is a PPC library
+		beq	.NoLibCall				#call from M68K code
 		
-		mtlr	r8
+		lwz	r8,2(r8)				#If so, get offset
+		
+.NoLibCall:	mtlr	r8
 		
 		lwz	r11,Break(r0)
 		mr.	r11,r11
@@ -3352,15 +3356,22 @@ EInt:		b	.FPUnav				#0
 #********************************************************************************************
 
 .DSI:		mtsprg0	r0
-		mtsprg1	r6
-		mtsprg2	r7
-		mtsprg3	r8
 
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU & FPU
 		sync
 		isync
+
+		mtsprg1	r6
+		mtsprg2	r7
+		mtsprg3	r1
+		
+		lwz	r0,SonnetBase(r0)
+		loadreg	r1,SysStack-0x20		#System stack in unused mem
+		or	r1,r1,r0
+
+		stwu	r8,-4(r1)
 
 		loadreg	r7,"DSI!"
 		stw	r7,0xf4(r0)
@@ -3402,7 +3413,7 @@ EInt:		b	.FPUnav				#0
 		
 .NotSDr0:	cmpwi	r6,1
 		bne	.NotSDr1
-		mr	r8,r1
+		mfsprg3	r8
 		b	.GetAddr
 		
 .NotSDr1:	cmpwi	r6,2
@@ -3437,7 +3448,7 @@ EInt:		b	.FPUnav				#0
 		
 .NotSDr7:	cmpwi	r6,8
 		bne	.NotSDr8
-		mfsprg3	r8
+		lwz	r8,0(r1)
 		b	.GetAddr
 		
 .NotSDr8:	cmpwi	r6,9
@@ -3572,10 +3583,11 @@ EInt:		b	.FPUnav				#0
 		
 .Notr0:		cmpwi	r8,1
 		bne	.Notr1
-		add	r7,r1,r7
+		mfsprg3	r8
+		add	r7,r8,r7
 		mr.	r6,r6
 		beq	.GotAmigaMemAd
-		mr	r1,r7
+		mtsprg3	r7
 		b	.GotAmigaMemAd
 		
 .Notr1:		cmpwi	r8,2
@@ -3630,11 +3642,11 @@ EInt:		b	.FPUnav				#0
 		
 .Notr7:		cmpwi	r8,8
 		bne	.Notr8
-		mfsprg3 r8
+		lwz	r8,0(r1)
 		add	r7,r8,r7
 		mr.	r6,r6
 		beq	.GotAmigaMemAd
-		mtsprg3	r7
+		stw	r7,0(r1)
 		b	.GotAmigaMemAd
 		
 .Notr8:		cmpwi	r8,9
@@ -3837,14 +3849,14 @@ EInt:		b	.FPUnav				#0
 .StoreByte:	loadreg	r8,"PUTB"
 		
 .DoStore:	mr	r0,r6
-		mr	r6,r1				#r13?
+#		mr	r6,r1				#r13?
 			
-		stwu	r3,-4(r6)
-		stwu	r4,-4(r6)
-		stwu	r23,-4(r6)
-		stwu	r24,-4(r6)
-		stwu	r30,-4(r6)
-		stwu	r31,-4(r6)
+		stwu	r3,-4(r1)
+		stwu	r4,-4(r1)
+		stwu	r23,-4(r1)
+		stwu	r24,-4(r1)
+		stwu	r30,-4(r1)
+		stwu	r31,-4(r1)
 								
 		lis	r3,EUMB
 		li	r24,OFTPR
@@ -3885,12 +3897,13 @@ EInt:		b	.FPUnav				#0
 		cmpw	r7,r8
 		bne	.WaitPFIFO
 
-		lwz	r31,0(r6)
-		lwz	r30,4(r6)
-		lwz	r24,8(r6)
-		lwz	r23,12(r6)
-		lwz	r4,16(r6)
-		lwz	r3,20(r6)
+		lwz	r31,0(r1)
+		lwz	r30,4(r1)
+		lwz	r24,8(r1)
+		lwz	r23,12(r1)
+		lwz	r4,16(r1)
+		lwz	r3,20(r1)
+		addi	r1,r1,24
 
 		b	.GotAmigaValue
 								
@@ -3898,14 +3911,14 @@ EInt:		b	.FPUnav				#0
 		lwz	r8,0(r8)
 		rlwinm	r0,r8,11,27,31			#Get Destination Reg (l) or Source (s)
 		loadreg	r8,"GETV"
-		mr	r6,r1
+#		mr	r6,r1
 		
-		stwu	r3,-4(r6)
-		stwu	r4,-4(r6)
-		stwu	r23,-4(r6)
-		stwu	r24,-4(r6)
-		stwu	r30,-4(r6)
-		stwu	r31,-4(r6)
+		stwu	r3,-4(r1)
+		stwu	r4,-4(r1)
+		stwu	r23,-4(r1)
+		stwu	r24,-4(r1)
+		stwu	r30,-4(r1)
+		stwu	r31,-4(r1)
 								
 		lis	r3,EUMB
 		li	r24,OFTPR
@@ -3947,12 +3960,13 @@ EInt:		b	.FPUnav				#0
 		
 		lwz	r8,MN_IDENTIFIER+4(r30)
 		
-		lwz	r31,0(r6)
-		lwz	r30,4(r6)
-		lwz	r24,8(r6)
-		lwz	r23,12(r6)
-		lwz	r4,16(r6)
-		lwz	r3,20(r6)		
+		lwz	r31,0(r1)
+		lwz	r30,4(r1)
+		lwz	r24,8(r1)
+		lwz	r23,12(r1)
+		lwz	r4,16(r1)
+		lwz	r3,20(r1)
+		addi	r1,r1,24		
 		
 		mfsrr0	r6
 		lwz	r6,0(r6)
@@ -3980,7 +3994,7 @@ EInt:		b	.FPUnav				#0
 		
 .NotDr0:	cmpwi	r6,1
 		bne	.NotDr1
-		mr	r1,r8
+		mtsprg3	r8
 		b	.GotAmigaValue
 		
 .NotDr1:	cmpwi	r6,2
@@ -4015,7 +4029,7 @@ EInt:		b	.FPUnav				#0
 		
 .NotDr7:	cmpwi	r6,8
 		bne	.NotDr8
-		mtsprg3	r8
+		stw	r8,0(r1)
 		b	.GotAmigaValue
 		
 .NotDr8:	cmpwi	r6,9
@@ -4150,10 +4164,11 @@ EInt:		b	.FPUnav				#0
 		loadreg	r7,"USER"
 		stw	r7,0xf4(r0)
 		
+		lwz	r8,0(r1)
 		mfsprg0	r0
 		mfsprg1 r6
 		mfsprg2	r7
-		mfsprg3	r8
+		mfsprg3	r1
 		
 		rfi
 
