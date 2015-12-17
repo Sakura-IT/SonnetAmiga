@@ -3849,7 +3849,6 @@ EInt:		b	.FPUnav				#0
 .StoreByte:	loadreg	r8,"PUTB"
 		
 .DoStore:	mr	r0,r6
-#		mr	r6,r1				#r13?
 			
 		stwu	r3,-4(r1)
 		stwu	r4,-4(r1)
@@ -3911,7 +3910,6 @@ EInt:		b	.FPUnav				#0
 		lwz	r8,0(r8)
 		rlwinm	r0,r8,11,27,31			#Get Destination Reg (l) or Source (s)
 		loadreg	r8,"GETV"
-#		mr	r6,r1
 		
 		stwu	r3,-4(r1)
 		stwu	r4,-4(r1)
