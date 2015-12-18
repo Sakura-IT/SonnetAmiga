@@ -25,6 +25,8 @@ SonnetAmiga has the following hardware requirements:
 
 See TOOLCHAIN file for building instructions.
 
+Automated binary builds are available from Jenkins: https://sonnet.uguu.waw.pl/jenkins/job/sonnetamiga/
+
 # Bugs
 
 We're using GitHub Issues for bug tracking:
