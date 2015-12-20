@@ -618,29 +618,16 @@ EnqueuePPC:
 #
 #********************************************************************************************
 
-FindNamePPC:
-		lis	r3,0x7000
-		cmplw	r3,r4
-		blt	.ZorroIIISpace
-		
-		mr	r6,r4					#a0
-		mr	r7,r5					#a1
-		lwz	r4,SysBase(r0)
-		li	r5,_LVOFindName
-		
-		bl	Run68KLowLevel
-		
-		b	.E4
-		
-.ZorroIIISpace:	lwz	r3,0(r4)
-		lwz	r8,0(r3)				#???
-		mr.	r8,r8
-		beq-	.E4
+FindNamePPC:			
+		lwz	r3,0(r4)				#Think this is bugged in WarpOS
+		lwz	r3,0(r3)
+		mr.	r3,r3
+		beq-	.ExitFindName
 		subi	r8,r5,1
 .Loop2:		mr	r6,r3
 		lwz	r3,0(r6)
 		mr.	r3,r3
-		beq-	.E4
+		beq-	.ExitFindName
 		lwz	r4,LN_NAME(r6)
 		mr	r5,r8
 		subi	r4,r4,1
@@ -652,7 +639,7 @@ FindNamePPC:
 		mr.	r0,r0
 		bne+	.Loop3
 		mr	r3,r6
-.E4:		blr	
+.ExitFindName:	blr	
 
 #********************************************************************************************
 #
