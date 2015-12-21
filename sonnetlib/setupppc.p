@@ -1854,16 +1854,16 @@ EInt:		b	.FPUnav				#0
 
 		mftbu	r9
 		lwz	r6,WAITTIME_TIME1(r4)
-		cmplw	r6,r9
-		bgt	.DoneWaiting
-		blt	.NotDoneYet
+		cmplw	r6,r9		
+		bgt	.NotDoneYet
+		blt	.DoneWaiting
 		
 		mftbl	r9
 		lwz	r6,WAITTIME_TIME2(r4)
-		cmplw	r6,r9
-		blt	.NotDoneYet
-				
-.DoneWaiting:	lwz	r6,WAITTIME_TASK(r4)
+		cmplw	r6,r9		
+		bgt	.NotDoneYet
+								
+.DoneWaiting:	lwz	r6,WAITTIME_TASK(r4)		
 		lwz	r9,RunningTask(r0)
 		cmpw	r6,r9
 		beq	.SetSig
