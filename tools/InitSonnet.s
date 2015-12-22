@@ -64,13 +64,14 @@ Best		move.l d7,-(a7)
 		move.b TC_FLAGS(a3),d7
 		btst #2,d7					;Check if task was tagged by sonnet.library
 		bne.s DoBit					;If yes, then redirect to PPC memory
+		
+		move.l pr_CLI(a3),d7				;Was this task started by CLI?
+		bne.s IsHell					;If yes, go there
+		
 		move.l LN_NAME(a3),d7				;Has the task a name?
 		beq.s NoBit					;If no then exit
 		move.l d7,a2
-		move.l (a2),d7
-		cmp.l #"Shel",d7				;(Should make this code cleaner)
-		beq.s IsHell
-		cmp.l #"Back",d7				;If Background CLI or Shell, then check CommandName
+
 FindEnd		move.b (a2)+,d7
 		bne.s FindEnd
 		move.l -5(a2),d7
@@ -78,11 +79,9 @@ FindEnd		move.b (a2)+,d7
 		beq.s DoBit					;if yes, then redirect to PPC memory
 		bra.s NoBit
 
-IsHell		move.l pr_CLI(a3),d7
-		beq.s NoBit
-		lsl.l #2,d7
+IsHell		lsl.l #2,d7
 		move.l d7,a3
-		move.l cli_CommandName(a3),d7
+		move.l cli_CommandName(a3),d7			;Get name of task started by CLI
 		beq.s NoBit
 		lsl.l #2,d7
 		move.l d7,a3
