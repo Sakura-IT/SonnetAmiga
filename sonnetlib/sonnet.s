@@ -877,10 +877,30 @@ xProces		move.l d0,Port(a5)
 		move.l 4.w,a6
 		move.l ThisTask(a6),a1
 		move.l d6,a2
-		lea TASKPPC_NAME(a2),a2
-
-		move.l #1019-TASKPPC_NAME,d0		;Name len limit
-		move.l LN_NAME(a1),a1
+		lea TASKPPC_NAME(a2),a2	
+		cmp.b #NT_PROCESS,LN_TYPE(a1)
+		beq.s CheckCLI
+		
+NoCLI		move.l LN_NAME(a1),a1
+		bra.s DoNameCp
+		
+CheckCLI	move.l pr_CLI(a1),d0
+		beq.s NoCLI
+		lsl.l #2,d0
+		move.l d0,a1
+		move.l cli_CommandName(a1),d0
+		bne.s GetCLIName
+		move.l ThisTask(a6),a1
+		bra.s NoCLI
+		
+GetCLIName	lsl.l #2,d0
+		addq.l #1,d0
+		move.l d0,a1
+		moveq.l #0,d0
+		move.b -1(a1),d0
+		bra.s CpName
+		
+DoNameCp	move.l #1019-TASKPPC_NAME,d0		;Name len limit		
 CpName		move.b (a1)+,(a2)
 		tst.b (a2)
 		beq.s EndName
