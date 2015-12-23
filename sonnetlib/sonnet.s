@@ -666,12 +666,12 @@ GtLoop2		move.l d7,a0
 
 		cnop 0,4
 
-PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,125,0,0
+PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,125,NP_StackSize,$8000,0,0
 PrcName		dc.b "MasterControl",0
 
 		cnop 0,4
 		
-Prc2Tags	dc.l NP_Entry,Joshua,NP_Name,Prc2Name,NP_Priority,5,0,0
+Prc2Tags	dc.l NP_Entry,Joshua,NP_Name,Prc2Name,NP_Priority,5,NP_StackSize,$8000,0,0
 Prc2Name	dc.b "Joshua",0
 
 		cnop 0,4		
@@ -866,6 +866,7 @@ xProces		move.l d0,Port(a5)
 		move.l TC_SPUPPER(a1),d0
 		move.l TC_SPLOWER(a1),d1
 		sub.l d1,d0
+		or.l #$10000,d0				;Set stack at least at 64k
 		move.l d0,d7
 		add.l #1024,d0
 
