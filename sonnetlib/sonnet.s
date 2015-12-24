@@ -173,7 +173,7 @@ FndMem		move.l d0,d7
 		tst.l d0		
 		beq.s Not3DFX
 		move.l d0,a2
-		move.l PCI_SPACE1(a2),d4
+		move.l PCI_SPACE0(a2),d4
 		bra.s FoundGfx
 		
 Not3DFX		move.w #VENDOR_ATI,d0			;Need more pciinfo

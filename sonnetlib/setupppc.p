@@ -785,11 +785,8 @@ mmuSetup:
 
 		bl	.SetupPT
 		
-		lis	r3,EUMB
-		addis	r4,r3,0x10
-		
-#		loadreg	r3,0x80000000				#PCI memory (EUMB) start effective address
-#		loadreg	r4,0x80100000				#end effective address
+		lis	r3,EUMB					#PCI memory (EUMB) start effective address
+		addis	r4,r3,0x10				#end effective address
 		mr	r5,r3					#start physical address
 		loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED	#WIMG
 		li	r7,2					#pp = 2 - Read/Write Access (0 = No Access)
@@ -804,22 +801,41 @@ mmuSetup:
 		
 		bl	.DoTBLs
 		
-		lwz	r3,RTGBase(r0)			#16MB Video RAM
-		addis	r4,r3,0x100
+		lhz	r3,RTGType(r0)
+		cmpwi	r3,0x1002
+		bne	.DoInhibit
+		loadreg	r6,PTE_WRITE_THROUGH
+		b	.DoWT
+
+.DoInhibit:	loadreg	r6,PTE_CACHE_INHIBITED		
+.DoWT:		lwz	r3,RTGBase(r0)			#32MB Video RAM (ATi) or Config (Avenger)
+		addis	r4,r3,0x200
 		mr	r24,r4
 		addis	r5,r3,0x4000
-		loadreg	r6,PTE_WRITE_THROUGH
 		li	r7,2
 		
 		bl	.DoTBLs
 		
 		lhz	r3,RTGType(r0)
+		cmpwi	r3,0x121a
+		bne	.No3DFX
+		
+		lwz	r3,RTGBase(r0)			#32MB Video RAM (Avenger)
+		addis	r3,r3,0x200
+		addis	r4,r3,0x200
+		addis	r5,r3,0x4000
+		loadreg	r6,PTE_WRITE_THROUGH
+		li	r7,2
+		
+		bl	.DoTBLs		
+		
+.No3DFX:	lhz	r3,RTGType(r0)
 		cmpwi	r3,0x1002
 		bne	.NoATI
 		mr	r3,r24
 		addis	r5,r3,0x4000
 		mr	r4,r3
-		addis	r4,r4,0xf00			#256MB max Video RAM (ATI)
+		addis	r4,r4,0xf00			#256-32MB max Video RAM (ATI)
 		li	r6,0
 		li	r7,2
 		
