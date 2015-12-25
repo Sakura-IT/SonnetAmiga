@@ -68,11 +68,15 @@ NoPatch		movem.l (a7)+,d0-a6
 ;********************************************************************************************
 
 NewAlloc:	tst.w d1					;Patch code - Test for attribute $0000 (Any)
-		beq.s Best					;Redirect
-		btst #0,d1					;If not FAST requested, exit
+		beq.s Best
+		btst #2,d1					;If FAST requested, redirect
+		bne.s Best					
+		btst #0,d1					;If not PUBLIC requested, exit
 		beq.s NoFast
 		btst #1,d1					;If CHIP requested, exit
 		bne.s NoFast
+		nop						;Let everything else through..?		
+		
 Best		move.l d7,-(a7)
 		move.l a3,-(a7)
 		move.l a2,-(a7)
