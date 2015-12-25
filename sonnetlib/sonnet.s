@@ -154,6 +154,15 @@ FreeROM		move.l d0,a1
 		jmp _LVOFreeMem(a6)
 
 FndMem		move.l d0,d7
+
+		jsr _LVODisable(a6)
+		move.l d7,a1
+		jsr _LVORemove(a6)
+		lea MemList(a6),a0
+		move.l d7,a1
+		jsr _LVOAddTail(a6)			;Move gfx memory to back to prevent
+		jsr _LVOEnable(a6)			;mem list corruption
+
 		move.l PCIBase(pc),d0
 		beq.s Clean
 		move.l d0,a6
@@ -703,7 +712,7 @@ DoPMsg		moveq.l #0,d4
 		lsr.l #4,d4
 		subq.l #1,d4
 		move.l a1,d3
-;		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
+		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
 		move.l d3,a1
 		jsr _LVOPutMsg(a6)
 
@@ -719,7 +728,7 @@ NxtMsg		move.l OFQPR(a2),d3			;Get Message Frame
 
 		move.l d3,a1
 		moveq.l #11,d4
-;		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
+		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
 		move.l d3,a1
 		move.l MN_MCTASK(a1),a0			;MN_MCTASK
 		jsr _LVOPutMsg(a6)
