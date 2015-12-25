@@ -612,6 +612,7 @@ PshMsg		cpushl dc,(a2)
 StoreD		move.l MN_IDENTIFIER(a1),d7
 		move.l MN_IDENTIFIER+4(a1),d0
 		move.l MN_IDENTIFIER+8(a1),a0
+
 		cmp.l #"PUTB",d7
 		beq.s PutB
 		cmp.l #"PUTH",d7
@@ -633,6 +634,7 @@ PutH		move.w d0,(a0)
 
 LoadD		move.l #"DONE",d0
 		move.l MN_IDENTIFIER+8(a1),a3
+
 		move.l (a3),MN_IDENTIFIER+4(a1)
 		move.l d0,MN_IDENTIFIER(a1)
 		move.l EUMBAddr(pc),a2
@@ -648,6 +650,7 @@ NoMirror68	move.l JProcPort(pc),a0
 
 Joshua		move.l 4.w,a6				;Fake Mirror task for PPC task
 		move.l ThisTask(a6),a0
+		or.b #TF_PPC,TC_FLAGS(a0)
 		lea pr_MsgPort(a0),a0
 		move.l a0,d7
 		jsr _LVOWaitPort(a6)

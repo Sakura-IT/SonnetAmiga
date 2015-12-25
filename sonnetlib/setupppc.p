@@ -3183,6 +3183,14 @@ EInt:		b	.FPUnav				#0
 		stwu	r5,-4(r1)
 		stwu	r6,-4(r1)
 
+		lwz	r5,PowerPCBase(r0)		#For GetHALInfo
+		lwz	r6,AlignmentExcLow(r5)		#Counts number of FPU aligment issues
+		addic	r6,r6,1				#For debugging and optimization purposes
+		stw	r6,AlignmentExcLow(r5)
+		lwz	r6,AlignmentExcHigh(r5)
+		addze	r6,r6
+		stw	r6,AlignmentExcHigh(r5)
+
 		mfsrr0	r5
 		lwz	r5,0(r5)
 		rlwinm	r0,r5,6,26,31
@@ -3392,8 +3400,16 @@ EInt:		b	.FPUnav				#0
 		loadreg	r7,"DSI!"
 		stw	r7,0xf4(r0)
 
+		lwz	r7,PowerPCBase(r0)		#For GetHALInfo
+		lwz	r6,DataExcLow(r7)		#Counts number of Amiga RAM
+		addic	r6,r6,1				#accesses by the PPC
+		stw	r6,DataExcLow(r7)		#For debugging/optimization purposes
+		lwz	r6,DataExcHigh(r7)
+		addze	r6,r6
+		stw	r6,DataExcHigh(r7)
+
 		mfsrr0	r7
-		stw	r7,0xf8(r0)		
+		stw	r7,0xf8(r0)
 		lwz	r7,0(r7)
 		
 .wosdb:		lwz	r6,SysBase(r0)			#Special wosdb patch
