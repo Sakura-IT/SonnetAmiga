@@ -624,6 +624,7 @@ FindNamePPC:
 		mr.	r3,r3
 		beq-	.ExitFindName
 		subi	r8,r5,1
+		lwz	r3,0(r4)
 .Loop2:		mr	r6,r3
 		lwz	r3,0(r6)
 		mr.	r3,r3
