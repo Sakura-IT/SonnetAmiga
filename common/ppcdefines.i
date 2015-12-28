@@ -64,6 +64,8 @@
 .set L2Size,224
 .set AlignStore,228
 
+.set EmuBuff,0x2f80
+
 #LibBase:
 
 .set LIST_REMOVEDTASKS,130

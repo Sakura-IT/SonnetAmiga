@@ -3178,8 +3178,6 @@ EInt:		b	.FPUnav				#0
 		or	r1,r1,r0
 		
 		stwu	r4,-4(r1)
-		mflr	r4
-		stwu	r4,-4(r1)
 		stwu	r5,-4(r1)
 		stwu	r6,-4(r1)
 
@@ -3191,9 +3189,14 @@ EInt:		b	.FPUnav				#0
 		addze	r6,r6
 		stw	r6,AlignmentExcHigh(r5)
 
+		li	r4,EmuBuff			#uncached memory
 		mfsrr0	r5
 		lwz	r5,0(r5)
 		rlwinm	r0,r5,6,26,31
+		
+		mfsrr0	r5
+		lwz	r5,0(r5)
+		
 		cmpwi	r0,0x34				#test for stfs
 		beq	.stfs
 		cmpwi	r0,0x30
@@ -3202,158 +3205,78 @@ EInt:		b	.FPUnav				#0
 		beq	.stfsx
 		b	.HaltIt
 
-.stfs:		bl	.GetEmStAddr
+#***********************************************
 		
-.StEmu:		lwz	r6,0(r1)
-		lwz	r5,4(r1)
-		lwz	r4,8(r1)
-		mtlr	r4
-		lwz	r4,12(r1)
-		mfsrr0	r1
-		addi	r1,r1,4				#Exit beyond offending instruction
-		mtsrr0	r1
-		mfsprg1	r1
-		b	.StMod
-		
-		.align 4				#Align on 16 byte boundary
-		
-.StMod:
-.long		0xd0000000|AlignStore			#Store offending using stfs
-		lwz	r0,AlignStore(r0)		#Get offending using lwz
-.long		0x90000000				#Store it correctly using stw
-		
-		mfsprg0	r0
-		
-		rfi					#Yes....It's selfmodifying code...
-							#Maybe apply to DSI too for speed?
-
-.GetEmStAddr:	mflr	r4
-		addi	r4,r4,.StMod-.StEmu
-		loadreg	r5,0xd0000000|AlignStore	#reset instructions
-		stw	r5,0(r4)
-		lis	r5,0x9000
-		stw	r5,8(r4)
-
-		mfsrr0	r5
-		lwz	r5,0(r5)			#get instruction
-		
-		lwz	r6,0(r4)			#first instruction
+.stfs:		loadreg	r6,0xd0000000|AlignStore	#first instruction
 		rlwimi	r6,r5,0,6,10
 		stw	r6,0(r4)
 
-		lwz	r6,8(r4)			#third instruction
+		loadreg	r6,0x80000000|AlignStore	#lwz r0,AlignStore(r0)
+		stw	r6,4(r4)
+
+		lis	r6,0x9000			#third instruction
 		rlwimi	r6,r5,0,11,31
-		stw	r6,8(r4)		
+		stw	r6,8(r4)
 		
-		dcbf	r0,r4				#Flush datacache
-		sync
-		icbi	r0,r4				#Invalidate instruction cache
-		isync
-		sync
-
-		blr					#Execute emulation
-
-.lfs:		bl	.GetEmLAddr
+		loadreg r6,0x7c1042a6			#mfsprg0 r0
+		stw	r6,12(r4)
 		
-.LEmu:		lwz	r6,0(r1)
+		loadreg	r6,0x4c000064			#rfi
+		stw	r6,16(r4)
+		
+.ReUseIt:	lwz	r6,0(r1)
 		lwz	r5,4(r1)
 		lwz	r4,8(r1)
-		mtlr	r4
-		lwz	r4,12(r1)
 		mfsrr0	r1
 		addi	r1,r1,4				#Exit beyond offending instruction
 		mtsrr0	r1
 		mfsprg1	r1
-		b	.LMod
+		ba	EmuBuff
 
-		.align 4				#Align on 16 byte boundary
+#***********************************************
 
-.LMod:
-.long		0x80000000				#Load offending using lwz
-		stw	r0,AlignStore(r0)		#Store offending using stw
-.long		0xc0000000|AlignStore			#load it correctly using lfs
-		
-		mfsprg0	r0
-		
-		rfi					#Yes....It's selfmodifying code...
-							#Maybe apply to DSI too for speed?
-
-.GetEmLAddr:	mflr	r4
-		addi	r4,r4,.LMod-.LEmu
-		lis	r5,0x8000			#reset instructions
-		stw	r5,0(r4)
-		loadreg	r5,0xc0000000|AlignStore
-		stw	r5,8(r4)
-
-		mfsrr0	r5
-		lwz	r5,0(r5)			#get instruction
-		
-		lwz	r6,0(r4)			#first instruction
+.lfs:		loadreg	r6,0x80000000			#first instruction
 		rlwimi	r6,r5,0,11,31
 		stw	r6,0(r4)
-
-		lwz	r6,8(r4)			#third instruction
+		
+		loadreg	r6,0x90000000|AlignStore
+		stw	r6,4(r4)
+		
+		loadreg	r6,0xc0000000|AlignStore	#third instruction
 		rlwimi	r6,r5,0,6,10
-		stw	r6,8(r4)		
+		stw	r6,8(r4)
 		
-		dcbf	r0,r4				#Flush datacache
-		sync		
-		icbi	r0,r4				#Invalidate instruction cache
-		isync
-		sync
+		loadreg r6,0x7c1042a6			#mfsprg0 r0
+		stw	r6,12(r4)
 		
-		blr
+		loadreg	r6,0x4c000064			#rfi
+		stw	r6,16(r4)
 		
-.stfsx:		bl	.GetEmStxAddr
-		
-.StxEmu:	lwz	r6,0(r1)
-		lwz	r5,4(r1)
-		lwz	r4,8(r1)
-		mtlr	r4
-		lwz	r4,12(r1)
-		mfsrr0	r1
-		addi	r1,r1,4				#Exit beyond offending instruction
-		mtsrr0	r1
-		mfsprg1	r1
-		b	.StxMod
+		b	.ReUseIt
 
-		.align 4				#Align on 16 byte boundary
-.StxMod:
-.long		0xd0000000|AlignStore			#Store offending using stfs
-		lwz	r0,AlignStore(r0)		#Get offending using lwz
-.long		0x7c00012e				#Store it correctly using stwx 
-		
-		mfsprg0	r0
-		
-		rfi					#Yes....It's selfmodifying code...
-							#Maybe apply to DSI too for speed?
+#***********************************************
 
-.GetEmStxAddr:	mflr	r4
-		addi	r4,r4,.StxMod-.StxEmu
-		loadreg	r5,0xd0000000|AlignStore	#reset instructions
-		stw	r5,0(r4)
-		loadreg	r5,0x7c00012e
-		stw	r5,8(r4)
-
-		mfsrr0	r5
-		lwz	r5,0(r5)			#get instruction
-		
-		lwz	r6,0(r4)			#first instruction
+.stfsx:		loadreg	r6,0xd0000000|AlignStore	#first instruction
 		rlwimi	r6,r5,0,6,10
 		stw	r6,0(r4)
 
-		lwz	r6,8(r4)			#third instruction
+		loadreg	r6,0x80000000|AlignStore
+		stw	r6,4(r4)
+
+		loadreg	r6,0x7c00012e			#third instruction
 		rlwimi	r6,r5,0,11,20
-		stw	r6,8(r4)		
+		stw	r6,8(r4)
 		
-		dcbf	r0,r4				#Flush datacache
-		sync		
-		icbi	r0,r4				#Invalidate instruction cache
-		isync
-		sync
-
-		blr					#Execute emulation
-
+		loadreg r6,0x7c1042a6			#mfsprg0 r0
+		stw	r6,12(r4)
+		
+		loadreg	r6,0x4c000064			#rfi
+		stw	r6,16(r4)
+		
+		b	.ReUseIt
+	
+#***********************************************	
+		
 .HaltIt:	loadreg	r3,"ALIG"
 		stw	r3,0xf4(r0)
 		mfsrr0	r3
@@ -3427,7 +3350,18 @@ EInt:		b	.FPUnav				#0
 		and.	r0,r7,r0
 		lis	r6,0x8000
 		cmpw	r6,r0				
+		beq	.DoInst	
+		
+		rlwinm	r6,r7,0,25,5
+		loadreg	r8,0x7c00002e			#check for stbx/sthx/stwx
+		cmpw	r6,r8
 		bne	.NoLoadStore
+		
+		rlwinm	r6,r7,11,27,31			#Source reg
+		rlwinm	r8,r7,16,27,31			#Dest 1
+		rlwinm	r7,r7,21,27,31			#dest 2
+
+		b	.NoLoadStore		
 
 .DoInst:	rlwinm	r6,r7,11,27,31			#Get Destination Reg (l) or Source (s)
 		rlwinm	r8,r7,16,27,31			#Get Source Reg (l) or Destination (s)
