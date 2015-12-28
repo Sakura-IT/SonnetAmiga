@@ -381,12 +381,7 @@ MoveSon		move.l (a0)+,(a1)+
 		lea Prc2Tags(pc),a1
 		move.l a1,d1
 		jsr _LVOCreateNewProc(a6)
-		
-		move.l d0,a2
-		lea pr_MsgPort(a2),a2		
-		lea JProcPort(pc),a1
-		move.l a2,(a1)
-		
+
 		move.l 4.w,a6
 
 NoLib		jsr _LVOEnable(a6)
@@ -650,7 +645,9 @@ LoadD		move.l #"DONE",d0
 		move.l a1,OFQPR(a2)			;Return Message Frame
 		bra GetLoop
 
-NoMirror68	move.l JProcPort(pc),a0
+NoMirror68	move.l JProcPort(pc),d0
+		beq.s NoMirror68
+		move.l d0,a0
 		move.l a0,MN_MIRROR(a1)
 		jsr _LVOPutMsg(a6)			;move message to waiting 68k task
 		bra NextMsg
@@ -660,19 +657,31 @@ NoMirror68	move.l JProcPort(pc),a0
 Joshua		move.l 4.w,a6				;Fake Mirror task for PPC task
 		move.l ThisTask(a6),a0
 		or.b #TF_PPC,TC_FLAGS(a0)
-		lea pr_MsgPort(a0),a0
-		move.l a0,d7
+		jsr _LVOCreateMsgPort(a6)
+		lea JProcPort(pc),a1
+		move.l d0,(a1)
+		tst.l d0
+		beq.s Tree
+		move.l d0,a0
+		move.l a0,-(a7)
+		lea PrtName(pc),a1
+		move.l a1,LN_NAME(a0)
+		move.l a0,a1
+		jsr _LVOAddPort(a6)
+GoRest		move.l 4.w,a6
+		move.l (a7),a0
 		jsr _LVOWaitPort(a6)
-GtLoop2		move.l d7,a0
+GtLoop2		move.l (a7),a0
 		jsr _LVOGetMsg(a6)
 		tst.l d0
-		beq.s Joshua
+		beq.s GoRest
 		move.l d0,a0
 		move.l MN_IDENTIFIER(a0),d0
 		cmp.l #"T68K",d0
 		bne.s GtLoop2
 		bsr Runk86
 		bra.s GtLoop2
+Tree		rts		
 		
 ;********************************************************************************************
 
@@ -683,8 +692,9 @@ PrcName		dc.b "MasterControl",0
 
 		cnop 0,4
 		
-Prc2Tags	dc.l NP_Entry,Joshua,NP_Name,Prc2Name,NP_Priority,5,NP_StackSize,$8000,0,0
+Prc2Tags	dc.l NP_Entry,Joshua,NP_Name,Prc2Name,NP_Priority,124,NP_StackSize,$8000,0,0
 Prc2Name	dc.b "Joshua",0
+PrtName		dc.b "Skynet",0
 
 		cnop 0,4		
 
