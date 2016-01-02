@@ -188,7 +188,6 @@ ExitCode:	li	r7,TS_REMOVED
 		subi	r4,r4,1024
 		stw	r4,MN_ARG0(r9)
 		
-		mr	r24,r9		
 		lis	r3,EUMB					#Send Msg to 68K
 		li	r24,OPHPR
 		lwbrx	r31,r24,r3		
@@ -3218,13 +3217,17 @@ EInt:		b	.FPUnav				#0
 		rlwimi	r6,r5,0,11,31
 		stw	r6,8(r4)
 		
-		loadreg r6,0x7c1042a6			#mfsprg0 r0
+.ReUseIt:	loadreg r6,0x7c1042a6			#mfsprg0 r0
 		stw	r6,12(r4)
 		
 		loadreg	r6,0x4c000064			#rfi
 		stw	r6,16(r4)
 		
-.ReUseIt:	lwz	r6,0(r1)
+		icbi	r0,r4
+		isync
+		sync
+		
+		lwz	r6,0(r1)
 		lwz	r5,4(r1)
 		lwz	r4,8(r1)
 		mfsrr0	r1
@@ -3246,12 +3249,6 @@ EInt:		b	.FPUnav				#0
 		rlwimi	r6,r5,0,6,10
 		stw	r6,8(r4)
 		
-		loadreg r6,0x7c1042a6			#mfsprg0 r0
-		stw	r6,12(r4)
-		
-		loadreg	r6,0x4c000064			#rfi
-		stw	r6,16(r4)
-		
 		b	.ReUseIt
 
 #***********************************************
@@ -3266,15 +3263,9 @@ EInt:		b	.FPUnav				#0
 		loadreg	r6,0x7c00012e			#third instruction
 		rlwimi	r6,r5,0,11,20
 		stw	r6,8(r4)
-		
-		loadreg r6,0x7c1042a6			#mfsprg0 r0
-		stw	r6,12(r4)
-		
-		loadreg	r6,0x4c000064			#rfi
-		stw	r6,16(r4)
-		
+
 		b	.ReUseIt
-	
+
 #***********************************************	
 		
 .HaltIt:	loadreg	r3,"ALIG"
