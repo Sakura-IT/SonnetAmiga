@@ -935,8 +935,10 @@ GetInfo:
 		beq	.INFO_L2CACHE
 		subf.	r7,r6,r7
 		beq	.INFO_L2WT
+		subf.	r7,r6,r7
+		beq	.INFO_L2SIZE
 		b	.NextInList
-		
+
 .INFO_CPULOAD:
 .INFO_SYSTEMLOAD:
 		b	.NextInList
@@ -1017,7 +1019,9 @@ GetInfo:
 .INFO_L2WT:	lwz	r7,L2STATE(r0)
 		rlwinm	r7,r7,13,31,31
 		b	.StoreTag
-
+		
+.INFO_L2SIZE:	lwz	r7,L2Size(r0)
+		b	.StoreTag
 #********************************************************************************************
 #
 #	void  GetSysTimePPC(TimeVal)	// r4

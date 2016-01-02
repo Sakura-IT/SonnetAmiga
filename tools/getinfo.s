@@ -12,7 +12,9 @@ FUNC_CNT	SET	FUNC_CNT-6	* Standard offset-6 bytes each
 		
 PPCINFO_L2CACHE	EQU	$8010200A		;State of L2 Cache (on/off)
 PPCINFO_L2STATE	EQU	$8010200B		;L2 in copyback or writethrough?
-
+PPCINFO_L2SIZE	EQU	$8010200C
+AlignmentExcLow	EQU	604
+DataExcLow	EQU	612
 
 ;************************************************************************************************
 
@@ -149,6 +151,17 @@ Done		move.l 52(a2),d2
 		move.l 60(a2),d2
 		move.l d2,36(a1)
 		
+		move.l 84(a2),d2
+		move.l #1024,d3
+		divu.l d3,d2		
+		move.l d2,72(a1)
+		
+		move.l _PowerPCBase-infotext(a4),a3
+		move.l 	AlignmentExcLow(a3),d2
+		move.l d2,76(a1)
+		move.l 	DataExcLow(a3),d2
+		move.l d2,80(a1)
+		
 		move.l a1,d2
 		jsr _LVOVPrintf(a6)
 				
@@ -173,6 +186,9 @@ infotext        dc.b    "CPU:                   %s   (PVR = %08lx)",10
 		dc.b    "System load:           %ld.%02ld%%",10
 		dc.b	"L2 Cache:              %s",10
 		dc.b	"L2 State:              %s",10
+		dc.b	"L2 Size:               %ld KBytes",10
+		dc.b	"FPU Align Emulation:   %ld times",10
+		dc.b	"DSI Emulation:         %ld times",10
 		dc.b    0
 
 CPU_603         dc.b    "PPC 603",0
@@ -196,7 +212,7 @@ L2CB		dc.b	"COPY-BACK",0
 Args		dc.l	0,0,0,0,0,0,0,0,0,0
 Time		dc.l	0,0
 		dc.l	0,0,0,0,0,0
-		dc.l	0,0
+		dc.l	0,0,0,0
 		
 DosBase		dc.l	0
 _PowerPCBase	dc.l	0
@@ -208,7 +224,7 @@ PowerPCLib	dc.b	"sonnet.library",0
 	
 Tags		dc.l	PPCINFO_CPU,0,PPCINFO_PVR,0,PPCINFO_CPUCLOCK,0,PPCINFO_BUSCLOCK,0
 		dc.l	PPCINFO_ICACHE,0,PPCINFO_DCACHE,0,PPCINFO_PAGETABLE,0,PPCINFO_TABLESIZE,0
-		dc.l	PPCINFO_L2CACHE,0,PPCINFO_L2STATE,0
+		dc.l	PPCINFO_L2CACHE,0,PPCINFO_L2STATE,0,PPCINFO_L2SIZE,0
 		dc.l	0,0
 	
 ;************************************************************************************************

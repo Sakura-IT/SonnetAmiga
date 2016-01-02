@@ -220,6 +220,7 @@
 .set PPCINFO_SYSTEMLOAD,      	0x80102009		#Total system load *100 [%]
 .set PPCINFO_L2CACHE,		0x8010200A		#State of L2 Cache (on/off)
 .set PPCINFO_L2STATE,		0x8010200B		#L2 in copyback or writethrough?
+.set PPCINFO_L2SIZE,		0x8010200C		#Size of L2 Cache
 
 .set HINFO_ALEXC_HIGH,		0x80103000		#For GetHALInfo
 .set HINFO_ALEXC_LOW,		0x80103001
@@ -441,7 +442,7 @@
 .set POOL_REQUIREMENTS,24
 .set POOL_PUDDLESIZE,28
 .set POOL_TRESHSIZE,32
-.set POOL_SIZE,36
+.set POOL_SIZE,44				#Room for MLN
 
 .set SPRG0,272
 .set SPRG1,273
@@ -767,3 +768,4 @@
 .set WAITTIME_TASK,22
 
 .set TAG_DONE,0
+.set MEMERR_SUCCESS,0
