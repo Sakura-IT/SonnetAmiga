@@ -741,15 +741,17 @@ CmpTimePPC:
 
 #********************************************************************************************
 #
-#	MemBlock = AllocVecPPC(Length)	// r3=r4 (r5 and r6 are ignored for now
+#	MemBlock = AllocVecPPC(Length)	// r3=r4 (r5 and r6 are ignored for now)
 #
 #********************************************************************************************
 
 AllocVecPPC:	prolog 228,"TOC"
 
 		stwu	r31,-4(r13)
-		stwu	r9,-4(r13)
-		stwu	r8,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)		
 
 		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
@@ -757,8 +759,121 @@ AllocVecPPC:	prolog 228,"TOC"
 		
 		li	r31,FAllocVecPPC-FRun68K
 		bl	DebugStartFunction
+		
+.NoDebug05:	mr	r31,r6
+		mr	r30,r5
+		mr	r29,r4
 
-.NoDebug05:	mr.	r3,r4
+		lwz	r3,RunningTask(r0)
+		la	r4,TASKPPC_TASKPOOLS(r3)
+		
+		mr	r28,r4
+		
+		lwz	r5,MLH_HEAD(r4)
+		lwz	r6,LN_SUCC(r5)
+		subi	r27,r5,36
+		mr.	r6,r6
+		bne	.AListNotEmpty
+		
+		loadreg	r4,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC|MEMF_REVERSE	#Should be r31
+		loadreg	r5,0x80000					#512kb
+		loadreg	r6,0x10000					#64kb
+		
+		bl	CreatePoolPPC
+		
+		mr.	r3,r3
+		beq	.PAllocErr
+		
+		mr	r27,r3
+		addi	r5,r27,36					#r5 = node
+		mr	r4,r28
+		
+		lwz	r3,0(r4)					#AddHead
+		stw	r5,0(r4)
+		stw	r3,0(r5)
+		stw	r4,4(r5)
+		stw	r5,4(r3)
+
+.AListNotEmpty:	mr	r4,r27						#Pool to r4
+		addi	r5,r29,32					#Room for size & pool
+		mr	r29,r5
+		
+		bl	AllocPooledPPC
+
+		mr.	r3,r3
+		beq	.PAllocErr
+
+		addi	r3,r3,32
+		stw	r29,-4(r3)					#Remember size
+		stw	r27,-8(r3)					#Remember pool
+		
+.PAllocErr:	lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug06
+
+		li	r31,FAllocVecPPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug06:	lwz	r27,0(r13)
+		lwz	r28,4(r13)
+		lwz	r29,8(r13)
+		lwz	r30,12(r13)
+		lwz	r31,16(r13)
+		addi	r13,r13,20
+		
+		epilog	"TOC"
+
+#********************************************************************************************
+#
+#	Result = FreeVecPPC(MemBlock)	// r3=r4
+#
+#********************************************************************************************
+
+FreeVecPPC:	prolog 228,"TOC"
+
+		stwu	r31,-4(r13)
+
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug07
+		
+		li	r31,FFreeVecPPC-FRun68K
+		bl	DebugStartFunction
+		
+.NoDebug07:	mr.	r31,r4
+		beq	.PFreeError
+
+		lwz	r4,-8(r31)				#Pool
+		lwz	r6,-4(r31)				#Size
+		subi	r5,r31,32				#Original MemBlock
+		
+		bl	FreePooledPPC
+
+.PFreeError:	lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug08
+
+		li	r31,FFreeVecPPC-FRun68K
+		bl	DebugEndFunction
+		
+.NoDebug08:	lwz	r31,0(r13)
+		addi	r13,r13,4
+
+		epilog	"TOC"
+		
+#********************************************************************************************
+#
+#	Support: MemBlock = AllocVec68K(Length)	// r3=r4 (r5 and r6 are ignored for now)
+#
+#********************************************************************************************
+
+AllocVec68K:	prolog 228,"TOC"
+
+		stwu	r31,-4(r13)
+		stwu	r9,-4(r13)
+		stwu	r8,-4(r13)
+
+		mr.	r3,r4
 		beq	.AllocErr
 
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC|MEMF_REVERSE	#Fixed for now
@@ -781,14 +896,7 @@ AllocVecPPC:	prolog 228,"TOC"
 		stw	r4,-4(r3)
 		stw	r31,-8(r3)
 		
-.AllocErr:	lbz	r31,DebugLevel(r0)
-		mr.	r31,r31
-		beq	.NoDebug06
-
-		li	r31,FAllocVecPPC-FRun68K
-		bl	DebugEndFunction
-
-.NoDebug06:	lwz	r8,0(r13)
+.AllocErr:	lwz	r8,0(r13)
 		lwz	r9,4(r13)
 		lwz	r31,8(r13)
 		addi	r13,r13,12
@@ -797,40 +905,26 @@ AllocVecPPC:	prolog 228,"TOC"
 
 #********************************************************************************************
 #
-#	Result = FreeVecPPC(MemBlock)	// r3=r4 r3 should be MEMERR_SUCCESS on success
+#	Support: Result = FreeVec68K(MemBlock)	// r3=r4
 #
 #********************************************************************************************		
 
-FreeVecPPC:	prolog 228,"TOC"
+FreeVec68K:	prolog 228,"TOC"
 		
 		stwu	r31,-4(r13)
 		stwu	r8,-4(r13)
 		stwu	r7,-4(r13)
-		
-		lbz	r31,DebugLevel(r0)
-		mr.	r31,r31
-		beq	.NoDebug07
-		
-		li	r31,FFreeVecPPC-FRun68K
-		bl	DebugStartFunction
 
-.NoDebug07:	lwz	r7,-4(r4)					#a1
+		lwz	r7,-4(r4)					#a1
 		lwz	r8,-8(r4)					#d0
 		lwz	r4,SysBase(r0)
 		li	r5,_LVOFreeMem
 
 		bl 	Run68KLowLevel
 		
-		li	r3,0
-		
-		lbz	r31,DebugLevel(r0)
-		mr.	r31,r31
-		beq	.NoDebug08
+		li	r3,MEMERR_SUCCESS
 
-		li	r31,FFreeVecPPC-FRun68K
-		bl	DebugEndFunction
-
-.NoDebug08:	lwz	r7,0(r13)
+		lwz	r7,0(r13)
 		lwz	r8,4(r13)
 		lwz	r31,8(r13)
 		addi	r13,r13,12
@@ -938,7 +1032,7 @@ GetInfo:
 		subf.	r7,r6,r7
 		beq	.INFO_L2SIZE
 		b	.NextInList
-
+		
 .INFO_CPULOAD:
 .INFO_SYSTEMLOAD:
 		b	.NextInList
@@ -1021,7 +1115,8 @@ GetInfo:
 		b	.StoreTag
 		
 .INFO_L2SIZE:	lwz	r7,L2Size(r0)
-		b	.StoreTag
+		b	.StoreTag		
+
 #********************************************************************************************
 #
 #	void  GetSysTimePPC(TimeVal)	// r4
@@ -1657,6 +1752,7 @@ InitSemaphorePPC:
 		prolog 228,"TOC"
 				
 		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
 		
 		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
@@ -1681,10 +1777,20 @@ InitSemaphorePPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,32
 
-		bl AllocVecPPC
+		lwz	r3,RunningTask(r0)
+		lwz	r30,TASKPPC_FLAGS(r3)
+		rlwinm.	r30,r30,(32-TASKPPC_CHOWN),31,31
+		beq	.NotCreating
 
-		mr.	r3,r3
+		bl AllocVec68K
+		
+		b	.Created
+
+.NotCreating:	bl AllocVecPPC
+		
+.Created:	mr.	r3,r3
 		beq-	.SemDone
+
 		stw	r3,SSPPC_RESERVE(r31)
 		li	r3,-1
 
@@ -1695,8 +1801,9 @@ InitSemaphorePPC:
 		li	r31,FInitSemaphorePPC-FRun68K
 		bl	DebugEndFunction
 
-.NoDebug12:	lwz	r31,0(r13)
-		addi	r13,r13,4
+.NoDebug12:	lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
 		
 		epilog "TOC"
 
@@ -1708,7 +1815,7 @@ InitSemaphorePPC:
 
 FreeSemaphorePPC:
 		prolog 228,"TOC"
-				
+
 		mr.	r4,r4
 		beq-	.NoSemDef
 
@@ -3610,7 +3717,7 @@ InsertOnPri:
 		beq-	.GoExit
 		
 		lwz	r0,TASKPPC_FLAGS(r4)
-		rlwinm.	r0,r0,(31-TASKPPC_EMULATOR),31,31
+		rlwinm.	r0,r0,(32-TASKPPC_EMULATOR),31,31
 		beq-	.NoEmul
 		mr	r4,r6
 		b	.GoExit
@@ -3682,7 +3789,7 @@ CreateTaskPPC:
 		lwz	r3,RunningTask(r0)
 		lwz	r23,PowerPCBase(r0)
 		lwz	r4,TASKPPC_FLAGS(r3)
-		ori	r4,r4,TASKPPC_CHOWN 
+		ori	r4,r4,1<<TASKPPC_CHOWN 
 		stw	r4,TASKPPC_FLAGS(r3) 
  		
 		loadreg	r4,TASKATTR_CODE
@@ -3699,7 +3806,7 @@ CreateTaskPPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0				#default alignment 
  
- 		bl AllocVecPPC
+ 		bl AllocVec68K
  
 		mr.	r3,r3 
 		beq-	.Error01			#Error NoMem 
@@ -3721,7 +3828,7 @@ CreateTaskPPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
- 		bl AllocVecPPC
+ 		bl AllocVec68K
  
 		mr.	r3,r3 
 		beq-	.Error02			#Error NoMem 
@@ -3733,7 +3840,7 @@ CreateTaskPPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
- 		bl AllocVecPPC
+ 		bl AllocVec68K
  
 		mr.	r3,r3	 
 		beq-	.Error03			#Error NoMem 
@@ -3771,7 +3878,7 @@ CreateTaskPPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
- 		bl AllocVecPPC
+ 		bl AllocVec68K
  
 		mr.	r3,r3 
 		beq-	.Error04			#Error NoMem 
@@ -3781,7 +3888,7 @@ CreateTaskPPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
- 		bl AllocVecPPC
+ 		bl AllocVec68K
  
 		mr.	r3,r3 
 		beq-	.Error05			#Error NoMem 
@@ -3814,7 +3921,7 @@ CreateTaskPPC:
 		beq-	.NotSystemTask
  
 		lis	r3,0 
-		ori	r3,r3,TASKPPC_SYSTEM 
+		ori	r3,r3,1<<TASKPPC_SYSTEM 
 		stw	r3,TASKPPC_FLAGS(r31)
  
 .NotSystemTask:	loadreg	r4,TASKATTR_ATOMIC
@@ -3827,7 +3934,7 @@ CreateTaskPPC:
 		beq-	.NotAtomicTask
  
 		lis	r3,0 
-		ori	r3,r3,TASKPPC_ATOMIC
+		ori	r3,r3,1<<TASKPPC_ATOMIC
 		lwz	r6,TASKPPC_FLAGS(r31) 
 		or	r6,r6,r3 
 		stw	r6,TASKPPC_FLAGS(r31)
@@ -3889,7 +3996,7 @@ CreateTaskPPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
- 		bl AllocVecPPC
+ 		bl AllocVec68K
  
 		mr.	r3,r3 
 		beq-	.Error06			#Error NoMem 
@@ -3909,7 +4016,7 @@ CreateTaskPPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
- 		bl AllocVecPPC
+ 		bl AllocVec68K
  
 		mr.	r3,r3 
 		beq-	.Error07			#Error NoMem 
@@ -3933,7 +4040,7 @@ CreateTaskPPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
- 		bl AllocVecPPC
+ 		bl AllocVec68K
  
 		mr.	r3,r3 
 		beq-	.Error08			#Error NoMem 
@@ -3947,7 +4054,7 @@ CreateTaskPPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
- 		bl AllocVecPPC
+ 		bl AllocVec68K
  
 		mr.	r3,r3 
 		beq-	.Error09			#Error NoMem 
@@ -3988,7 +4095,7 @@ CreateTaskPPC:
  
 		addi	r5,r23,BASE_STOREBAT0-4		#Default BATS in PowerPCBase
 		lis	r3,0 
-		ori	r3,r3,TASKPPC_BAT
+		ori	r3,r3,1<<TASKPPC_BAT
 		lwz	r6,TASKPPC_FLAGS(r31) 
 		or	r6,r6,r3 
 		stw	r6,TASKPPC_FLAGS(r31) 
@@ -4139,7 +4246,7 @@ CreateTaskPPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,32 
  
- 		bl AllocVecPPC
+ 		bl AllocVec68K
  
 		mr.	r3,r3 
 		beq-	.Error10			#Error NoMem 
@@ -4188,7 +4295,7 @@ CreateTaskPPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
- 		bl AllocVecPPC
+ 		bl AllocVec68K
  
 		mr.	r3,r3 
 		beq-	.Error12			#Error NoMem 
@@ -4201,7 +4308,7 @@ CreateTaskPPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0 
  
- 		bl AllocVecPPC
+ 		bl AllocVec68K
  
 		mr.	r3,r3 
 		beq-	.Error13			#Error NoMem 
@@ -4258,7 +4365,7 @@ CreateTaskPPC:
 		beq+	.WaitAtomic01			#Wait for Atomic
 
 		lwz	r3,TASKPPC_FLAGS(r31)
-		andi.	r0,r3,TASKPPC_SYSTEM
+		andi.	r0,r3,1<<TASKPPC_SYSTEM
 		bne-	.SystemTask			#Yes -> Skip next
 
 		lwz	r5,IdDefTasks(r0)		#Normal Tasks +1
@@ -4303,51 +4410,52 @@ CreateTaskPPC:
 							#Error handling:
 .Error13:	mr	r4,r16
 
-		bl FreeVecPPC
+		bl FreeVec68K
 
-.Error12:	addi	r4,r18,48
+.Error12:	addi	r4,r18,MP_PPC_SEM
+		lwz	r4,SSPPC_RESERVE(r4)
 
-		bl FreeSemaphorePPC
+		bl FreeVec68K
 
 .Error11:	mr	r4,r18
 
-		bl FreeVecPPC
+		bl FreeVec68K
  
 .Error10:	mr	r4,r24
 
-		bl FreeVecPPC
+		bl FreeVec68K
  
 .Error09:	mr	r4,r26
 
-		bl FreeVecPPC
+		bl FreeVec68K
  
 .Error08:	mr	r4,r27
 
-		bl FreeVecPPC
+		bl FreeVec68K
  
 .Error07:	mr	r4,r28
 
-		bl FreeVecPPC
+		bl FreeVec68K
  
 .Error06:	mr	r4,r21
 
-		bl FreeVecPPC 
+		bl FreeVec68K 
  
 .Error05:	mr	r4,r22
 
-		bl FreeVecPPC
+		bl FreeVec68K
  
 .Error04:	mr	r4,r19
 
-		bl FreeVecPPC
+		bl FreeVec68K
  
 .Error03:	mr	r4,r20
 
-		bl FreeVecPPC
+		bl FreeVec68K
  
 .Error02:	mr	r4,r31
 
-		bl FreeVecPPC
+		bl FreeVec68K
 
 .Error01:	li	r3,0				#Error flag in r3 
 
@@ -4355,8 +4463,8 @@ CreateTaskPPC:
 		lwz	r3,RunningTask(r0)
 
 		lwz	r4,TASKPPC_FLAGS(r3)
-		ori	r4,r4,TASKPPC_CHOWN 
-		xori	r4,r4,TASKPPC_CHOWN
+		ori	r4,r4,1<<TASKPPC_CHOWN 
+		xori	r4,r4,1<<TASKPPC_CHOWN
 		stw	r4,TASKPPC_FLAGS(r3) 
 
 		mr	r3,r5				#Exit with task in r3 (or not)
@@ -5312,12 +5420,13 @@ DeleteTaskPPC:
 		beq-	.NoMsgPort
 
 		addi	r4,r27,MP_PPC_SEM
-		
-		bl FreeSemaphorePPC
+		lwz	r4,SSPPC_RESERVE(r4)
+
+		bl FreeVec68K
 
 		mr	r4,r27
 		
-		bl FreeVecPPC
+		bl FreeVec68K
 
 .NoMsgPort:	lwz	r4,TaskListSem(r0)
 		
@@ -5350,8 +5459,10 @@ DeleteTaskPPC:
 		li	r0,-1
 		stb	r0,RescheduleFlag(r0)		#Reschedule
 		
-		bl CauseInterrupt
+		bl FreeAllMem				#Remove all allocated memory by task (not by CreateTaskPPC)
 		
+		bl CauseInterrupt
+
 .EndTask:	b	.EndTask			#Halt this Task
 
 .NotOwnTask2:	li	r4,Atomic
@@ -5375,7 +5486,7 @@ DeleteTaskPPC:
 		stw	r5,4(r4)
 		stw	r4,0(r5)
 		stw	r3,4(r5)
-		stw	r5,0(r3)			#Maybe for freemem?
+		stw	r5,0(r3)			#In WarpOS a seperate task takes care of all freemems (TC_MEMENTRY)
 
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r31)
@@ -5383,6 +5494,9 @@ DeleteTaskPPC:
 		li	r4,Atomic
 		
 		bl AtomicDone
+
+		mr	r4,r31
+		bl 	.FreeTaskMem			#Remove all allocated memory by task
 
 		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
@@ -5606,7 +5720,7 @@ CreatePoolPPC:
 		mr	r5,r29
 		li	r6,32
 		
-		bl AllocVecPPC
+		bl AllocVec68K
 		
 		mr.	r31,r3
 		beq-	.NoCreatePool
@@ -5665,7 +5779,7 @@ DeletePoolPPC:
 		mr.	r4,r3
 		beq	.NextBlock	
 		
-		bl FreeVecPPC
+		bl FreeVec68K
 		
 		b	.NextPuddle
 	
@@ -5676,13 +5790,13 @@ DeletePoolPPC:
 		mr.	r4,r3
 		beq	.AllFreed		
 		
-		bl FreeVecPPC
+		bl FreeVec68K
 		
 		b	.NextBlock
 		
 .AllFreed:	mr	r4,r31
 		
-		bl FreeVecPPC
+		bl FreeVec68K
 		
 		lwz	r4,MemSem(r0)
 		
@@ -5695,7 +5809,7 @@ DeletePoolPPC:
 
 #********************************************************************************************
 #
-#	memory = AllocPooledPPC(poolheader, size) // r3=r4,r5 		TO BE CHECKED
+#	memory = AllocPooledPPC(poolheader, size) // r3=r4,r5
 #
 #********************************************************************************************
 
@@ -5730,7 +5844,7 @@ AllocPooledPPC:
 		lwz	r5,POOL_REQUIREMENTS(r31)
 		li	r6,32
 		
-		bl AllocVecPPC
+		bl AllocVec68K
 		
 		mr.	r28,r3
 		
@@ -5777,7 +5891,7 @@ AllocPooledPPC:
 		lwz	r5,POOL_REQUIREMENTS(r3)
 		li	r6,32
 		
-		bl AllocVecPPC
+		bl AllocVec68K
 		
 		mr.	r5,r3
 		
@@ -5906,6 +6020,14 @@ AllocatePPC:
 		sub	r29,r29,r31
 		stw	r29,MH_FREE(r30)
 		
+		subi	r28,r3,1
+		mfctr	r29
+		mtctr	r31
+		li	r30,0
+.ClearAlloc:	stbu	r30,1(r28)
+		bdnz	.ClearAlloc
+		mtctr	r29
+		
 .ExitAlloc:	lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug38
@@ -5923,7 +6045,7 @@ AllocatePPC:
 
 #********************************************************************************************
 #
-#	support: void DeallocatePPC(Memheader, memoryBlock, byteSize) // r3=r4,r5,r6(a0,a1,d0)
+#	support: void DeallocatePPC(Memheader, memoryBlock, byteSize) // r4,r5,r6(a0,a1,d0)
 #
 #********************************************************************************************
 
@@ -6079,7 +6201,7 @@ FreePooledPPC:
 
 		subi	r4,r30,32
 		
-		bl FreeVecPPC
+		bl FreeVec68K
 
 		b	.ExitFreePool
 		
@@ -6124,7 +6246,7 @@ FreePooledPPC:
 		
 		mr	r4,r29
 		
-		bl FreeVecPPC		
+		bl FreeVec68K		
 		
 .ExitFreePool:	lwz	r4,MemSem(r0)
 		
@@ -7038,15 +7160,15 @@ ChangeMMU:
 		bne-	.ExitChMMU
 
 		lwz	r5,TASKPPC_FLAGS(r3)
-		ori	r5,r5,TASKPPC_BAT
+		ori	r5,r5,1<<TASKPPC_BAT
 		stw	r5,TASKPPC_FLAGS(r3)
 		bl	GetBATs
 
 		b	.ExitChMMU
 
 .ChangeToTable:	lwz	r5,TASKPPC_FLAGS(r3)
-		ori	r5,r5,TASKPPC_BAT
-		xori	r5,r5,TASKPPC_BAT
+		ori	r5,r5,1<<TASKPPC_BAT
+		xori	r5,r5,1<<TASKPPC_BAT
 		stw	r5,TASKPPC_FLAGS(r3)
 		bl	StoreBATs
 
@@ -7316,345 +7438,51 @@ MoveFromBAT:
 #
 #********************************************************************************************		
 
-FreeAllMem:	blr
+FreeAllMem:	lwz	r4,RunningTask(r0)
 
-		prolog 228,"TOC"
+.FreeTaskMem:	blr
 
-		lwz	r4,MemSem(r0)
-		
-		bl ObtainSemaphorePPC
-
-		lwz	r3,RunningTask(r0)
-
-		bl	.DoFree
-
-		lwz	r4,MemSem(r0)
-
-		bl ReleaseSemaphorePPC
-
-		epilog "TOC"
-
-#********************************************************************************************
-		
-.DoFree:	stw	r13,-4(r1)			#From FreeAllMem
-		mflr	r0
-		stw	r0,8(r1)
-		stwu	r1,-48(r1)
-		lwz	r3,TASKPPC_TASKPOOLS(r3)
-		b	.NextPool
-
-.PListNotEmpty:	lwz	r5,0(r3)
-		lwz	r4,4(r3)
-		stw	r5,0(r4)
-		lwz	r5,4(r3)
-		lwz	r4,0(r3)
-		stw	r5,4(r4)
-		bl	.GotPoolMem
-
-		mr	r3,r13
-.NextPool:	lwz	r13,0(r3)
-		cmplwi	r13,0
-		bne+	.PListNotEmpty
-		addi	r1,r1,48
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r13,-4(r1)
-		blr
-
-.GotPoolMem:	stw	r16,-4(r1)
-		stw	r15,-8(r1)
-		stw	r14,-12(r1)
-		stw	r13,-16(r1)
-		mflr	r0
-		stw	r0,8(r1)
-		mr	r15,r3
-		stwu	r1,-64(r1)
-		cmplwi	r15,0
-		beq-	.GotExit
-		
-		lwz	r13,36(r15)			#Pool
-		lwz	r14,24(r15)			#Pool
-		lwz	r3,8(r15)			#Pool?
-		andi.	r3,r3,1
-		bne-	.Unknown1
-		
-		lwz	r4,0(r15)
-		lwz	r3,4(r15)
-		stw	r4,0(r3)
-		lwz	r4,4(r15)
-		lwz	r3,0(r15)
-		stw	r4,4(r3)
-		b	.Unknown1
-
-.UnknownLoop1:	lwz	r4,8(r13)
-		mr	r3,r13
-		
-		bl	Support1
-		
-		lwz	r4,8(r13)			#Len
-		mr	r3,r13				#Block
-		
-		bl Run68KLowLevel
-		
-		
-		mr	r13,r16
-.Unknown1:	lwz	r16,0(r13)
-		cmplwi	r16,0
-		bne+	.UnknownLoop1
-		b	.Unknown2
-
-.UnknownLoop2:	lwz	r4,16(r15)
-		mr	r3,r14
-		
-		bl	Support1
-		
-		lwz	r4,16(r15)
-		mr	r3,r14
-		
-		bl Run68KLowLevel	
-		
-		mr	r14,r13
-.Unknown2:	lwz	r13,0(r14)
-		cmplwi	r13,0
-		bne+	.UnknownLoop2
-		
-		mr	r3,r15
-		li	r4,48
-
-		bl Run68KLowLevel
-
-.GotExit:	addi	r1,r1,64
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r16,-4(r1)
-		lwz	r15,-8(r1)
-		lwz	r14,-12(r1)
-		lwz	r13,-16(r1)
-		blr
-		
-#********************************************************************************************		
-
-Support1:	
-		prolog 228,"TOC"					#3rd jump from FreeVecPPC 7380
+		prolog 228,"TOC"			#r4 should be Task
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
-		stwu	r28,-4(r13)
-		stwu	r27,-4(r13)
-		stwu	r26,-4(r13)
-		stwu	r25,-4(r13)
-		stwu	r24,-4(r13)
 
-		lbz	r6,18736(r2)			#MemFlag TLB?
-		mr.	r6,r6
-		beq-	.ExitSupp
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug55
+		
+		li	r31,FFreeAllMem-FRun68K
+		bl	DebugStartFunction
 
-		mr	r5,r3
-		add	r6,r5,r4
-		lwz	r4,17748(r2)
-		lis	r0,0xffff
-		ori	r0,r0,0xf000
-		addi	r5,r5,0x0fff
-		and	r5,r5,r0
-		and	r6,r6,r0
-		cmpw	r5,r6
-		beq-	.ExitSupp
+.NoDebug55:	la	r4,TASKPPC_TASKPOOLS(r4)
+		lwz	r5,MLH_HEAD(r4)
+.NextFPool:	mr	r30,r5
+		lwz	r29,LN_SUCC(r5)
+		mr.	r29,r29
+		beq	.AreNoPools
 
-		li	r7,2
-		li	r8,0
-		li	r9,31
-		lwz	r10,17744(r2)
-		mr	r31,r5
-		mr	r30,r6
+		subi	r4,r5,36
 
-		bl Super
-		
-		mr	r31,r3
-		
-		bl Warp43
-		
-		mr	r4,r31
-		
-		bl User
+		bl DeletePoolPPC
 
-		lwz	r3,15728(r2)
-		lwz	r25,410(r3)			#Base+410
-.NextSupp:	lwz	r24,0(r25)
-		mr.	r24,r24
-		beq-	.ExitSupp
+		mr	r5,r29
+		b	.NextFPool
+		
+.AreNoPools:	lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug56
 
-		lwz	r4,8(r25)
-		mr	r5,r31
-		mr	r6,r30
-		li	r7,2
-		li	r8,0
-		li	r9,31
-		lwz	r10,17744(r2)
+		li	r31,FFreeAllMem-FRun68K
+		bl	DebugEndFunction
 
-		bl Super
-		
-		mr	r31,r3
-		
-		bl Warp43
-		
-		mr	r4,r31
-		
-		bl User
-
-		mr	r25,r24
-		b	.NextSupp
-
-.ExitSupp:	lwz	r24,0(r13)
-		lwz	r25,4(r13)
-		lwz	r26,8(r13)
-		lwz	r27,12(r13)
-		lwz	r28,16(r13)
-		lwz	r29,20(r13)
-		lwz	r30,24(r13)
-		lwz	r31,28(r13)
-		addi	r13,r13,32
-
-		epilog "TOC"
-
-#********************************************************************************************
-		
-Warp43:
-		mflr	r0
-		stwu	r0,-4(r13)
-		subi	r0,r10,1
-		rlwinm	r0,r0,16,16,31
-		rlwimi	r4,r0,0,23,31
-		bl	.ySupport
-		lwz	r0,0(r13)
-		addi	r13,r13,4
-		mtlr	r0
-		blr
-
-.ySupport:	mflr	r0
-		stwu	r0,-4(r13)
-		stwu	r31,-4(r13)
-		stwu	r30,-4(r13)
-		stwu	r29,-4(r13)
-		mfmsr	r29
-		ori	r0,r29,48
-		xori	r0,r0,48
-		mtmsr	r0
-		sync	
-		isync	
-		
-		li	r0,64
-		mtctr	r0
-		li	r10,0
-		
-.TLBLoop:	tlbie	r10
-		addi	r10,r10,4096
-		bdnz+	.TLBLoop
-		
-		sub	r0,r6,r5
-		rlwinm	r0,r0,20,12,31
-		mtctr	r0
-		mr	r30,r9
-		lis	r9,-4096			#Change to hex
-		ori	r9,r9,0
-		mr	r10,r7
-		mr	r11,r8
-		
-.BigLoop1:	mfctr	r0
-		stwu	r0,-4(r13)
-		and	r8,r9,r5
-		mfsrin	r6,r8
-		rlwinm	r12,r6,7,0,24
-		oris	r12,r12,32768
-		rlwimi	r12,r5,10,26,31
-		ori	r31,r12,64
-		
-		bl	.xSupport
-		
-		subi	r3,r3,8
-		subi	r6,r6,8
-		li	r0,8
-		mtctr	r0
-		
-.UnknownLoop3:	lwzu	r0,8(r6)
-		cmpw	r0,r12
-		bdnzf+	2,.UnknownLoop3
-		
-		beq-	.Unknown4
-		
-		li	r0,8
-		mtctr	r0
-		
-.UnknownLoop4:	lwzu	r0,8(r3)
-		cmpw	r0,r31
-		bdnzf+	2,.UnknownLoop4
-		
-		mr	r6,r3
-		bne-	.Unknown5
-		
-.Unknown4:	lwz	r3,4(r6)
-		rlwinm	r0,r3,29,28,31
-		andc	r0,r0,r30
-		and	r8,r11,r30
-		or	r8,r8,r0
-		rlwimi	r3,r8,3,25,28
-		cmplwi	r10,4
-		beq-	.Unknown6
-		
-		rlwimi	r3,r10,0,30,31
-.Unknown6:	stw	r3,4(r6)
-.Unknown5:	addi	r5,r5,4096
-		lwz	r0,0(r13)
-		addi	r13,r13,4
-		mtctr	r0
-		bdnz+	.BigLoop1
-		
-		mtmsr	r29
-		sync	
-		isync	
-		
-		lwz	r29,0(r13)
+.NoDebug56:	lwz	r29,0(r13)
 		lwz	r30,4(r13)
 		lwz	r31,8(r13)
 		addi	r13,r13,12
-		lwz	r0,0(r13)
-		addi	r13,r13,4
-		mtlr	r0
-		blr
 
-.xSupport:	mflr	r0
-		stwu	r0,-4(r13)
-		stwu	r8,-4(r13)
-		stwu	r7,-4(r13)
-		stwu	r5,-4(r13)
-		rlwinm	r0,r5,20,16,31
-		xor	r5,r6,r0
-		not	r6,r5
-		rlwinm	r7,r5,22,10,31
-		rlwinm	r8,r6,22,10,31
-		and	r7,r7,r4
-		and	r8,r8,r4
-		rlwinm	r0,r4,16,16,31
-		rlwinm	r3,r4,16,16,31
-		or	r7,r7,r0
-		or	r8,r8,r3
-		rlwinm	r0,r4,0,0,6
-		mr	r3,r0
-		rlwimi	r0,r7,16,7,15
-		rlwimi	r3,r8,16,7,15
-		rlwimi	r0,r5,6,16,25
-		rlwimi	r3,r6,6,16,25
-		mr	r6,r0
-		lwz	r5,0(r13)
-		lwz	r7,4(r13)
-		lwz	r8,8(r13)
-		addi	r13,r13,12
-		lwz	r0,0(r13)
-		addi	r13,r13,4
-		mtlr	r0
-		
-		blr
-		
+		epilog "TOC"
+
 #********************************************************************************************
 #
 #	void RemExcHandler(XLock) // r4			*NEEDS FUNCTIONALITY IN INTERRUPT

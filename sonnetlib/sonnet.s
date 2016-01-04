@@ -11,6 +11,7 @@
 	include	libraries/configvars.i
 	include	exec/execbase.i
 	include powerpc/powerpc.i
+	include powerpc/tasksPPC.i
 	include	dos/dostags.i
 	include dos/dos_lib.i
 	include exec/ports.i
@@ -899,6 +900,14 @@ xProces		move.l d0,Port(a5)
 
 		move.l 4.w,a6
 		move.l ThisTask(a6),a1
+		move.l d6,a2
+		lea TASKPPC_TASKPOOLS(a2),a2
+		move.l a2,d0
+		move.l d0,8(a2)
+		addq.l #4,d0
+		move.l d0,(a2)
+		moveq.l #0,d0
+		move.l d0,4(a2)		
 		move.l d6,a2
 		lea TASKPPC_NAME(a2),a2	
 		cmp.b #NT_PROCESS,LN_TYPE(a1)

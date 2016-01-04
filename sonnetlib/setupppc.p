@@ -122,11 +122,8 @@ Start:		loadreg	r0,"REDY"			#Dummy entry at absolute 0x7400
 		trap					#For PP_THROW
 	
 StartCode:	blrl
-ExitCode:	li	r7,TS_REMOVED
-		lwz	r9,RunningTask(r0)
-		stb	r7,TC_STATE(r9)
-		
-		lis	r7,EUMB					#Get Msg Frame for 
+
+ExitCode:	lis	r7,EUMB					#Get Msg Frame for 
 		li	r8,OFTPR				#communication with 68K
 		lwbrx	r9,r8,r7			
 		addi	r10,r9,4		
@@ -187,7 +184,7 @@ ExitCode:	li	r7,TS_REMOVED
 		lwz	r4,TC_SPLOWER(r4)
 		subi	r4,r4,1024
 		stw	r4,MN_ARG0(r9)
-		
+
 		lis	r3,EUMB					#Send Msg to 68K
 		li	r24,OPHPR
 		lwbrx	r31,r24,r3		
@@ -197,6 +194,8 @@ ExitCode:	li	r7,TS_REMOVED
 		and	r23,r23,r4				#Keep it 8000-BFFE
 		stwbrx	r23,r24,r3				#triggers Interrupt
 		sync
+
+		LIBCALLPOWERPC FreeAllMem
 
 		loadreg	r1,SysStack-0x20			#System stack in unused mem
 		lwz	r13,SonnetBase(r0)
@@ -215,6 +214,10 @@ ExitCode:	li	r7,TS_REMOVED
 		and	r23,r23,r4				#Keep it 0000-3FFE
 		stwbrx	r23,r24,r3
 		sync
+
+		li	r7,TS_REMOVED
+		lwz	r9,RunningTask(r0)
+		stb	r7,TC_STATE(r9)
 
 		li	r0,0
 		stw	r0,RunningTask(r0)
@@ -2209,9 +2212,19 @@ EInt:		b	.FPUnav				#0
 		
 		bne	.NotDeleted
 
+		mr	r5,r9
+		lwz	r3,PowerPCBase(r0)
+		la	r4,LIST_REMOVEDTASKS(r3)	#Deleted task list at base
+		addi	r4,r4,4				#AddTailPPC
+		lwz	r3,4(r4)
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
+
 		li	r9,0
 		stw	r9,RunningTask(r0)
-		b	.ReturnToUser		
+		b	.Deleted		
 
 .NotDeleted:	li	r4,TS_CHANGING
 		lbz	r3,TC_STATE(r9)
@@ -3263,9 +3276,9 @@ EInt:		b	.FPUnav				#0
 		loadreg	r6,0x7c00012e			#third instruction
 		rlwimi	r6,r5,0,11,20
 		stw	r6,8(r4)
-
+				
 		b	.ReUseIt
-
+	
 #***********************************************	
 		
 .HaltIt:	loadreg	r3,"ALIG"
@@ -3313,6 +3326,8 @@ EInt:		b	.FPUnav				#0
 
 		loadreg	r7,"DSI!"
 		stw	r7,0xf4(r0)
+		
+		stw	r9,0x140(r0)
 
 		lwz	r7,PowerPCBase(r0)		#For GetHALInfo
 		lwz	r6,DataExcLow(r7)		#Counts number of Amiga RAM
