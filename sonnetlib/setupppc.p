@@ -195,8 +195,6 @@ ExitCode:	lis	r7,EUMB					#Get Msg Frame for
 		stwbrx	r23,r24,r3				#triggers Interrupt
 		sync
 
-		LIBCALLPOWERPC FreeAllMem
-
 		loadreg	r1,SysStack-0x20			#System stack in unused mem
 		lwz	r13,SonnetBase(r0)
 		or	r1,r1,r13

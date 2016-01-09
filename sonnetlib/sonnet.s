@@ -532,8 +532,8 @@ ReUse		move.l a2,d7
 		lea PushMsg(pc),a5
 		jsr _LVOSupervisor(a6)
 		move.l EUMBAddr(pc),a2
-		move.l a1,OFQPR(a2)			;Return Message Frame
 		move.l d7,IFQPR(a2)			;Message the PPC
+		move.l a1,OFQPR(a2)			;Return Message Frame
 		bra NextMsg
 
 Sig68k		move.l DosBase(pc),d6
@@ -602,8 +602,12 @@ RtnLL		move.l (a7)+,a1
 		move.l EUMBAddr(pc),a2
 		move.l IFQPR(a2),a2
 		move.l d0,MN_PPSTRUCT+6*4(a2)
-NoScrn		move.l #"DONE",MN_IDENTIFIER(a2)
+		move.l #"DONE",MN_IDENTIFIER(a2)
 		move.l MN_PPC(a1),MN_PPC(a2)
+		
+		move.l MN_PPSTRUCT+0*4(a1),MN_PPSTRUCT+0*4(a2)
+		move.l MN_PPSTRUCT+1*4(a1),MN_PPSTRUCT+1*4(a2)
+
 		move.l 4.w,a6
 		bra ReUse
 
@@ -688,12 +692,12 @@ Tree		rts
 
 		cnop 0,4
 
-PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,125,NP_StackSize,$8000,0,0
+PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,1,NP_StackSize,$8000,0,0
 PrcName		dc.b "MasterControl",0
 
 		cnop 0,4
 		
-Prc2Tags	dc.l NP_Entry,Joshua,NP_Name,Prc2Name,NP_Priority,124,NP_StackSize,$8000,0,0
+Prc2Tags	dc.l NP_Entry,Joshua,NP_Name,Prc2Name,NP_Priority,1,NP_StackSize,$8000,0,0
 Prc2Name	dc.b "Joshua",0
 PrtName		dc.b "Skynet",0
 
