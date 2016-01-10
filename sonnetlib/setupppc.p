@@ -3324,8 +3324,6 @@ EInt:		b	.FPUnav				#0
 
 		loadreg	r7,"DSI!"
 		stw	r7,0xf4(r0)
-		
-		stw	r9,0x140(r0)
 
 		lwz	r7,PowerPCBase(r0)		#For GetHALInfo
 		lwz	r6,DataExcLow(r7)		#Counts number of Amiga RAM
@@ -3360,12 +3358,13 @@ EInt:		b	.FPUnav				#0
 		loadreg	r8,0x7c00002e			#check for stbx/sthx/stwx
 		cmpw	r6,r8
 		bne	.NoLoadStore
-		
+
 		rlwinm	r6,r7,11,27,31			#Source reg
 		rlwinm	r8,r7,16,27,31			#Dest 1
-		rlwinm	r7,r7,21,27,31			#dest 2
+		rlwinm	r7,r7,21,27,31			#dest 2 (Displacement)
+		li	r0,0				#Update bit
 
-		b	.NoLoadStore		
+		b	.Dostxx		
 
 .DoInst:	rlwinm	r6,r7,11,27,31			#Get Destination Reg (l) or Source (s)
 		rlwinm	r8,r7,16,27,31			#Get Source Reg (l) or Destination (s)
@@ -3376,7 +3375,7 @@ EInt:		b	.FPUnav				#0
 
 		beq	.GetAddr
 
-		cmpwi	r6,0
+.Dostxx:	cmpwi	r6,0
 		bne	.NotSDr0
 		mfsprg0	r8
 		b	.GetAddr
@@ -3532,7 +3531,7 @@ EInt:		b	.FPUnav				#0
 		b	.GetAddr
 		
 .NotSDr30:	cmpwi	r6,31
-		bne	.HaltDSI			#Should not happen
+		bne	.NoClutch			#Should not happen
 		mr	r8,r31
 
 .GetAddr:	mr	r6,r0
@@ -3805,6 +3804,26 @@ EInt:		b	.FPUnav				#0
 .GotAmigaMemAd:	mfsrr0	r8
 		lwz	r8,0(r8)
 		mr	r6,r0
+		rlwinm	r0,r8,0,25,5
+		loadreg	r8,0x7c00002e				#check for stbx/sthx/stwx
+		cmpw	r0,r8
+		bne	.Nostxx
+
+		mfsrr0	r8
+		lwz	r8,0(r8)
+		rlwinm	r0,r8,25,29,31
+		cmpwi	r0,6
+		beq	.StoreHalf
+		cmpwi	r0,3
+		beq	.StoreByte
+		cmpwi	r0,2
+		beq	.StoreWord
+
+		b	.NoClutch				#Not Supported
+
+.Nostxx:	mfsrr0	r8
+		lwz	r8,0(r8)			
+		mr	r6,r0
 		rlwinm.	r0,r8,4,31,31				#Check load or store		
 		beq	.LoadInstr
 	
@@ -3812,7 +3831,7 @@ EInt:		b	.FPUnav				#0
 		bne	.StoreHalf
 		rlwinm. r0,r8,5,31,31
 		bne	.StoreByte
-		loadreg	r8,"PUTW"
+.StoreWord:	loadreg	r8,"PUTW"
 		b	.DoStore
 .StoreHalf:	loadreg	r8,"PUTH"
 		b	.DoStore
