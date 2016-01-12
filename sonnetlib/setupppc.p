@@ -3187,6 +3187,8 @@ EInt:		b	.FPUnav				#0
 		loadreg	r1,SysStack-0x20		#System stack in unused mem
 		or	r1,r1,r0
 		
+		mfcr	r0
+		stwu	r0,-4(r1)
 		stwu	r4,-4(r1)
 		stwu	r5,-4(r1)
 		stwu	r6,-4(r1)
@@ -3241,6 +3243,8 @@ EInt:		b	.FPUnav				#0
 		lwz	r6,0(r1)
 		lwz	r5,4(r1)
 		lwz	r4,8(r1)
+		lwz	r0,12(r1)
+		mtcr	r0
 		mfsrr0	r1
 		addi	r1,r1,4				#Exit beyond offending instruction
 		mtsrr0	r1
@@ -3304,24 +3308,60 @@ EInt:		b	.FPUnav				#0
 
 #********************************************************************************************
 
-.DSI:		mtsprg0	r0
-
-		mfmsr	r0
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+.DSI:		mtsprg0	r0				#Still need to fix CHIP access
+		mtsprg1	r1				#Between 4000-7000 (using Supervisor mode)
+		mfmsr	r0				#And 100000-200000 (moving FIFO)
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#And Zorro2 space 200000-290000 (moving FIFO)
 		mtmsr	r0				#Reenable MMU & FPU
 		sync
 		isync
-
-		mtsprg1	r6
-		mtsprg2	r7
-		mtsprg3	r1
 		
 		lwz	r0,SonnetBase(r0)
 		loadreg	r1,SysStack-0x20		#System stack in unused mem
 		or	r1,r1,r0
-
+		
+		mflr	r0
+		stwu	r0,-4(r1)
+		mfcr	r0
+		stwu	r0,-4(r1)
+		li	r0,0
+		stwu	r0,-4(r1)			#For when rA = 0
+		stwu	r31,-4(r1)
+		stwu	r30,-4(r1)
+		stwu	r29,-4(r1)
+		stwu	r28,-4(r1)
+		stwu	r27,-4(r1)
+		stwu	r26,-4(r1)
+		stwu	r25,-4(r1)
+		stwu	r24,-4(r1)
+		stwu	r23,-4(r1)
+		stwu	r22,-4(r1)
+		stwu	r21,-4(r1)
+		stwu	r20,-4(r1)
+		stwu	r19,-4(r1)
+		stwu	r18,-4(r1)
+		stwu	r17,-4(r1)
+		stwu	r16,-4(r1)
+		stwu	r15,-4(r1)
+		stwu	r14,-4(r1)
+		stwu	r13,-4(r1)
+		stwu	r12,-4(r1)
+		stwu	r11,-4(r1)
+		stwu	r10,-4(r1)
+		stwu	r9,-4(r1)
 		stwu	r8,-4(r1)
-
+		stwu	r7,-4(r1)
+		stwu	r6,-4(r1)
+		stwu	r5,-4(r1)
+		stwu	r4,-4(r1)
+		stwu	r3,-4(r1)
+		stwu	r2,-4(r1)
+		mfsprg1	r31
+		stwu	r31,-4(r1)
+		mfsprg0	r31
+		stwu	r31,-4(r1)
+		mr	r30,r1				#Start of reg table in r30
+		
 		loadreg	r7,"DSI!"
 		stw	r7,0xf4(r0)
 
@@ -3333,833 +3373,159 @@ EInt:		b	.FPUnav				#0
 		addze	r6,r6
 		stw	r6,DataExcHigh(r7)
 
-		mfsrr0	r7
-		stw	r7,0xf8(r0)
-		lwz	r7,0(r7)
+		mfsrr0	r31
+		stw	r31,0xf8(r0)
+		lwz	r31,0(r31)			#get offending instruction in r31
 		
-.wosdb:		lwz	r6,SysBase(r0)			#Special wosdb patch
-		cmpw	r6,r10
-		bne	.Nowosdb
-
-		loadreg	r0,0x80ca0142			#MemList(sysbase)->r6
-		lwz	r6,PPCMemHeader(r0)		#dummy
-		mtsprg1	r6
-
-		cmpw	r0,r7
-		beq	.Clutch
-
-.Nowosdb:	lis	r0,0xc000			#check for load or store instruction
-		and.	r0,r7,r0
+.Nowosdb:	li	r29,0
+		lis	r0,0xc000			#check for load or store instruction
+		and.	r0,r31,r0
 		lis	r6,0x8000
 		cmpw	r6,r0				
-		beq	.DoInst	
-		
-		rlwinm	r6,r7,0,25,5
+		beq	.LoadStore
+
+		rlwinm	r6,r31,0,25,5
 		loadreg	r8,0x7c00002e			#check for stbx/sthx/stwx
 		cmpw	r6,r8
-		bne	.NoLoadStore
-
-		rlwinm	r6,r7,11,27,31			#Source reg
-		rlwinm	r8,r7,16,27,31			#Dest 1
-		rlwinm	r7,r7,21,27,31			#dest 2 (Displacement)
-		li	r0,0				#Update bit
-
-		b	.Dostxx		
-
-.DoInst:	rlwinm	r6,r7,11,27,31			#Get Destination Reg (l) or Source (s)
-		rlwinm	r8,r7,16,27,31			#Get Source Reg (l) or Destination (s)
-		rlwinm.	r0,r7,4,31,31			#Check load or store
-		rlwinm	r0,r7,6,31,31			#Check for update bit
-		rlwinm	r7,r7,0,16,31			#Displacement (halfword)
-		extsh	r7,r7				#Extend sign of displacement
-
-		beq	.GetAddr
-
-.Dostxx:	cmpwi	r6,0
-		bne	.NotSDr0
-		mfsprg0	r8
-		b	.GetAddr
+		bne	.NotSupported
 		
-.NotSDr0:	cmpwi	r6,1
-		bne	.NotSDr1
-		mfsprg3	r8
-		b	.GetAddr
+		b	.DoneDSI			#See fixes still to be done at top DSI code
 		
-.NotSDr1:	cmpwi	r6,2
-		bne	.NotSDr2
-		mr	r8,r2
-		b	.GetAddr
+		li	r29,1
+		rlwinm	r6,r31,13,25,29			#Source reg
+		rlwinm	r8,r31,18,25,29			#Dest 1
+		rlwinm	r4,r31,23,25,29			#Dest 2
+		lwzx	r4,r30,r4			#Displacement (word)
+		li	r5,0				#Update bit
+		li	r9,1				#Mark as Store instruction
 		
-.NotSDr2:	cmpwi	r6,3
-		bne	.NotSDr3
-		mr	r8,r3
-		b	.GetAddr
+		b	.GoStore
 		
-.NotSDr3:	cmpwi	r6,4
-		bne	.NotSDr4
-		mr	r8,r4
-		b	.GetAddr		
-
-.NotSDr4:	cmpwi	r6,5
-		bne	.NotSDr5
-		mr	r8,r5
-		b	.GetAddr
+.LoadStore:	rlwinm	r6,r31,13,25,29			#Get Destination Reg (l) or Source (s)
+		rlwinm	r8,r31,18,25,29			#Get Source Reg (l) or Destination (s)
+		rlwinm	r9,r31,4,31,31			#Check load or store
+		rlwinm	r5,r31,6,31,31			#Check for update bit
+		rlwinm	r4,r31,0,16,31			#Displacement (halfword)
+		extsh	r4,r4				#Extend sign of displacement		
 		
-.NotSDr5:	cmpwi	r6,6
-		bne	.NotSDr6
-		mfsprg1	r8
-		b	.GetAddr
+.GoStore:	mr.	r5,r5
+		bne	.NoZero				#When update r0 = r0 and not 0
+		mr.	r8,r8
+		bne	.NoZero
+		li	r8,128				#Point to 0 in reg table
 		
-.NotSDr6:	cmpwi	r6,7
-		bne	.NotSDr7
-		mfsprg2	r8
-		b	.GetAddr
+.NoZero:	lwzx	r3,r30,r8			#Get Destination Address			
+		add	r3,r3,r4			#Add displacement
+		mr.	r5,r5
+		beq	.NoUpdate
+		stwx	r3,r30,r8			#Update Destination Reg
+.NoUpdate:	lwzx	r2,r30,r6			#Get value to store
 		
-.NotSDr7:	cmpwi	r6,8
-		bne	.NotSDr8
-		lwz	r8,0(r1)
-		b	.GetAddr
+		mr.	r9,r9
+		beq	.GoLoad				#Load or store?
 		
-.NotSDr8:	cmpwi	r6,9
-		bne	.NotSDr9
-		mr	r8,r9
-		b	.GetAddr
-		
-.NotSDr9:	cmpwi	r6,10
-		bne	.NotSDr10
-		mr	r8,r10
-		b	.GetAddr
-		
-.NotSDr10:	cmpwi	r6,11
-		bne	.NotSDr11
-		mr	r8,r11
-		b	.GetAddr
-		
-.NotSDr11:	cmpwi	r6,12
-		bne	.NotSDr12
-		mr	r8,r12
-		b	.GetAddr		
-
-.NotSDr12:	cmpwi	r6,13
-		bne	.NotSDr13
-		mr	r8,r13
-		b	.GetAddr
-		
-.NotSDr13:	cmpwi	r6,14
-		bne	.NotSDr14
-		mr	r8,r14
-		b	.GetAddr
-		
-.NotSDr14:	cmpwi	r6,15
-		bne	.NotSDr15
-		mr	r8,r15
-		b	.GetAddr
-		
-.NotSDr15:	cmpwi	r6,16
-		bne	.NotSDr16
-		mr	r8,r16
-		b	.GetAddr		
-
-.NotSDr16:	cmpwi	r6,17
-		bne	.NotSDr17
-		mr	r8,r17
-		b	.GetAddr
-		
-.NotSDr17:	cmpwi	r6,18
-		bne	.NotSDr18
-		mr	r8,r18
-		b	.GetAddr
-		
-.NotSDr18:	cmpwi	r6,19
-		bne	.NotSDr19
-		mr	r8,r19
-		b	.GetAddr
-		
-.NotSDr19:	cmpwi	r6,20
-		bne	.NotSDr20
-		mr	r8,r20
-		b	.GetAddr		
-
-.NotSDr20:	cmpwi	r6,21
-		bne	.NotSDr21
-		mr	r8,r21
-		b	.GetAddr
-		
-.NotSDr21:	cmpwi	r6,22
-		bne	.NotSDr22
-		mr	r8,r22
-		b	.GetAddr
-		
-.NotSDr22:	cmpwi	r6,23
-		bne	.NotSDr23
-		mr	r8,r23
-		b	.GetAddr
-		
-.NotSDr23:	cmpwi	r6,24
-		bne	.NotSDr24
-		mr	r8,r24
-		b	.GetAddr
-		
-.NotSDr24:	cmpwi	r6,25
-		bne	.NotSDr25
-		mr	r8,r25
-		b	.GetAddr
-		
-.NotSDr25:	cmpwi	r6,26
-		bne	.NotSDr26
-		mr	r8,r26
-		b	.GetAddr
-		
-.NotSDr26:	cmpwi	r6,27
-		bne	.NotSDr27
-		mr	r8,r27
-		b	.GetAddr
-		
-.NotSDr27:	cmpwi	r6,28
-		bne	.NotSDr28
-		mr	r8,r28
-		b	.GetAddr		
-
-.NotSDr28:	cmpwi	r6,29
-		bne	.NotSDr29
-		mr	r8,r29
-		b	.GetAddr
-		
-.NotSDr29:	cmpwi	r6,30
-		bne	.NotSDr30
-		mr	r8,r30
-		b	.GetAddr
-		
-.NotSDr30:	cmpwi	r6,31
-		bne	.NoClutch			#Should not happen
-		mr	r8,r31
-
-.GetAddr:	mr	r6,r0
-		mr	r0,r8
-		
-		mfsrr0	r8
-		lwz	r8,0(r8)
-		rlwinm	r8,r8,16,27,31			#Get Source Reg (l) or Destination (s)
-		
-		cmpwi	r8,0
-		bne	.Notr0
-		mfsprg0 r8
-		add	r7,r8,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mtsprg0	r7
-		b	.GotAmigaMemAd
-		
-.Notr0:		cmpwi	r8,1
-		bne	.Notr1
-		mfsprg3	r8
-		add	r7,r8,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mtsprg3	r7
-		b	.GotAmigaMemAd
-		
-.Notr1:		cmpwi	r8,2
-		bne	.Notr2
-		add	r7,r2,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r2,r7
-		b	.GotAmigaMemAd
-		
-.Notr2:		cmpwi	r8,3
-		bne	.Notr3
-		add	r7,r3,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r3,r7
-		b	.GotAmigaMemAd
-		
-.Notr3:		cmpwi	r8,4
-		bne	.Notr4
-		add	r7,r4,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r4,r7
-		b	.GotAmigaMemAd
-		
-.Notr4:		cmpwi	r8,5
-		bne	.Notr5
-		add	r7,r5,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r5,r7
-		b	.GotAmigaMemAd
-		
-.Notr5:		cmpwi	r8,6
-		bne	.Notr6
-		mfsprg1	r8
-		add	r7,r8,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mtsprg1	r7
-		b	.GotAmigaMemAd
-		
-.Notr6:		cmpwi	r8,7
-		bne	.Notr7
-		mfsprg2	r8
-		add	r7,r8,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mtsprg2	r7
-		b	.GotAmigaMemAd
-		
-.Notr7:		cmpwi	r8,8
-		bne	.Notr8
-		lwz	r8,0(r1)
-		add	r7,r8,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		stw	r7,0(r1)
-		b	.GotAmigaMemAd
-		
-.Notr8:		cmpwi	r8,9
-		bne	.Notr9
-		add	r7,r9,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r9,r7
-		b	.GotAmigaMemAd
-		
-.Notr9:		cmpwi	r8,10
-		bne	.Notr10
-		add	r7,r10,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r10,r7
-		b	.GotAmigaMemAd
-		
-.Notr10:	cmpwi	r8,11
-		bne	.Notr11
-		add	r7,r11,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r11,r7
-		b	.GotAmigaMemAd
-		
-.Notr11:	cmpwi	r8,12
-		bne	.Notr12
-		add	r7,r12,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r12,r7
-		b	.GotAmigaMemAd
-		
-.Notr12:	cmpwi	r8,13
-		bne	.Notr13
-		add	r7,r13,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r13,r7
-		b	.GotAmigaMemAd
-		
-.Notr13:	cmpwi	r8,14
-		bne	.Notr14
-		add	r7,r14,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r14,r7
-		b	.GotAmigaMemAd
-		
-.Notr14:	cmpwi	r8,15
-		bne	.Notr15
-		add	r7,r15,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r15,r7
-		b	.GotAmigaMemAd
-		
-.Notr15:	cmpwi	r8,16
-		bne	.Notr16
-		add	r7,r16,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r16,r7
-		b	.GotAmigaMemAd
-		
-.Notr16:	cmpwi	r8,17
-		bne	.Notr17
-		add	r7,r17,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r17,r7
-		b	.GotAmigaMemAd
-		
-.Notr17:	cmpwi	r8,18
-		bne	.Notr18
-		add	r7,r18,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r18,r7
-		b	.GotAmigaMemAd
-		
-.Notr18:	cmpwi	r8,19
-		bne	.Notr19
-		add	r7,r19,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r19,r7
-		b	.GotAmigaMemAd
-		
-.Notr19:	cmpwi	r8,20
-		bne	.Notr20
-		add	r7,r20,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r20,r7
-		b	.GotAmigaMemAd
-		
-.Notr20:	cmpwi	r8,21
-		bne	.Notr21
-		add	r7,r21,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r21,r7
-		b	.GotAmigaMemAd
-		
-.Notr21:	cmpwi	r8,22
-		bne	.Notr22
-		add	r7,r22,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r22,r7
-		b	.GotAmigaMemAd
-		
-.Notr22:	cmpwi	r8,23
-		bne	.Notr23
-		add	r7,r23,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r23,r7
-		b	.GotAmigaMemAd
-		
-.Notr23:	cmpwi	r8,24
-		bne	.Notr24
-		add	r7,r24,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r24,r7
-		b	.GotAmigaMemAd
-		
-.Notr24:	cmpwi	r8,25
-		bne	.Notr25
-		add	r7,r25,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r25,r7
-		b	.GotAmigaMemAd
-		
-.Notr25:	cmpwi	r8,26
-		bne	.Notr26
-		add	r7,r26,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r26,r7
-		b	.GotAmigaMemAd
-		
-.Notr26:	cmpwi	r8,27
-		bne	.Notr27
-		add	r7,r27,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r27,r7
-		b	.GotAmigaMemAd
-		
-.Notr27:	cmpwi	r8,28
-		bne	.Notr28
-		add	r7,r28,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r28,r7
-		b	.GotAmigaMemAd
-		
-.Notr28:	cmpwi	r8,29
-		bne	.Notr29
-		add	r7,r29,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r29,r7
-		b	.GotAmigaMemAd
-		
-.Notr29:	cmpwi	r8,30
-		bne	.Notr30
-		add	r7,r30,r7
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r30,r7
-		b	.GotAmigaMemAd
-		
-.Notr30:	cmpwi	r8,31
-		bne	.HaltDSI
-		add	r7,r31,r7				#Should not happen
-		mr.	r6,r6
-		beq	.GotAmigaMemAd
-		mr	r31,r7
-
-.GotAmigaMemAd:	mfsrr0	r8
-		lwz	r8,0(r8)
-		mr	r6,r0
-		rlwinm	r0,r8,0,25,5
-		loadreg	r8,0x7c00002e				#check for stbx/sthx/stwx
-		cmpw	r0,r8
-		bne	.Nostxx
-
-		mfsrr0	r8
-		lwz	r8,0(r8)
-		rlwinm	r0,r8,25,29,31
+		mr.	r29,r29				#Normal store or with index?
+		beq	.NoStxx
+	
+		rlwinm	r0,r31,25,29,31			#Indexed store
 		cmpwi	r0,6
 		beq	.StoreHalf
 		cmpwi	r0,3
 		beq	.StoreByte
 		cmpwi	r0,2
 		beq	.StoreWord
-
-		b	.NoClutch				#Not Supported
-
-.Nostxx:	mfsrr0	r8
-		lwz	r8,0(r8)			
-		mr	r6,r0
-		rlwinm.	r0,r8,4,31,31				#Check load or store		
-		beq	.LoadInstr
-	
-		rlwinm.	r0,r8,3,31,31
+		b	.NotSupported			#Not Supported
+		
+.NoStxx:	rlwinm.	r0,r31,3,31,31			#Normal store
 		bne	.StoreHalf
-		rlwinm. r0,r8,5,31,31
+		rlwinm. r0,r31,5,31,31
 		bne	.StoreByte
-.StoreWord:	loadreg	r8,"PUTW"
+.StoreWord:	loadreg	r9,"PUTW"
 		b	.DoStore
-.StoreHalf:	loadreg	r8,"PUTH"
+.StoreHalf:	loadreg	r9,"PUTH"
 		b	.DoStore
-.StoreByte:	loadreg	r8,"PUTB"
+.StoreByte:	loadreg	r9,"PUTB"
+
+.DoStore:	bl	.DoSixtyEight			#Send message to 68K
 		
-.DoStore:	mr	r0,r6
-			
-		stwu	r3,-4(r1)
-		stwu	r4,-4(r1)
-		stwu	r23,-4(r1)
-		stwu	r24,-4(r1)
-		stwu	r30,-4(r1)
-		stwu	r31,-4(r1)
-								
-		lis	r3,EUMB
-		li	r24,OFTPR
-		lwbrx	r30,r24,r3			
-		addi	r23,r30,4
-		loadreg	r4,0xc000
-		or	r23,r23,r4
-		loadreg r4,0xffff
-		and	r23,r23,r4			#Keep it C000-FFFE		
-		stwbrx	r23,r24,r3
-		lwz	r30,0(r30)
+		b	.DoneDSI			#We're done
 
-		stw	r8,MN_IDENTIFIER(r30)
-		stw	r0,MN_IDENTIFIER+4(r30)		#AmigaValue
-		stw	r7,MN_IDENTIFIER+8(r30)		#AmigaAddress
+.GoLoad:	loadreg	r9,"GETV"
+
+		bl	.DoSixtyEight			#Returns value in r10
 		
-		lwz	r4,MCTask(r0)
-		la	r4,pr_MsgPort(r4)
-		stw	r4,MN_MCTASK(r30)
-		li	r4,NT_MESSAGE
-		stb	r4,LN_TYPE(r30)
-		li	r4,192
-		sth	r4,MN_LENGTH(r30)
-
-		sync
-
-		lis	r3,EUMB
-		li	r24,OPHPR
-		lwbrx	r31,r24,r3		
-		stw	r30,0(r31)		
-		addi	r23,r31,4
-		loadreg	r4,0xbfff
-		and	r23,r23,r4			#Keep it 8000-BFFE
-		stwbrx	r23,r24,r3			#triggers Interrupt
-
-		loadreg	r8,"DONE"
-.WaitPFIFO:	lwz	r7,MN_IDENTIFIER(r30)
-		cmpw	r7,r8
-		bne	.WaitPFIFO
-
-		lwz	r31,0(r1)
-		lwz	r30,4(r1)
-		lwz	r24,8(r1)
-		lwz	r23,12(r1)
-		lwz	r4,16(r1)
-		lwz	r3,20(r1)
-		addi	r1,r1,24
-
-		b	.GotAmigaValue
-								
-.LoadInstr:	mfsrr0	r8
-		lwz	r8,0(r8)
-		rlwinm	r0,r8,11,27,31			#Get Destination Reg (l) or Source (s)
-		loadreg	r8,"GETV"
-		
-		stwu	r3,-4(r1)
-		stwu	r4,-4(r1)
-		stwu	r23,-4(r1)
-		stwu	r24,-4(r1)
-		stwu	r30,-4(r1)
-		stwu	r31,-4(r1)
-								
-		lis	r3,EUMB
-		li	r24,OFTPR
-		lwbrx	r30,r24,r3			
-		addi	r23,r30,4
-		loadreg	r4,0xc000
-		or	r23,r23,r4
-		loadreg r4,0xffff
-		and	r23,r23,r4			#Keep it C000-FFFE		
-		stwbrx	r23,r24,r3
-		lwz	r30,0(r30)
-
-		stw	r8,MN_IDENTIFIER(r30)
-		stw	r7,MN_IDENTIFIER+8(r30)		#AmigaAddress
-
-		lwz	r4,MCTask(r0)
-		la	r4,pr_MsgPort(r4)
-		stw	r4,MN_MCTASK(r30)
-		li	r4,NT_MESSAGE
-		stb	r4,LN_TYPE(r30)
-		li	r4,192
-		sth	r4,MN_LENGTH(r30)
-
-		sync
-
-		lis	r3,EUMB
-		li	r24,OPHPR
-		lwbrx	r31,r24,r3		
-		stw	r30,0(r31)		
-		addi	r23,r31,4
-		loadreg	r4,0xbfff
-		and	r23,r23,r4			#Keep it 8000-BFFE
-		stwbrx	r23,r24,r3			#triggers Interrupt
-		
-		loadreg	r8,"DONE"		
-.WaitGFIFO:	lwz	r7,MN_IDENTIFIER(r30)
-		cmpw	r7,r8
-		bne	.WaitGFIFO
-		
-		lwz	r8,MN_IDENTIFIER+4(r30)
-		
-		lwz	r31,0(r1)
-		lwz	r30,4(r1)
-		lwz	r24,8(r1)
-		lwz	r23,12(r1)
-		lwz	r4,16(r1)
-		lwz	r3,20(r1)
-		addi	r1,r1,24		
-		
-		mfsrr0	r6
-		lwz	r6,0(r6)
-		rlwinm	r6,r6,16,16,31
-		andi.	r6,r6,0xa800
-		oris	r6,r6,0xffff
-		cmpwi	r6,-32768				#lwz/lwzu 0x8000
+		rlwinm	r9,r31,16,16,31
+		andi.	r9,r9,0xa800
+		oris	r9,r9,0xffff
+		cmpwi	r9,-32768			#lwz/lwzu 0x8000
 		beq	.FixedValue
-		rlwinm	r8,r8,16,16,31
-		cmpwi	r6,-24576				#lhz/lhzu 0xa000
+		rlwinm	r10,r10,16,16,31
+		cmpwi	r9,-24576			#lhz/lhzu 0xa000
 		beq	.FixedValue
-		extsh	r8,r8
-		cmpwi	r6,-22528				#lha/lhau 0xa800
+		extsh	r10,r10
+		cmpwi	r9,-22528			#lha/lhau 0xa800
 		beq	.FixedValue
-		rlwinm	r8,r8,24,24,31
-		cmpwi	r6,-30720				#lbz/lbzu
-		bne	.HaltDSI				#Should not happen
-		
-.FixedValue:	mr	r6,r0
+		rlwinm	r10,r10,24,24,31
+		cmpwi	r9,-30720			#lbz/lbzu
+		bne	.NotSupported			#Not Supported
 
-		cmpwi	r6,0
-		bne	.NotDr0
-		mtsprg0	r8
-		b	.GotAmigaValue
+.FixedValue:	stwx	r10,r30,r6			#Store gotten value in correct register
 		
-.NotDr0:	cmpwi	r6,1
-		bne	.NotDr1
-		mtsprg3	r8
-		b	.GotAmigaValue
-		
-.NotDr1:	cmpwi	r6,2
-		bne	.NotDr2
-		mr	r2,r8
-		b	.GotAmigaValue
-		
-.NotDr2:	cmpwi	r6,3
-		bne	.NotDr3
-		mr	r3,r8
-		b	.GotAmigaValue
-		
-.NotDr3:	cmpwi	r6,4
-		bne	.NotDr4
-		mr	r4,r8
-		b	.GotAmigaValue		
-
-.NotDr4:	cmpwi	r6,5
-		bne	.NotDr5
-		mr	r5,r8
-		b	.GotAmigaValue
-		
-.NotDr5:	cmpwi	r6,6
-		bne	.NotDr6
-		mtsprg1	r8
-		b	.GotAmigaValue
-		
-.NotDr6:	cmpwi	r6,7
-		bne	.NotDr7
-		mtsprg2	r8
-		b	.GotAmigaValue
-		
-.NotDr7:	cmpwi	r6,8
-		bne	.NotDr8
-		stw	r8,0(r1)
-		b	.GotAmigaValue
-		
-.NotDr8:	cmpwi	r6,9
-		bne	.NotDr9
-		mr	r9,r8
-		b	.GotAmigaValue
-		
-.NotDr9:	cmpwi	r6,10
-		bne	.NotDr10
-		mr	r10,r8
-		b	.GotAmigaValue
-		
-.NotDr10:	cmpwi	r6,11
-		bne	.NotDr11
-		mr	r11,r8
-		b	.GotAmigaValue
-		
-.NotDr11:	cmpwi	r6,12
-		bne	.NotDr12
-		mr	r12,r8
-		b	.GotAmigaValue		
-
-.NotDr12:	cmpwi	r6,13
-		bne	.NotDr13
-		mr	r13,r8
-		b	.GotAmigaValue
-		
-.NotDr13:	cmpwi	r6,14
-		bne	.NotDr14
-		mr	r14,r8
-		b	.GotAmigaValue
-		
-.NotDr14:	cmpwi	r6,15
-		bne	.NotDr15
-		mr	r15,r8
-		b	.GotAmigaValue
-		
-.NotDr15:	cmpwi	r6,16
-		bne	.NotDr16
-		mr	r16,r8
-		b	.GotAmigaValue		
-
-.NotDr16:	cmpwi	r6,17
-		bne	.NotDr17
-		mr	r17,r8
-		b	.GotAmigaValue
-		
-.NotDr17:	cmpwi	r6,18
-		bne	.NotDr18
-		mr	r18,r8
-		b	.GotAmigaValue
-		
-.NotDr18:	cmpwi	r6,19
-		bne	.NotDr19
-		mr	r19,r8
-		b	.GotAmigaValue
-		
-.NotDr19:	cmpwi	r6,20
-		bne	.NotDr20
-		mr	r20,r8
-		b	.GotAmigaValue		
-
-.NotDr20:	cmpwi	r6,21
-		bne	.NotDr21
-		mr	r21,r8
-		b	.GotAmigaValue
-		
-.NotDr21:	cmpwi	r6,22
-		bne	.NotDr22
-		mr	r22,r8
-		b	.GotAmigaValue
-		
-.NotDr22:	cmpwi	r6,23
-		bne	.NotDr23
-		mr	r23,r8
-		b	.GotAmigaValue
-		
-.NotDr23:	cmpwi	r6,24
-		bne	.NotDr24
-		mr	r24,r8
-		b	.GotAmigaValue
-		
-.NotDr24:	cmpwi	r6,25
-		bne	.NotDr25
-		mr	r25,r8
-		b	.GotAmigaValue
-		
-.NotDr25:	cmpwi	r6,26
-		bne	.NotDr26
-		mr	r26,r8
-		b	.GotAmigaValue
-		
-.NotDr26:	cmpwi	r6,27
-		bne	.NotDr27
-		mr	r26,r7
-		b	.GotAmigaValue
-		
-.NotDr27:	cmpwi	r6,28
-		bne	.NotDr28
-		mr	r28,r8
-		b	.GotAmigaValue		
-
-.NotDr28:	cmpwi	r6,29
-		bne	.NotDr29
-		mr	r29,r8
-		b	.GotAmigaValue
-		
-.NotDr29:	cmpwi	r6,30
-		bne	.NotDr30
-		mr	r30,r8
-		b	.GotAmigaValue
-		
-.NotDr30:	cmpwi	r6,31
-		bne	.HaltDSI			#Should not happen
-		mr	r31,r8
-
-.GotAmigaValue:	b	.Clutch
-			
-							
-.NoLoadStore:	nop
-		b	.NoClutch
-		
-.Clutch:	mfsrr0	r7
+.DoneDSI:	mfsrr0	r7				#Skip offending instruction
 		addi	r7,r7,4
 		mtsrr0	r7
 		
-.ClutchNoStep:	mfspr	r7,HID0
+.DSINoStep:	mfspr	r7,HID0				#Invalidate Inst Cache (needed?)
 		ori	r7,r7,HID0_ICFI
 		mtspr	HID0,r7
 		isync		
 		
-		loadreg	r7,"USER"
+		loadreg	r7,"USER"			#Return to user
 		stw	r7,0xf4(r0)
-		
-		lwz	r8,0(r1)
+
+		lwz	r31,0(r1)			#Load registers with correct values
+		mtsprg0	r31
+		lwz	r31,4(r1)
+		mtsprg1	r31
+		lwz	r2,8(r1)
+		lwz	r3,12(r1)
+		lwz	r4,16(r1)
+		lwz	r5,20(r1)
+		lwz	r6,24(r1)
+		lwz	r7,28(r1)
+		lwz	r8,32(r1)
+		lwz	r9,36(r1)
+		lwz	r10,40(r1)
+		lwz	r11,44(r1)
+		lwz	r12,48(r1)
+		lwz	r13,52(r1)
+		lwz	r14,56(r1)
+		lwz	r15,60(r1)
+		lwz	r16,64(r1)
+		lwz	r17,68(r1)
+		lwz	r18,72(r1)
+		lwz	r19,76(r1)
+		lwz	r20,80(r1)
+		lwz	r21,84(r1)
+		lwz	r22,88(r1)
+		lwz	r23,92(r1)
+		lwz	r24,96(r1)
+		lwz	r25,100(r1)
+		lwz	r26,104(r1)
+		lwz	r27,108(r1)
+		lwz	r28,112(r1)
+		lwz	r29,116(r1)
+		lwz	r30,120(r1)
+		lwz	r31,124(r1)
+		lwz	r0,132(r1)
+		mtcr	r0
+		lwz	r0,136(r1)
+		mtlr	r0
+		mfsprg1	r1
 		mfsprg0	r0
-		mfsprg1 r6
-		mfsprg2	r7
-		mfsprg3	r1
-		
 		rfi
 
-.NoClutch:	mfspr	r0,HID0
+.NotSupported:	mfspr	r0,HID0
 		ori	r0,r0,HID0_DCE
 		xori	r0,r0,HID0_DCE
 		sync	
@@ -4167,6 +3533,51 @@ EInt:		b	.FPUnav				#0
 		isync
 		
 .HaltDSI:	b	.HaltDSI
+
+#*************************************************
+
+.DoSixtyEight:	lis	r28,EUMB
+		li	r24,OFTPR
+		lwbrx	r25,r24,r28			
+		addi	r23,r25,4
+		loadreg	r20,0xc000
+		or	r23,r23,r20
+		loadreg r20,0xffff
+		and	r23,r23,r20			#Keep it C000-FFFE		
+		stwbrx	r23,r24,r28
+		lwz	r25,0(r25)
+
+		stw	r9,MN_IDENTIFIER(r25)
+		stw	r2,MN_IDENTIFIER+4(r25)		#AmigaValue
+		stw	r3,MN_IDENTIFIER+8(r25)		#AmigaAddress
+		
+		lwz	r20,MCTask(r0)
+		la	r20,pr_MsgPort(r20)
+		stw	r20,MN_MCTASK(r25)
+		li	r20,NT_MESSAGE
+		stb	r20,LN_TYPE(r25)
+		li	r20,192
+		sth	r20,MN_LENGTH(r25)
+
+		sync
+
+		lis	r28,EUMB
+		li	r24,OPHPR
+		lwbrx	r22,r24,r28		
+		stw	r25,0(r22)		
+		addi	r23,r22,4
+		loadreg	r20,0xbfff
+		and	r23,r23,r20			#Keep it 8000-BFFE
+		stwbrx	r23,r24,r28			#triggers Interrupt
+
+		loadreg	r9,"DONE"
+.WaitPFIFO:	lwz	r21,MN_IDENTIFIER(r25)
+		cmpw	r21,r9
+		bne	.WaitPFIFO
+		
+		lwz	r10,MN_IDENTIFIER+4(r25)	#Returned value for load in r10
+		
+		blr
 
 #********************************************************************************************
 
