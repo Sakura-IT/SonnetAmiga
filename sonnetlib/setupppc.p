@@ -865,7 +865,7 @@ mmuSetup:
 		
 		bl	.DoTBLs						
 		
-		li	r3,0x3000			#Exception code (16K cached)
+		li	r3,0x1000			#Exception code (16K cached)
 		li	r4,0x7000
 		mr	r5,r3
 		li	r6,r0
