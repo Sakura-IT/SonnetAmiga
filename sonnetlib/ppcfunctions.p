@@ -903,12 +903,12 @@ AllocVec68K:	prolog 228,"TOC"
 
 #********************************************************************************************
 #
-#	Support: Result = FreeVec68K(MemBlock)	// r3=r4
+#	Support: Result = FreeVec68K(MemBlock)	// r3=r4	#This call is asynchronous
 #
 #********************************************************************************************		
 
 FreeVec68K:	prolog 228,"TOC"
-		
+
 		stwu	r31,-4(r13)
 		stwu	r8,-4(r13)
 		stwu	r7,-4(r13)
@@ -919,7 +919,7 @@ FreeVec68K:	prolog 228,"TOC"
 		li	r5,_LVOFreeMem
 
 		bl 	Run68KLowLevel
-		
+
 		li	r3,MEMERR_SUCCESS
 
 		lwz	r7,0(r13)
@@ -2729,53 +2729,22 @@ WaitFor68K:
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
 
-		mr	r31,r4	
-
-#		lwz	r30,SysBase(r0)
-#		lwz	r29,0*4(r31)
-#		cmpw	r29,r30
-#		bne	.WasNoMsg
-	
-#		loadreg	r30,0xffffff2e			#Perform FreeVec68K Asynchronous
-#		lwz	r29,1*4(r31)
-#		cmpw	r29,r30
-#		beq	.ASync
+		mr	r31,r4
 
 .WasNoMsg:	lwz	r4,RunningTask(r0)
 		lwz	r4,TASKPPC_MSGPORT(r4)		
-		
+
 		bl WaitPortPPC		
-							
+
 .WasNoDone:	lwz	r4,RunningTask(r0)
 		lwz	r4,TASKPPC_MSGPORT(r4)
-		
+
 		bl GetMsgPPC
-				
+
 		mr.	r30,r3
-		
+
 		beq	.WasNoMsg
-		
-#		lwz	r4,SysBase(r0)
-#		lwz	r29,MN_PPSTRUCT+0*4(r30)
-#		cmpw	r4,r29
-#		bne	.Sync
-	
-#		loadreg	r4,0xffffff2e
-#		lwz	r29,MN_PPSTRUCT+1*4(r30)
-#		cmpw	r4,r29
-#		bne	.Sync
-		
-#		lis	r3,EUMB				#Free the message
-#		li	r27,IFHPR
-#		lwbrx	r29,r27,r3		
-#		stw	r30,0(r29)		
-#		addi	r28,r29,4
-#		loadreg	r29,0x3fff			#ffff3fff?
-#		and	r28,r28,r29			#Keep it 0000-3FFE
-#		stwbrx	r28,r27,r3
-#		sync
-#		b	.WasNoDone
-		
+
 .Sync:		loadreg	r4,"DONE"
 		lwz	r29,MN_IDENTIFIER(r30)
 		cmpw	r4,r29
@@ -2791,6 +2760,10 @@ WaitFor68K:
 		bdnz+	.CopyPPB
 
 		lwz	r4,MN_PPSTRUCT+6*4(r30)		#return d0 for Run68KLowLevel
+		mr	r29,r4
+
+		bl Super
+		mr	r4,r3
 
 		lis	r3,EUMB				#Free the message
 		li	r27,IFHPR
@@ -2801,6 +2774,10 @@ WaitFor68K:
 		and	r28,r28,r31			#Keep it 0000-3FFE
 		stwbrx	r28,r27,r3
 		sync
+
+		bl User
+		
+		mr	r4,r29		
 
 		mtctr	r26
 
@@ -2842,7 +2819,10 @@ Run68K:
 .NoDebug03:	mr	r31,r4
 		
 		mfctr	r25
-			
+
+		bl Super
+		mr	r5,r3
+
 		lis	r3,EUMB
 		li	r24,OFTPR
 		lwbrx	r30,r24,r3			
@@ -2853,6 +2833,9 @@ Run68K:
 		and	r23,r23,r4			#Keep it C000-FFFE		
 		stwbrx	r23,r24,r3
 		lwz	r30,0(r30)			
+			
+		mr	r4,r5
+		bl User
 			
 		subi	r5,r30,4		
 		li	r6,48
@@ -2893,6 +2876,9 @@ Run68K:
 		
 		mr	r29,r31
 		
+		bl Super
+		mr	r5,r3
+		
 		lis	r3,EUMB
 		li	r24,OPHPR
 		lwbrx	r31,r24,r3		
@@ -2901,6 +2887,9 @@ Run68K:
 		loadreg	r4,0xbfff			#ffffbfff?
 		and	r23,r23,r4			#Keep it 8000-BFFE
 		stwbrx	r23,r24,r3			#triggers Interrupt
+
+		mr	r4,r5
+		bl User
 
 		mr	r4,r29
 
@@ -6484,6 +6473,9 @@ Run68KLowLevel:
 		mr	r25,r9
 		mfctr	r22
 
+		bl Super
+		mr	r5,r3
+
 		lis	r3,EUMB
 		li	r24,OFTPR
 		lwbrx	r30,r24,r3			
@@ -6494,6 +6486,9 @@ Run68KLowLevel:
 		and	r23,r23,r4				#Keep it C000-FFFE		
 		stwbrx	r23,r24,r3
 		lwz	r30,0(r30)
+
+		mr	r4,r5
+		bl User
 
 		subi	r5,r30,4
 				
@@ -6523,6 +6518,9 @@ Run68KLowLevel:
 				
 		sync
 		
+		bl Super
+		mr	r25,r3
+		
 		lis	r3,EUMB
 		li	r24,OPHPR
 		lwbrx	r31,r24,r3		
@@ -6531,6 +6529,9 @@ Run68KLowLevel:
 		loadreg	r4,0xbfff				#ffffbfff?
 		and	r23,r23,r4				#Keep it 8000-BFFE		
 		stwbrx	r23,r24,r3				#triggers Interrupt
+
+		mr	r4,r25
+		bl User
 
 		subi	r4,r30,MN_PPSTRUCT
 

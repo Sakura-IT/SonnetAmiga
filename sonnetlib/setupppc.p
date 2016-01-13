@@ -123,7 +123,12 @@ Start:		loadreg	r0,"REDY"			#Dummy entry at absolute 0x7400
 	
 StartCode:	blrl
 
-ExitCode:	lis	r7,EUMB					#Get Msg Frame for 
+ExitCode:	mr	r14,r4
+		mr	r15,r3
+		LIBCALLPOWERPC Super
+		mr	r12,r3
+
+		lis	r7,EUMB					#Get Msg Frame for 
 		li	r8,OFTPR				#communication with 68K
 		lwbrx	r9,r8,r7			
 		addi	r10,r9,4		
@@ -132,9 +137,14 @@ ExitCode:	lis	r7,EUMB					#Get Msg Frame for
 		loadreg r11,0xffff				#0xfffeffff?
 		and	r10,r10,r11				#Keep it C000-FFFE		
 		stwbrx	r10,r8,r7
+		lwz	r9,0(r9)
 		sync
 		
-		lwz	r9,0(r9)				
+		mr	r4,r12		
+		LIBCALLPOWERPC User		
+		mr	r4,r14
+		mr	r3,r15
+
 		subi	r10,r9,4		
 		li	r11,48
 		li	r7,0
@@ -185,6 +195,9 @@ ExitCode:	lis	r7,EUMB					#Get Msg Frame for
 		subi	r4,r4,1024
 		stw	r4,MN_ARG0(r9)
 
+		LIBCALLPOWERPC Super
+		mr	r5,r3
+
 		lis	r3,EUMB					#Send Msg to 68K
 		li	r24,OPHPR
 		lwbrx	r31,r24,r3		
@@ -212,6 +225,9 @@ ExitCode:	lis	r7,EUMB					#Get Msg Frame for
 		and	r23,r23,r4				#Keep it 0000-3FFE
 		stwbrx	r23,r24,r3
 		sync
+
+		mr	r4,r5
+		LIBCALLPOWERPC User
 
 		li	r7,TS_REMOVED
 		lwz	r9,RunningTask(r0)
@@ -841,8 +857,8 @@ mmuSetup:
 		
 		bl	.DoTBLs		
 		
-.NoATI:		li	r3,0				#Zeropage (12K no cache)
-		li	r4,0x3000
+.NoATI:		li	r3,0				#Zeropage (4K no cache)
+		li	r4,0x1000
 		mr	r5,r3
 		loadreg	r6,PTE_CACHE_INHIBITED
 		li	r7,2				#pp = 2 - Read/Write Access
@@ -853,16 +869,16 @@ mmuSetup:
 		li	r4,0x7000
 		mr	r5,r3
 		li	r6,r0
-		li	r7,2
-		
+		li	r7,0				#pp = 0 - Supervisor access only.
+							#Otherwise DSI/ISI (e.g. CHIP access)
 		bl	.DoTBLs
 		
 		loadreg	r3,0x100000			#Message FIFOs (64k no cache)
 		loadreg	r4,0x110000
 		mr	r5,r3
 		li	r6,PTE_CACHE_INHIBITED
-		li	r7,2
-		
+		li	r7,0				#pp = 0 - Supervisor access only.
+							#Otherwise DSI/ISI (e.g. CHIP access)
 		bl	.DoTBLs
 		
 		loadreg	r3,0x110000			#Message (1.5MB no cache)
@@ -972,7 +988,7 @@ mmuSetup:
 		rlwinm	r3,r8,4,28,31			#get 4 MSBs
 		rlwinm	r4,r9,4,28,31
 
-		lis	r8,0x6000			#set ks and kp
+		lis	r8,0x2000			#set ks and kp (0x6000 = 11; 0x4000 = 10 etc.)
 .srx_set:	or	r5,r3,r8
 
 		rlwinm	r13,r3,28,0,4
@@ -3308,10 +3324,10 @@ EInt:		b	.FPUnav				#0
 
 #********************************************************************************************
 
-.DSI:		mtsprg0	r0				#Still need to fix CHIP access
-		mtsprg1	r1				#Between 4000-7000 (using Supervisor mode)
-		mfmsr	r0				#And 100000-200000 (moving FIFO)
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#And Zorro2 space 200000-290000 (moving FIFO)
+.DSI:		mtsprg0	r0
+		mtsprg1	r1				
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU & FPU
 		sync
 		isync
@@ -3389,7 +3405,7 @@ EInt:		b	.FPUnav				#0
 		cmpw	r6,r8
 		bne	.NotSupported
 		
-		b	.DoneDSI			#See fixes still to be done at top DSI code
+		b	.DoneDSI			#Payback crashes when enabled...
 		
 		li	r29,1
 		rlwinm	r6,r31,13,25,29			#Source reg

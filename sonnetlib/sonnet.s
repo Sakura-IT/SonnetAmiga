@@ -513,6 +513,8 @@ GetLoop		move.l d6,a0
 		beq MsgF68k
 		cmp.l #"LL68",d0
 		beq MsgLL68
+		cmp.l #"FREE",d0
+		beq MsgFree
 		cmp.l #"GETV",d0
 		beq LoadD
 		and.l #$ffffff00,d0
@@ -610,6 +612,22 @@ RtnLL		move.l (a7)+,a1
 
 		move.l 4.w,a6
 		bra ReUse
+
+MsgFree		move.l MN_PPSTRUCT+0*4(a1),a6		;Asynchronous FreeMem call from the PPC.
+		move.l MN_PPSTRUCT+1*4(a1),a0
+		add.l a6,a0
+		move.l a1,-(a7)
+		pea RtnFree(pc)
+		move.l a0,-(a7)	
+		move.l MN_PPSTRUCT+4*4(a1),d0
+		move.l MN_PPSTRUCT+3*4(a1),a1
+		rts
+
+RtnFree		move.l (a7)+,a1
+		move.l EUMBAddr(pc),a2
+		move.l a1,OFQPR(a2)			;Return Message Frame
+		move.l 4.w,a6
+		bra NextMsg
 
 PushMsg		moveq.l #11,d4
 		move.l a1,a2
