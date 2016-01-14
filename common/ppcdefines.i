@@ -64,7 +64,7 @@
 .set L2Size,224
 .set AlignStore,228
 
-.set EmuBuff,0x2f80
+.set EmuBuff,0xf80
 
 #LibBase:
 
