@@ -2090,7 +2090,7 @@ EInt:		b	.FPUnav				#0
 		lfd	f8,PP_FREGS+7*8(r8)
 		lwz	r9,PP_OFFSET(r8)
 		
-		mr	r7,r8
+		mr	r17,r8
 		lwz	r8,PP_CODE(r8)
 		add	r8,r8,r9
 		mr.	r9,r9					#Check if it is a PPC library
@@ -2110,6 +2110,7 @@ EInt:		b	.FPUnav				#0
 		isync
 		
 .NoBreak:	li	r0,0
+		mr	r7,r0
 		mr	r8,r0
 		mr	r9,r0
 		mr	r10,r0
@@ -2117,15 +2118,13 @@ EInt:		b	.FPUnav				#0
 		mr	r12,r0
 		mr	r14,r0
 		mr	r15,r0
-		mr	r16,r0
-		mr	r17,r0
 		mr	r18,r0
 		mr	r19,r0
 		mr	r20,r0
 		mr	r21,r0
 		
-		lwz	r17,PP_FLAGS(r7)
-		rlwinm.	r17,r17,(32-PPB_LINEAR),31,31
+		lwz	r16,PP_FLAGS(r17)
+		rlwinm.	r16,r16,(32-PPB_LINEAR),31,31
 		beq	.NotLinear
 
 		mr	r5,r22
@@ -2148,15 +2147,15 @@ EInt:		b	.FPUnav				#0
 
 		li	r0,0
 		
-		lwz	r17,PP_FLAGS(r7)
-		rlwinm.	r17,r17,(32-PPB_THROW),31,31
+		lwz	r16,PP_FLAGS(r17)
+		rlwinm.	r16,r16,(32-PPB_THROW),31,31
 		beq	.NoThrow
 		
-		mfsrr0	r7
-		subi	r7,r7,4					#Set start on a TRAP instruction
-		mtsrr0	r7
+		mfsrr0	r16
+		subi	r16,r16,4				#Set start on a TRAP instruction
+		mtsrr0	r16
 
-.NoThrow:	mr	r7,r0
+.NoThrow:	mr	r16,r0
 		mr	r17,r0
 		stb	r0,ExceptionMode(r0)
 		stb	r0,PortInUse(r0)
