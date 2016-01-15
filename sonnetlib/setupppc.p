@@ -123,7 +123,20 @@ Start:		loadreg	r0,"REDY"			#Dummy entry at absolute 0x7400
 	
 StartCode:	blrl
 
-ExitCode:	mr	r14,r4
+ExitCode:	lwz	r17,RunningTask(r0)
+		lwz	r17,TASKPPC_STARTMSG(r17)
+		lwz	r17,PP_FLAGS(r17)
+		rlwinm.	r17,r17,(32-PPB_LINEAR),31,31
+		beq	.NotLinear2
+
+		mr	r22,r5
+		mr	r23,r6
+		mr	r24,r7
+		mr	r25,r8
+		mr	r26,r9
+		mr	r27,r10
+
+.NotLinear2:	mr	r14,r4
 		mr	r15,r3
 		LIBCALLPOWERPC Super
 		mr	r12,r3
@@ -178,14 +191,14 @@ ExitCode:	mr	r14,r4
 		stw	r29,PP_REGS+11*4(r9)
 		stw	r30,PP_REGS+13*4(r9)
 		stw	r31,PP_REGS+14*4(r9)		
-		stfd	f0,PP_FREGS+0*8(r9)
-		stfd	f1,PP_FREGS+1*8(r9)
-		stfd	f2,PP_FREGS+2*8(r9)
-		stfd	f3,PP_FREGS+3*8(r9)
-		stfd	f4,PP_FREGS+4*8(r9)
-		stfd	f5,PP_FREGS+5*8(r9)
-		stfd	f6,PP_FREGS+6*8(r9)
-		stfd	f7,PP_FREGS+7*8(r9)
+		stfd	f1,PP_FREGS+0*8(r9)
+		stfd	f2,PP_FREGS+1*8(r9)
+		stfd	f3,PP_FREGS+2*8(r9)
+		stfd	f4,PP_FREGS+3*8(r9)
+		stfd	f5,PP_FREGS+4*8(r9)
+		stfd	f6,PP_FREGS+5*8(r9)
+		stfd	f7,PP_FREGS+6*8(r9)
+		stfd	f8,PP_FREGS+7*8(r9)
 		lwz	r8,MCTask(r0)
 		la	r4,pr_MsgPort(r8)		
 		stw	r4,MN_MCTASK(r9)
@@ -2067,14 +2080,14 @@ EInt:		b	.FPUnav				#0
 		lwz	r29,PP_REGS+11*4(r8)
 		lwz	r30,PP_REGS+13*4(r8)
 		lwz	r31,PP_REGS+14*4(r8)
-		lfd	f0,PP_FREGS+0*8(r8)
-		lfd	f1,PP_FREGS+1*8(r8)
-		lfd	f2,PP_FREGS+2*8(r8)
-		lfd	f3,PP_FREGS+3*8(r8)
-		lfd	f4,PP_FREGS+4*8(r8)
-		lfd	f5,PP_FREGS+5*8(r8)
-		lfd	f6,PP_FREGS+6*8(r8)
-		lfd	f7,PP_FREGS+7*8(r8)
+		lfd	f1,PP_FREGS+0*8(r8)
+		lfd	f2,PP_FREGS+1*8(r8)
+		lfd	f3,PP_FREGS+2*8(r8)
+		lfd	f4,PP_FREGS+3*8(r8)
+		lfd	f5,PP_FREGS+4*8(r8)
+		lfd	f6,PP_FREGS+5*8(r8)
+		lfd	f7,PP_FREGS+6*8(r8)
+		lfd	f8,PP_FREGS+7*8(r8)
 		lwz	r9,PP_OFFSET(r8)
 		
 		mr	r7,r8
@@ -2111,7 +2124,18 @@ EInt:		b	.FPUnav				#0
 		mr	r20,r0
 		mr	r21,r0
 		
-		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
+		lwz	r17,PP_FLAGS(r7)
+		rlwinm.	r17,r17,(32-PPB_LINEAR),31,31
+		beq	.NotLinear
+
+		mr	r5,r22
+		mr	r6,r23
+		mr	r7,r24
+		mr	r8,r25
+		mr	r9,r26
+		mr	r10,r27
+		
+.NotLinear:	loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
 		mtsrr1	r0		
 		mfsprg0	r0
 		mtsrr0	r0
@@ -2124,8 +2148,8 @@ EInt:		b	.FPUnav				#0
 
 		li	r0,0
 		
-		lwz	r7,PP_FLAGS(r7)
-		rlwinm.	r7,r7,(32-PPB_THROW),31,31
+		lwz	r17,PP_FLAGS(r7)
+		rlwinm.	r17,r17,(32-PPB_THROW),31,31
 		beq	.NoThrow
 		
 		mfsrr0	r7
@@ -2133,6 +2157,7 @@ EInt:		b	.FPUnav				#0
 		mtsrr0	r7
 
 .NoThrow:	mr	r7,r0
+		mr	r17,r0
 		stb	r0,ExceptionMode(r0)
 		stb	r0,PortInUse(r0)
 
