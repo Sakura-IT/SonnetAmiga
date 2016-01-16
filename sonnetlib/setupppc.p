@@ -3229,9 +3229,79 @@ EInt:		b	.FPUnav				#0
 		
 		mfcr	r0
 		stwu	r0,-4(r1)
-		stwu	r4,-4(r1)
-		stwu	r5,-4(r1)
+		li	r0,0
+		stwu	r0,-4(r1)			#For when rA = 0
+
+		stwu	r31,-4(r1)
+		stwu	r30,-4(r1)
+		stwu	r29,-4(r1)
+		stwu	r28,-4(r1)
+		stwu	r27,-4(r1)
+		stwu	r26,-4(r1)
+		stwu	r25,-4(r1)
+		stwu	r24,-4(r1)
+		stwu	r23,-4(r1)
+		stwu	r22,-4(r1)
+		stwu	r21,-4(r1)
+		stwu	r20,-4(r1)
+		stwu	r19,-4(r1)
+		stwu	r18,-4(r1)
+		stwu	r17,-4(r1)
+		stwu	r16,-4(r1)
+		stwu	r15,-4(r1)
+		stwu	r14,-4(r1)
+		stwu	r13,-4(r1)
+		stwu	r12,-4(r1)
+		stwu	r11,-4(r1)
+		stwu	r10,-4(r1)
+		stwu	r9,-4(r1)
+		stwu	r8,-4(r1)
+		stwu	r7,-4(r1)
 		stwu	r6,-4(r1)
+		stwu	r5,-4(r1)
+		stwu	r4,-4(r1)
+		stwu	r3,-4(r1)
+		stwu	r2,-4(r1)
+		mfsprg1	r30
+		stwu	r30,-4(r1)
+		mfsprg0	r30
+		stwu	r30,-4(r1)
+		mr	r30,r1				#Start of regtable in r30
+		
+		stfdu	f31,-8(r1)
+		stfdu	f30,-8(r1)
+		stfdu	f29,-8(r1)
+		stfdu	f28,-8(r1)
+		stfdu	f27,-8(r1)
+		stfdu	f26,-8(r1)
+		stfdu	f25,-8(r1)
+		stfdu	f24,-8(r1)
+		stfdu	f23,-8(r1)
+		stfdu	f22,-8(r1)
+		stfdu	f21,-8(r1)
+		stfdu	f20,-8(r1)
+		stfdu	f19,-8(r1)
+		stfdu	f18,-8(r1)
+		stfdu	f17,-8(r1)
+		stfdu	f16,-8(r1)
+		stfdu	f15,-8(r1)
+		stfdu	f14,-8(r1)
+		stfdu	f13,-8(r1)
+		stfdu	f12,-8(r1)
+		stfdu	f11,-8(r1)
+		stfdu	f10,-8(r1)
+		stfdu	f9,-8(r1)
+		stfdu	f8,-8(r1)
+		stfdu	f7,-8(r1)
+		stfdu	f6,-8(r1)
+		stfdu	f5,-8(r1)
+		stfdu	f4,-8(r1)
+		stfdu	f3,-8(r1)
+		stfdu	f2,-8(r1)
+		stfdu	f1,-8(r1)
+		stfdu	f0,-8(r1)
+		
+		mr	r31,r1				#Start of fp regtable in r31
 
 		lwz	r5,PowerPCBase(r0)		#For GetHALInfo
 		lwz	r6,AlignmentExcLow(r5)		#Counts number of FPU aligment issues
@@ -3241,14 +3311,17 @@ EInt:		b	.FPUnav				#0
 		addze	r6,r6
 		stw	r6,AlignmentExcHigh(r5)
 
-		li	r4,EmuBuff			#uncached memory
 		mfsrr0	r5
 		lwz	r5,0(r5)
-		rlwinm	r0,r5,6,26,31
-		
-		mfsrr0	r5
-		lwz	r5,0(r5)
-		
+
+		rlwinm	r6,r5,14,24,28			#get floating point register offset
+		rlwinm	r7,r5,18,25,29			#get destination register offset
+		mr.	r7,r7
+		beq	.ItsR0
+		lwzx	r7,r30,r7			#get address from destination register
+.ItsR0:		rlwinm	r8,r5,0,16,31			#get displacement
+
+		rlwinm	r0,r5,6,26,31		
 		cmpwi	r0,0x34				#test for stfs
 		beq	.stfs
 		cmpwi	r0,0x30
@@ -3257,69 +3330,101 @@ EInt:		b	.FPUnav				#0
 		beq	.stfsx
 		b	.HaltIt
 
+.stfs:		lfdx	f1,r31,r6			#get value from fp register
+		stfs	f1,AlignStore(r0)		#store it on correct aligned spot
+		lwz	r6,AlignStore(r0)		#Get the correct 32 bit value
+		stwx	r6,r7,r8			#Store correct value
+		b	.AligExit
+
+.lfs:		lwzx	r9,r7,r8			#Get 32 bit value
+		stw	r9,AlignStore(r0)		#Store it on aligned spot
+		lfs	f1,AlignStore(r0)		#Get it and convert it to 64 bit
+		stfdx	f1,r31,r6			#Store the 64 bit value
+		b	.AligExit
+		
+.stfsx:		rlwinm	r8,r5,23,25,29			#get index register
+		lwzx	r8,r30,r8			#get index register value
+		b	.stfs
+		
 #***********************************************
+						
+.AligExit:	lfdu	f0,0(r1)
+		lfdu	f1,8(r1)
+		lfdu	f2,8(r1)
+		lfdu	f3,8(r1)
+		lfdu	f4,8(r1)
+		lfdu	f5,8(r1)
+		lfdu	f6,8(r1)
+		lfdu	f7,8(r1)
+		lfdu	f8,8(r1)
+		lfdu	f9,8(r1)
+		lfdu	f10,8(r1)
+		lfdu	f11,8(r1)
+		lfdu	f12,8(r1)
+		lfdu	f13,8(r1)
+		lfdu	f14,8(r1)
+		lfdu	f15,8(r1)
+		lfdu	f16,8(r1)
+		lfdu	f17,8(r1)
+		lfdu	f18,8(r1)
+		lfdu	f19,8(r1)
+		lfdu	f20,8(r1)
+		lfdu	f21,8(r1)
+		lfdu	f22,8(r1)
+		lfdu	f23,8(r1)
+		lfdu	f24,8(r1)
+		lfdu	f25,8(r1)
+		lfdu	f26,8(r1)
+		lfdu	f27,8(r1)
+		lfdu	f28,8(r1)
+		lfdu	f29,8(r1)
+		lfdu	f30,8(r1)
+		lfdu	f31,8(r1)
 		
-.stfs:		loadreg	r6,0xd0000000|AlignStore	#first instruction
-		rlwimi	r6,r5,0,6,10
-		stw	r6,0(r4)
-
-		loadreg	r6,0x80000000|AlignStore	#lwz r0,AlignStore(r0)
-		stw	r6,4(r4)
-
-		lis	r6,0x9000			#third instruction
-		rlwimi	r6,r5,0,11,31
-		stw	r6,8(r4)
-		
-.ReUseIt:	loadreg r6,0x7c1042a6			#mfsprg0 r0
-		stw	r6,12(r4)
-		
-		loadreg	r6,0x4c000064			#rfi
-		stw	r6,16(r4)
-		
-		icbi	r0,r4
-		isync
-		sync
-		
-		lwz	r6,0(r1)
-		lwz	r5,4(r1)
-		lwz	r4,8(r1)
-		lwz	r0,12(r1)
+		lwzu	r31,8(r1)			#Load registers with correct values
+		mtsprg0	r31
+		lwzu	r31,4(r1)
+		mtsprg1	r31
+		lwzu	r2,4(r1)
+		lwzu	r3,4(r1)
+		lwzu	r4,4(r1)
+		lwzu	r5,4(r1)
+		lwzu	r6,4(r1)
+		lwzu	r7,4(r1)
+		lwzu	r8,4(r1)
+		lwzu	r9,4(r1)
+		lwzu	r10,4(r1)
+		lwzu	r11,4(r1)
+		lwzu	r12,4(r1)
+		lwzu	r13,4(r1)
+		lwzu	r14,4(r1)
+		lwzu	r15,4(r1)
+		lwzu	r16,4(r1)
+		lwzu	r17,4(r1)
+		lwzu	r18,4(r1)
+		lwzu	r19,4(r1)
+		lwzu	r20,4(r1)
+		lwzu	r21,4(r1)
+		lwzu	r22,4(r1)
+		lwzu	r23,4(r1)
+		lwzu	r24,4(r1)
+		lwzu	r25,4(r1)
+		lwzu	r26,4(r1)
+		lwzu	r27,4(r1)
+		lwzu	r28,4(r1)
+		lwzu	r29,4(r1)
+		lwzu	r30,4(r1)
+		lwzu	r31,4(r1)
+		lwzu	r0,8(r1)
 		mtcr	r0
+		
 		mfsrr0	r1
 		addi	r1,r1,4				#Exit beyond offending instruction
 		mtsrr0	r1
 		mfsprg1	r1
-		ba	EmuBuff
+		mfsprg0	r0
 
-#***********************************************
-
-.lfs:		loadreg	r6,0x80000000			#first instruction
-		rlwimi	r6,r5,0,11,31
-		stw	r6,0(r4)
-		
-		loadreg	r6,0x90000000|AlignStore
-		stw	r6,4(r4)
-		
-		loadreg	r6,0xc0000000|AlignStore	#third instruction
-		rlwimi	r6,r5,0,6,10
-		stw	r6,8(r4)
-		
-		b	.ReUseIt
-
-#***********************************************
-
-.stfsx:		loadreg	r6,0xd0000000|AlignStore	#first instruction
-		rlwimi	r6,r5,0,6,10
-		stw	r6,0(r4)
-
-		loadreg	r6,0x80000000|AlignStore
-		stw	r6,4(r4)
-
-		loadreg	r6,0x7c00012e			#third instruction
-		rlwimi	r6,r5,0,11,20
-		stw	r6,8(r4)
-				
-		b	.ReUseIt
+		rfi
 	
 #***********************************************	
 		
@@ -3417,7 +3522,7 @@ EInt:		b	.FPUnav				#0
 		stw	r31,0xf8(r0)
 		lwz	r31,0(r31)			#get offending instruction in r31
 		
-.Nowosdb:	li	r29,0
+		li	r29,0
 		lis	r0,0xc000			#check for load or store instruction
 		and.	r0,r31,r0
 		lis	r6,0x8000
@@ -3514,13 +3619,9 @@ EInt:		b	.FPUnav				#0
 .DoneDSI:	mfsrr0	r7				#Skip offending instruction
 		addi	r7,r7,4
 		mtsrr0	r7
-		
-.DSINoStep:	mfspr	r7,HID0				#Invalidate Inst Cache (needed?)
-		ori	r7,r7,HID0_ICFI
-		mtspr	HID0,r7
 		isync		
 		
-		loadreg	r7,"USER"			#Return to user
+.DSINoStep:	loadreg	r7,"USER"			#Return to user
 		stw	r7,0xf4(r0)
 
 		lwz	r31,0(r1)			#Load registers with correct values
