@@ -2262,7 +2262,7 @@ EInt:		b	.FPUnav				#0
 
 		li	r9,0
 		stw	r9,RunningTask(r0)
-		b	.Deleted		
+		b	.ReturnToUser
 
 .NotDeleted:	li	r4,TS_CHANGING
 		lbz	r3,TC_STATE(r9)
@@ -2270,7 +2270,7 @@ EInt:		b	.FPUnav				#0
 		
 		beq	.GoToWait
 		
-.Deleted:	la	r4,NewTasks(r0)
+		la	r4,NewTasks(r0)
 		mr	r6,r4
 		
 		lwz	r5,0(r4)			#RemHeadPPC
@@ -2301,12 +2301,15 @@ EInt:		b	.FPUnav				#0
 	
 .SwitchOld:	la	r4,ReadyTasks(r0)		#Old = Context, New = PPStruct
 		lwz	r5,RunningTask(r0)
-		stw	r9,RunningTask(r0)
+		stw	r9,RunningTask(r0)		
+		li	r6,TS_RUN
+		stb	r6,TC_STATE(r9)
+		
+#		mr.	r5,r5
+#		beq	.LoadContext
 		
 		li	r6,TS_READY
 		stb	r6,TC_STATE(r5)
-		li	r6,TS_RUN
-		stb	r6,TC_STATE(r9)
 		
 		bl	.StoreContext
 		
@@ -2323,6 +2326,9 @@ EInt:		b	.FPUnav				#0
 		la	r4,ReadyTasks(r0)		
 		lwz	r5,RunningTask(r0)
 		stw	r9,RunningTask(r0)
+		
+#		mr.	r5,r5
+#		beq	.Dispatch
 		
 		li	r6,TS_READY
 		stb	r6,TC_STATE(r5)
@@ -3227,6 +3233,11 @@ EInt:		b	.FPUnav				#0
 		loadreg	r1,SysStack-0x20		#System stack in unused mem
 		or	r1,r1,r0
 		
+		loadreg	r0,"ALIG"
+		stw	r0,0xf4(r0)
+		mfsrr0	r0
+		stw	r0,0xf8(r0)
+		
 		mfcr	r0
 		stwu	r0,-4(r1)
 		li	r0,0
@@ -3328,7 +3339,7 @@ EInt:		b	.FPUnav				#0
 		beq	.lfs
 		cmpwi	r0,0x1f
 		beq	.stfsx
-		b	.HaltIt
+		b	.HaltAlign
 
 .stfs:		lfdx	f1,r31,r6			#get value from fp register
 		stfs	f1,AlignStore(r0)		#store it on correct aligned spot
@@ -3348,7 +3359,10 @@ EInt:		b	.FPUnav				#0
 		
 #***********************************************
 						
-.AligExit:	lfdu	f0,0(r1)
+.AligExit:	loadreg	r7,"USER"			#Return to user
+		stw	r7,0xf4(r0)
+
+		lfdu	f0,0(r1)
 		lfdu	f1,8(r1)
 		lfdu	f2,8(r1)
 		lfdu	f3,8(r1)
@@ -3428,10 +3442,6 @@ EInt:		b	.FPUnav				#0
 	
 #***********************************************	
 		
-.HaltIt:	loadreg	r3,"ALIG"
-		stw	r3,0xf4(r0)
-		mfsrr0	r3
-		stw	r3,0xf8(r0)
 .HaltAlign:	b	.HaltAlign
 
 #********************************************************************************************
