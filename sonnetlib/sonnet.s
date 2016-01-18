@@ -953,7 +953,7 @@ GetCLIName	lsl.l #2,d0
 		moveq.l #0,d0
 		move.b -1(a1),d0
 		bra.s CpName
-		
+
 DoNameCp	move.l #1019-TASKPPC_NAME,d0		;Name len limit		
 CpName		move.b (a1)+,(a2)
 		tst.b (a2)
@@ -982,7 +982,7 @@ ClrMsg		clr.l (a2)+
 
 		lea MN_PPSTRUCT(a1),a2
 		moveq.l #PP_SIZE/4-1,d0
-		move.l PStruct(a5),a0
+		move.l PStruct(a5),a0		
 CpMsg2		move.l (a0)+,(a2)+
 		dbf d0,CpMsg2
 
@@ -1048,9 +1048,10 @@ GtLoop		move.l Port(a5),a0
 		bra.s GtLoop
 
 DizDone		move.l PStruct(a5),a1
+		lea PP_REGS(a1),a1
 		move.l a0,a2
-		lea MN_PPSTRUCT(a0),a0
-		moveq.l #PP_SIZE/4-1,d0
+		lea MN_PPSTRUCT+PP_REGS(a0),a0
+		moveq.l #(PP_SIZE-PP_REGS)/4-1,d0
 CpBck		move.l (a0)+,(a1)+
 		dbf d0,CpBck
 		moveq.l #PPERR_SUCCESS,d7
@@ -1214,8 +1215,7 @@ NoRun		move.l (a7)+,d1
 ;
 ;********************************************************************************************
 
-CreatePPCTask:
-		movem.l d1-a6,-(a7)
+CreatePPCTask:	movem.l d1-a6,-(a7)
 
 		RUNPOWERPC	_PowerPCBase,CreateTaskPPC
 

@@ -58,7 +58,7 @@
 .set TaskExitCode,200
 .set WaitListSem,204				#18150
 .set CPUInfo,208
-.set SysStackPointer,212
+
 .set ViolationAddress,216			#Pointer
 .set MemSize,220
 .set L2Size,224
@@ -732,6 +732,8 @@
 .set PP_CODE,MN_PPSTRUCT
 .set PP_OFFSET,PP_CODE+4
 .set PP_FLAGS,PP_CODE+8
+.set PP_STACKPTR,PP_CODE+12
+.set PP_STACKSIZE,PP_CODE+16
 .set PP_REGS,PP_CODE+20
 .set PP_FREGS,PP_CODE+80
 .set PP_SIZE,144

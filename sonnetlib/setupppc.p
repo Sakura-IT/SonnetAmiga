@@ -2091,7 +2091,7 @@ EInt:		b	.FPUnav				#0
 		lwz	r9,PP_OFFSET(r8)
 		
 		mr	r17,r8
-		lwz	r8,PP_CODE(r8)
+		lwz	r8,PP_CODE(r8)		
 		add	r8,r8,r9
 		mr.	r9,r9					#Check if it is a PPC library
 		beq	.NoLibCall				#call from M68K code
@@ -2303,38 +2303,30 @@ EInt:		b	.FPUnav				#0
 		lwz	r5,RunningTask(r0)
 		stw	r9,RunningTask(r0)		
 		li	r6,TS_RUN
-		stb	r6,TC_STATE(r9)
-		
-#		mr.	r5,r5
-#		beq	.LoadContext
-		
+		stb	r6,TC_STATE(r9)		
 		li	r6,TS_READY
 		stb	r6,TC_STATE(r5)
-		
+
 		bl	.StoreContext
-		
+
 		addi	r4,r4,4				#AddTailPPC
 		lwz	r3,4(r4)
 		stw	r5,4(r4)
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
-		
+
 		b	.LoadContext
 	
 .SwitchNew:	
 		la	r4,ReadyTasks(r0)		
 		lwz	r5,RunningTask(r0)
 		stw	r9,RunningTask(r0)
-		
-#		mr.	r5,r5
-#		beq	.Dispatch
-		
 		li	r6,TS_READY
 		stb	r6,TC_STATE(r5)
-		
+
 		bl	.StoreContext
-		
+
 		addi	r4,r4,4				#AddTailPPC
 		lwz	r3,4(r4)
 		stw	r5,4(r4)
