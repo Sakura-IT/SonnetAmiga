@@ -982,7 +982,13 @@ ClrMsg		clr.l (a2)+
 
 		lea MN_PPSTRUCT(a1),a2
 		moveq.l #PP_SIZE/4-1,d0
-		move.l PStruct(a5),a0		
+		move.l PStruct(a5),a0
+		
+		tst.l PP_STACKPTR(a0)			;Unsupported, but not yet encountered
+		beq.s CpMsg2
+		
+		ILLEGAL
+		
 CpMsg2		move.l (a0)+,(a2)+
 		dbf d0,CpMsg2
 
@@ -1021,15 +1027,24 @@ FndPort		move.l d0,Port(a5)
 yProces		lea pr_MsgPort(a1),a1
 		move.l a1,Port(a5)
 
-Stacker		move.l Port(a5),a0
-		moveq.l #0,d1
+Stacker		move.l ThisTask(a6),a1
+		move.l TC_SIGALLOC(a1),d0
+;		and.l #$fffff000,d0
+		move.l Port(a5),a0		
 		move.b MP_SIGBIT(a0),d1
-		moveq.l #1,d0
-		lsl.l d1,d0
-		or.w #SIGBREAKF_CTRL_C,d0		;Check for CTRL-C signals
+		moveq.l #1,d2
+		lsl.l d1,d2
+		or.l d2,d0	
+		
 		jsr _LVOWait(a6)
 
-		and.w #SIGBREAKF_CTRL_C,d0
+		move.l Port(a5),a0		
+		move.b MP_SIGBIT(a0),d1
+		moveq.l #1,d2
+		lsl.l d1,d2
+		not.l d2
+		move.l d0,d1
+		and.l d2,d1
 		beq.s GtLoop
 		
 		bsr CrossSignals		
