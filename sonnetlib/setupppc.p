@@ -3509,7 +3509,7 @@ EInt:		b	.FPUnav				#0
 		stwu	r31,-4(r1)
 		mr	r30,r1				#Start of reg table in r30
 		
-		loadreg	r7,"DSI!"
+		loadreg	r7,"DSI?"
 		stw	r7,0xf4(r0)
 
 		lwz	r7,PowerPCBase(r0)		#For GetHALInfo
@@ -3535,8 +3535,6 @@ EInt:		b	.FPUnav				#0
 		loadreg	r8,0x7c00002e			#check for stbx/sthx/stwx
 		cmpw	r6,r8
 		bne	.NotSupported
-		
-		b	.DoneDSI			#Payback crashes when enabled...
 		
 		li	r29,1
 		rlwinm	r6,r31,13,25,29			#Source reg
@@ -3675,7 +3673,9 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r0
 		isync
 		
-.HaltDSI:	b	.HaltDSI
+.HaltDSI:	loadreg	r7,"DSI!"
+		stw	r7,0xf4(r0)
+		b	.HaltDSI
 
 #*************************************************
 
