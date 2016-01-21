@@ -112,7 +112,7 @@ SetLen:		mr	r30,r28
 		bl	Epic				#Setup the EPIC controller
 		bl	End
 
-Start:		loadreg	r0,"REDY"			#Dummy entry at absolute 0x7400
+Start:		loadreg	r0,'REDY'			#Dummy entry at absolute 0x7400
 		stw	r0,Init(r0)
 .IdleLoop:	nop					#IdleTask
 		nop
@@ -165,7 +165,7 @@ ExitCode:	lwz	r17,RunningTask(r0)
 .ClearLLMsg:	stwu	r7,4(r10)
 		bdnz	.ClearLLMsg
 		
-		loadreg r7,"FPPC"
+		loadreg r7,'FPPC'
 		stw	r7,MN_IDENTIFIER(r9)
 		li	r7,192
 		sth	r7,MN_LENGTH(r9)
@@ -265,7 +265,7 @@ End:		mflr	r4
 		stw	r14,Atomic(r0)
 		stw	r28,4(r29)			#Signal 68k that PPC is initialized
 
-		loadreg r6,"INIT"
+		loadreg r6,'INIT'
 .WInit:		lwz	r28,Init(r0)
 		cmplw	r28,r6
 		bne	.WInit
@@ -1073,7 +1073,7 @@ mmuSetup:
 .ExitTBL:	mtlr	r22
 		blr
 
-.ExitTBLErr:	loadreg	r0,"TBL!"
+.ExitTBLErr:	loadreg	r0,'TBL!'
 		stw	r0,0xf4(r0)
 		b	.ExitTBLErr
 
@@ -1189,7 +1189,7 @@ ConfigMem:	mflr	r15			#Code lifted from the Sonnet Driver
 		bl	ConfigWrite32		#set MCCR1 to ffea0000  set MEMGO!
 
 		li	r3,0
-		loadreg r4,"Boon"		#0x426F6F6E -> "Boon"
+		loadreg r4,'Boon'		#0x426F6F6E -> "Boon"
 		li	r5,1
 		li	r8,0
 		li	r9,0
@@ -1740,7 +1740,7 @@ EInt:		b	.FPUnav				#0
 		mfxer	r0
 		mtsprg3	r0
 
-		prolog	228,"TOC"
+		prolog	228,'TOC'
 
 		stwu	r3,-4(r13)
 		stwu	r4,-4(r13)
@@ -1750,7 +1750,7 @@ EInt:		b	.FPUnav				#0
 		stwu	r8,-4(r13)
 		stwu	r9,-4(r13)
 
-		loadreg	r3,"EXEX"
+		loadreg	r3,'EXEX'
 		stw	r3,0xf4(r0)
 	
 		lis	r3,EUMBEPICPROC
@@ -1789,12 +1789,12 @@ EInt:		b	.FPUnav				#0
 		sync
 
 		lwz	r5,0(r5)
-		loadreg	r4,"TPPC"
+		loadreg	r4,'TPPC'
 		lwz	r6,MN_IDENTIFIER(r5)
 		cmpw	r4,r6				#The one we want?
 		beq	.MsgTPPC
 		
-		loadreg	r4,"LLPP"			#Cross-signaling
+		loadreg	r4,'LLPP'			#Cross-signaling
 		cmpw	r4,r6				#CTRL-C for now
 		bne	.NoXSignal 			#(Restriction is in sonnet.s)
 	
@@ -1823,7 +1823,7 @@ EInt:		b	.FPUnav				#0
 		mr	r4,r31
 		b	.ChkNextSig	
 		
-.NoXSignal:	loadreg	r4,"DONE"
+.NoXSignal:	loadreg	r4,'DONE'
 		cmpw	r4,r6
 		bne	.NxtInQ
 		
@@ -2163,7 +2163,7 @@ EInt:		b	.FPUnav				#0
 		loadreg	r0,Quantum
 		mtdec	r0
 
-		loadreg	r0,"WARP"
+		loadreg	r0,'WARP'
 		
 		rfi
 		
@@ -2183,7 +2183,7 @@ EInt:		b	.FPUnav				#0
 		lwzu	r3,4(r13)
 		addi	r13,r13,4
 	
-		excepilog "TOC"
+		excepilog 'TOC'
 
 		lwz	r1,0(r1)				#Restore user stack
 
@@ -2198,7 +2198,7 @@ EInt:		b	.FPUnav				#0
 		stb	r0,ExceptionMode(r0)
 		stb	r0,PortInUse(r0)
 		
-		loadreg	r0,"USER"
+		loadreg	r0,'USER'
 		stw	r0,0xf4(r0)
 		
 		mfspr	r0,HID0
@@ -2584,7 +2584,7 @@ EInt:		b	.FPUnav				#0
 		loadreg	r0,Quantum
 		mtdec	r0
 
-		loadreg	r0,"IDLE"
+		loadreg	r0,'IDLE'
 		stw	r0,0xf4(r0)
 		
 		li	r0,0
@@ -2620,7 +2620,7 @@ EInt:		b	.FPUnav				#0
 		mfxer	r0
 		mtsprg3	r0
 		
-		prolog	228,"TOC"
+		prolog	228,'TOC'
 
 		stwu	r3,-4(r13)
 		stwu	r4,-4(r13)
@@ -2630,7 +2630,7 @@ EInt:		b	.FPUnav				#0
 		stwu	r8,-4(r13)
 		stwu	r9,-4(r13)
 			
-		loadreg r0,"DECI"
+		loadreg r0,'DECI'
 		stw	r0,0xf4(r0)			
 				
 .ListLoop:	lwz	r9,PowerPCBase(r0)
@@ -2788,7 +2788,7 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r0
 		isync
 		
-		loadreg	r3,"IABR"
+		loadreg	r3,'IABR'
 		stw	r3,0xf4(r0)
 		mfsrr0	r3
 		stw	r3,0xf8(r0)
@@ -2805,7 +2805,7 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r0
 		isync
 		
-		loadreg	r3,"CHCK"
+		loadreg	r3,'CHCK'
 		stw	r3,0xf4(r0)
 		mfsrr0	r3
 		stw	r3,0xf8(r0)
@@ -2822,7 +2822,7 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r0
 		isync
 		
-		loadreg	r3,"SYSC"
+		loadreg	r3,'SYSC'
 		stw	r3,0xf4(r0)
 		mfsrr0	r3
 		stw	r3,0xf8(r0)
@@ -2866,7 +2866,7 @@ EInt:		b	.FPUnav				#0
 		mfcr	r0
 		stwu	r0,-4(r13)
 
-		loadreg	r29,"TRCE"
+		loadreg	r29,'TRCE'
 		stw	r29,0xf4(r0)
 				
 		lwz	r31,PowerPCBase(r0)
@@ -3181,7 +3181,7 @@ EInt:		b	.FPUnav				#0
 		li	r0,0
 		stb	r0,ExceptionMode(r0)
 
-		loadreg	r0,"USER"
+		loadreg	r0,'USER'
 		stw	r0,0xf4(r0)
 		
 		mfspr	r0,HID0
@@ -3203,7 +3203,7 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r0
 		isync
 		
-		loadreg	r3,"NOFP"
+		loadreg	r3,'NOFP'
 		stw	r3,0xf4(r0)
 		mfsrr0	r3
 		stw	r3,0xf8(r0)
@@ -3225,7 +3225,7 @@ EInt:		b	.FPUnav				#0
 		loadreg	r1,SysStack-0x20		#System stack in unused mem
 		or	r1,r1,r0
 		
-		loadreg	r0,"ALIG"
+		loadreg	r0,'ALIG'
 		stw	r0,0xf4(r0)
 		mfsrr0	r0
 		stw	r0,0xf8(r0)
@@ -3351,7 +3351,7 @@ EInt:		b	.FPUnav				#0
 		
 #***********************************************
 						
-.AligExit:	loadreg	r7,"USER"			#Return to user
+.AligExit:	loadreg	r7,'USER'			#Return to user
 		stw	r7,0xf4(r0)
 
 		lfdu	f0,0(r1)
@@ -3445,7 +3445,7 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r0
 		isync
 		
-		loadreg	r3,"ISI!"
+		loadreg	r3,'ISI!'
 		stw	r3,0xf4(r0)
 		mfsrr0	r3
 		stw	r3,0xf8(r0)
@@ -3509,7 +3509,7 @@ EInt:		b	.FPUnav				#0
 		stwu	r31,-4(r1)
 		mr	r30,r1				#Start of reg table in r30
 		
-		loadreg	r7,"DSI?"
+		loadreg	r7,'DSI?'
 		stw	r7,0xf4(r0)
 
 		lwz	r7,PowerPCBase(r0)		#For GetHALInfo
@@ -3535,6 +3535,7 @@ EInt:		b	.FPUnav				#0
 		loadreg	r8,0x7c00002e			#check for stbx/sthx/stwx
 		cmpw	r6,r8
 		bne	.NotSupported
+		nop
 		
 		li	r29,1
 		rlwinm	r6,r31,13,25,29			#Source reg
@@ -3585,17 +3586,17 @@ EInt:		b	.FPUnav				#0
 		bne	.StoreHalf
 		rlwinm. r0,r31,5,31,31
 		bne	.StoreByte
-.StoreWord:	loadreg	r9,"PUTW"
+.StoreWord:	loadreg	r9,'PUTW'
 		b	.DoStore
-.StoreHalf:	loadreg	r9,"PUTH"
+.StoreHalf:	loadreg	r9,'PUTH'
 		b	.DoStore
-.StoreByte:	loadreg	r9,"PUTB"
+.StoreByte:	loadreg	r9,'PUTB'
 
 .DoStore:	bl	.DoSixtyEight			#Send message to 68K
 		
 		b	.DoneDSI			#We're done
 
-.GoLoad:	loadreg	r9,"GETV"
+.GoLoad:	loadreg	r9,'GETV'
 
 		bl	.DoSixtyEight			#Returns value in r10
 		
@@ -3621,7 +3622,7 @@ EInt:		b	.FPUnav				#0
 		mtsrr0	r7
 		isync		
 		
-.DSINoStep:	loadreg	r7,"USER"			#Return to user
+.DSINoStep:	loadreg	r7,'USER'			#Return to user
 		stw	r7,0xf4(r0)
 
 		lwz	r31,0(r1)			#Load registers with correct values
@@ -3673,7 +3674,7 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r0
 		isync
 		
-.HaltDSI:	loadreg	r7,"DSI!"
+.HaltDSI:	loadreg	r7,'DSI!'
 		stw	r7,0xf4(r0)
 		b	.HaltDSI
 
@@ -3713,7 +3714,7 @@ EInt:		b	.FPUnav				#0
 		and	r23,r23,r20			#Keep it 8000-BFFE
 		stwbrx	r23,r24,r28			#triggers Interrupt
 
-		loadreg	r9,"DONE"
+		loadreg	r9,'DONE'
 .WaitPFIFO:	lwz	r21,MN_IDENTIFIER(r25)
 		cmpw	r21,r9
 		bne	.WaitPFIFO
@@ -3759,7 +3760,7 @@ EInt:		b	.FPUnav				#0
 		mfcr	r0
 		stwu	r0,-4(r13)
 
-		loadreg	r29,"TRAP"
+		loadreg	r29,'TRAP'
 		stw	r29,0xf4(r0)
 
 		mfsrr0	r31
@@ -4100,7 +4101,7 @@ EInt:		b	.FPUnav				#0
 		li	r0,0
 		stb	r0,ExceptionMode(r0)
 
-		loadreg	r0,"USER"
+		loadreg	r0,'USER'
 		stw	r0,0xf4(r0)
 		
 		mfspr	r0,HID0
@@ -4112,7 +4113,7 @@ EInt:		b	.FPUnav				#0
 		
 		rfi
 		
-.HaltErr:	loadreg r3,"HALT"			#DEBUG
+.HaltErr:	loadreg r3,'HALT'			#DEBUG
 		stw	r3,0xf4(r0)			#Error
 		mfsrr0	r3
 		stw	r3,0xf8(r0)			#Current PC
