@@ -44,4 +44,3 @@ We, the developers, are officially stating that all code interacting with
 Mediator boards was developed without access to the official Mediator SDK.
 This project is not endorsed by ELBOX in any way.
 
-
