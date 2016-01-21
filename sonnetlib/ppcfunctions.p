@@ -2814,7 +2814,7 @@ Run68K:
 		beq	.NoDebug03
 		
 		li	r31,FRun68K-FRun68K
-#		bl	DebugStartFunction
+		bl	DebugStartFunction
 
 .NoDebug03:	mr	r31,r4
 		
@@ -5896,13 +5896,13 @@ AllocPooledPPC:
 		beq	.MakeHeader
 		
 .LoopBack:	addi	r5,r30,32
-		mr	r30,r5
 		
 		bl AllocatePPC				#mh, size
 		
 		mr.	r3,r3
 		beq	.NoRoomHere
 		
+		addi	r30,r30,32
 		addi	r3,r3,32
 		stw	r30,-4(r3)
 		
@@ -6206,10 +6206,10 @@ FreePooledPPC:
 .NoDebug45:	mr	r31,r4
 		mr	r30,r5
 		mr.	r28,r6
-		addi	r28,r28,32
 		bne	.NoAmnesia
-	
+
 		lwz	r28,-4(r30)
+		subi	r28,r28,32
 		
 .NoAmnesia:	lwz	r4,MemSem(r0)
 		
@@ -6257,7 +6257,7 @@ FreePooledPPC:
 		
 .CorrectMHFnd:	mr	r4,r29				#MH
 		mr	r5,r30				#Block
-		mr	r6,r28				#Size
+		addi	r6,r28,32			#Size
 			
 		bl DeallocatePPC
 		
