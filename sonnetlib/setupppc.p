@@ -3532,7 +3532,7 @@ EInt:		b	.FPUnav				#0
 		beq	.LoadStore
 
 		rlwinm	r6,r31,0,25,5
-		loadreg	r8,0x7c00002e			#check for stbx/sthx/stwx
+		loadreg	r8,0x7c00002e			#check for stbx/sthx/stwx/lbzx/lhzx/lwzx
 		cmpw	r6,r8
 		bne	.NotSupported
 		nop
@@ -3580,6 +3580,14 @@ EInt:		b	.FPUnav				#0
 		beq	.StoreByte
 		cmpwi	r0,2
 		beq	.StoreWord
+		mr.	r0,r0
+		beq	.GoLoadx			#Lwzx
+		cmpwi	r0,1
+		beq	.GoLoadx			#lbzx
+		cmpwi	r0,4
+		beq	.GoLoadx			#lhzx
+		cmpwi	r0,5
+		beq	.GoLoadx			#lhax
 		b	.NotSupported			#Not Supported
 		
 .NoStxx:	rlwinm.	r0,r31,3,31,31			#Normal store
@@ -3595,6 +3603,22 @@ EInt:		b	.FPUnav				#0
 .DoStore:	bl	.DoSixtyEight			#Send message to 68K
 		
 		b	.DoneDSI			#We're done
+
+.GoLoadx:	mr	r19,r0
+		loadreg	r9,'GETV'
+		
+		bl	.DoSixtyEight
+		
+		mr.	r19,r19
+		beq	.FixedValue			#Word
+		rlwinm	r10,r10,16,16,31
+		cmpwi	r19,4
+		beq	.FixedValue			#halfword
+		extsh	r10,r10
+		cmpwi	r19,5				#halfword algebraic
+		beq	.FixedValue
+		rlwinm	r10,r10,24,24,31
+		b	.FixedValue			#byte
 
 .GoLoad:	loadreg	r9,'GETV'
 
