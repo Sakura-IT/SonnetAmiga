@@ -1,4 +1,4 @@
-FUNC_CNT	EQU	-30		* Skip 4 standard vectors
+FUNC_CNT	SET	-30		* Skip 4 standard vectors
 FUNCDEF		MACRO
 _LVO\1		EQU	FUNC_CNT 
 FUNC_CNT	SET	FUNC_CNT-6	* Standard offset-6 bytes each

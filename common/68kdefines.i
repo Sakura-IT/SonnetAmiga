@@ -39,7 +39,7 @@ DEVICE_VOODOO5		EQU	$0009
 DEVICE_RV280PRO		EQU	$5960
 DEVICE_RV280MOB		EQU	$5C63
 
-FUNC_CNT	 EQU	-30		* Skip 4 standard vectors
+FUNC_CNT	 SET	-30		* Skip 4 standard vectors
 FUNCDEF		 MACRO
 _LVO\1		 EQU	FUNC_CNT
 FUNC_CNT	 SET	FUNC_CNT-6	* Standard offset-6 bytes each
