@@ -204,8 +204,7 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		stw	r4,MN_MCTASK(r9)
 		
 		lwz	r4,RunningTask(r0)
-		lwz	r4,TC_SPLOWER(r4)
-		subi	r4,r4,1024
+		lwz	r4,TASKPPC_TASKMEM(r4)
 		stw	r4,MN_ARG0(r9)
 
 		LIBCALLPOWERPC Super
@@ -1997,6 +1996,7 @@ EInt:		b	.FPUnav				#0
 		stw	r31,LN_NAME(r8)
 		lwz	r31,MN_ARG1(r9)
 		stw	r31,TASKPPC_STACKSIZE(r8)
+		stw	r8,TASKPPC_TASKMEM(r8)
 		addi	r4,r8,1024		
 		stw	r4,TC_SPLOWER(r8)
 		add	r4,r4,r31

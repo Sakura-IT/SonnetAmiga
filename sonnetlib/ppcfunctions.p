@@ -6204,7 +6204,8 @@ FreePooledPPC:
 		bl	DebugStartFunction
 
 .NoDebug45:	mr	r31,r4
-		mr	r30,r5
+		mr.	r30,r5
+		beq	.ExitPoolZero
 		mr.	r28,r6
 		bne	.NoAmnesia
 
@@ -6279,7 +6280,7 @@ FreePooledPPC:
 		
 		bl ReleaseSemaphorePPC
 
-		lbz	r31,DebugLevel(r0)
+.ExitPoolZero:	lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug46
 
