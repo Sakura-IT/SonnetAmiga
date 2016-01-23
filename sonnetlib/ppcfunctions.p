@@ -5837,7 +5837,9 @@ AllocPooledPPC:
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
-		
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
+
 		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug43
@@ -5886,32 +5888,44 @@ AllocPooledPPC:
 		b	.ExitPooledMem
 		
 .DoPuddle:	la	r4,POOL_PUDDLELIST(r31)
-		lwz	r29,LH_TAILPRED(r4)
-		cmplw	r4,r29
-		beq	.MakeHeader
-		lwz	r4,LH_HEAD(r4)
+
+		bl	RemHeadPPC
 		
-.NextMH:	lwz	r29,LN_SUCC(r4)
-		mr.	r29,r29
+		mr.	r4,r3
 		beq	.MakeHeader
 		
-.LoopBack:	addi	r5,r30,32
+.LoopBack:	mr	r27,r4
+		addi	r5,r30,32
 		
 		bl AllocatePPC				#mh, size
 		
-		mr.	r3,r3
-		beq	.NoRoomHere
+		mr.	r26,r3
+		beq	.MakeHeader2		
+
+		lwz	r5,POOL_PUDDLESIZE(r31)
+		rlwinm	r5,r5,24,8,31			#Establish granularity
+		lwz	r4,MH_FREE(r27)
+		divwu	r4,r4,r5			
+		addi	r4,r4,0x80			#Establish priority based on free space
+		stb	r4,LN_PRI(r27)
 		
+		la	r4,POOL_PUDDLELIST(r31)
+		mr	r5,r27
+		
+		bl 	EnqueuePPC
+				
 		addi	r30,r30,32
-		addi	r3,r3,32
+		addi	r3,r26,32
 		stw	r30,-4(r3)
-		
+
 		b	.ExitPooledMem
 
-.NoRoomHere:	mr	r4,r29
-		b	.NextMH
+.MakeHeader2:	la	r4,POOL_PUDDLELIST(r31)
+		mr	r5,r27
+		
+		bl	AddHeadPPC
 
-.MakeHeader:	lwz	r4,POOL_PUDDLESIZE(r31)
+.MakeHeader:	lwz	r4,POOL_PUDDLESIZE(r31)	
 		addi	r4,r4,MH_SIZE
 		lwz	r5,POOL_REQUIREMENTS(r31)
 		li	r6,32
@@ -5937,18 +5951,14 @@ AllocPooledPPC:
 		add	r4,r4,r3
 		stw	r4,MH_UPPER(r5)		
 		la	r4,POOL_PUDDLELIST(r31)
-		mr	r28,r5
-		
-		bl AddHeadPPC
-
-		mr	r4,r28
+		mr	r4,r5
 
 		b	.LoopBack
 		
 .ExitPooledMem:	lwz	r4,MemSem(r0)
 		
 		bl ReleaseSemaphorePPC
-		
+
 		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug44
@@ -5956,11 +5966,13 @@ AllocPooledPPC:
 		li	r31,FAllocPooledPPC-FRun68K
 		bl	DebugEndFunction
 
-.NoDebug44:	lwz	r28,0(r13)
-		lwz	r29,4(r13)
-		lwz	r30,8(r13)
-		lwz	r31,12(r13)
-		addi	r13,r13,16
+.NoDebug44:	lwz	r26,0(r13)
+		lwz	r27,4(r13)
+		lwz	r28,8(r13)
+		lwz	r29,12(r13)
+		lwz	r30,16(r13)
+		lwz	r31,20(r13)
+		addi	r13,r13,24
 		
 		epilog 'TOC'
 
@@ -6180,7 +6192,9 @@ DeallocatePPC:
 		
 #********************************************************************************************
 
-.GuruTime:	b	.GuruTime		#STUB
+.GuruTime:	loadreg	r31,'MEM!'
+		stw	r31,0xf8(r0)
+		b	.GuruTime		#STUB
 
 #********************************************************************************************
 #
@@ -6266,9 +6280,27 @@ FreePooledPPC:
 		lwz	r5,POOL_PUDDLESIZE(r31)
 		cmpw	r4,r5
 		
-		bne	.ExitFreePool
+		beq	.RemovePuddle
 		
 		mr	r4,r29
+		
+		bl RemovePPC
+		
+		lwz	r5,POOL_PUDDLESIZE(r31)
+		rlwinm	r5,r5,24,8,31			#Establish granularity
+		lwz	r4,MH_FREE(r29)
+		divwu	r4,r4,r5			
+		addi	r4,r4,0x80			#Establish priority based on free space
+		stb	r4,LN_PRI(r29)
+		
+		la	r4,POOL_PUDDLELIST(r31)
+		mr	r5,r29
+		
+		bl 	EnqueuePPC
+		
+		b	.ExitFreePool
+		
+.RemovePuddle:	mr	r4,r29
 		
 		bl RemovePPC
 		
@@ -7476,13 +7508,9 @@ MoveFromBAT:
 #
 #	void FreeAllMem(void) // 
 #
-#********************************************************************************************		
+#********************************************************************************************
 
-FreeAllMem:	lwz	r4,RunningTask(r0)
-
-FreeTaskMem:	blr
-
-		prolog 228,'TOC'			#r4 should be Task
+FreeAllMem:	prolog 228,'TOC'
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -7495,7 +7523,8 @@ FreeTaskMem:	blr
 		li	r31,FFreeAllMem-FRun68K
 		bl	DebugStartFunction
 
-.NoDebug55:	la	r4,TASKPPC_TASKPOOLS(r4)
+.NoDebug55:	lwz	r4,RunningTask(r0)
+		la	r4,TASKPPC_TASKPOOLS(r4)
 		lwz	r5,MLH_HEAD(r4)
 .NextFPool:	mr	r30,r5
 		lwz	r29,LN_SUCC(r5)
