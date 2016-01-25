@@ -1369,7 +1369,14 @@ AllocXMsgPPC:
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 
-		addi	r31,r4,20
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug60
+		
+		li	r31,FAllocXMsgPPC-FRun68K
+		bl	DebugStartFunction
+
+.NoDebug60:	addi	r31,r4,20
 		mr	r30,r5
 		mr	r4,r31
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
@@ -1382,7 +1389,14 @@ AllocXMsgPPC:
 		stw	r30,MN_REPLYPORT(r3)
 		sth	r31,MN_LENGTH(r3)
 		
-.NoMaam:	lwz	r30,0(r13)
+.NoMaam:	lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug61
+
+		li	r31,FAllocXMsgPPC-FRun68K
+		bl	DebugEndFunction
+
+.NoDebug61:	lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
 		
@@ -2503,7 +2517,7 @@ WaitPortPPC:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
-		
+
 		lbz	r31,DebugLevel(r0)
 		mr.	r31,r31
 		beq	.NoDebug33
@@ -2680,7 +2694,7 @@ User:
 
 #********************************************************************************************
 #
-#	void PutXMsgPPC(MsgPort, message) // r4,r5 (UNDER DEVELOPMENT)
+#	void PutXMsgPPC(MsgPort, message) // r4,r5
 #
 #********************************************************************************************
 
@@ -2689,28 +2703,114 @@ PutXMsgPPC:
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
-		li	r31,NT_MESSAGE
-		stb	r31,LN_TYPE(r5)
-				
-		mr	r31,r4
-		mr	r30,r5
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
+		stwu	r25,-4(r13)
+		stwu	r24,-4(r13)
+		stwu	r23,-4(r13)
+		stwu	r22,-4(r13)
 		
-		bl FlushL1DCache
-				
-		mr 	r4,r31
-		mr	r5,r30
-		
-		lis	r3,EUMB		
-		stw	r5,0x5c(r3)
-		sync
-		stw	r4,0x58(r3)
-		sync
+		lbz	r31,DebugLevel(r0)
+		mr.	r31,r31
+		beq	.NoDebug62
 
-.NoSigTask:	lwz	r30,0(r13)
-		lwz	r31,4(r13)
-		addi	r13,r13,8
+		li	r31,FPutXMsgPPC-FRun68K
+		bl	DebugStartFunction
+
+.NoDebug62:	li	r31,NT_MESSAGE
+		stb	r31,LN_TYPE(r5)	
+		
+		mr	r31,r5
+		mr	r22,r4
+		lhz	r29,MN_LENGTH(r31)
+		cmplwi	r29,156				#FIFO msg length - 32 -4 (for MN_MCTASK)
+		bgt	.ErrorX		
+				
+		bl Super
+		mr	r5,r3
+
+		lis	r3,EUMB
+		li	r24,OFTPR
+		lwbrx	r30,r24,r3			
+		addi	r23,r30,4
+		loadreg	r4,0xc000
+		or	r23,r23,r4
+		loadreg r4,0xffff			#fffeffff?
+		and	r23,r23,r4			#Keep it C000-FFFE		
+		stwbrx	r23,r24,r3
+		lwz	r30,0(r30)			
+			
+		mr	r4,r5
+		bl User
+
+		mfctr	r28
+
+		subi	r25,r30,4
+		li	r26,48				#FIFO msg length / 4
+		li	r27,0
+		mtctr	r26
+.ClrMsg:	stwu	r27,4(r25)
+		bdnz	.ClrMsg
+
+		addi	r25,r30,28
+		subi	r27,r31,4
+		li	r26,39				#FIFO msg length -32 -4 /4
+		mtctr	r26
+.FillXMsg:	lwzu	r29,4(r27)
+		stwu	r29,4(r25)
+		bdnz	.FillXMsg
+
+		mtctr	r28
+
+		li	r25,192
+		sth	r25,MN_LENGTH(r30)
+		li	r25,NT_MESSAGE
+		stb	r25,LN_TYPE(r30)
+		loadreg	r25,'XMSG'
+		stw	r25,MN_IDENTIFIER(r30)
+		lwz	r25,MN_REPLYPORT+32(r30)
+		stw	r25,MN_REPLYPORT(r30)
+		lwz	r25,MCTask(r0)
+		la	r25,pr_MsgPort(r25)
+		stw	r25,MN_MCTASK(r30)
+		stw	r25,MN_REPLYPORT+32(r30)
+		stw	r22,MN_MIRROR(r30)
+		stw	r31,MN_PPC(r30)
+
+		bl Super
+		mr	r5,r3
+		
+		lis	r3,EUMB
+		li	r24,OPHPR
+		lwbrx	r31,r24,r3		
+		stw	r30,0(r31)		
+		addi	r23,r31,4
+		loadreg	r4,0xbfff			#ffffbfff?
+		and	r23,r23,r4			#Keep it 8000-BFFE
+		stwbrx	r23,r24,r3			#triggers Interrupt
+
+		mr	r4,r5
+		bl User
+
+		lwz	r22,0(r13)
+		lwz	r23,4(r13)
+		lwz	r24,8(r13)
+		lwz	r25,12(r13)
+		lwz	r26,16(r13)
+		lwz	r27,20(r13)
+		lwz	r28,24(r13)
+		lwz	r29,28(r13)
+		lwz	r30,32(r13)
+		lwz	r31,36(r13)
+		addi	r13,r13,40
 		
 		epilog 'TOC'
+
+.ErrorX:	loadreg	r5,'XMSG'
+		stw	r5,0xf8(r0)
+		b	.ErrorX
 
 #********************************************************************************************
 #
@@ -2900,7 +3000,7 @@ Run68K:
 		beq	.NoDebug04
 
 		li	r31,FRun68K-FRun68K
-#		bl	DebugEndFunction
+		bl	DebugEndFunction
 		
 .NoDebug04:	mtctr	r25
 		li	r3,0
@@ -6936,6 +7036,9 @@ PutMsgPPC:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 
+		loadreg	r29,'test'
+		stw	r29,0x170(r0)
+
 		mr	r29,r3
 		mr	r31,r4
 		mr	r30,r5
@@ -8945,7 +9048,13 @@ DebugStartFunction:
 		stwu	r29,-4(r13)
 		stwu	r30,-4(r13)		
 
-		mr	r30,r4
+		mr.	r31,r31
+		bne	.NoRun
+
+		lwz	r5,PP_OFFSET-MN_PPSTRUCT(r4)
+		lwz	r4,PP_CODE-MN_PPSTRUCT(r4)
+
+.NoRun:		mr	r30,r4
 		mr	r29,r5
 
 		bl	.GetText
@@ -8996,7 +9105,12 @@ DebugEndFunction:
 		stwu	r4,-4(r13)
 		stwu	r5,-4(r13)
 
-		bl	.GetText2
+		mr.	r31,r31
+		bne	.NoRunResult
+
+		lwz	r3,PP_CODE+20(r29)
+
+.NoRunResult:	bl	.GetText2
 		
 .FText2:		
 .byte		"Process: %s Function: %s r3 = %08lx",10,0

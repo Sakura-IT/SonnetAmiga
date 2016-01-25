@@ -1822,7 +1822,45 @@ EInt:		b	.FPUnav				#0
 		mr	r4,r31
 		b	.ChkNextSig	
 		
-.NoXSignal:	loadreg	r4,'DONE'
+.NoXSignal:	loadreg r4,'XMSG'
+		cmpw	r4,r6
+		bne	.NoXMsg
+		lwz	r4,MN_REPLYPORT(r5)
+		addi	r7,r5,32
+		stw	r4,MN_REPLYPORT(r7)
+		lwz	r8,MN_PPC(r5)
+		lhz	r4,MN_LENGTH(r7)
+		mfctr	r3
+		mtctr	r4
+		
+		subi	r8,r8,1
+		subi	r7,r7,1
+.CopyXBack:	lbzu	r6,1(r7)
+		stbu	r6,1(r8)
+		bdnz	.CopyXBack
+		mtctr	r3
+			
+		lis	r3,EUMB				#Free the message
+		li	r4,IFHPR
+		lwbrx	r6,r4,r3		
+		stw	r5,0(r6)		
+		addi	r8,r6,4
+		loadreg	r6,0x3fff			#ffff3fff?
+		and	r8,r8,r6			#Keep it 0000-3FFE
+		stwbrx	r8,r4,r3
+		sync
+		
+		addi	r5,r5,32
+		lwz	r4,MN_REPLYPORT(r5)
+		lwz	r3,MP_SIGTASK(r4)
+		mr.	r3,r3
+		beq	.NxtInQ
+		
+		li	r6,TS_READY
+		stb	r6,TC_STATE(r3)				
+		b	.PutMsgIt
+
+.NoXMsg:	loadreg	r4,'DONE'
 		cmpw	r4,r6
 		bne	.NxtInQ
 		
@@ -1834,7 +1872,7 @@ EInt:		b	.FPUnav				#0
 		mr	r3,r4
 				
 		lwz	r4,TASKPPC_MSGPORT(r3)				
-		lbz	r6,MP_SIGBIT(r4)
+.PutMsgIt:	lbz	r6,MP_SIGBIT(r4)
 		li	r8,1
 		slw	r8,r8,r6		
 		addi	r4,r4,MP_MSGLIST						

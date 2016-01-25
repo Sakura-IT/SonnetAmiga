@@ -504,7 +504,13 @@ GetLoop		move.l d6,a0
 		move.l d0,d7
 		beq.s NextMsg
 		move.l d0,a1
-		move.l MN_IDENTIFIER(a1),d0
+		move.b LN_TYPE(a1),d0
+		cmp.b #NT_REPLYMSG,d0
+		bne.s NoXReply
+		move.l -32+MN_IDENTIFIER(a1),d0
+		cmp.l #"XMSG",d0
+		beq MsgRXMSG
+NoXReply	move.l MN_IDENTIFIER(a1),d0
 		cmp.l #"T68K",d0
 		beq.s MsgT68k
 		cmp.l #"FPPC",d0
@@ -513,6 +519,8 @@ GetLoop		move.l d6,a0
 		beq MsgF68k
 		cmp.l #"LL68",d0
 		beq MsgLL68
+		cmp.l #"XMSG",d0
+		beq MsgXMSG
 		cmp.l #"FREE",d0
 		beq MsgFree
 		cmp.l #"GETV",d0
@@ -526,7 +534,7 @@ MsgT68k		move.b LN_TYPE(a1),d7
 		cmp.b #NT_MESSAGE,d7
 		beq.s Sig68k
 		cmp.b #NT_REPLYMSG,d7			;signal PPC that 68k is done
-		bne.s NextMsg
+		bne GetLoop
 
 		move.l MN_ARG2(a1),a2
 		move.l #"DONE",MN_IDENTIFIER(a2)
@@ -536,7 +544,7 @@ ReUse		move.l a2,d7
 		move.l EUMBAddr(pc),a2
 		move.l d7,IFQPR(a2)			;Message the PPC
 		move.l a1,OFQPR(a2)			;Return Message Frame
-		bra NextMsg
+		bra GetLoop
 
 Sig68k		move.l DosBase(pc),d6
 		move.l MN_PPSTRUCT(a1),d7
@@ -562,6 +570,7 @@ NoCNP		move.l #_LVODateStamp,d6
 		bra.s EndPtch
 
 NoDS		nop
+		
 		bra.s EndPtch				;For more DOS functions
 
 NoDosL		nop
@@ -573,11 +582,11 @@ EndPtch		move.l ThisTask(a6),a0
 		move.l a0,d0
 		beq NoMirror68		
 		jsr _LVOPutMsg(a6)			;move message to waiting 68k task
-		bra NextMsg
+		bra GetLoop
 
 MsgF68k		move.l d7,a1
 		jsr _LVOReplyMsg(a6)
-		bra NextMsg
+		bra GetLoop
 
 MsgFPPC		move.l d7,a1
 		move.l MN_ARG0(a1),a1
@@ -586,7 +595,7 @@ MsgFPPC		move.l d7,a1
 		move.l 4.w,a6
 		move.l d7,a1
 		jsr _LVOReplyMsg(a6)
-		bra NextMsg
+		bra GetLoop
 
 MsgLL68		move.l MN_PPSTRUCT+0*4(a1),a6
 		move.l MN_PPSTRUCT+1*4(a1),a0
@@ -627,7 +636,7 @@ RtnFree		move.l (a7)+,a1
 		move.l EUMBAddr(pc),a2
 		move.l a1,OFQPR(a2)			;Return Message Frame
 		move.l 4.w,a6
-		bra NextMsg
+		bra GetLoop
 
 PushMsg		moveq.l #11,d4
 		move.l a1,a2
@@ -673,7 +682,30 @@ NoMirror68	move.l JProcPort(pc),d0
 		move.l d0,a0
 		move.l a0,MN_MIRROR(a1)
 		jsr _LVOPutMsg(a6)			;move message to waiting 68k task
-		bra NextMsg
+		bra GetLoop
+		
+MsgXMSG		move.l MN_MIRROR(a1),a0
+		lea 32(a1),a1		
+		jsr _LVOPutMsg(a6)
+		bra GetLoop
+		
+MsgRXMSG	lea -32(a1),a1
+		move.b #NT_REPLYMSG,LN_TYPE(a1)
+		move.l EUMBAddr(pc),a2
+		move.l MN_REPLYPORT(a1),d0
+		beq FreeRXMsg
+
+		move.l IFQPR(a2),a2
+		move.l a1,a3
+		move.l a2,d7
+		moveq.l #192/4-1,d0
+CopyRXMsg	move.l (a3)+,(a2)+
+		dbf d0,CopyRXMsg
+		
+		move.l EUMBAddr(pc),a2
+		move.l d7,IFQPR(a2)			;Message the PPC
+FreeRXMsg	move.l a1,OFQPR(a2)			;Return Message Frame
+		bra GetLoop		
 		
 ;********************************************************************************************
 
@@ -710,12 +742,12 @@ Tree		rts
 
 		cnop 0,4
 
-PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,1,NP_StackSize,$8000,0,0
+PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,4,NP_StackSize,$8000,0,0
 PrcName		dc.b "MasterControl",0
 
 		cnop 0,4
 		
-Prc2Tags	dc.l NP_Entry,Joshua,NP_Name,Prc2Name,NP_Priority,1,NP_StackSize,$8000,0,0
+Prc2Tags	dc.l NP_Entry,Joshua,NP_Name,Prc2Name,NP_Priority,3,NP_StackSize,$8000,0,0
 Prc2Name	dc.b "Joshua",0
 PrtName		dc.b "Skynet",0
 
@@ -1034,7 +1066,7 @@ Stacker		move.l ThisTask(a6),a1
 		move.b MP_SIGBIT(a0),d1
 		moveq.l #1,d2
 		lsl.l d1,d2
-		or.l d2,d0	
+		or.l d2,d0
 		
 		jsr _LVOWait(a6)
 
@@ -1051,6 +1083,7 @@ Stacker		move.l ThisTask(a6),a1
 		
 GtLoop		move.l Port(a5),a0
 		jsr _LVOGetMsg(a6)
+		
 		tst.l d0
 		beq.s Stacker
 		move.l d0,a0
@@ -1231,6 +1264,8 @@ NoRun		move.l (a7)+,d1
 ;********************************************************************************************
 
 CreatePPCTask:	movem.l d1-a6,-(a7)
+
+		ILLEGAL
 
 		RUNPOWERPC	_PowerPCBase,CreateTaskPPC
 
@@ -1429,6 +1464,7 @@ PutChProc:
 ;********************************************************************************************
 
 PutXMsg:
+		ILLEGAL
 		movem.l d0-a6,-(a7)			#STUB
 		move.l #"DONE",d6
 		move.l d6,MN_IDENTIFIER(a1)
