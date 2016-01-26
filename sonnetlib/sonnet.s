@@ -546,36 +546,7 @@ ReUse		move.l a2,d7
 		move.l a1,OFQPR(a2)			;Return Message Frame
 		bra GetLoop
 
-Sig68k		move.l DosBase(pc),d6
-		move.l MN_PPSTRUCT(a1),d7
-		cmp.l d6,d7
-		bne.s NoDosL
-		move.l #_LVOCreateNewProc,d6		;Start of compatibility patches
-		move.l MN_PPSTRUCT+4(a1),d7
-		cmp.l d6,d7
-		bne.s NoCNP
-		move.l SonnetBase(pc),d6
-		move.l MN_PPSTRUCT+24(a1),d7
-		or.l d6,d7
-		move.l d7,MN_PPSTRUCT+24(a1)
-		bra.s EndPtch
-
-NoCNP		move.l #_LVODateStamp,d6
-		cmp.l d6,d7
-		bne.s NoDS
-		move.l SonnetBase(pc),d6
-		move.l MN_PPSTRUCT+24(a1),d7
-		or.l d6,d7
-		move.l d7,MN_PPSTRUCT+24(a1)
-		bra.s EndPtch
-
-NoDS		nop
-		
-		bra.s EndPtch				;For more DOS functions
-
-NoDosL		nop
-
-EndPtch		move.l ThisTask(a6),a0
+Sig68k		move.l ThisTask(a6),a0
 		lea pr_MsgPort(a0),a0
 		move.l a0,MN_REPLYPORT(a1)
 		move.l MN_MIRROR(a1),a0
