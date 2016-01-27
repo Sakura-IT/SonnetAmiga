@@ -349,8 +349,6 @@ SetCache:
 .ICACHEINVALL:  bl Super
 
 		b	.Mojo1					#Some L1 mojo
-		
-#		.balign 32					#Make sure it is cacheline aligned
 
 .Mojo2:		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
@@ -360,8 +358,6 @@ SetCache:
 		isync	
 		b 	.Mojo3
 .Mojo1:		b 	.Mojo2
-		
-#		.balign 32
 		
 .Mojo3:		mr	r4,r3
 		bl User
@@ -6841,9 +6837,6 @@ PutMsgPPC:
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
-
-		loadreg	r29,'test'
-		stw	r29,0x170(r0)
 
 		mr	r29,r3
 		mr	r31,r4
