@@ -44,7 +44,7 @@
 	XREF	AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
 	XREF	AddUniqueSemaphorePPC,IsExceptionMode
 
-	XREF 	PPCCode,PPCLen,RunningTask,WaitingTasks,MCTask,Init
+	XREF 	PPCCode,PPCLen,RunningTask,LIST_WAITINGTASKS,MCTask,Init
 	XREF	SysBase,PowerPCBase,DOSBase
 	XDEF	_PowerPCBase
 
@@ -68,12 +68,12 @@ ROMTAG:
 		dc.b	0					;RT_PRI
 		dc.l	LibName
 		dc.l	IDString
-		dc.l	INIT
+		dc.l	LIBINIT
 
 ENDSKIP:
 		ds.w	1
 
-INIT:
+LIBINIT:
 		movem.l d1-a6,-(a7)
 		move.l 4.w,a6
 		lea Buffer(pc),a4
@@ -1218,7 +1218,7 @@ GetPPCState:
 		move.l d1,-(a7)
 		moveq.l #PPCSTATEF_POWERSAVE,d0		;If no waiting then POWERSAVE
 		move.l SonnetBase(pc),a0
-		move.l WaitingTasks(a0),d1
+		move.l LIST_WAITINGTASKS(a0),d1		;PPC Cache?
 		beq.s NoWait
 		moveq.l #PPCSTATEF_APPACTIVE,d0
 NoWait		move.l RunningTask(a0),d1

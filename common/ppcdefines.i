@@ -14,75 +14,76 @@
 #Overhead = 3.5MB
 
 #Sonnet Base:
+
 .set SonnetBase,0
 .set SysBase,4
 .set PPCMemHeader,8
 .set DOSBase,12
-.set CPUHID0,16
-.set CPUHID1,20
-.set CPUSDR1,24
-.set RunningTask,28				#Pointer
-.set ReadyTasks,32				#MLH	; 102(Base)
-.set WaitingTasks,44				#MLH	; 116(Base)
-.set Init,56
-.set Atomic,60
-.set TaskListSem,64				#Pointer
-.set Semaphores,68				#MLH
-.set SemListSem,80				#Pointer
-.set PortListSem,84				#Pointer
-.set SnoopList,88				#MLH
-.set L2STATE,100
-.set MCTask,104					#Pointer
-.set TaskException,108				#Pointer
-.set DState,112
-.set DLockState,113
-.set ExceptionMode,114
-.set RescheduleFlag,115				#626
-.set AllTasks,116				#MLH
-.set NewTasks,128				#MLH, Shared, 32 aligned
-.set SnoopSem,140				#Pointer
-.set Ports,144					#MLH (424)
-.set CurrentPort,156				#610
-.set NumAllTasks,160				#630
-.set IdSysTasks,164				#662
-.set IdDefTasks,168				#666
-.set MemSem,172
-.set PowerPCBase,176
-.set Break,180
-.set LowActivityPrio,184			#658
-.set LowActivityPrioOffset,188			#670
-.set PortInUse,192				#628	; See CurrentPort
-.set DebugLevel,193				#18737
-.set RTGType,194
-.set RTGBase,196
-.set TaskExitCode,200
-.set WaitListSem,204				#18150
-.set CPUInfo,208
-
-.set ViolationAddress,216			#Pointer
-.set MemSize,220
-.set L2Size,224
-.set AlignStore,228
+.set MCTask,16
+.set Init,20					#Pointer
+.set CPUHID0,24
+.set CPUHID1,28
+.set RunningTask,32				#Pointer
+.set Atomic,36
+.set TaskListSem,40				#Pointer
+.set SemListSem,44				#Pointer
+.set PortListSem,48				#Pointer
+.set L2STATE,52
+.set CPUSDR1,56					#Pointer
+.set TaskException,60				#Pointer
+.set DState,64
+.set DLockState,65
+.set ExceptionMode,66
+.set RescheduleFlag,67				#626
+.set SnoopSem,68				#Pointer
+.set CurrentPort,72				#610
+.set NumAllTasks,76				#630
+.set IdSysTasks,80				#662
+.set IdDefTasks,84				#666
+.set MemSem,88
+.set PowerPCBase,92
+.set Break,96
+.set LowActivityPrio,100			#658
+.set LowActivityPrioOffset,104			#670
+.set PortInUse,108				#628	; See CurrentPort
+.set DebugLevel,109				#18737
+.set RTGType,112
+.set RTGBase,116
+.set TaskExitCode,120
+.set WaitListSem,124				#18150
+.set CPUInfo,128
+.set AlignStore,132
+.set ViolationAddress,136			#Pointer
+.set MemSize,140
+.set L2Size,144
 
 #LibBase:
 
-.set LIST_REMOVEDTASKS,130
-.set LIST_REMOVEDEXC,382
-.set LIST_READYEXC,368
-.set LIST_INSTALLEDEXC,356
-.set LIST_EXCINTERRUPT,344
-.set LIST_EXCIABR,332
-.set LIST_EXCPERFMON,320
-.set LIST_EXCTRACE,308
-.set LIST_EXCSYSTEMCALL,296
-.set LIST_EXCDECREMENTER,284
-.set LIST_EXCFPUN,272
-.set LIST_EXCPROGRAM,260
-.set LIST_EXCALIGN,248
-.set LIST_EXCIACCESS,236
-.set LIST_EXCDACCESS,224
-.set LIST_EXCMCHECK,212
-.set LIST_WAITTIME,396
+.set LIST_READYTASKS,96
+.set LIST_WAITINGTASKS,112
+.set LIST_REMOVEDTASKS,128
+.set LIST_ALLTASKS,144
+.set LIST_SNOOP,160
+.set LIST_SEMAPHORES,176
+.set LIST_REMOVEDEXC,192
+.set LIST_READYEXC,208
+.set LIST_INSTALLEDEXC,224
+.set LIST_EXCINTERRUPT,240
+.set LIST_EXCIABR,256
+.set LIST_EXCPERFMON,272
+.set LIST_EXCTRACE,288
+.set LIST_EXCSYSTEMCALL,304
+.set LIST_EXCDECREMENTER,320
+.set LIST_EXCFPUN,336
+.set LIST_EXCPROGRAM,352
+.set LIST_EXCALIGN,368
+.set LIST_EXCIACCESS,384
+.set LIST_EXCDACCESS,400
+.set LIST_EXCMCHECK,416
+.set LIST_WAITTIME,432
+.set LIST_PORTS,448
+.set LIST_NEWTASKS,464
+
 .set AlignmentExcHigh,600
 .set AlignmentExcLow,604
 .set DataExcHigh,608
@@ -659,7 +660,8 @@
 .set TASKPPC_CTMEM,260
 .set TASKPPC_SSPPC_RESERVE,800
 .set TASKPPC_PORT,832
-.set TASKPPC_NAME,932
+.set TASKPPC_ALLTASK,932
+.set TASKPPC_NAME,952
 
 .set SYS_SIGALLOC,0xFFFF
 

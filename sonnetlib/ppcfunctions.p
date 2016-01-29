@@ -550,7 +550,6 @@ RemovePPC:
 		stw	r3,0(r4)
 		blr	
 
-
 #********************************************************************************************
 #
 #	node = RemHeadPPC(list) // r3=r4
@@ -561,11 +560,11 @@ RemHeadPPC:
 		lwz	r5,0(r4)
 		lwz	r3,0(r5)
 		mr.	r3,r3
-		beq-	.E2
+		beq-	.HeadListEmpty
 		stw	r3,0(r4)
 		stw	r4,4(r3)
 		mr	r3,r5
-.E2:		blr	
+.HeadListEmpty:	blr	
 
 #********************************************************************************************
 #
@@ -577,11 +576,11 @@ RemTailPPC:
 		lwz	r3,8(r4)
 		lwz	r5,4(r3)
 		mr.	r5,r5
-		beq-	.E3
+		beq-	.TailListEmpty
 		stw	r5,8(r4)
 		addi	r4,r4,4
 		stw	r4,0(r5)
-.E3:		blr	
+.TailListEmpty:	blr	
 
 #********************************************************************************************
 #
@@ -1134,18 +1133,22 @@ GetSysTimePPC:
 		li	r6,0
 .Loop4:		mr.	r3,r3
 		bge-	.Link18
+
 		addc	r4,r4,r4
 		adde	r3,r3,r3
 		add	r6,r6,r6
 		b	.Link19
+
 .Link18:	addc	r4,r4,r4
 		adde	r3,r3,r3
 		add	r6,r6,r6
 		cmplw	r5,r3
 		bgt-	.Link20
+
 .Link19:	sub.	r3,r3,r5
 		addi	r6,r6,1
 .Link20:	bdnz+	.Loop4
+
 		mr	r3,r6
 		lwz	r4,0(r13)
 		lwz	r5,4(r13)
@@ -1171,31 +1174,36 @@ NextTagItemPPC:
 .NextTag:	lwz	r5,0(r4)
 		mr.	r5,r5
 		beq	.EndTag
+
 		subf.	r7,r6,r5
 		beq-	.IgnoreTag
+
 		subf.	r7,r6,r7
 		beq-	.ChainTag
+
 		subf.	r7,r6,r7
 		beq-	.SkipTags
+
 .EndTag:	mr	r3,r5
 		lwz	r5,0(r13)
 		lwzu	r6,4(r13)
 		lwzu	r7,4(r13)
 		lwzu	r8,4(r13)
 		addi	r13,r13,4
-
 		blr
 
 .IgnoreTag:	addi	r4,r4,8
-		b	.NextTag		
+		b	.NextTag
+
 .ChainTag:	lwz	r4,4(r4)
 		b	.NextTag
+
 .SkipTags:	lwz	r7,4(r4)
 		li	r8,3
 		slw	r7,r7,r8
 		add 	r4,r4,r7
 		b	.NextTag
-			
+
 #********************************************************************************************
 #
 #	value = GetTagDataPPC(tagValue, defaultVal, taglist) // r3=r4,r5,r6
@@ -1219,9 +1227,10 @@ GetTagDataPPC:
 		mtlr	r7
 		mr.	r3,r3
 		bne	.Done
+
 		mr	r3,r8
 		b	.Done2
-		
+
 .Done:		lwz	r3,4(r3)		
 .Done2:		lwz	r4,0(r13)
 		lwzu	r5,4(r13)
@@ -1672,7 +1681,8 @@ LockTaskList:
 
 		bl ObtainSemaphorePPC
 
-		la	r3,AllTasks(r0)
+		lwz	r3,PowerPCBase(r0)
+		addi	r3,r3,LIST_ALLTASKS
 		
 		lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -1830,12 +1840,8 @@ ObtainSemaphorePPC:
 		xori	r4,r4,SIGF_SINGLE
 		stw	r4,TC_SIGRECVD(r3)
 		addi	r4,r30,SS_WAITQUEUE
-		addi	r4,r4,4				#AddTailPPC
-		lwz	r3,4(r4)
-		stw	r5,4(r4)
-		stw	r4,0(r5)
-		stw	r3,4(r5)
-		stw	r5,0(r3)
+		
+		bl AddTailPPC
 
 		li	r4,Atomic
 		bl AtomicDone
@@ -2002,7 +2008,7 @@ ReleaseSemaphorePPC:
 		b	.Released				#Actually not released
 								#As current task has more locks
 .LastInLine:	lis	r0,0
-		nop	
+		nop			
 		stw	r0,SS_OWNER(r31)
 		lha	r5,SS_QUEUECOUNT(r31)
 		subi	r5,r5,1
@@ -2022,14 +2028,10 @@ ReleaseSemaphorePPC:
 		bl AtomicDone
 
 		addi	r4,r31,SS_WAITQUEUE
-		lwz	r5,0(r4)				#RemHeadPPC
-		lwz	r3,0(r5)
+		
+		bl RemHeadPPC
+
 		mr.	r3,r3
-		beq-	.NoHead
-		stw	r3,0(r4)
-		stw	r4,4(r3)
-		mr	r3,r5
-.NoHead:	mr.	r3,r3
 		beq-	.NoneFurther
 		mr	r30,r3
 		lwz	r4,8(r30)				#r4 = task
@@ -2133,8 +2135,10 @@ ReleaseSemaphorePPC:
 .NoneFurther:	li	r0,0
 		sth	r0,SSPPC_LOCK(r31)
 
-.Released:	li	r31,FReleaseSemaphorePPC-FRun68K
-#		bl	DebugEndFunction
+.Released:	lwz	r3,0(r13)
+
+		li	r31,FReleaseSemaphorePPC-FRun68K
+		bl	DebugEndFunction
 
 		lwz	r3,0(r13)
 		lwz	r4,4(r13)
@@ -2186,7 +2190,8 @@ AddSemaphorePPC:
 		
 		bl ObtainSemaphorePPC
 		
-		la	r4,Semaphores(r0)
+		lwz	r4,PowerPCBase(r0)
+		addi	r4,r4,LIST_SEMAPHORES
 		mr	r5,r30
 		
 		bl EnqueuePPC
@@ -2253,7 +2258,8 @@ FindSemaphorePPC:
 
 		bl ObtainSemaphorePPC
 
-		la	r4,Semaphores(r0)
+		lwz	r4,PowerPCBase(r0)
+		addi	r4,r4,LIST_SEMAPHORES
 		mr	r5,r30
 
 		bl FindNamePPC
@@ -2297,7 +2303,8 @@ AddPortPPC:
 
 		bl ObtainSemaphorePPC
 
-		la	r4,Ports(r0)
+		lwz	r4,PowerPCBase(r0)
+		addi	r4,r4,LIST_PORTS
 		mr	r5,r30
 
 		bl EnqueuePPC
@@ -2336,11 +2343,9 @@ RemPortPPC:
 		bl ObtainSemaphorePPC
 
 		mr	r4,r31
-		lwz	r3,0(r4)
-		lwz	r4,4(r4)
-		stw	r4,4(r3)
-		stw	r3,0(r4)
 		
+		bl RemovePPC
+
 		lwz	r4,PortListSem(r0)
 		
 		bl ReleaseSemaphorePPC
@@ -2374,7 +2379,8 @@ FindPortPPC:
 
 		bl ObtainSemaphorePPC
 
-		la	r4,Ports(r0)		
+		lwz	r4,PowerPCBase(r0)
+		addi	r4,r4,LIST_PORTS
 
 		bl FindNamePPC
 
@@ -2924,24 +2930,32 @@ CopyMemPPC:
 
 		andi.	r3,r4,7
 		bne-	.NoSAlign8
+
 		andi.	r7,r5,7
 		beq-	.Align8
+
 .NoSAlign8:	andi.	r3,r4,3
 		bne-	.NoSAlign4
+
 		andi.	r7,r5,3
 		beq-	.Align4
+
 .NoSAlign4:	andi.	r3,r4,1
 		bne-	.NoSAlign2
+
 		andi.	r7,r5,1
 		beq-	.Align2
+
 .NoSAlign2:	mr.	r6,r6
 		beq-	.ExitCopy
+
 		mtctr	r6
 		subi	r4,r4,1
 		subi	r5,r5,1
 .LoopAl1:	lbzu	r0,1(r4)
 		stbu	r0,1(r5)
 		bdnz+	.LoopAl1
+
 		b	.ExitCopy
 		
 .Align2:	rlwinm	r7,r6,31,1,31
@@ -2950,45 +2964,55 @@ CopyMemPPC:
 		subi	r5,r5,2
 		mr.	r7,r7
 		beq-	.ExitAl2
+
 .LoopAl2:	lhzu	r0,2(r4)
 		sthu	r0,2(r5)
 		bdnz+	.LoopAl2
+
 .ExitAl2:	andi.	r6,r6,1
 		beq-	.ExitCopy
+
 		lbzu	r0,2(r4)
 		stbu	r0,2(r5)
 		b	.ExitCopy
-		
+
 .Align4:	rlwinm	r7,r6,30,2,31
 		mtctr	r7
 		subi	r4,r4,4
 		subi	r5,r5,4
 		mr.	r7,r7
 		beq-	.SmallSize4
+
 .LoopAl4:	lwzu	r0,4(r4)
 		stwu	r0,4(r5)
 		bdnz+	.LoopAl4
+
 .SmallSize4:	andi.	r6,r6,3
 		beq-	.ExitCopy
+
 		mtctr	r6
 		addi	r4,r4,3
 		addi	r5,r5,3
 .SmallLoop4:	lbzu	r0,1(r4)
 		stbu	r0,1(r5)
 		bdnz+	.SmallLoop4
+
 		b	.ExitCopy
-		
+
 .Align8:	rlwinm	r7,r6,29,3,31		
 		mtctr	r7
 		subi	r4,r4,8
 		subi	r5,r5,8
 		mr.	r7,r7
 		beq-	.SmallSize8
+
 .LoopAl8:	lfdu	f0,8(r4)
 		stfdu	f0,8(r5)
 		bdnz+	.LoopAl8
+
 .SmallSize8:	andi.	r6,r6,7
 		beq-	.ExitCopy
+
 		mtctr	r6
 		addi	r4,r4,7
 		addi	r5,r5,7
@@ -3707,26 +3731,22 @@ InsertOnPri:
 		cmpw	r3,r7
 		ble+	.CompareNode
 		
-.GoExit:	lwz	r3,4(r4)				#AddHeadPPC
-		stw	r5,4(r4)
-		stw	r4,0(r5)
-		stw	r3,4(r5)
-		stw	r5,0(r3)
-		
+.GoExit:	bl AddHeadPPC
+
 		lwz	r3,0(r13)
 		lwz	r4,4(r13)
 		lwz	r5,8(r13)
 		lwz	r6,12(r13)
 		lwz	r7,16(r13)
 		addi	r13,r13,20
-		
+
 		lwz	r1,0(r1)
 		lwz	r13,-4(r1)
 		lwz	r0,8(r1)
 		mtlr	r0
 		lwz	r0,4(r1)
 		mtcr	r0
-		
+
 		blr
 
 #********************************************************************************************
@@ -3828,13 +3848,10 @@ CreateTaskPPC:
 		ori	r0,r0,84 
 		stw	r0,ML_SIZE+ME_LENGTH(r3)	#Length 
 		mr	r5,r3 
-		addi	r4,r31,TC_MEMENTRY		#Link into TC_MEMENRY 
-		lwz	r3,LH_HEAD(r4) 
-		stw	r5,LH_HEAD(r4) 
-		stw	r3,LH_HEAD(r5) 
-		stw	r4,LH_TAIL(r5) 
-		stw	r5,LH_TAIL(r3)
-		
+		addi	r4,r31,TC_MEMENTRY		#Link into TC_MEMENRY
+
+		bl AddHeadPPC
+
 		loadreg	r4,TASKATTR_NAME 
 		li	r5,0				#defaultVal 
 		mr	r6,r30				#TagList 
@@ -3874,14 +3891,12 @@ CreateTaskPPC:
 		stw	r22,ML_SIZE+ME_ADDR(r3) 
 		stw	r28,ML_SIZE+ME_LENGTH(r3) 
 		mr	r5,r3 
-		addi	r4,r31,TC_MEMENTRY 
-		lwz	r3,LH_HEAD(r4) 
-		stw	r5,LH_HEAD(r4) 
-		stw	r3,LH_HEAD(r5) 
-		stw	r4,LH_TAIL(r5) 
-		stw	r5,LH_TAIL(r3) 
-		mr	r3,r29 
-		mr	r4,r22 
+		addi	r4,r31,TC_MEMENTRY
+
+		bl AddHeadPPC
+
+		mr	r3,r29
+		mr	r4,r22
 		stw	r4,LN_NAME(r31)
  
 		bl CopyStr
@@ -4005,11 +4020,8 @@ CreateTaskPPC:
 		stw	r29,ML_SIZE+ME_LENGTH(r3) 
 		mr	r5,r3 
 		addi	r4,r31,TC_MEMENTRY
-		lwz	r3,LH_HEAD(r4) 
-		stw	r5,LH_HEAD(r4) 
-		stw	r3,LH_HEAD(r5) 
-		stw	r4,LH_TAIL(r5) 
-		stw	r5,LH_TAIL(r3) 
+
+		bl AddHeadPPC
  
 		li	r4,CONTEXT_LENGTH
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
@@ -4043,12 +4055,9 @@ CreateTaskPPC:
 		stw	r0,ML_SIZE+ME_LENGTH(r3) 
 		mr	r5,r3 
 		addi	r4,r31,TC_MEMENTRY
-		lwz	r3,LH_HEAD(r4) 
-		stw	r5,LH_HEAD(r4) 
-		stw	r3,LH_HEAD(r5) 
-		stw	r4,LH_TAIL(r5) 
-		stw	r5,LH_TAIL(r3) 
- 
+
+		bl AddHeadPPC
+
 		loadreg	r0,MACHINESTATE_DEFAULT
 		stw	r0,CONTEXT_SRR1(r26)		#f070 to srr1
 		stw	r25,CONTEXT_CODE(r26)		#Code to srr0
@@ -4298,13 +4307,10 @@ CreateTaskPPC:
  
  		bl ObtainSemaphorePPC
 	 
-		la	r4,AllTasks(r0)
-		addi	r4,r4,4
-		lwz	r3,4(r4) 			#AddTailPPC
-		stw	r5,4(r4)			#Insert dummy task in list 
-		stw	r4,0(r5)
-		stw	r3,4(r5)
-		stw	r5,0(r3)
+	 	lwz	r4,PowerPCBase(r0)
+	 	addi	r4,r4,LIST_ALLTASKS
+
+	 	bl AddTailPPC				#Insert dummy task in list
 
  		la	r4,NumAllTasks(r0)
 		lwz	r3,0(r4)
@@ -4355,7 +4361,8 @@ CreateTaskPPC:
 .SkipSystem:	stw	r5,TASKPPC_ID(r31)
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r31)
-		la	r4,ReadyTasks(r0)
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_READYTASKS(r4)
 		mr	r5,r31				#Task
 		loadreg	r0,Quantum
 		stw	r0,TASKPPC_QUANTUM(r31)
@@ -4518,6 +4525,7 @@ SetDecInterrupt:
 		li	r6,0
 		mr.	r3,r3
 .NextCtr:	bge-	.IsPos
+
 		addc	r4,r4,r4
 		adde	r3,r3,r3
 		add	r6,r6,r6
@@ -4528,9 +4536,11 @@ SetDecInterrupt:
 		add	r6,r6,r6
 		cmplw	r5,r3
 		bgt-	.NoSubAdd
+
 .WasNeg:	sub.	r3,r3,r5
 		addi	r6,r6,1
 .NoSubAdd:	bdnz+	.NextCtr
+
 		mr	r3,r6
 		blr
 
@@ -4583,11 +4593,9 @@ ChangeStack:
 		stw	r29,ML_SIZE+ME_LENGTH(r3)
 		mr	r5,r3
 		addi	r4,r28,TC_MEMENTRY
-		lwz	r3,LN_SUCC(r4)
-		stw	r5,LN_SUCC(r4)
-		stw	r3,LN_SUCC(r5)
-		stw	r4,LN_PRED(r5)
-		stw	r5,LN_PRED(r3)
+
+		bl AddHeadPPC
+
 		lwz	r3,TC_SPLOWER(r28)
 		lwz	r4,TC_SPUPPER(r28)
 		mr	r27,r4
@@ -4661,7 +4669,8 @@ FindTaskPPC:
 
 		bl ObtainSemaphorePPC
 
-		la	r4,AllTasks(r0)
+		lwz	r4,PowerPCBase(r0)
+		addi	r4,r4,LIST_ALLTASKS
 		
 		bl FindNamePPC
 
@@ -4759,12 +4768,8 @@ ProcurePPC:
 
 		addi	r4,r30,SS_WAITQUEUE
 		mr	r5,r29
-		addi	r4,r4,4
-		lwz	r3,4(r4)				#AddTailPPC
-		stw	r5,4(r4)
-		stw	r4,0(r5)
-		stw	r3,4(r5)
-		stw	r5,0(r3)
+
+		bl AddTailPPC
 
 		li	r4,Atomic
 
@@ -4830,10 +4835,8 @@ VacatePPC:
 		subi	r5,r5,1
 		sth	r5,SS_QUEUECOUNT(r30)
 		mr	r5,r4
-		lwz	r3,0(r4)				#RemovePPC
-		lwz	r4,4(r4)
-		stw	r4,4(r3)
-		stw	r3,0(r4)
+		
+		bl RemovePPC
 
 		li	r4,Atomic
 		
@@ -4917,7 +4920,8 @@ SnoopTask:
 		
 		bl ObtainSemaphorePPC
 
-		la	r4,SnoopList(r0)
+		lwz	r4,PowerPCBase(r0)
+		addi	r4,r4,LIST_SNOOP
 		mr	r5,r31
 
 		bl AddHeadPPC
@@ -5059,15 +5063,10 @@ ObtainSemaphoreSharedPPC:
 		lwz	r4,TC_SIGRECVD(r3)
 		ori	r4,r4,16
 		xori	r4,r4,16
-		stw	r4,TC_SIGRECVD(r3)
-		
+		stw	r4,TC_SIGRECVD(r3)		
 		addi	r4,r30,SS_WAITQUEUE
-		addi	r4,r4,4				#AddTailPPC
-		lwz	r3,4(r4)
-		stw	r5,4(r4)
-		stw	r4,0(r5)
-		stw	r3,4(r5)
-		stw	r5,0(r3)
+
+		bl AddTailPPC
 
 		li	r4,Atomic
 		
@@ -5351,7 +5350,8 @@ DeleteTaskPPC:
 		
 		bl ObtainSemaphorePPC
 
-		la	r28,SnoopList(r0)
+		lwz	r28,PowerPCBase(r0)
+		addi	r28,r28,LIST_SNOOP
 .Loop100:	lwz	r27,0(r28)
 		mr.	r27,r27
 		beq-	.EmptySnoopLst
@@ -5393,14 +5393,11 @@ DeleteTaskPPC:
 
 		lwz	r4,TASKPPC_TASKPTR(r31)
 
-		mr.	r4,r4				#STUB
-		beq	.NoTaskPtr			#STUB
-		
-		lwz	r3,0(r4)
-		lwz	r4,4(r4)
-		stw	r4,4(r3)
-		stw	r3,0(r4)
-		
+		mr.	r4,r4
+		beq	.NoTaskPtr
+
+		bl RemovePPC		
+
 .NoTaskPtr:	la	r4,NumAllTasks(r0)		#Tasks -1
 		lwz	r3,0(r4)
 		subi	r3,r3,1
@@ -5430,20 +5427,14 @@ DeleteTaskPPC:
 		beq+	.NotOwnTask2			#Wait Atomic
 
 		mr	r4,r31
-		lwz	r3,0(r4)			#RemovePPC
-		lwz	r4,4(r4)
-		stw	r4,4(r3)
-		stw	r3,0(r4)
-		mr	r5,r31
 		
+		bl RemovePPC
+
+		mr	r5,r31		
 		lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_REMOVEDTASKS(r3)	#Deleted task list at base
-		addi	r4,r4,4				#AddTailPPC
-		lwz	r3,4(r4)
-		stw	r5,4(r4)
-		stw	r4,0(r5)
-		stw	r3,4(r5)
-		stw	r5,0(r3)			#In WarpOS a seperate task takes care of all freemems (TC_MEMENTRY)
+		
+		bl AddTailPPC				#In WarpOS a seperate task takes care of all freemems (TC_MEMENTRY)
 
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r31)
@@ -5687,14 +5678,9 @@ CreatePoolPPC:
 		lwz	r4,RunningTask(r0)
 		la 	r4,TASKPPC_TASKPOOLS(r4)
 		
-		lwz	r3,0(r4)					#AddHead
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
-		
-.NoCreatePool:	mr	r3,r31
+		bl AddHeadPPC
 
+.NoCreatePool:	mr	r3,r31
 		li	r31,FCreatePoolPPC-FRun68K
 		bl	DebugEndFunction
 
@@ -6210,7 +6196,7 @@ FreePooledPPC:
 		la	r4,POOL_PUDDLELIST(r31)
 		mr	r5,r29
 		
-		bl 	EnqueuePPC
+		bl EnqueuePPC
 		
 		b	.ExitFreePool
 		
@@ -6351,20 +6337,20 @@ SetTaskPriPPC:
 		lwz	r6,TASKPPC_ELAPSED2(r30)
 		add	r4,r4,r6
 		stw	r4,TASKPPC_ELAPSED2(r30)
+		mr	r4,r30
 
-		mr	r4,r30				#RemovePPC
-		lwz	r3,LN_SUCC(r4)
-		lwz	r4,LN_PRED(r4)
-		stw	r4,LN_PRED(r3)
-		stw	r3,LN_SUCC(r4)
+		bl RemovePPC
+
 		mr	r5,r30
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r30)
 
-		la	r4,ReadyTasks(r0)		#Insert in Readytasks list on Pri
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_READYTASKS(r4)		#Insert in Readytasks list on Pri
 		bl	InsertOnPri
 
-		lwz	r4,ReadyTasks(r0)		#Check if we are top
+		lwz	r4,PowerPCBase(r0)
+		lwz	r4,LIST_READYTASKS(r4)		#Check if we are top
 		cmplw	r4,r30
 		bne-	.DonePriChange
 
@@ -6581,10 +6567,9 @@ SignalPPC:
 		b	.SigExit
 
 .GotSignal:	mr	r4,r30
-		lwz	r3,0(r4)
-		lwz	r4,4(r4)
-		stw	r4,4(r3)
-		stw	r3,0(r4)
+
+		bl RemovePPC
+
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r30)
 		lwz	r7,TASKPPC_TIMESTAMP2(r30)
@@ -6593,15 +6578,18 @@ SignalPPC:
 		lwz	r6,TASKPPC_ELAPSED2(r30)
 		add	r7,r7,r6
 		stw	r7,TASKPPC_ELAPSED2(r30)
-		la	r4,ReadyTasks(r0)
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_READYTASKS(r4)
 		mr	r5,r30
 		
 		bl InsertOnPri				#Prio recalculation
 							#r4 = ReadyTasksList r5 = Task
 		li	r4,Atomic
+
 		bl AtomicDone
 
-		lwz	r4,ReadyTasks(r0)
+		lwz	r4,PowerPCBase(r0)
+		lwz	r4,LIST_READYTASKS(r4)
 		cmplw	r4,r30				#Check if we are top
 		bne-	.SigExit
 		
@@ -6679,16 +6667,12 @@ GetMsgPPC:
 		bne+	.PortWait2
 
 .IntListEmpty:	addi	r4,r31,MP_MSGLIST
-		lwz	r5,0(r4)			#RemHeadPPC
-		lwz	r3,0(r5)
-		mr.	r3,r3
-		beq-	.EmptyList
-		stw	r3,0(r4)
-		stw	r4,4(r3)
-		mr	r3,r5
-.EmptyList:	mr	r5,r3
 
+		bl RemHeadPPC
+
+		mr	r5,r3
 		addi	r4,r31,MP_PPC_SEM
+		
 		bl ReleaseSemaphorePPC
 
 		mr	r3,r5
@@ -6792,12 +6776,9 @@ ReplyMsgPPC:
 
 .IntListEmpty2:	addi	r4,r31,MP_MSGLIST
 		mr	r5,r30
-		addi	r4,r4,4					#AddTailPPC
-		lwz	r3,4(r4)
-		stw	r5,4(r4)
-		stw	r4,0(r5)
-		stw	r3,4(r5)
-		stw	r5,0(r3)
+
+		bl AddTailPPC
+
 		lwz	r4,MP_SIGTASK(r31)
 		mr.	r4,r4
 		beq-	.NoSig
@@ -6891,12 +6872,9 @@ PutMsgPPC:
 		li	r0,NT_MESSAGE
 		stb	r0,LN_TYPE(r30)
 .NotNormalMsg:	mr	r5,r30
-		addi	r4,r4,4
-		lwz	r3,4(r4)				#AddTailPPC
-		stw	r5,4(r4)
-		stw	r4,0(r5)
-		stw	r3,4(r5)
-		stw	r5,0(r3)
+
+		bl AddTailPPC
+
 		lwz	r4,MP_SIGTASK(r31)
 		mr.	r4,r4
 		beq-	.NoPutSig
@@ -7412,7 +7390,8 @@ MoveFromBAT:
 #
 #********************************************************************************************
 
-FreeAllMem:	prolog 228,'TOC'
+FreeAllMem:	blr
+		prolog 228,'TOC'
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
@@ -7474,11 +7453,8 @@ RemExcHandler:
 
 		addi	r4,r31,LIST_REMOVEDEXC			#In lib base
 		mr	r5,r30
-		lwz	r3,0(r4)
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
+
+		bl AddHeadPPC
 
 		li	r4,Atomic
 
@@ -7962,31 +7938,23 @@ SetExcHandler:
 		lwz	r5,EXCDATA_MCHECK(r6)
 		mr.	r5,r5
 		beq-	.NoVMCheck
-		
+
 		loadreg	r3,(1<<EXC_MCHECK)
-		
+
 		bl	.CopyIt
-		
-		lwz	r3,0(r4)
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
-		
+
+		bl AddHeadPPC		
+
 .NoVMCheck:	lwz	r5,EXCDATA_DACCESS(r6)
 		mr.	r5,r5
 		beq-	.NoVDAccess
-		
+
 		loadreg	r3,(1<<EXC_DACCESS)
-		
+
 		bl	.CopyIt
-		
-		lwz	r3,0(r4)
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
-		
+
+		bl AddHeadPPC
+
 .NoVDAccess:	lwz	r5,EXCDATA_IACCESS(r6)
 		mr.	r5,r5
 		beq-	.NoVIAccess
@@ -7994,13 +7962,9 @@ SetExcHandler:
 		loadreg	r3,(1<<EXC_IACCESS)
 		
 		bl	.CopyIt
-		
-		lwz	r3,0(r4)
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
-		
+
+		bl AddHeadPPC
+
 .NoVIAccess:	lwz	r5,EXCDATA_INTERRUPT(r6)
 		mr.	r5,r5
 		beq-	.NoVInterrupt
@@ -8008,13 +7972,9 @@ SetExcHandler:
 		loadreg	r3,(1<<EXC_INTERRUPT)
 		
 		bl	.CopyIt
-		
-		lwz	r3,0(r4)
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
-		
+
+		bl AddHeadPPC		
+
 .NoVInterrupt:	lwz	r5,EXCDATA_ALIGN(r6)
 		mr.	r5,r5
 		beq-	.NoVAlign
@@ -8022,13 +7982,9 @@ SetExcHandler:
 		loadreg	r3,(1<<EXC_ALIGN)
 		
 		bl	.CopyIt
-		
-		lwz	r3,0(r4)
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
-		
+
+		bl AddHeadPPC
+
 .NoVAlign:	lwz	r5,EXCDATA_PROGRAM(r6)
 		mr.	r5,r5
 		beq-	.NoVProgram
@@ -8036,97 +7992,69 @@ SetExcHandler:
 		loadreg	r3,(1<<EXC_PROGRAM)
 		
 		bl	.CopyIt
-		
-		lwz	r3,0(r4)
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
-		
+
+		bl AddHeadPPC		
+
 .NoVProgram:	lwz	r5,EXCDATA_FPUN(r6)
 		mr.	r5,r5
 		beq-	.NoVFPUn
-		
+
 		loadreg	r3,(1<<EXC_FPUN)
-		
+
 		bl	.CopyIt
-		
-		lwz	r3,0(r4)
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
-		
+
+		bl AddHeadPPC
+
 .NoVFPUn:	lwz	r5,EXCDATA_DECREMENTER(r6)
 		mr.	r5,r5
 		beq-	.NoVDec
-		
+
 		loadreg	r3,(1<<EXC_DECREMENTER)
-		
+
 		bl	.CopyIt
-		
-		lwz	r3,0(r4)
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
-		
+
+		bl AddHeadPPC
+
 .NoVDec:	lwz	r5,EXCDATA_SYSTEMCALL(r6)
 		mr.	r5,r5
 		beq-	.NoVSC
-		
+
 		loadreg	r3,(1<<EXC_SYSTEMCALL)
-		
+
 		bl	.CopyIt
-		
-		lwz	r3,0(r4)
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
-		
+
+		bl AddHeadPPC
+
 .NoVSC:		lwz	r5,EXCDATA_TRACE(r6)
 		mr.	r5,r5
 		beq-	.NoVTrace
-		
+
 		loadreg	r3,(1<<EXC_TRACE)
-		
+
 		bl	.CopyIt
-		
-		lwz	r3,0(r4)
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
-		
+
+		bl AddHeadPPC
+
 .NoVTrace:	lwz	r5,EXCDATA_PERFMON(r6)
 		mr.	r5,r5
 		beq-	.NoVPerfMon
-		
+
 		loadreg	r3,(1<<EXC_PERFMON)
-		
+
 		bl	.CopyIt
-		
-		lwz	r3,0(r4)
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
-		
+
+		bl AddHeadPPC
+
 .NoVPerfMon:	lwz	r5,EXCDATA_IABR(r6)
 		mr.	r5,r5
 		beq-	.NoVIABR
-		
+
 		loadreg	r3,(1<<EXC_IABR)
-		
+
 		bl	.CopyIt
-		
-		lwz	r3,0(r4)
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
-		
+
+		bl AddHeadPPC
+
 .NoVIABR:	lwz	r0,0(r13)
 		addi	r13,r13,4
 		mtlr	r0
@@ -8241,13 +8169,9 @@ WaitTime:
 		stw	r0,LN_NAME(r31)
 		addi	r4,r29,LIST_WAITTIME
 		mr	r5,r31
-		
-		lwz	r3,0(r4)			#AddHeadPPC
-		stw	r5,0(r4)
-		stw	r3,0(r5)
-		stw	r4,4(r5)
-		stw	r5,4(r3)
-		
+
+		bl AddHeadPPC		
+
 		li	r0,0		
 		stb	r0,FLAG_WAIT(r29)
 
@@ -8279,12 +8203,9 @@ WaitTime:
 		bne-	.TimeOut
 
 		mr	r4,r31
-		
-		lwz	r3,0(r4)			#RemovePPC
-		lwz	r4,4(r4)
-		stw	r4,4(r3)
-		stw	r3,0(r4)
-		
+
+		bl RemovePPC		
+
 		b	.SigBeforeTime
 
 .TimeOut:	ori	r4,r4,SIGF_WAIT

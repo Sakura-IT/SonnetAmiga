@@ -2,7 +2,7 @@
 .include sonnet_libppc.i
 .include ppcmacros-std.i
 
-.global PPCCode,PPCLen,RunningTask,WaitingTasks,Init,ViolationAddress
+.global PPCCode,PPCLen,RunningTask,LIST_WAITINGTASKS,Init,ViolationAddress
 .global MCTask,SysBase,PowerPCBase,DOSBase,DebugLevel
 
 .set	PPCLen,(PPCEnd-PPCCode)
@@ -204,6 +204,14 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		stw	r4,MN_MCTASK(r9)
 		
 		lwz	r4,RunningTask(r0)
+		lwz	r4,TASKPPC_TASKPTR(r4)
+		
+		lwz	r3,0(r4)			#RemovePPC
+		lwz	r4,4(r4)
+		stw	r4,4(r3)
+		stw	r3,0(r4)
+		
+		lwz	r4,RunningTask(r0)
 		lwz	r4,TASKPPC_TASKMEM(r4)
 		stw	r4,MN_ARG0(r9)
 
@@ -287,30 +295,30 @@ End:		mflr	r4
 		stw	r13,-4(r1)
 		subi	r13,r1,4
 		stwu	r1,-284(r1)		
-
-		la	r4,ReadyTasks(r0)
-		bl	.MakeList
-
-		la	r4,WaitingTasks(r0)
-		bl	.MakeList
-
-		la	r4,Semaphores(r0)
-		bl	.MakeList
-
-		la	r4,Ports(r0)
-		bl	.MakeList
-
-		la	r4,AllTasks(r0)
-		bl	.MakeList
-
-		la	r4,SnoopList(r0)
-		bl	.MakeList
-		
-		la	r4,NewTasks(r0)
-		bl	.MakeList
-		
+				
 		lwz	r3,PowerPCBase(r0)
 		
+		la	r4,LIST_READYTASKS(r3)
+		bl	.MakeList
+		
+		la	r4,LIST_WAITINGTASKS(r3)
+		bl	.MakeList
+		
+		la	r4,LIST_NEWTASKS(r3)
+		bl	.MakeList
+
+		la	r4,LIST_SEMAPHORES(r3)
+		bl	.MakeList
+
+		la	r4,LIST_PORTS(r3)
+		bl	.MakeList
+
+		la	r4,LIST_SNOOP(r3)
+		bl	.MakeList
+
+		la	r4,LIST_ALLTASKS(r3)
+		bl	.MakeList
+
 		la	r4,LIST_REMOVEDTASKS(r3)
 		bl	.MakeList
 		
@@ -1810,7 +1818,8 @@ EInt:		b	.FPUnav				#0
 		stw	r8,TC_SIGRECVD(r4)
 		b	.NoXSignal
 		
-.ChkWait:	la	r4,WaitingTasks(r0)		#Check for it in the waiting tasks
+.ChkWait:	lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_WAITINGTASKS(r4)	#Check for it in the waiting tasks
 		lwz	r4,0(r4)
 .ChkNextSig:	lwz	r31,0(r4)
 		mr.	r31,r31				#Check for the end of the list
@@ -1856,6 +1865,10 @@ EInt:		b	.FPUnav				#0
 		mr.	r3,r3
 		beq	.NxtInQ
 		
+		lwz	r6,RunningTask(r0)
+		cmpw	r6,r3
+		beq	.PutMsgIt
+		
 		li	r6,TS_READY
 		stb	r6,TC_STATE(r3)				
 		b	.PutMsgIt
@@ -1889,7 +1902,8 @@ EInt:		b	.FPUnav				#0
 									
 		b	.NxtInQ
 		
-.MsgTPPC:	la	r4,NewTasks(r0)
+.MsgTPPC:	lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_NEWTASKS(r4)
 		
 		addi	r4,r4,4				#AddTailPPC
 		lwz	r3,4(r4)
@@ -1966,7 +1980,8 @@ EInt:		b	.FPUnav				#0
 		b	.NextWaitList
 
 .NoWaitTime:	li	r9,TS_READY
-		la	r4,WaitingTasks(r0)
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_WAITINGTASKS(r4)
 		lwz	r4,MLH_HEAD(r4)
 .NextOnList:	lwz	r5,LN_SUCC(r4)
 		mr.	r5,r5
@@ -1992,7 +2007,8 @@ EInt:		b	.FPUnav				#0
 		stw	r3,0(r4)
 				
 		mr	r5,r6
-		la	r4,ReadyTasks(r0)
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_READYTASKS(r4)
 		
 		addi	r4,r4,4				#AddTailPPC
 		lwz	r3,4(r4)
@@ -2005,7 +2021,8 @@ EInt:		b	.FPUnav				#0
 
 		b	.TrySwitch
 
-.NewTask:	la	r4,NewTasks(r0)
+.NewTask:	lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_NEWTASKS(r4)
 		mr	r6,r4
 
 		lwz	r5,0(r4)			#RemHeadPPC
@@ -2100,6 +2117,22 @@ EInt:		b	.FPUnav				#0
 		stw	r6,TASKPPC_MSGPORT(r8)
 
 		stw	r8,RunningTask(r0)
+		
+		la	r5,TASKPPC_ALLTASK(r8)
+		stw	r8,14(r5)		
+		stw	r5,TASKPPC_TASKPTR(r8)
+		lwz	r3,LN_NAME(8)			#Copy Name pointer 
+		stw	r3,LN_NAME(r5)
+		
+		lwz	r4,PowerPCBase(r0)
+		addi	r4,r4,LIST_ALLTASKS
+
+		addi	r4,r4,4				#AddTailPPC
+		lwz	r3,4(r4)
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
 
 		mr	r8,r9
 		
@@ -2263,7 +2296,8 @@ EInt:		b	.FPUnav				#0
 .TrySwitch:	mr.	r9,r9
 		bne	.CheckWait
 
-		la	r4,ReadyTasks(r0)
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_READYTASKS(r4)
 		
 		lwz	r5,0(r4)			#RemHeadPPC
 		lwz	r3,0(r5)
@@ -2308,7 +2342,8 @@ EInt:		b	.FPUnav				#0
 		
 		beq	.GoToWait
 		
-		la	r4,NewTasks(r0)
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_NEWTASKS(r4)
 		mr	r6,r4
 		
 		lwz	r5,0(r4)			#RemHeadPPC
@@ -2322,7 +2357,8 @@ EInt:		b	.FPUnav				#0
 .NoNode1:	mr.	r9,r3
 		bne	.SwitchNew			#Dispatch fixed bug
 
-		la	r4,ReadyTasks(r0)
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_READYTASKS(r4)
 	
 		lwz	r5,0(r4)			#RemHeadPPC
 		lwz	r3,0(r5)
@@ -2337,7 +2373,8 @@ EInt:		b	.FPUnav				#0
 		
 		b	.ReturnToUser
 	
-.SwitchOld:	la	r4,ReadyTasks(r0)		#Old = Context, New = PPStruct
+.SwitchOld:	lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_READYTASKS(r4)		#Old = Context, New = PPStruct
 		lwz	r5,RunningTask(r0)
 		stw	r9,RunningTask(r0)		
 		li	r6,TS_RUN
@@ -2356,8 +2393,8 @@ EInt:		b	.FPUnav				#0
 
 		b	.LoadContext
 	
-.SwitchNew:	
-		la	r4,ReadyTasks(r0)		
+.SwitchNew:	lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_READYTASKS(r4)		
 		lwz	r5,RunningTask(r0)
 		stw	r9,RunningTask(r0)
 		li	r6,TS_READY
@@ -2563,7 +2600,8 @@ EInt:		b	.FPUnav				#0
 
 .GoToWait:	li	r4,TS_WAIT
 		stb	r4,TC_STATE(r9)
-		la	r4,WaitingTasks(r0)
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_WAITINGTASKS(r4)
 		mr	r5,r9
 		
 		bl	.StoreContext
@@ -2577,8 +2615,8 @@ EInt:		b	.FPUnav				#0
 		
 		li	r4,0
 		stw	r4,RunningTask(r0)
-
-		la	r4,ReadyTasks(r0)
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_READYTASKS(r4)
 
 		lwz	r5,0(r4)			#RemHeadPPC
 		lwz	r3,0(r5)
