@@ -2138,7 +2138,7 @@ ReleaseSemaphorePPC:
 .Released:	lwz	r3,0(r13)
 
 		li	r31,FReleaseSemaphorePPC-FRun68K
-		bl	DebugEndFunction
+#		bl	DebugEndFunction
 
 		lwz	r3,0(r13)
 		lwz	r4,4(r13)
@@ -3731,7 +3731,11 @@ InsertOnPri:
 		cmpw	r3,r7
 		ble+	.CompareNode
 		
-.GoExit:	bl AddHeadPPC
+.GoExit:	lwz	r3,4(r4)
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
 
 		lwz	r3,0(r13)
 		lwz	r4,4(r13)
