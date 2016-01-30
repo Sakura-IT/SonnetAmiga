@@ -28,7 +28,8 @@
 ** Linking of WarpOS programs (e.g. by using vlink):
 **  vlink -oprog startup.o prog.o vc.lib x.o
 **
-**
+**  V2.3s 30-Jan-16  rkujawa
+**        Change PowerPC library name to sonnet.library. 
 **  V2.3  05-Jan-11  phx
 **        Define _errno here, for compatbility with 68k startup code.
 **  V2.2  10-Oct-08  phx
@@ -401,7 +402,7 @@ exit:
 DOSName:
 	dc.b	"dos.library",0
 PowerPCName:
-	dc.b	"powerpc.library",0
+	dc.b	"sonnet.library",0
 NilName:
 	dc.b	"NIL:",0
 
