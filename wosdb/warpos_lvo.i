@@ -99,11 +99,12 @@
 .set	SetNiceValue        ,       -744
 
 
-.macro	CALLWOS
-.ifgt	$NARG-1
-	mr	r3,\2
-.endif
-	lwz	r0,\1+2(r3)
-	mtlr	r0
+.macro CALLWOS function, register
+	.ifnb \register
+		mr r3,\register
+	.endif
+	lwz r0,\function+2(r3)
+	mtlr r0
 	blrl
 .endm
+
