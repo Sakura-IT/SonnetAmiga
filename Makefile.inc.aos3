@@ -1,4 +1,5 @@
 ASM68KPARAM+=-Iinclude_i:
+VBCC=vbcc:
 POSIXLIB=posixlib:
 RM=delete force 
 

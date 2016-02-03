@@ -31,10 +31,12 @@ SONNETO_N=dev-startup
 SONNETO_DIR=dev/startup
 SONNETO_O=sonnet.o
 SONNETO_X=x.o
+WOSDB_N=wosdb
+WOSDB_WOSDB=wosdb
 
 export
 
-all : $(SONNETLIB_N) $(SONNETRUN_N) $(SONNETO_N) $(TOOLS_N)
+all : $(SONNETLIB_N) $(SONNETRUN_N) $(SONNETO_N) $(TOOLS_N) $(WOSDB_N)
 
 $(SONNETLIB_N) :
 	$(MAKE) -C $(SONNETLIB_N)
@@ -48,6 +50,9 @@ $(TOOLS_N) :
 $(SONNETO_N) :
 	$(MAKE) -C $(SONNETO_DIR) 
 
+$(WOSDB_N) :
+	$(MAKE) -C $(WOSDB_N)
+
 disasm68k :
 	$(MAKE) -C $(SONNETLIB_N) disasm68k
 	$(MAKE) -C $(TOOLS_N) disasm68k
@@ -57,12 +62,13 @@ clean :
 	$(MAKE) -C $(SONNETRUN_N) clean
 	$(MAKE) -C $(SONNETO_DIR) clean
 	$(MAKE) -C $(TOOLS_N) clean
+	$(MAKE) -C $(WOSDB_N) clean
 	$(RM) $(DISTRIBUTION)
 
 distribution :
 	$(LHA) a $(DISTRIBUTION) $(SONNETLIB_N)/$(SONNETLIB_LIB) $(TOOLS_N)/$(TOOLS_GETINFO) $(TOOLS_N)/$(TOOLS_GETINFOPPC) $(TOOLS_N)/$(TOOLS_INITSONNET) $(SONNETRUN_N)/$(SONNETRUN_SONNETPATCH) $(SONNETO_DIR)/$(SONNETO_O) $(SONNETO_DIR)/$(SONNETO_X) README.md
 
-.PHONY: $(SONNETLIB_N) $(SONNETRUN_N) $(TOOLS_N)
+.PHONY: $(SONNETLIB_N) $(SONNETRUN_N) $(TOOLS_N) $(SONNETO_N) $(WOSDB_N)
 
 include Makefile.inc.$(HOST)
 

@@ -9,3 +9,7 @@ ifndef POSIXLIB
 $(error POSIXLIB is undefined, read the TOOLCHAIN file)
 endif
 
+ifndef VBCC
+$(error VBCC is undefined, read the TOOLCHAIN file)
+endif
+
