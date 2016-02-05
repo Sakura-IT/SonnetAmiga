@@ -16,7 +16,7 @@ OBJECTS = stdui.o debugger.o asmdebugger.o ppc_disasm.o exchandler.o \
 
 wosdb: $(OBJECTS)
 #	$(CC) -v -o wosdb $(OBJECTS) -lm -lamiga
-	$(LD) -t $(LDFLAGS) $(VBCC_WARPOS_TARGET)/lib/sonnet.o $(OBJECTS) -lm -lamiga -s -Rshort -L$(VBCC_WARPOS_TARGET)/lib -lvc $(VBCC_WARPOS_TARGET)/lib/x.o  $(LDHUNKATTR) -o $@ 
+	$(LD) $(LDFLAGS) $(VBCC_WARPOS_TARGET)/lib/sonnet.o $(OBJECTS) -lm -lamiga -s -Rshort -L$(VBCC_WARPOS_TARGET)/lib -lvc $(VBCC_WARPOS_TARGET)/lib/x.o  $(LDHUNKATTR) -o $@ 
 # XXX: can we avoid calling ld manually here by configuring vbcc correctly?
 
 stdui.o: stdui.c debugger.h ppc_disasm.h
