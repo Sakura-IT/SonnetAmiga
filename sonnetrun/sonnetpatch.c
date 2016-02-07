@@ -49,6 +49,8 @@ typedef uint8_t bool;
 #include <sys/queue.h>
 #endif
 
+#define DEBUG	1
+
 #define HUNK_UNIT	0x3E7
 #define HUNK_NAME	0x3E8
 #define HUNK_CODE	0x3E9
@@ -410,7 +412,9 @@ hunk_all_parse(int ifd)
 
 	offset = lseek(ifd, 0, SEEK_CUR); /* get current offset */
 
+#ifdef DEBUG
 	printf("starting hunk parser at %llx\n", offset);
+#endif /* DEBUG */
 
 	while (current_hunk < hh.table_size) {
 
@@ -427,8 +431,9 @@ hunk_all_parse(int ifd)
 		hip->offset = offset;
 		
 		offset = lseek(ifd, (hip->size+1) * sizeof(uint32_t), SEEK_CUR);
-
+#ifdef DEBUG
 		printf("lseeked to offset %llx\n", offset);
+#endif /* DEBUG */
 
 		read32be(ifd, &subhunkid);
 		if (subhunkid != HUNK_END) {
