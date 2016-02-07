@@ -1,15 +1,19 @@
-/* $VER: ppc_disasm.c V1.3 (09.03.2001)
+/* $VER: ppc_disasm.c V1.5 (27.05.2009)
  *
  * Disassembler module for the PowerPC microprocessor family
- * Copyright (c) 1998-2001  Frank Wille
+ * Copyright (c) 1998-2001,2009  Frank Wille
  *
- * ppc_disasm.c is freeware and may be freely redistributed as long as
- * no modifications are made and nothing is charged for it.
- * Non-commercial usage is allowed without any restrictions.
- * EVERY PRODUCT OR PROGRAM DERIVED DIRECTLY FROM MY SOURCE MAY NOT BE
+ * ppc_disasm.c is freeware and may be freely redistributed and modified
+ * for non-commercial usage, as long as the above copyright of the original
+ * author is preserved and appears in the documentation or the program itself.
+ * EVERY PRODUCT OR PROGRAM DERIVED DIRECTLY FROM THIS SOURCE MAY NOT BE
  * SOLD COMMERCIALLY WITHOUT PERMISSION FROM THE AUTHOR.
  *
  *
+ * v1.5  (27.05.2009) phx
+ *       Modified license. No long needs to specify endianess.
+ * v1.4  (29.08.2001) phx
+ *       AltiVec support.
  * v1.3  (09.03.2001) phx
  *       Last two operands in 4-operand float instructions were swapped.
  * v1.2  (09.11.2000) phx
@@ -83,6 +87,12 @@ static char *ldstnames[] = {
   "lwz","lwzu","lbz","lbzu","stw","stwu","stb","stbu","lhz","lhzu",
   "lha","lhau","sth","sthu","lmw","stmw","lfs","lfsu","lfd","lfdu",
   "stfs","stfsu","stfd","stfdu"
+};
+
+static char *vmnames[] = {
+  "mhaddshs","mhraddshs","mladduhm",NULL,"msumubm","msummbm",
+  "msumuhm","msumuhs","msumshm","msumshs","sel","perm",
+  "sldoi",NULL,"maddfp","nmsubfp"
 };
 
 
@@ -197,6 +207,35 @@ static char *fd_ra_rb(char *s,ppc_word in,int mask)
       s += sprintf(s,rfmt,(int)PPCGETA(in));
     if (mask & 1)
       s += sprintf(s,rfmt,(int)PPCGETB(in));
+    *--s = '\0';
+  }
+  else
+    *s = '\0';
+  return (s);
+}
+
+
+static char *vd_va_vb(char *s,ppc_word in,int mask)
+{
+  static const char *fmt = "v%d,";
+
+  if (mask) {
+    if (mask & 4)
+      s += sprintf(s,fmt,(int)PPCGETD(in));
+
+    if (mask & 2) {
+      if (mask & 16) {  /* A = SIMM */
+        int a = PPCGETA(in);
+        s += sprintf(s,fmt+1,(a>15)?(a-32):a);
+      }
+      else if (mask & 8)  /* A = UIMM */
+        s += sprintf(s,fmt+1,(int)PPCGETA(in));
+      else
+        s += sprintf(s,fmt,(int)PPCGETA(in));
+    }
+
+    if (mask & 1)
+      s += sprintf(s,fmt,(int)PPCGETB(in));
     *--s = '\0';
   }
   else
@@ -772,19 +811,80 @@ static void mtfsb(struct DisasmPara_PPC *dp,ppc_word in,int n)
 }
 
 
+static void vdab(struct DisasmPara_PPC *dp,ppc_word in,char *name,
+                 int mask,int chkrc)
+/* standard AltiVec instruction: vxxx vD,vA,vB */
+{
+  sprintf(dp->opcode,"%s%s",name,rcsel[chkrc&&(in&PPCVRC)]);
+  vd_va_vb(dp->operands,in,mask);
+}
+
+
+static void vdabc(struct DisasmPara_PPC *dp,ppc_word in)
+/* four operands AltiVec instruction: vxxx vD,vA,vB,vC */
+{
+  int nameidx = (in & 0x3f) - 32;
+
+  if (vmnames[nameidx]) {
+    sprintf(dp->opcode,"v%s",vmnames[nameidx]);
+    sprintf(vd_va_vb(dp->operands,in,7),
+            (nameidx==12) ? ",%d" : ",v%d", (int)PPCGETC(in));
+  }
+  else
+    ill(dp,in);
+}
+
+
+static void vldst(struct DisasmPara_PPC *dp,ppc_word in,char *name)
+{
+  if (in & 1) {
+    ill(dp,in);
+  }
+  else {
+    dp->flags |= PPCF_ALTIVEC;
+    strcpy(dp->opcode,name);
+    sprintf(dp->operands,"v%d,r%d,r%d",(int)PPCGETD(in),
+            (int)PPCGETA(in),(int)PPCGETB(in));
+  }
+}
+
+
+static void dstrm(struct DisasmPara_PPC *dp,ppc_word in,char *name)
+{
+  if (in & 0x01800001) {
+    ill(dp,in);
+  }
+  else {
+    char *s = dp->operands;;
+
+    if (PPCGETIDX2(in) == 822) {  /* dss, dssall */
+      if (PPCGETA(in) || PPCGETB(in)) {
+        ill(dp,in);
+        return;
+      }
+      sprintf(dp->opcode,"d%s%s",name,(in&PPCDST) ? "all" : "");
+    }
+    else {
+      sprintf(dp->opcode,"d%s%c",name,(in&PPCDST) ? 't' : '\0');
+      s += sprintf(s,"r%d,r%d,",(int)PPCGETA(in),(int)PPCGETB(in));
+    }
+    sprintf(s,"%d",(int)PPCGETSTRM(in));
+    dp->flags |= PPCF_ALTIVEC;
+  }
+}
+
+
+
 ppc_word *PPC_Disassemble(struct DisasmPara_PPC *dp)
 /* Disassemble PPC instruction and return a pointer to the next */
 /* instruction, or NULL if an error occured. */
 {
-  ppc_word in = *(dp->instr);
+  unsigned char *p = (unsigned char *)dp->instr;
+  ppc_word in = p[0]<<24 | p[1]<<16 | p[2]<<8 | p[3];
 
   if (dp->opcode==NULL || dp->operands==NULL)
     return (NULL);  /* no buffers */
 
-#ifdef LITTLEENDIAN
-  in = (in & 0xff)<<24 | (in & 0xff00)<<8 | (in & 0xff0000)>>8 |
-       (in & 0xff000000)>>24;
-#endif
   dp->type = PPCINSTR_OTHER;
   dp->flags = 0;
   *(dp->operands) = 0;
@@ -796,6 +896,559 @@ ppc_word *PPC_Disassemble(struct DisasmPara_PPC *dp)
 
     case 3:
       trapi(dp,in,0);  /* twi */
+      break;
+
+    case 4:
+      dp->flags |= PPCF_ALTIVEC;
+
+      if ((in & 0x30) == 0x20) {
+        /* vxxx vA,vB,vC,vD  - four operands instructions */
+        vdabc(dp,in);
+        break;
+      }
+      if (in & 1) {
+        ill(dp,in);
+        break;
+      }
+
+      switch (PPCGETIDX2(in)<<1) {
+        case 0:
+          vdab(dp,in,"vaddubm",7,0);
+          break;
+
+        case 2:
+          vdab(dp,in,"vmaxub",7,0);
+          break;
+
+        case 4:
+          vdab(dp,in,"vrlb",7,0);
+          break;
+
+        case 6:
+        case 6+PPCVRC:
+          vdab(dp,in,"vcmpequb",7,1);
+          break;
+
+        case 8:
+          vdab(dp,in,"vmuloub",7,0);
+          break;
+
+        case 10:
+          vdab(dp,in,"vaddfp",7,0);
+          break;
+
+        case 12:
+          vdab(dp,in,"vmrghb",7,0);
+          break;
+
+        case 14:
+          vdab(dp,in,"vpkuhum",7,0);
+          break;
+
+        case 64:
+          vdab(dp,in,"vadduhm",7,0);
+          break;
+
+        case 66:
+          vdab(dp,in,"vmaxuh",7,0);
+          break;
+
+        case 68:
+          vdab(dp,in,"vrlh",7,0);
+          break;
+
+        case 70:
+        case 70+PPCVRC:
+          vdab(dp,in,"vcmpequh",7,1);
+          break;
+
+        case 72:
+          vdab(dp,in,"vmulouh",7,0);
+          break;
+
+        case 74:
+          vdab(dp,in,"vsubfp",7,0);
+          break;
+
+        case 76:
+          vdab(dp,in,"vmrghh",7,0);
+          break;
+
+        case 78:
+          vdab(dp,in,"vpkuwum",7,0);
+          break;
+
+        case 128:
+          vdab(dp,in,"vadduwm",7,0);
+          break;
+
+        case 130:
+          vdab(dp,in,"vmaxuw",7,0);
+          break;
+
+        case 132:
+          vdab(dp,in,"vrlw",7,0);
+          break;
+
+        case 134:
+        case 134+PPCVRC:
+          vdab(dp,in,"vcmpequw",7,1);
+          break;
+
+        case 140:
+          vdab(dp,in,"vmrghw",7,0);
+          break;
+
+        case 142:
+          vdab(dp,in,"vpkuhus",7,0);
+          break;
+
+        case 198:
+        case 198+PPCVRC:
+          vdab(dp,in,"vcmpeqfp",7,1);
+          break;
+
+        case 206:
+          vdab(dp,in,"vpkuwus",7,0);
+          break;
+
+        case 258:
+          vdab(dp,in,"vmaxsb",7,0);
+          break;
+
+        case 260:
+          vdab(dp,in,"vslb",7,0);
+          break;
+
+        case 264:
+          vdab(dp,in,"vmulosb",7,0);
+          break;
+
+        case 266:
+          vdab(dp,in,"vrefp",5,0);
+          break;
+
+        case 268:
+          vdab(dp,in,"vmrglb",7,0);
+          break;
+
+        case 270:
+          vdab(dp,in,"vpkshus",7,0);
+          break;
+
+        case 322:
+          vdab(dp,in,"vmaxsh",7,0);
+          break;
+
+        case 324:
+          vdab(dp,in,"vslh",7,0);
+          break;
+
+        case 328:
+          vdab(dp,in,"vmulosh",7,0);
+          break;
+
+        case 330:
+          vdab(dp,in,"vrsqrtefp",5,0);
+          break;
+
+        case 332:
+          vdab(dp,in,"vmrglh",7,0);
+          break;
+
+        case 334:
+          vdab(dp,in,"vpkswus",7,0);
+          break;
+
+        case 384:
+          vdab(dp,in,"vaddcuw",7,0);
+          break;
+
+        case 386:
+          vdab(dp,in,"vmaxsw",7,0);
+          break;
+
+        case 388:
+          vdab(dp,in,"vslw",7,0);
+          break;
+
+        case 394:
+          vdab(dp,in,"vexptefp",5,0);
+          break;
+
+        case 396:
+          vdab(dp,in,"vmrglw",7,0);
+          break;
+
+        case 398:
+          vdab(dp,in,"vpkshss",7,0);
+          break;
+
+        case 452:
+          vdab(dp,in,"vsl",7,0);
+          break;
+
+        case 454:
+        case 454+PPCVRC:
+          vdab(dp,in,"vcmpgefp",7,1);
+          break;
+
+        case 458:
+          vdab(dp,in,"vlogefp",5,0);
+          break;
+
+        case 462:
+          vdab(dp,in,"vpkswss",7,0);
+          break;
+
+        case 512:
+          vdab(dp,in,"vaddubs",7,0);
+          break;
+
+        case 514:
+          vdab(dp,in,"vminub",7,0);
+          break;
+
+        case 516:
+          vdab(dp,in,"vsrb",7,0);
+          break;
+
+        case 518:
+        case 518+PPCVRC:
+          vdab(dp,in,"vcmpgtub",7,1);
+          break;
+
+        case 520:
+          vdab(dp,in,"vmuleub",7,0);
+          break;
+
+        case 522:
+          vdab(dp,in,"vrfin",5,0);
+          break;
+
+        case 524:
+          vdab(dp,in,"vspltb",15,0);
+          break;
+
+        case 526:
+          vdab(dp,in,"vupkhsb",5,0);
+          break;
+
+        case 576:
+          vdab(dp,in,"vadduhs",7,0);
+          break;
+
+        case 578:
+          vdab(dp,in,"vminuh",7,0);
+          break;
+
+        case 580:
+          vdab(dp,in,"vsrh",7,0);
+          break;
+
+        case 582:
+        case 582+PPCVRC:
+          vdab(dp,in,"vcmpgtuh",7,1);
+          break;
+
+        case 584:
+          vdab(dp,in,"vmuleuh",7,0);
+          break;
+
+        case 586:
+          vdab(dp,in,"vrfiz",5,0);
+          break;
+
+        case 588:
+          vdab(dp,in,"vsplth",15,0);
+          break;
+
+        case 590:
+          vdab(dp,in,"vupkhsh",5,0);
+          break;
+
+        case 640:
+          vdab(dp,in,"vadduws",7,0);
+          break;
+
+        case 642:
+          vdab(dp,in,"vminuw",7,0);
+          break;
+
+        case 644:
+          vdab(dp,in,"vsrw",7,0);
+          break;
+
+        case 646:
+        case 646+PPCVRC:
+          vdab(dp,in,"vcmpgtuw",7,1);
+          break;
+
+        case 650:
+          vdab(dp,in,"vrfip",5,0);
+          break;
+
+        case 652:
+          vdab(dp,in,"vspltw",15,0);
+          break;
+
+        case 654:
+          vdab(dp,in,"vupklsb",5,0);
+          break;
+
+        case 708:
+          vdab(dp,in,"vsr",7,0);
+          break;
+
+        case 710:
+        case 710+PPCVRC:
+          vdab(dp,in,"vcmpgtfp",7,1);
+          break;
+
+        case 714:
+          vdab(dp,in,"vrfim",5,0);
+          break;
+
+        case 718:
+          vdab(dp,in,"vupklsh",5,0);
+          break;
+
+        case 768:
+          vdab(dp,in,"vaddsbs",7,0);
+          break;
+
+        case 770:
+          vdab(dp,in,"vminsb",7,0);
+          break;
+
+        case 772:
+          vdab(dp,in,"vsrab",7,0);
+          break;
+
+        case 774:
+        case 774+PPCVRC:
+          vdab(dp,in,"vcmpgtsb",7,1);
+          break;
+
+        case 776:
+          vdab(dp,in,"vmulesb",7,0);
+          break;
+
+        case 778:
+          vdab(dp,in,"vcfux",15,0);
+          break;
+
+        case 780:
+          vdab(dp,in,"vspltisb",22,0);
+          break;
+
+        case 782:
+          vdab(dp,in,"vpkpx",7,0);
+          break;
+
+        case 832:
+          vdab(dp,in,"vaddshs",7,0);
+          break;
+
+        case 834:
+          vdab(dp,in,"vminsh",7,0);
+          break;
+
+        case 836:
+          vdab(dp,in,"vsrah",7,0);
+          break;
+
+        case 838:
+        case 838+PPCVRC:
+          vdab(dp,in,"vcmpgtsh",7,1);
+          break;
+
+        case 840:
+          vdab(dp,in,"vmulesh",7,0);
+          break;
+
+        case 842:
+          vdab(dp,in,"vcfsx",15,0);
+          break;
+
+        case 844:
+          vdab(dp,in,"vspltish",22,0);
+          break;
+
+        case 846:
+          vdab(dp,in,"vupkhpx",5,0);
+          break;
+
+        case 896:
+          vdab(dp,in,"vaddsws",7,0);
+          break;
+
+        case 898:
+          vdab(dp,in,"vminsw",7,0);
+          break;
+
+        case 900:
+          vdab(dp,in,"vsraw",7,0);
+          break;
+
+        case 902:
+        case 902+PPCVRC:
+          vdab(dp,in,"vcmpgtsw",7,1);
+          break;
+
+        case 906:
+          vdab(dp,in,"vctuxs",15,0);
+          break;
+
+        case 908:
+          vdab(dp,in,"vspltisw",22,0);
+          break;
+
+        case 966:
+        case 966+PPCVRC:
+          vdab(dp,in,"vcmpbfp",7,1);
+          break;
+
+        case 970:
+          vdab(dp,in,"vctsxs",15,0);
+          break;
+
+        case 974:
+          vdab(dp,in,"vupklpx",5,0);
+          break;
+
+        case 1024:
+          vdab(dp,in,"vsububm",7,0);
+          break;
+
+        case 1026:
+          vdab(dp,in,"vavgub",7,0);
+          break;
+
+        case 1028:
+          vdab(dp,in,"vand",7,0);
+          break;
+
+        case 1034:
+          vdab(dp,in,"vmaxfp",7,0);
+          break;
+
+        case 1036:
+          vdab(dp,in,"vslo",7,0);
+          break;
+
+        case 1088:
+          vdab(dp,in,"vsubuhm",7,0);
+          break;
+
+        case 1090:
+          vdab(dp,in,"vavguh",7,0);
+          break;
+
+        case 1092:
+          vdab(dp,in,"vandc",7,0);
+          break;
+
+        case 1098:
+          vdab(dp,in,"vminfp",7,0);
+          break;
+
+        case 1100:
+          vdab(dp,in,"vsro",7,0);
+          break;
+
+        case 1152:
+          vdab(dp,in,"vsubuwm",7,0);
+          break;
+
+        case 1154:
+          vdab(dp,in,"vavguw",7,0);
+          break;
+
+        case 1156:
+          vdab(dp,in,"vor",7,0);
+          break;
+
+        case 1220:
+          vdab(dp,in,"vxor",7,0);
+          break;
+
+        case 1282:
+          vdab(dp,in,"vavgsb",7,0);
+          break;
+
+        case 1284:
+          vdab(dp,in,"vnor",7,0);
+          break;
+
+        case 1346:
+          vdab(dp,in,"vavgsh",7,0);
+          break;
+
+        case 1408:
+          vdab(dp,in,"vsubcuw",7,0);
+          break;
+
+        case 1410:
+          vdab(dp,in,"vavgsw",7,0);
+          break;
+
+        case 1536:
+          vdab(dp,in,"vsububs",7,0);
+          break;
+
+        case 1540:
+          vdab(dp,in,"mfvscr",4,0);
+          break;
+
+        case 1544:
+          vdab(dp,in,"vsum4ubs",7,0);
+          break;
+
+        case 1600:
+          vdab(dp,in,"vsubuhs",7,0);
+          break;
+
+        case 1604:
+          vdab(dp,in,"mtvscr",1,0);
+          break;
+
+        case 1608:
+          vdab(dp,in,"vsum4shs",7,0);
+          break;
+
+        case 1664:
+          vdab(dp,in,"vsubuws",7,0);
+          break;
+
+        case 1672:
+          vdab(dp,in,"vsum2sws",7,0);
+          break;
+
+        case 1792:
+          vdab(dp,in,"vsubsbs",7,0);
+          break;
+
+        case 1800:
+          vdab(dp,in,"vsum4sbs",7,0);
+          break;
+
+        case 1856:
+          vdab(dp,in,"vsubshs",7,0);
+          break;
+
+        case 1920:
+          vdab(dp,in,"vsubsws",7,0);
+          break;
+
+        case 1928:
+          vdab(dp,in,"vsumsws",7,0);
+          break;
+
+        default:
+          ill(dp,in);
+          break;
+      }
       break;
 
     case 7: 
@@ -986,6 +1639,14 @@ ppc_word *PPC_Disassemble(struct DisasmPara_PPC *dp)
             trap(dp,in,0);  /* tw */
           break;
 
+        case 6:
+          vldst(dp,in,"lvsl");  /* AltiVec */
+          break;
+
+        case 7:
+          vldst(dp,in,"lvebx");  /* AltiVec */
+          break;
+
         case 8:
         case (PPCOE>>1)+8:
           dab(dp,swapab(in),"subc",7,0,1,-1,0);
@@ -1042,6 +1703,14 @@ ppc_word *PPC_Disassemble(struct DisasmPara_PPC *dp)
           dab(dp,in,"and",7,1,0,-1,0);
           break;
 
+        case 38:
+          vldst(dp,in,"lvsr");  /* AltiVec */
+          break;
+
+        case 39:
+          vldst(dp,in,"lvehx");  /* AltiVec */
+          break;
+
         case 40:
         case (PPCOE>>1)+40:
           dab(dp,swapab(in),"sub",7,0,1,-1,0);
@@ -1077,6 +1746,10 @@ ppc_word *PPC_Disassemble(struct DisasmPara_PPC *dp)
           trap(dp,in,PPCF_64);  /* td */
           break;
 
+        case 71:
+          vldst(dp,in,"lvewx");  /* AltiVec */
+          break;
+
         case 73:
           dab(dp,in,"mulhd",7,0,0,-1,PPCF_64);
           break;
@@ -1107,6 +1780,10 @@ ppc_word *PPC_Disassemble(struct DisasmPara_PPC *dp)
           dab(dp,in,"lbzx",7,0,0,0,0);
           break;
 
+        case 103:
+          vldst(dp,in,"lvx");  /* AltiVec */
+          break;
+
         case 104:
         case (PPCOE>>1)+104:
           if (in & PPCBMASK)
@@ -1124,6 +1801,10 @@ ppc_word *PPC_Disassemble(struct DisasmPara_PPC *dp)
             dab(dp,in,"not",6,1,0,-1,0);
           else
             dab(dp,in,"nor",7,1,0,-1,0);
+          break;
+
+        case 135:
+          vldst(dp,in,"stvebx");  /* AltiVec */
           break;
 
         case 136:
@@ -1159,12 +1840,20 @@ ppc_word *PPC_Disassemble(struct DisasmPara_PPC *dp)
           dab(dp,in,"stwx",7,0,0,0,0);
           break;
 
+        case 167:
+          vldst(dp,in,"stvehx");  /* AltiVec */
+          break;
+
         case 181:
           dab(dp,in,"stdux",7,0,0,0,PPCF_64);
           break;
 
         case 183:
           dab(dp,in,"stwux",7,0,0,0,0);
+          break;
+
+        case 199:
+          vldst(dp,in,"stvewx");  /* AltiVec */
           break;
 
         case 200:
@@ -1193,6 +1882,10 @@ ppc_word *PPC_Disassemble(struct DisasmPara_PPC *dp)
 
         case 215:
           dab(dp,in,"stbx",7,0,0,0,0);
+          break;
+
+        case 231:
+          vldst(dp,in,"stvx");  /* AltiVec */
           break;
 
         case 232:
@@ -1286,8 +1979,16 @@ ppc_word *PPC_Disassemble(struct DisasmPara_PPC *dp)
           dab(dp,in,"lwax",7,0,0,0,PPCF_64);
           break;
 
+        case 342:
+          dstrm(dp,in,"st");  /* AltiVec Stream */
+          break;
+
         case 343:
           dab(dp,in,"lhax",7,0,0,0,0);
+          break;
+
+        case 359:
+          vldst(dp,in,"lvxl");  /* AltiVec */
           break;
 
         case 370:
@@ -1300,6 +2001,10 @@ ppc_word *PPC_Disassemble(struct DisasmPara_PPC *dp)
 
         case 373:
           dab(dp,in,"lwaux",7,0,0,0,PPCF_64);
+          break;
+
+        case 374:
+          dstrm(dp,in,"stst");  /* AltiVec Stream */
           break;
 
         case 375:
@@ -1363,6 +2068,10 @@ ppc_word *PPC_Disassemble(struct DisasmPara_PPC *dp)
 
         case 476:
           dab(dp,in,"nand",7,1,0,-1,0);
+          break;
+
+        case 487:
+          vldst(dp,in,"stvxl");  /* AltiVec */
           break;
 
         case 489:
@@ -1481,6 +2190,10 @@ ppc_word *PPC_Disassemble(struct DisasmPara_PPC *dp)
 
         case 794:
           dab(dp,in,"srad",7,1,0,-1,PPCF_64);
+          break;
+
+        case 822:
+          dstrm(dp,in,"ss");  /* AltiVec Stream */
           break;
 
         case 824:
@@ -1677,7 +2390,7 @@ ppc_word *PPC_Disassemble(struct DisasmPara_PPC *dp)
             break;
 
           case 20:
-            fdabc(dp,in,"sqrte",2,0);
+            fdabc(dp,in,"rsqrte",2,0);
             break;
 
           case 24:

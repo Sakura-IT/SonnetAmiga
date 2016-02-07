@@ -1,15 +1,21 @@
-/* $VER: ppc_disasm.h V0.1 (23.05.1998)
+/* $VER: ppc_disasm.h V1.6 (09.12.2011)
  *
  * Disassembler module for the PowerPC microprocessor family
- * Copyright (c) 1998-2001  Frank Wille
+ * Copyright (c) 1998-2001,2009,2011 Frank Wille
  *
- * ppc_disasm.c is freeware and may be freely redistributed as long as
- * no modifications are made and nothing is charged for it.
- * Non-commercial usage is allowed without any restrictions.
- * EVERY PRODUCT OR PROGRAM DERIVED DIRECTLY FROM MY SOURCE MAY NOT BE
+ * ppc_disasm.h is freeware and may be freely redistributed and modified
+ * for non-commercial usage, as long as the above copyright of the original
+ * author is preserved and appears in the documentation or the program itself.
+ * EVERY PRODUCT OR PROGRAM DERIVED DIRECTLY FROM THIS SOURCE MAY NOT BE
  * SOLD COMMERCIALLY WITHOUT PERMISSION FROM THE AUTHOR.
  *
  *
+ * v1.6  (09.12.2011) phx
+ *       fsqrte -> frsqrte
+ * v1.5  (27.05.2009) phx
+ *       Modified license. No long needs to specify endianess.
+ * v1.4  (29.08.2001) phx
+ *       AltiVec support.
  * v0.1  (23.05.1998) phx
  *       First version, which implements all PowerPC instructions.
  * v0.0  (09.05.1998) phx
@@ -23,20 +29,13 @@
 
 /* version/revision */
 #define PPCDISASM_VER 1
-#define PPCDISASM_REV 3
+#define PPCDISASM_REV 6
 
 
 /* typedefs */
 typedef unsigned int ppc_word;
 #ifndef NULL
 #define NULL (0L)
-#endif
-
-
-/* endianess */
-#if !defined(BIGENDIAN) && !defined(LITTLEENDIAN)
-#error Define either BIGENDIAN or LITTLEENDIAN!
-#define BIGENDIAN
 #endif
 
 
@@ -52,6 +51,9 @@ typedef unsigned int ppc_word;
 #define PPCCRAMASK      0x001c0000
 #define PPCLMASK        0x00600000
 #define PPCOE           0x00000400
+#define PPCVRC          0x00000400
+#define PPCDST          0x02000000
+#define PPCSTRM         0x00600000
 
 #define PPCIDXSH        26
 #define PPCDSH          21
@@ -74,6 +76,7 @@ typedef unsigned int ppc_word;
 #define PPCGETCRA(x)    (((x)&PPCCRAMASK)>>PPCCRASH)
 #define PPCGETL(x)      (((x)&PPCLMASK)>>PPCLSH)
 #define PPCGETIDX2(x)   (((x)&PPCIDX2MASK)>>PPCIDX2SH)
+#define PPCGETSTRM(x)   (((x)&PPCSTRM)>>PPCDSH)
 
 
 /* Disassembler structure, the interface to the application */
@@ -99,6 +102,7 @@ struct DisasmPara_PPC {
 #define PPCF_UNSIGNED  (1<<1)   /* unsigned immediate instruction */
 #define PPCF_SUPER     (1<<2)   /* supervisor level instruction */
 #define PPCF_64        (1<<3)   /* 64-bit only instruction */
+#define PPCF_ALTIVEC   (1<<4)   /* AltiVec instruction */
 
 
 /* ppc_disasm.o prototypes */
