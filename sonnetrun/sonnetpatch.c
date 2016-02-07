@@ -125,6 +125,7 @@ void hunk_info_print(void);
 bool hunk_get_type(uint32_t, const struct hunkdef **);
 bool hunk_to_patch_tokenize(char **);
 bool hunk_header_patch_sonnet(int, int);
+bool hunk_header_patch_simple(int, int);
 void snprintf_memf(char *, size_t, uint8_t);
 bool file_close(int *);
 bool file_open(int *, char *);
@@ -162,7 +163,7 @@ main(int argc, char *argv[])
 {
 	int ifd, ofd;
 	int copt;
-	bool opt_patchit;
+	bool opt_patchit, opt_patchsimple;
 	char *myname;
 
 	opt_patchit = false;
@@ -170,6 +171,9 @@ main(int argc, char *argv[])
 
 	while ((copt = getopt(argc, argv, "p:")) != -1) {
 		switch (copt) {
+		case 's':
+			opt_patchsimple = true;
+			break;
 		case 'p':
 			opt_patchit = true;
 			if (!hunk_to_patch_tokenize(&optarg)) {
@@ -197,7 +201,7 @@ main(int argc, char *argv[])
 	if (!file_open(&ifd, argv[0]))
 		return 2; 
 
-	if (opt_patchit) {
+	if (opt_patchit || opt_patchsimple) {
 		if (!file_create(&ofd, argv[1])) {
 			file_close(&ifd);
 			return 2;
@@ -206,9 +210,19 @@ main(int argc, char *argv[])
 
 	if (!hunk_header_parse(ifd)) {
 		file_close(&ifd);
-		if(opt_patchit)
+		if(opt_patchit || opt_patchsimple)
 			file_close(&ofd);
 		return 3;
+	}
+
+	if(opt_patchsimple) {
+		/* XXX: handle errors */
+		hunk_header_patch_simple(ifd, ofd);
+	
+		file_close(&ifd);
+		file_close(&ofd);
+
+		return 0;	
 	}
 
 	if(!hunk_all_parse(ifd)) {
@@ -228,6 +242,13 @@ main(int argc, char *argv[])
 	/* XXX: TAILQ cleanup here and above in case of errors */
 	file_close(&ifd);
 	return EXIT_SUCCESS;
+}
+
+bool
+hunk_header_patch_simple(int ifd, int ofd)
+{
+	/* TODO: implement */
+	return true;
 }
 
 bool
@@ -389,6 +410,8 @@ hunk_all_parse(int ifd)
 
 	offset = lseek(ifd, 0, SEEK_CUR); /* get current offset */
 
+	printf("starting hunk parser at %llx\n", offset);
+
 	while (current_hunk < hh.table_size) {
 
 		/* extract a pointer for the current hunk from the queue */
@@ -404,6 +427,8 @@ hunk_all_parse(int ifd)
 		hip->offset = offset;
 		
 		offset = lseek(ifd, (hip->size+1) * sizeof(uint32_t), SEEK_CUR);
+
+		printf("lseeked to offset %llx\n", offset);
 
 		read32be(ifd, &subhunkid);
 		if (subhunkid != HUNK_END) {
@@ -573,7 +598,7 @@ copy32(int ifd, int ofd)
 void
 usage(char *myname)
 {
-	printf("%s: [-p hnum...] hunkfile\n", myname);
+	printf("%s: [-s|-p hnum...] hunkfile [outfile]\n", myname);
 }
 
 void
