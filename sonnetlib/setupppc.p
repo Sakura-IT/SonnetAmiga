@@ -3407,12 +3407,23 @@ EInt:		b	.FPUnav				#0
 		beq	.lfs
 		cmpwi	r0,0x1f
 		beq	.stfsx
+		cmpwi	r0,0x32
+		beq	.lfd
 		b	.HaltAlign
 
 .stfs:		lfdx	f1,r31,r6			#get value from fp register
 		stfs	f1,AlignStore(r0)		#store it on correct aligned spot
 		lwz	r6,AlignStore(r0)		#Get the correct 32 bit value
 		stwx	r6,r7,r8			#Store correct value
+		b	.AligExit
+
+.lfd:		lwzx	r9,r7,r8
+		stw	r9,AlignStore(r0)
+		addi	r8,r8,4
+		lwzx	r9,r7,r8
+		stw	r9,AlignStore2(r0)
+		lfd	f1,AlignStore(r0)
+		stfdx	f1,r31,r6
 		b	.AligExit
 
 .lfs:		lwzx	r9,r7,r8			#Get 32 bit value

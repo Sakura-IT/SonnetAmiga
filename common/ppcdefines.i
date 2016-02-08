@@ -53,9 +53,10 @@
 .set WaitListSem,124				#18150
 .set CPUInfo,128
 .set AlignStore,132
-.set ViolationAddress,136			#Pointer
-.set MemSize,140
-.set L2Size,144
+.set AlignStore2,136
+.set ViolationAddress,140			#Pointer
+.set MemSize,144
+.set L2Size,148
 
 #LibBase:
 
