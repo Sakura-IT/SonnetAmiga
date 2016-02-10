@@ -2762,6 +2762,7 @@ WaitFor68K:
 		bl User
 		
 		mr	r4,r29		
+		lwz	r5,MN_PPSTRUCT+5*4(r30)
 
 		mtctr	r26
 
@@ -2874,6 +2875,8 @@ Run68K:
 		mr	r4,r29
 
 		bl 	WaitFor68K
+
+		mr	r3,r5
 
 		li	r31,FRun68K-FRun68K
 		bl	DebugEndFunction
@@ -8772,7 +8775,7 @@ DebugStartFunction:
 		bl	.GetText
 .FText:		
 .byte		"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
-		.align 4
+		.balign 4
 .FArgs:		
 .long		0,0,0,0,0,0
 
@@ -8822,16 +8825,11 @@ DebugEndFunction:
 		mr.	r30,r30
 		beq	.NoDebugEnd
 
-		mr.	r31,r31
-		bne	.NoRunResult
-
-		lwz	r3,PP_CODE+20(r29)
-
-.NoRunResult:	bl	.GetText2
+		bl	.GetText2
 		
 .FText2:		
 .byte		"Process: %s Function: %s r3 = %08lx",10,0
-		.align 4
+		.balign 4
 .FArgs2:		
 .long		0,0,0
 
@@ -8956,7 +8954,7 @@ FIsExceptionMode:	.byte	"IsExceptionMode",0
 FAllocatePPC:		.byte	"AllocatePPC",0
 FDeallocatePPC:		.byte	"DeallocatePPC",0
 
-			.align	4
+			.balign	4
 
 #********************************************************************************************
 EndFunctions:

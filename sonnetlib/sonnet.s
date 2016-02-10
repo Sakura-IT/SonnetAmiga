@@ -541,6 +541,7 @@ MsgT68k		move.b LN_TYPE(a1),d7
 ReUse		move.l a2,d7
 		lea PushMsg(pc),a5
 		jsr _LVOSupervisor(a6)
+		move.l 4.w,a6
 		move.l EUMBAddr(pc),a2
 		move.l d7,IFQPR(a2)			;Message the PPC
 		move.l a1,OFQPR(a2)			;Return Message Frame
@@ -697,6 +698,9 @@ Joshua		move.l 4.w,a6				;Fake Mirror task for PPC task
 GoRest		move.l 4.w,a6
 		move.l (a7),a0
 		jsr _LVOWaitPort(a6)
+		moveq.l #0,d0
+		moveq.l #-1,d1
+		jsr _LVOSetSignal(a6)
 GtLoop2		move.l (a7),a0
 		jsr _LVOGetMsg(a6)
 		tst.l d0
@@ -713,12 +717,12 @@ Tree		rts
 
 		cnop 0,4
 
-PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,4,NP_StackSize,$8000,0,0
+PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,4,NP_StackSize,$20000,0,0
 PrcName		dc.b "MasterControl",0
 
 		cnop 0,4
 		
-Prc2Tags	dc.l NP_Entry,Joshua,NP_Name,Prc2Name,NP_Priority,3,NP_StackSize,$8000,0,0
+Prc2Tags	dc.l NP_Entry,Joshua,NP_Name,Prc2Name,NP_Priority,3,NP_StackSize,$20000,0,0
 Prc2Name	dc.b "Joshua",0
 PrtName		dc.b "Skynet",0
 
@@ -1111,7 +1115,6 @@ NoFPU		movem.l d0-a6,-(a7)			;68k routines called from PPC
 		move.l PP_CODE(a1),a0
 		add.l PP_OFFSET(a1),a0
 		move.l a0,-(a7)
-
 		btst #AFB_FPU40,AttnFlags+1(a6)
 		beq.s NoFPU3
 		lea PP_FREGS(a1),a6
