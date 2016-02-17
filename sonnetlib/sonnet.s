@@ -322,6 +322,7 @@ Wait		move.l $3004(a1),d5
 NoPCILb		jsr _LVOEnqueue(a6)
 
 		move.l #FunctionsLen,d0
+		moveq.l #0,d1
 		bsr AllocVec32
 
 		tst.l d0
@@ -699,7 +700,7 @@ GoRest		move.l 4.w,a6
 		move.l (a7),a0
 		jsr _LVOWaitPort(a6)
 		moveq.l #0,d0
-		moveq.l #-1,d1
+		move.l #$0000ffff,d1
 		jsr _LVOSetSignal(a6)
 GtLoop2		move.l (a7),a0
 		jsr _LVOGetMsg(a6)
@@ -744,7 +745,7 @@ SonInt:		movem.l d0-a6,-(a7)
 		move.l OMR1(a2),a1			;Message
 		move.l #$ffffffff,OMR0(a2)		;Destroy value
 		cmp.l #$ffffffff,a0
-		beq.s NoSingl
+		beq.s ClearInt
 
 DoPMsg		moveq.l #0,d4
 		move.w MN_LENGTH(a1),d4			;PPC should make it 32 byte aligned
@@ -754,10 +755,10 @@ DoPMsg		moveq.l #0,d4
 		move.l a1,d3
 		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
 		move.l d3,a1
-		jsr _LVOPutMsg(a6)
+		jsr _LVOPutMsg(a6)		
+ClearInt	move.l d2,OMISR(a2)
 
-NoSingl 	move.l OMISR(a2),d3
-		move.l d2,OMISR(a2)
+NoSingl	 	move.l OMISR(a2),d3		
 		move.l #$20000000,d4			;OMISR[OPQI]
 		and.l d4,d3
 		beq.s DidInt
@@ -923,12 +924,18 @@ xProces		move.l d0,Port(a5)
 		add.l #1024,d0
 
 		move.l _PowerPCBase(pc),a6
+		moveq.l #0,d1
 		jsr _LVOAllocVec32(a6)
 		move.l d0,d6
 		beq Stacker
 
 		move.l 4.w,a6
 		move.l ThisTask(a6),a1
+		move.l d6,a2
+		move.l #255,d0
+ClearTaskMem	clr.l (a2)+
+		dbf d0,ClearTaskMem
+		
 		move.l d6,a2
 		lea TASKPPC_TASKPOOLS(a2),a2
 		move.l a2,d0
@@ -1248,7 +1255,7 @@ CreatePPCTask:	movem.l d1-a6,-(a7)
 
 ;********************************************************************************************
 ;
-;	memblock = AllocVec32(memsize) // d0 = d0 (d1 is ignored)
+;	memblock = AllocVec32(memsize) // d0 = d0 (d1 is fixed)
 ;
 ;********************************************************************************************
 
@@ -1256,7 +1263,8 @@ AllocVec32:
 		move.l a6,-(a7)
 		add.l #$38,d0
 		move.l 4.w,a6
-		move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC|MEMF_REVERSE,d1	;attributes are FIXED to Sonnet mem
+		and.l #MEMF_CLEAR,d1
+		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE,d1		;attributes are FIXED to Sonnet mem
 		jsr _LVOAllocVec(a6)
 		move.l d0,d1
 		beq.s MemErr
@@ -1293,6 +1301,7 @@ AllocXMsg:
 		move.l a0,d2
 		add.l #$14,d0
 		move.l d0,d3
+		moveq.l #0,d1
 		jsr _LVOAllocVec32(a6)
 		tst.l d0
 		beq.s NoAl32

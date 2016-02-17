@@ -3703,6 +3703,10 @@ InsertOnPri:
 		stwu	r4,-4(r13)
 		stwu	r3,-4(r13)
 
+		lwz	r3,PowerPCBase(r0)
+		li	r6,-1
+		stb	r6,FLAG_READY(r3)
+
 		lwz	r3,TASKPPC_PRIORITY(r5)
 		lwz	r6,TASKPPC_PRIOFFSET(r5)
 		add	r3,r3,r6
@@ -3739,6 +3743,10 @@ InsertOnPri:
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
+
+		lwz	r3,PowerPCBase(r0)
+		li	r6,0
+		stb	r6,FLAG_READY(r3)
 
 		lwz	r3,0(r13)
 		lwz	r4,4(r13)

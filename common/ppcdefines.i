@@ -57,6 +57,7 @@
 .set ViolationAddress,140			#Pointer
 .set MemSize,144
 .set L2Size,148
+.set Slice,152
 
 #LibBase:
 
@@ -90,6 +91,7 @@
 .set DataExcHigh,608
 .set DataExcLow,612
 .set FLAG_WAIT,627
+.set FLAG_READY,628
 
 .set EXCDATA_TYPE,8				#Always NT_INTERRUPT
 .set EXCDATA_PRI,9				#This
@@ -196,9 +198,9 @@
 .set MEMF_REVERSE,		0x00040000
 
 .set SonnetBusClock,66666666			#66.6 MHz
-.set SonnetTimerFreq,(SonnetBusClock/8)		#Default when EICR=0x4 at bits 30-28
-.set SwitchFreq,50				#50Hz
-.set Quantum,(SonnetTimerFreq/SwitchFreq)	#1/50s
+.set DecTimerFreq,(SonnetBusClock/4)		#Dec goes at 1/4 of Bus clock
+.set SwitchFreq,50				#
+.set Quantum,(DecTimerFreq/SwitchFreq)		#
 
 .set EXCATTR_CODE,		0x80101000		#
 .set EXCATTR_DATA,		0x80101001		#
@@ -744,6 +746,8 @@
 .set PPB_ASYNC,0
 .set PPB_LINEAR,1
 .set PPB_THROW,2
+.set PPB_INTASYNC,5
+.set PPF_INTASYNC,32
 
 .set ATTEMPT_SUCCESS,-1
 .set ATTEMPT_FAILURE,0
