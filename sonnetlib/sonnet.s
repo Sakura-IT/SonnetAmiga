@@ -322,7 +322,7 @@ Wait		move.l $3004(a1),d5
 NoPCILb		jsr _LVOEnqueue(a6)
 
 		move.l #FunctionsLen,d0
-		moveq.l #0,d1
+		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE|MEMF_CLEAR,d1
 		bsr AllocVec32
 
 		tst.l d0
@@ -924,7 +924,7 @@ xProces		move.l d0,Port(a5)
 		add.l #1024,d0
 
 		move.l _PowerPCBase(pc),a6
-		moveq.l #0,d1
+		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE,d1
 		jsr _LVOAllocVec32(a6)
 		move.l d0,d6
 		beq Stacker
@@ -1264,7 +1264,7 @@ AllocVec32:
 		add.l #$38,d0
 		move.l 4.w,a6
 		and.l #MEMF_CLEAR,d1
-		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE,d1		;attributes are FIXED to Sonnet mem
+		or.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE,d1		;attributes are FIXED to Sonnet mem
 		jsr _LVOAllocVec(a6)
 		move.l d0,d1
 		beq.s MemErr
@@ -1301,7 +1301,7 @@ AllocXMsg:
 		move.l a0,d2
 		add.l #$14,d0
 		move.l d0,d3
-		moveq.l #0,d1
+		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE|MEMF_CLEAR,d1
 		jsr _LVOAllocVec32(a6)
 		tst.l d0
 		beq.s NoAl32
