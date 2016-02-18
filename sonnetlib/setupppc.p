@@ -2151,7 +2151,7 @@ EInt:		b	.FPUnav				#0
 		la	r5,TASKPPC_ALLTASK(r8)
 		stw	r8,14(r5)		
 		stw	r5,TASKPPC_TASKPTR(r8)
-		lwz	r3,LN_NAME(8)			#Copy Name pointer 
+		lwz	r3,LN_NAME(r8)			#Copy Name pointer 
 		stw	r3,LN_NAME(r5)
 		
 		lwz	r4,PowerPCBase(r0)
@@ -2408,6 +2408,12 @@ EInt:		b	.FPUnav				#0
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
+
+		lwz	r4,TASKPPC_TASKPTR(r9)		
+		lwz	r3,0(r4)			#RemovePPC
+		lwz	r4,4(r4)
+		stw	r4,4(r3)
+		stw	r3,0(r4)
 
 		li	r9,0
 		stw	r9,RunningTask(r0)
