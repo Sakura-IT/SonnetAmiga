@@ -1817,20 +1817,44 @@ EInt:		b	.FPUnav				#0
 		lwz	r8,TC_SIGRECVD(r4)		#Copy to PPC task
 		or	r8,r8,r3
 		stw	r8,TC_SIGRECVD(r4)
-		b	.NoXSignal
+		b	.RelFrame
 		
 .ChkWait:	lwz	r4,PowerPCBase(r0)
 		la	r4,LIST_WAITINGTASKS(r4)	#Check for it in the waiting tasks
 		lwz	r4,0(r4)
 .ChkNextSig:	lwz	r31,0(r4)
 		mr.	r31,r31				#Check for the end of the list
-		beq	.NoXSignal
+		beq	.ChkRdy
 		lwz	r8,TASKPPC_STARTMSG(r4)
 		lwz	r8,MN_REPLYPORT(r8)
 		cmpw	r8,r3
 		beq	.ReUseLoop
 		mr	r4,r31
 		b	.ChkNextSig	
+		
+.ChkRdy:	lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_READYTASKS(r4)		#Check for it in the ready tasks
+		lwz	r4,0(r4)
+.ChkRdySig:	lwz	r31,0(r4)
+		mr.	r31,r31				#Check for the end of the list
+		beq	.RelFrame
+		lwz	r8,TASKPPC_STARTMSG(r4)
+		lwz	r8,MN_REPLYPORT(r8)
+		cmpw	r8,r3
+		beq	.ReUseLoop
+		mr	r4,r31
+		b	.ChkRdySig				
+		
+.RelFrame:	lis	r3,EUMB				#Free the message
+		li	r4,IFHPR
+		lwbrx	r6,r4,r3		
+		stw	r5,0(r6)		
+		addi	r8,r6,4
+		loadreg	r7,0x3fff			#ffff3fff?
+		and	r8,r8,r7			#Keep it 0000-3FFE
+		stwbrx	r8,r4,r3
+
+		b	.NxtInQ		
 		
 .NoXSignal:	loadreg r4,'XMSG'
 		cmpw	r4,r6

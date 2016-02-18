@@ -689,16 +689,16 @@ Joshua		move.l 4.w,a6				;Fake Mirror task for PPC task
 		lea JProcPort(pc),a1
 		move.l d0,(a1)
 		tst.l d0
-		beq.s Tree
-		move.l d0,a0
-		move.l a0,-(a7)
-		lea PrtName(pc),a1
-		move.l a1,LN_NAME(a0)
-		move.l a0,a1
-		jsr _LVOAddPort(a6)
+		beq.s Tree		
+		move.l d0,-(a7)
+		
 GoRest		move.l 4.w,a6
-		move.l (a7),a0
-		jsr _LVOWaitPort(a6)
+		move.l (a7),a0		
+		move.b MP_SIGBIT(a0),d1
+		moveq.l #1,d0
+		lsl.l d1,d0
+		jsr _LVOWait(a6)
+
 		moveq.l #0,d0
 		move.l #$0000ffff,d1
 		jsr _LVOSetSignal(a6)
@@ -1213,7 +1213,6 @@ ClearMsg	clr.l (a2)+
 		
 		move.l EUMBAddr(pc),a2
 		move.l a1,IFQPR(a2)			;Signal PPC with Frame
-		move.l a1,OFQPR(a1)			;Release Frame
 
 		rts
 
