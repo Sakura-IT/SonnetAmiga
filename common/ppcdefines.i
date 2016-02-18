@@ -37,7 +37,7 @@
 .set RescheduleFlag,67				#626
 .set SnoopSem,68				#Pointer
 .set CurrentPort,72				#610
-.set NumAllTasks,76				#630
+.set L2Size,76
 .set IdSysTasks,80				#662
 .set IdDefTasks,84				#666
 .set MemSem,88
@@ -56,8 +56,6 @@
 .set AlignStore2,136
 .set ViolationAddress,140			#Pointer
 .set MemSize,144
-.set L2Size,148
-.set Slice,152
 
 #LibBase:
 
@@ -92,6 +90,7 @@
 .set DataExcLow,612
 .set FLAG_WAIT,627
 .set FLAG_READY,628
+.set NumAllTasks,630
 
 .set EXCDATA_TYPE,8				#Always NT_INTERRUPT
 .set EXCDATA_PRI,9				#This

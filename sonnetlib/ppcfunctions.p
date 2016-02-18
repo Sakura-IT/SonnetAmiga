@@ -4327,10 +4327,10 @@ CreateTaskPPC:
 
 	 	bl AddTailPPC				#Insert dummy task in list
 
- 		la	r4,NumAllTasks(r0)
-		lwz	r3,0(r4)
+		lwz	r4,PowerPCBase(r0)
+		lwz	r3,NumAllTasks(r4)
 		addi	r3,r3,1				#Set number of tasks
-		stw	r3,0(r4)
+		stw	r3,NumAllTasks(r4)
  
 		dcbst	r0,r4				#Cache
 
@@ -5413,10 +5413,10 @@ DeleteTaskPPC:
 
 		bl RemovePPC		
 
-.NoTaskPtr:	la	r4,NumAllTasks(r0)		#Tasks -1
-		lwz	r3,0(r4)
+.NoTaskPtr:	lwz	r4,PowerPCBase(r0)		#Tasks -1
+		lwz	r3,NumAllTasks(r4)
 		subi	r3,r3,1
-		stw	r3,0(r4)
+		stw	r3,NumAllTasks(r4)
 		dcbst	r0,r4
 
 		lwz	r4,TaskListSem(r0)

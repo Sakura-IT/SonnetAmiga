@@ -211,6 +211,11 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		stw	r4,4(r3)
 		stw	r3,0(r4)
 		
+		lwz	r4,PowerPCBase(r0)		#Tasks -1
+		lwz	r3,NumAllTasks(r4)
+		subi	r3,r3,1
+		stw	r3,NumAllTasks(r4)		
+
 		lwz	r4,RunningTask(r0)
 		lwz	r4,TASKPPC_TASKMEM(r4)
 		stw	r4,MN_ARG0(r9)
@@ -2163,6 +2168,11 @@ EInt:		b	.FPUnav				#0
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
+
+		lwz	r4,PowerPCBase(r0)		#Tasks +1
+		lwz	r3,NumAllTasks(r4)
+		addi	r3,r3,1
+		stw	r3,NumAllTasks(r4)
 
 		mr	r8,r9
 		
