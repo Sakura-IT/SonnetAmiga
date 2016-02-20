@@ -1765,7 +1765,7 @@ EInt:		b	.FPUnav				#0
 
 		loadreg	r3,'EXEX'
 		stw	r3,0xf4(r0)
-	
+
 		lis	r3,EUMBEPICPROC
 		lwz	r5,EPIC_IACK(r3)		#Read IACKR to acknowledge interrupt
 
@@ -1833,9 +1833,13 @@ EInt:		b	.FPUnav				#0
 		lwz	r8,TASKPPC_STARTMSG(r4)
 		lwz	r8,MN_REPLYPORT(r8)
 		cmpw	r8,r3
-		beq	.ReUseLoop
+		beq	.SetReady
 		mr	r4,r31
-		b	.ChkNextSig	
+		b	.ChkNextSig
+		
+.SetReady:	li	r3,TS_READY
+#		stb	r3,TC_STATE(r4)			#NOT WORKING!
+		b	.ReUseLoop	
 		
 .ChkRdy:	lwz	r4,PowerPCBase(r0)
 		la	r4,LIST_READYTASKS(r4)		#Check for it in the ready tasks
@@ -2052,11 +2056,13 @@ EInt:		b	.FPUnav				#0
 		stw	r3,4(r5)
 		stw	r5,0(r3)
 
+		b	.NextOnList
+
 .EndOfWaitList:	lwz	r9,RunningTask(r0)
 
 		b	.TrySwitch
 
-.NewTask:	lwz	r4,PowerPCBase(r0)
+		lwz	r4,PowerPCBase(r0)
 		la	r4,LIST_NEWTASKS(r4)
 		mr	r6,r4
 
@@ -2070,8 +2076,6 @@ EInt:		b	.FPUnav				#0
 	
 .NoNode5:	mr.	r9,r3
 		beq	.ReturnToUser
-
-		mr	r3,r9
 		
 .Dispatch:	lwz	r8,MN_ARG0(r9)		
 
@@ -2396,9 +2400,26 @@ EInt:		b	.FPUnav				#0
 		
 .NoNode3:	mr.	r9,r3
 		
-		beq	.NewTask
+		bne	.DoReady
+		
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_NEWTASKS(r4)
+		mr	r6,r4
 
-		li	r6,TS_RUN
+		lwz	r5,0(r4)			#RemHeadPPC
+		lwz	r3,0(r5)
+		mr.	r3,r3
+		beq-	.NoNode6
+		stw	r3,0(r4)
+		stw	r4,4(r3)
+		mr	r3,r5
+	
+.NoNode6:	mr.	r9,r3
+		beq	.DoIdle
+		
+		b	.Dispatch
+
+.DoReady:	li	r6,TS_RUN
 		stb	r6,TC_STATE(r9)
 		stw	r9,RunningTask(r0)		
 		b	.LoadContext
@@ -2427,7 +2448,7 @@ EInt:		b	.FPUnav				#0
 
 		li	r9,0
 		stw	r9,RunningTask(r0)
-		b	.ReturnToUser
+		b	.TrySwitch
 
 .NotDeleted:	li	r4,TS_CHANGING
 		lbz	r3,TC_STATE(r9)
@@ -2471,7 +2492,7 @@ EInt:		b	.FPUnav				#0
 		lwz	r5,RunningTask(r0)
 		stw	r9,RunningTask(r0)		
 		li	r6,TS_RUN
-		stb	r6,TC_STATE(r9)		
+		stb	r6,TC_STATE(r9)						
 		li	r6,TS_READY
 		stb	r6,TC_STATE(r5)
 
@@ -2706,28 +2727,13 @@ EInt:		b	.FPUnav				#0
 		stw	r3,4(r5)
 		stw	r5,0(r3)
 		
-		li	r4,0
-		stw	r4,RunningTask(r0)
-		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_READYTASKS(r4)
-
-		lwz	r5,0(r4)			#RemHeadPPC
-		lwz	r3,0(r5)
-		mr.	r3,r3
-		beq-	.NoNode4
-		stw	r3,0(r4)
-		stw	r4,4(r3)
-		mr	r3,r5
-
-.NoNode4:	mr.	r9,r3
-		beq	.DoIdle
-		
-		li	r0,TS_RUN
-		stb	r0,TC_STATE(r9)
+		li	r9,0
 		stw	r9,RunningTask(r0)
 		
-		b	.LoadContext
+		b	.TrySwitch
 
+#********************************************************************************************		
+		
 .DoIdle:	loadreg	r0,IdleTask+(.IdleLoop-Start)	#Switch to idle task
 		lwz	r1,SonnetBase(r0)
 		or	r0,r1,r0
@@ -2736,6 +2742,10 @@ EInt:		b	.FPUnav				#0
 		loadreg	r1,SysStack-0x20		#System stack in unused mem
 		lwz	r0,SonnetBase(r0)
 		or	r1,r1,r0
+
+		lwz	r9,0xf0(r0)				#Debug counter to check
+		addi	r9,r9,1					#Whether exception is still
+		stw	r9,0xf0(r0)
 
 		stw	r13,-4(r1)
 		subi	r13,r1,4
@@ -2750,9 +2760,9 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r0
 		isync
 
-		loadreg	r0,100
+		loadreg	r0,Quantum
 		mtdec	r0
-
+		
 		loadreg	r0,'IDLE'
 		stw	r0,0xf4(r0)
 		

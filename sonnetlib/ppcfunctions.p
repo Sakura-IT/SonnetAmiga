@@ -1437,7 +1437,7 @@ CreateMsgPortPPC:
 		bne-	.NoSemMem
 		lwz	r3,RunningTask(r0)
 		stw	r3,MP_SIGTASK(r30)
-		li	r0,0
+		li	r0,PA_SIGNAL
 		stb	r0,MP_FLAGS(r30)
 		li	r0,NT_MSGPORTPPC
 		stb	r0,LN_TYPE(r30)
@@ -6520,10 +6520,14 @@ SignalPPC:
 		mr	r29,r3
 
 		lbz	r0,LN_TYPE(r4)
-		cmplwi	r0,NT_PPCTASK
+		cmpwi	r0,NT_PPCTASK
 		beq-	.PPCTask
+		cmpwi	r0,NT_TASK
+		beq	.LegacyTask
+		cmpwi	r0,NT_PROCESS
+		bne	.SigExit
 
-		mr	r8,r30						#d0
+.LegacyTask:	mr	r8,r30						#d0
 		mr	r7,r31						#a1
 		lwz	r4,SysBase(r0)
 		li	r5,_LVOSignal
@@ -6886,7 +6890,7 @@ PutMsgPPC:
 
 		li	r0,NT_MESSAGE
 		stb	r0,LN_TYPE(r30)
-.NotNormalMsg:	mr	r5,r30
+		mr	r5,r30
 
 		bl AddTailPPC
 
