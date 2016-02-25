@@ -2609,7 +2609,7 @@ PutXMsgPPC:
 		mr	r31,r5
 		mr	r22,r4
 		lhz	r29,MN_LENGTH(r31)
-		cmplwi	r29,156				#FIFO msg length - 32 -4 (for MN_MCTASK)
+		cmplwi	r29,156				#FIFO msg length - 32 -4 (for MN_MCPORT)
 		bgt	.ErrorX		
 				
 		bl Super
@@ -2656,9 +2656,8 @@ PutXMsgPPC:
 		stw	r25,MN_IDENTIFIER(r30)
 		lwz	r25,MN_REPLYPORT+32(r30)
 		stw	r25,MN_REPLYPORT(r30)
-		lwz	r25,MCTask(r0)
-		la	r25,pr_MsgPort(r25)
-		stw	r25,MN_MCTASK(r30)
+		lwz	r25,MCPort(r0)
+		stw	r25,MN_MCPORT(r30)
 		stw	r25,MN_REPLYPORT+32(r30)
 		stw	r22,MN_MIRROR(r30)
 		stw	r31,MN_PPC(r30)
@@ -2734,7 +2733,15 @@ WaitFor68K:
 		cmpw	r4,r29
 		bne	.WasNoDone
 		
-		mfctr	r26
+		lwz	r4,RunningTask(r0)
+		lwz	r26,TASKPPC_MIRROR68K(r4)
+		mr.	r26,r26
+		bne	.GotMirror
+		
+		lwz	r26,MN_MIRROR(r30)
+		stw	r26,TASKPPC_MIRROR68K(r4)
+		
+.GotMirror:	mfctr	r26
 		subi	r4,r31,4
 		addi	r29,r30,MN_PPSTRUCT-4		#r30 = new msg
 		li	r6,PP_SIZE/4
@@ -2840,14 +2847,17 @@ Run68K:
 		
 		lwz	r5,TASKPPC_STARTMSG(r5)
 		mr.	r5,r5				#Task made by CreateTaskPPC?
-		beq	.NotCreated
-		
+		beq	.NotRunPPC
 		lwz	r5,MN_MIRROR(r5)
 		stw	r5,MN_MIRROR(r30)
+		b	.FromRunPPC
 		
-.NotCreated:	lwz	r4,MCTask(r0)
-		la	r4,pr_MsgPort(r4)
-		stw	r4,MN_MCTASK(r30)
+.NotRunPPC:	lwz	r5,RunningTask(r0)
+		lwz	r5,TASKPPC_MIRROR68K(r5)
+		stw	r5,MN_MIRROR(r30)
+		
+.FromRunPPC:	lwz	r4,MCPort(r0)
+		stw	r4,MN_MCPORT(r30)
 		li	r5,NT_MESSAGE
 		stb	r5,LN_TYPE(r30)
 		li	r5,192
@@ -3494,6 +3504,10 @@ PutPublicMsgPPC:
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
 
+		loadreg	r29,'ahah'
+		stw	r29,0x144(r0)
+
+
 		mr	r31,r4
 		mr	r30,r5
 		li	r29,PUBMSG_SUCCESS
@@ -3812,7 +3826,7 @@ CreateTaskPPC:
 		beq-	.Error01			#Error NoCode 
  
 		mr	r25,r3 
-		li	r4,246				#246 bytes
+		li	r4,256				#Original 246 bytes
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0				#default alignment 
  
@@ -6454,9 +6468,8 @@ Run68KLowLevel:
 		sth	r5,MN_LENGTH(r30)		
 		li	r5,NT_MESSAGE
 		stb	r5,LN_TYPE(r30)		
-		lwz	r4,MCTask(r0)
-		la	r4,pr_MsgPort(r4)
-		stw	r4,MN_MCTASK(r30)
+		lwz	r4,MCPort(r0)
+		stw	r4,MN_MCPORT(r30)
 		lwz	r5,RunningTask(r0)
 		stw	r5,MN_PPC(r30)
 				
@@ -6837,6 +6850,9 @@ PutMsgPPC:
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
+
+		loadreg	r29,'ahah'
+		stw	r29,0x140(r0)
 
 		mr	r29,r3
 		mr	r31,r4

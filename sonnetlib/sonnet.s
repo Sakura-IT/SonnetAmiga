@@ -44,7 +44,7 @@
 	XREF	AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
 	XREF	AddUniqueSemaphorePPC,IsExceptionMode
 
-	XREF 	PPCCode,PPCLen,RunningTask,LIST_WAITINGTASKS,MCTask,Init
+	XREF 	PPCCode,PPCLen,RunningTask,LIST_WAITINGTASKS,MCPort,Init
 	XREF	SysBase,PowerPCBase,DOSBase
 	XDEF	_PowerPCBase
 
@@ -83,7 +83,7 @@ LIBINIT:
 		moveq.l #37,d0
 		jsr _LVOOpenLibrary(a6)
 		tst.l d0
-		beq Clean				;Open dos.library
+		beq.s Clean				;Open dos.library
 		move.l d0,DosBase-Buffer(a4)
 
 		lea ExpLib(pc),a1
@@ -192,7 +192,7 @@ Not3DFX		move.w #VENDOR_ATI,d0			;Need more pciinfo
 		moveq.l #0,d2
 		jsr _LVOPCIFindCard(a6)
 		tst.l d0
-		beq NxtATI
+		beq.s NxtATI
 		move.l d0,a2
 		move.l PCI_SPACE0(a2),d4
 		bra.s FoundGfx
@@ -379,13 +379,8 @@ MoveSon		move.l (a0)+,(a1)+
 		move.l a1,d1
 		move.l DosBase(pc),a6
 		jsr _LVOCreateNewProc(a6)
-		
-		lea Prc2Tags(pc),a1
-		move.l a1,d1
-		jsr _LVOCreateNewProc(a6)
 
 		move.l 4.w,a6
-
 NoLib		jsr _LVOEnable(a6)
 
 PPCInit		move.l SonnetBase(pc),a1
@@ -484,91 +479,40 @@ IntName		dc.b "Gort",0
 		cnop	0,4
 
 ;********************************************************************************************
+;********************************************************************************************
 
 MasterControl:
 		move.l #"INIT",d6
 		move.l SonnetBase(pc),a4
 		move.l 4.w,a6
-		move.l ThisTask(a6),d0
-		move.l d0,MCTask(a4)
+		jsr _LVOCreateMsgPort(a6)
+		tst.l d0
+		beq.s MasterControl
+		move.l d0,MCPort(a4)
 		move.l d6,Init(a4)
+		move.l d0,d6
 		jsr _LVOCacheClearU(a6)
 
-NextMsg		move.l ThisTask(a6),a0
-		lea pr_MsgPort(a0),a0
-		move.l a0,d6
+NextMsg		move.l d6,a0
 		jsr _LVOWaitPort(a6)
-
+		
 GetLoop		move.l d6,a0
 		jsr _LVOGetMsg(a6)
 
 		move.l d0,d7
 		beq.s NextMsg
+				
 		move.l d0,a1
-		move.b LN_TYPE(a1),d0
-		cmp.b #NT_REPLYMSG,d0
-		bne.s NoXReply
-		move.l -32+MN_IDENTIFIER(a1),d0
-		cmp.l #"XMSG",d0
-		beq MsgRXMSG
-NoXReply	move.l MN_IDENTIFIER(a1),d0
+		move.l MN_IDENTIFIER(a1),d0
 		cmp.l #"T68K",d0
-		beq.s MsgT68k
-		cmp.l #"FPPC",d0
-		beq MsgFPPC
-		cmp.l #"F68k",d0
-		beq MsgF68k
+		beq MsgMir68
 		cmp.l #"LL68",d0
-		beq MsgLL68
-		cmp.l #"XMSG",d0
-		beq MsgXMSG
+		beq.s MsgLL68
 		cmp.l #"FREE",d0
-		beq MsgFree
-		cmp.l #"GETV",d0
-		beq LoadD
-		and.l #$ffffff00,d0
-		cmp.l #$50555400,d0
-		beq StoreD
+		beq.s MsgFree
 		bra.s GetLoop
-
-MsgT68k		move.b LN_TYPE(a1),d7
-		cmp.b #NT_MESSAGE,d7
-		beq.s Sig68k
-		cmp.b #NT_REPLYMSG,d7			;signal PPC that 68k is done
-		bne GetLoop
-
-		move.l MN_ARG2(a1),a2
-		move.l #"DONE",MN_IDENTIFIER(a2)
-ReUse		move.l a2,d7
-		lea PushMsg(pc),a5
-		jsr _LVOSupervisor(a6)
-		move.l 4.w,a6
-		move.l EUMBAddr(pc),a2
-		move.l d7,IFQPR(a2)			;Message the PPC
-		move.l a1,OFQPR(a2)			;Return Message Frame
-		bra GetLoop
-
-Sig68k		move.l ThisTask(a6),a0
-		lea pr_MsgPort(a0),a0
-		move.l a0,MN_REPLYPORT(a1)
-		move.l MN_MIRROR(a1),a0
-		move.l a0,d0
-		beq NoMirror68		
-		jsr _LVOPutMsg(a6)			;move message to waiting 68k task
-		bra GetLoop
-
-MsgF68k		move.l d7,a1
-		jsr _LVOReplyMsg(a6)
-		bra GetLoop
-
-MsgFPPC		move.l d7,a1
-		move.l MN_ARG0(a1),a1
-		move.l _PowerPCBase(pc),a6
-		jsr _LVOFreeVec32(a6)
-		move.l 4.w,a6
-		move.l d7,a1
-		jsr _LVOReplyMsg(a6)
-		bra GetLoop
+		
+;********************************************************************************************
 
 MsgLL68		move.l MN_PPSTRUCT+0*4(a1),a6
 		move.l MN_PPSTRUCT+1*4(a1),a0
@@ -593,7 +537,17 @@ RtnLL		move.l (a7)+,a1
 		move.l MN_PPSTRUCT+1*4(a1),MN_PPSTRUCT+1*4(a2)
 
 		move.l 4.w,a6
-		bra ReUse
+		move.l a2,d7
+		move.l a1,d5
+		lea PushMsg(pc),a5
+		jsr _LVOSupervisor(a6)
+		move.l 4.w,a6
+		move.l EUMBAddr(pc),a2
+		move.l d7,IFQPR(a2)			;Message the PPC
+		move.l d5,OFQPR(a2)			;Return Message Frame
+		bra GetLoop
+		
+;********************************************************************************************
 
 MsgFree		move.l MN_PPSTRUCT+0*4(a1),a6		;Asynchronous FreeMem call from the PPC.
 		move.l MN_PPSTRUCT+1*4(a1),a0
@@ -610,16 +564,179 @@ RtnFree		move.l (a7)+,a1
 		move.l a1,OFQPR(a2)			;Return Message Frame
 		move.l 4.w,a6
 		bra GetLoop
+		
+;********************************************************************************************
 
 PushMsg		moveq.l #11,d4
 		move.l a1,a2
-PshMsg		cpushl dc,(a2)
+PshMsg		cpushl dc,(a2)				;040+
 		lea L1_CACHE_LINE_SIZE_040(a2),a2	;Cache_Line 040/060 = 16 bytes
 		dbf d4,PshMsg
 		rte
+		
+;********************************************************************************************
 
-StoreD		move.l MN_IDENTIFIER(a1),d7
-		move.l MN_IDENTIFIER+4(a1),d0
+MsgMir68	move.l a1,-(a7)
+		move.l DosBase(pc),a6
+		lea Prc2Tags(pc),a1
+		move.l a1,d1
+		jsr _LVOCreateNewProc(a6)
+		move.l (a7)+,a1
+		move.l 4.w,a6
+		tst.l d0
+		beq.s MsgMir68
+		move.l d0,a0
+		lea pr_MsgPort(a0),a0
+		jsr _LVOPutMsg(a6)
+		bra GetLoop
+		
+;********************************************************************************************		
+;********************************************************************************************
+
+MirrorTask	move.l 4.w,a6				;Mirror task for PPC task
+		move.l ThisTask(a6),a0
+		or.b #TF_PPC,TC_FLAGS(a0)
+		lea pr_MsgPort(a0),a0
+		move.l a0,d6
+		jsr _LVOWaitPort(a6)
+
+Error		jsr _LVOCreateMsgPort(a6)
+		tst.l d0
+		beq.s Error
+		move.l d0,-(a7)
+		
+CleanUp		move.l d6,a0
+		jsr _LVOGetMsg(a6)
+		tst.l d0
+		beq.s GoWaitPort
+		
+		move.l d0,a1
+		move.l (a7),a0
+		jsr _LVOPutMsg(a6)
+		bra.s CleanUp
+
+GoWaitPort	move.l (a7),a0
+		jsr _LVOWaitPort(a6)
+		
+GtLoop2		move.l (a7),a0
+		jsr _LVOGetMsg(a6)
+		move.l d0,d7
+		beq.s GoWaitPort
+				
+		move.l d0,a0
+		move.l MN_IDENTIFIER(a0),d0
+		cmp.l #"T68K",d0
+		beq.s DoRunk86
+		cmp.l #"END!",d0
+		bne.s GtLoop2
+		move.l EUMBAddr(pc),a2
+		move.l a0,OFQPR(a2)			;Return Message to free state
+		move.l (a7)+,d0
+		rts
+		
+DoRunk86	move.l (a7),MN_MIRROR(a0)
+		bsr Runk86
+		bra.s GoWaitPort
+		
+;********************************************************************************************
+
+		cnop 0,4
+
+PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,4,NP_StackSize,$20000,0,0
+PrcName		dc.b "MasterControl",0
+
+		cnop 0,4
+		
+Prc2Tags	dc.l NP_Entry,MirrorTask,NP_Name,Prc2Name,NP_Priority,3,NP_StackSize,$20000,0,0
+Prc2Name	dc.b "Joshua",0
+
+		cnop 0,4
+				
+;********************************************************************************************
+;********************************************************************************************
+
+SonInt:		movem.l d0-a6,-(a7)
+		move.l 4.w,a6
+		move.l EUMBAddr(pc),a2
+		move.l #$03000000,d2			;OMISR[OM0I|OM1I]
+		move.l OMISR(a2),d3
+		and.l d2,d3
+		beq.s NoSingl
+
+		move.l OMR0(a2),a0			;Port
+		move.l OMR1(a2),a1			;Message
+		move.l #$ffffffff,OMR0(a2)		;Destroy value
+		cmp.l #$ffffffff,a0
+		beq.s ClearInt
+
+DoPMsg		moveq.l #0,d4
+		move.w MN_LENGTH(a1),d4			;PPC should make it 32 byte aligned
+		beq.s NoSingl
+		lsr.l #4,d4
+		subq.l #1,d4
+		move.l a1,d3
+		bsr InvMsg				;PCI memory is cache inhibited for 68k
+		move.l d3,a1
+;		jsr _LVOPutMsg(a6)		
+ClearInt	move.l d2,OMISR(a2)
+
+NoSingl	 	move.l OMISR(a2),d3		
+		move.l #$20000000,d4			;OMISR[OPQI]
+		and.l d4,d3
+		beq.s DidInt
+
+NxtMsg		move.l EUMBAddr(pc),a2
+		move.l OFQPR(a2),d3			;Get Message Frame
+		cmp.l #-1,d3
+		beq.s DidInt
+
+		move.l d3,a1
+		moveq.l #11,d4
+		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
+		move.l d3,a1
+		move.b LN_TYPE(a1),d0
+		cmp.b #NT_REPLYMSG,d0
+		bne.s NoXReply
+	
+		move.l -32+MN_IDENTIFIER(a1),d0
+		cmp.l #"XMSG",d0
+		beq MsgRXMSG
+		
+NoXReply	move.l MN_IDENTIFIER(a1),d0
+		cmp.l #"T68K",d0
+		beq MsgT68k
+		cmp.l #"END!",d0
+		beq MsgT68k
+		cmp.l #"FPPC",d0
+		beq MsgFPPC
+		cmp.l #"XMSG",d0
+		beq MsgXMSG
+		cmp.l #"GETV",d0
+		beq.s LoadD
+		and.l #$ffffff00,d0
+		cmp.l #$50555400,d0
+		beq.s StoreD		
+		
+CommandMaster	move.l d3,a1
+		move.l MN_MCPORT(a1),a0
+DoPutMsg	jsr _LVOPutMsg(a6)
+		bra.s NxtMsg
+
+DidInt		moveq.l #0,d7
+		movem.l (a7)+,d0-a6
+		rts
+
+InvMsg		cinvl dc,(a1)				;040+
+		lea L1_CACHE_LINE_SIZE_040(a1),a1	;Cache_Line 040/060 = 16 bytes
+		dbf d4,InvMsg				;12x16 = MsgLen (192 bytes)
+		rts
+
+IntData		dc.l 0
+
+;********************************************************************************************
+
+StoreD		move.l MN_IDENTIFIER(a1),d7		;Handles indirect access from PPC
+		move.l MN_IDENTIFIER+4(a1),d0		;to Amiga Memory
 		move.l MN_IDENTIFIER+8(a1),a0
 
 		cmp.l #"PUTB",d7
@@ -627,13 +744,13 @@ StoreD		move.l MN_IDENTIFIER(a1),d7
 		cmp.l #"PUTH",d7
 		beq.s PutH
 		cmp.l #"PUTW",d7
-		bne GetLoop
+		bne NxtMsg
 		move.l d0,(a0)
 Putted		move.l #"DONE",d7
 		move.l d7,MN_IDENTIFIER(a1)
 		move.l EUMBAddr(pc),a2
 		move.l a1,OFQPR(a2)			;Return Message Frame
-		bra GetLoop
+		bra NxtMsg
 
 PutB		move.b d0,(a0)
 		bra.s Putted
@@ -648,25 +765,34 @@ LoadD		move.l #"DONE",d0
 		move.l d0,MN_IDENTIFIER(a1)
 		move.l EUMBAddr(pc),a2
 		move.l a1,OFQPR(a2)			;Return Message Frame
-		bra GetLoop
+		bra NxtMsg
+		
+;********************************************************************************************		
+		
+MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
+		move.l a0,d0
+		beq CommandMaster
+		bra DoPutMsg
 
-NoMirror68	move.l JProcPort(pc),d0
-		beq.s NoMirror68
-		move.l d0,a0
-		move.l a0,MN_MIRROR(a1)
-		jsr _LVOPutMsg(a6)			;move message to waiting 68k task
-		bra GetLoop
+;********************************************************************************************
+
+MsgFPPC		jsr _LVOReplyMsg(a6)			;Ends the RunPPC function
+		bra NxtMsg
 		
-MsgXMSG		move.l MN_MIRROR(a1),a0
-		lea 32(a1),a1		
-		jsr _LVOPutMsg(a6)
-		bra GetLoop
+;********************************************************************************************		
+
+MsgXMSG		
+		move.l MN_MIRROR(a1),a0
+		lea 32(a1),a1
+		bra DoPutMsg
 		
+;********************************************************************************************		
+
 MsgRXMSG	lea -32(a1),a1
 		move.b #NT_REPLYMSG,LN_TYPE(a1)
 		move.l EUMBAddr(pc),a2
 		move.l MN_REPLYPORT(a1),d0
-		beq FreeRXMsg
+		beq.s FreeRXMsg
 
 		move.l IFQPR(a2),a2
 		move.l a1,a3
@@ -678,115 +804,9 @@ CopyRXMsg	move.l (a3)+,(a2)+
 		move.l EUMBAddr(pc),a2
 		move.l d7,IFQPR(a2)			;Message the PPC
 FreeRXMsg	move.l a1,OFQPR(a2)			;Return Message Frame
-		bra GetLoop		
-		
-;********************************************************************************************
-
-Joshua		move.l 4.w,a6				;Fake Mirror task for PPC task
-		move.l ThisTask(a6),a0
-		or.b #TF_PPC,TC_FLAGS(a0)
-		jsr _LVOCreateMsgPort(a6)
-		lea JProcPort(pc),a1
-		move.l d0,(a1)
-		tst.l d0
-		beq.s Tree		
-		move.l d0,-(a7)
-		
-GoRest		move.l 4.w,a6
-		move.l (a7),a0		
-		move.b MP_SIGBIT(a0),d1
-		moveq.l #1,d0
-		lsl.l d1,d0
-		jsr _LVOWait(a6)
-
-		moveq.l #0,d0
-		move.l #$0000ffff,d1
-		jsr _LVOSetSignal(a6)
-GtLoop2		move.l (a7),a0
-		jsr _LVOGetMsg(a6)
-		tst.l d0
-		beq.s GoRest
-		move.l d0,a0
-		move.l MN_IDENTIFIER(a0),d0
-		cmp.l #"T68K",d0
-		bne.s GtLoop2
-		bsr Runk86
-		bra.s GtLoop2
-Tree		rts		
-		
-;********************************************************************************************
-
-		cnop 0,4
-
-PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,4,NP_StackSize,$20000,0,0
-PrcName		dc.b "MasterControl",0
-
-		cnop 0,4
-		
-Prc2Tags	dc.l NP_Entry,Joshua,NP_Name,Prc2Name,NP_Priority,3,NP_StackSize,$20000,0,0
-Prc2Name	dc.b "Joshua",0
-PrtName		dc.b "Skynet",0
-
-		cnop 0,4		
-
-JProcPort	dc.l 0
+		bra NxtMsg
 
 ;********************************************************************************************
-
-SonInt:		movem.l d0-a6,-(a7)
-		move.l 4.w,a6
-		move.l EUMBAddr(pc),a2
-		move.l #$03000000,d2			;OMISR[OM0I|OM1I]
-		move.l OMISR(a2),d3
-		and.l d2,d3
-		beq NoSingl
-
-		move.l OMR0(a2),a0			;Port
-		move.l OMR1(a2),a1			;Message
-		move.l #$ffffffff,OMR0(a2)		;Destroy value
-		cmp.l #$ffffffff,a0
-		beq.s ClearInt
-
-DoPMsg		moveq.l #0,d4
-		move.w MN_LENGTH(a1),d4			;PPC should make it 32 byte aligned
-		beq.s NoSingl
-		lsr.l #4,d4
-		subq.l #1,d4
-		move.l a1,d3
-		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
-		move.l d3,a1
-		jsr _LVOPutMsg(a6)		
-ClearInt	move.l d2,OMISR(a2)
-
-NoSingl	 	move.l OMISR(a2),d3		
-		move.l #$20000000,d4			;OMISR[OPQI]
-		and.l d4,d3
-		beq.s DidInt
-
-NxtMsg		move.l OFQPR(a2),d3			;Get Message Frame
-		cmp.l #-1,d3
-		beq.s DidInt
-
-		move.l d3,a1
-		moveq.l #11,d4
-		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
-		move.l d3,a1
-		move.l MN_MCTASK(a1),a0			;MN_MCTASK
-		jsr _LVOPutMsg(a6)
-
-		bra.s NxtMsg
-
-DidInt		moveq.l #0,d7
-		movem.l (a7)+,d0-a6
-		rts
-
-InvMsg		cinvl dc,(a1)
-		lea L1_CACHE_LINE_SIZE_040(a1),a1	;Cache_Line 040/060 = 16 bytes
-		dbf d4,InvMsg				;12x16 = MsgLen (192 bytes)
-		rts
-
-IntData		dc.l 0
-
 ;********************************************************************************************
 
 Open:
@@ -894,25 +914,14 @@ RunPPC:		link a5,#-8
 		move.l 4.w,a6
 		move.l ThisTask(a6),a1
 		cmp.b #NT_PROCESS,LN_TYPE(a1)
-		bne.s xTask
-		lea pr_MsgPort(a1),a1
-		move.l a1,d0
-		bra.s xProces
+xTask		bne.s xTask
 
-xTask		move.l LN_NAME(a1),a1
-		jsr _LVOFindPort(a6)
+		jsr _LVOCreateMsgPort(a6)
 		tst.l d0
-		beq.s NewP
-
+		bne.s xProces
+		
 		moveq.l #PPERR_ASYNCERR,d7
 		bra EndIt
-
-NewP		jsr _LVOCreateMsgPort(a6)
-		tst.l d0
-		beq Cannot
-		move.l ThisTask(a6),a1
-		move.l d0,a2
-		move.l LN_NAME(a1),LN_NAME(a2)
 
 xProces		move.l d0,Port(a5)
 		move.l ThisTask(a6),a1
@@ -968,7 +977,7 @@ GetCLIName	lsl.l #2,d0
 		move.b -1(a1),d0
 		bra.s CpName
 
-DoNameCp	move.l #1019-TASKPPC_NAME,d0		;Name len limit		
+DoNameCp	moveq.l #1019-TASKPPC_NAME,d0		;Name len limit		
 CpName		move.b (a1)+,(a2)
 		tst.b (a2)
 		beq.s EndName
@@ -1017,6 +1026,8 @@ CpMsg2		move.l (a0)+,(a2)+
 ;********************************************************************************************
 
 WaitForPPC:
+		ILLEGAL
+
 		link a5,#-8
 		movem.l d1-a6,-(a7)
 		moveq.l #0,d0
@@ -1077,8 +1088,14 @@ GtLoop		move.l Port(a5),a0
 		bsr.s Runk86
 		bra.s GtLoop
 
-DizDone		move.l PStruct(a5),a1
+DizDone		move.l a0,-(a7)
+		move.l MN_ARG0(a0),a1			;Releases memory from RunPPC created
+		move.l _PowerPCBase(pc),a6		;PPC task
+		jsr _LVOFreeVec32(a6)
+		move.l 4.w,a6
+		move.l PStruct(a5),a1
 		lea PP_REGS(a1),a1
+		move.l (a7)+,a0
 		move.l a0,a2
 		lea MN_PPSTRUCT+PP_REGS(a0),a0
 		moveq.l #(PP_SIZE-PP_REGS)/4-1,d0
@@ -1091,9 +1108,6 @@ CpBck		move.l (a0)+,(a1)+
 
 Cannot		moveq.l #-1,d7
 Success		move.l 4.w,a6
-		move.l ThisTask(a6),a1
-		cmp.b #NT_PROCESS,LN_TYPE(a1)
-		beq.s EndIt
 		move.l Port(a5),d0
 		beq.s EndIt
 		bsr.s FreePrt
@@ -1174,11 +1188,22 @@ xBack		move.l a6,-(a7)
 
 NoFPU4		move.l (a7),a1
 		move.l EUMBAddr(pc),a2
-		move.l IFQPR(a2),a2
-		move.l a2,MN_ARG2(a1)
+		move.l IFQPR(a2),-(a7)
+		move.l (a7),a2
 		moveq.l #47,d1
 DoReslt		move.l (a1)+,(a2)+
 		dbf d1,DoReslt
+		
+		move.l (a7)+,a2
+		move.l #"DONE",MN_IDENTIFIER(a2)
+		move.l a2,d7
+		move.l (a7),a1
+		lea PushMsg(pc),a5
+		move.l 4.w,a6
+		jsr _LVOSupervisor(a6)
+		move.l EUMBAddr(pc),a2
+		move.l d7,IFQPR(a2)			;Message the PPC
+		move.l (a7),OFQPR(a2)			;Return Message Frame
 
 		move.l (a7)+,a6
 		movem.l (a7)+,d0-a5
@@ -1194,7 +1219,7 @@ DoReslt		move.l (a1)+,(a2)+
 		fmove.d (a7)+,fp2
 		fmove.d (a7)+,fp1
 		fmove.d (a7)+,fp0
-NoFPU2		jmp _LVOReplyMsg(a6)
+NoFPU2		rts
 
 CrossSignals	move.l EUMBAddr(pc),a2			;Get Frame
 		move.l IFQPR(a2),a1
@@ -1206,11 +1231,7 @@ ClearMsg	clr.l (a2)+
 
 		move.l #"LLPP",MN_IDENTIFIER(a1)
 		move.l d0,MN_ARG0(a1)
-		move.l ThisTask(a6),a2
-		lea pr_MsgPort(a2),a2
-		move.l a2,d0
-		move.l d0,MN_ARG1(a1)
-		
+		move.l Port(a5),MN_ARG1(a1)		
 		move.l EUMBAddr(pc),a2
 		move.l a1,IFQPR(a2)			;Signal PPC with Frame
 

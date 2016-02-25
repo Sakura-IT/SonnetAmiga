@@ -3,7 +3,7 @@
 .include ppcmacros-std.i
 
 .global PPCCode,PPCLen,RunningTask,LIST_WAITINGTASKS,Init,ViolationAddress
-.global MCTask,SysBase,PowerPCBase,DOSBase,DebugLevel
+.global MCPort,SysBase,PowerPCBase,DOSBase,DebugLevel
 
 .set	PPCLen,(PPCEnd-PPCCode)
 
@@ -199,9 +199,8 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		stfd	f6,PP_FREGS+5*8(r9)
 		stfd	f7,PP_FREGS+6*8(r9)
 		stfd	f8,PP_FREGS+7*8(r9)
-		lwz	r8,MCTask(r0)
-		la	r4,pr_MsgPort(r8)		
-		stw	r4,MN_MCTASK(r9)
+		lwz	r8,MCPort(r0)
+		stw	r8,MN_MCPORT(r9)
 		
 		lwz	r4,RunningTask(r0)
 		lwz	r4,TASKPPC_TASKPTR(r4)
@@ -3909,9 +3908,8 @@ EInt:		b	.FPUnav				#0
 		stw	r2,MN_IDENTIFIER+4(r25)		#AmigaValue
 		stw	r3,MN_IDENTIFIER+8(r25)		#AmigaAddress
 		
-		lwz	r20,MCTask(r0)
-		la	r20,pr_MsgPort(r20)
-		stw	r20,MN_MCTASK(r25)
+		lwz	r20,MCPort(r0)
+		stw	r20,MN_MCPORT(r25)
 		li	r20,NT_MESSAGE
 		stb	r20,LN_TYPE(r25)
 		li	r20,192
