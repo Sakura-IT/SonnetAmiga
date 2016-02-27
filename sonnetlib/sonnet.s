@@ -616,7 +616,25 @@ CleanUp		move.l d6,a0
 		bra.s CleanUp
 
 GoWaitPort	move.l (a7),a0
-		jsr _LVOWaitPort(a6)
+		move.l ThisTask(a6),a1
+		move.l TC_SIGALLOC(a1),d0
+		move.b MP_SIGBIT(a0),d1
+		moveq.l #1,d2
+		lsl.l d1,d2
+		or.l d2,d0		
+		jsr _LVOWait(a6)
+		
+		move.l (a7),a0		
+		move.b MP_SIGBIT(a0),d1
+		moveq.l #1,d2
+		lsl.l d1,d2
+		not.l d2
+		move.l d0,d1
+		and.l d2,d1
+		beq.s GtLoop2
+
+		move.l a0,a3
+		bsr CrossSignals
 		
 GtLoop2		move.l (a7),a0
 		jsr _LVOGetMsg(a6)
@@ -634,7 +652,7 @@ GtLoop2		move.l (a7),a0
 		move.l (a7)+,d0
 		rts
 		
-DoRunk86	move.l (a7),MN_MIRROR(a0)
+DoRunk86	move.l (a7),MN_MIRROR(a0)	
 		bsr Runk86
 		bra.s GoWaitPort
 		
@@ -771,7 +789,7 @@ LoadD		move.l #"DONE",d0
 		
 MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
 		move.l a0,d0
-		beq CommandMaster
+		beq CommandMaster		
 		bra DoPutMsg
 
 ;********************************************************************************************
@@ -1072,6 +1090,7 @@ Stacker		move.l ThisTask(a6),a1
 		and.l d2,d1
 		beq.s GtLoop
 		
+		move.l Port(a5),a3
 		bsr CrossSignals		
 		
 GtLoop		move.l Port(a5),a0
@@ -1231,7 +1250,7 @@ ClearMsg	clr.l (a2)+
 
 		move.l #"LLPP",MN_IDENTIFIER(a1)
 		move.l d0,MN_ARG0(a1)
-		move.l Port(a5),MN_ARG1(a1)		
+		move.l a3,MN_ARG1(a1)		
 		move.l EUMBAddr(pc),a2
 		move.l a1,IFQPR(a2)			;Signal PPC with Frame
 

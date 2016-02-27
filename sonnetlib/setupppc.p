@@ -1826,14 +1826,14 @@ EInt:		b	.FPUnav				#0
 .ChkWait:	lwz	r4,PowerPCBase(r0)
 		la	r4,LIST_WAITINGTASKS(r4)	#Check for it in the waiting tasks
 		lwz	r4,0(r4)
-.ChkNextSig:	lwz	r31,0(r4)
-		mr.	r31,r31				#Check for the end of the list
+.ChkNextSig:	lwz	r7,0(r4)
+		mr.	r7,r7				#Check for the end of the list
 		beq	.ChkRdy
 		lwz	r8,TASKPPC_STARTMSG(r4)
 		lwz	r8,MN_REPLYPORT(r8)
 		cmpw	r8,r3
 		beq	.SetReady
-		mr	r4,r31
+		mr	r4,r7
 		b	.ChkNextSig
 		
 .SetReady:	li	r3,TS_READY
@@ -1843,14 +1843,14 @@ EInt:		b	.FPUnav				#0
 .ChkRdy:	lwz	r4,PowerPCBase(r0)
 		la	r4,LIST_READYTASKS(r4)		#Check for it in the ready tasks
 		lwz	r4,0(r4)
-.ChkRdySig:	lwz	r31,0(r4)
-		mr.	r31,r31				#Check for the end of the list
+.ChkRdySig:	lwz	r7,0(r4)
+		mr.	r7,r7				#Check for the end of the list
 		beq	.RelFrame
 		lwz	r8,TASKPPC_STARTMSG(r4)
 		lwz	r8,MN_REPLYPORT(r8)
 		cmpw	r8,r3
 		beq	.ReUseLoop
-		mr	r4,r31
+		mr	r4,r7
 		b	.ChkRdySig				
 		
 .RelFrame:	lis	r3,EUMB				#Free the message
