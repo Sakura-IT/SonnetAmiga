@@ -351,6 +351,15 @@ MoveSon		move.l (a0)+,(a1)+
 		move.l d0,a1
 		jsr _LVOAddLibrary(a6)
 
+		lea WARPFUNCTABLE(pc),a0		;Set up a fake warp.library
+		lea WARPDATATABLE(pc),a1		;Some programs do a version
+		sub.l a2,a2				;check on this
+		moveq.l #124,d0
+		moveq.l #0,d1
+		jsr _LVOMakeLibrary(a6)
+		move.l d0,a1
+		jsr _LVOAddLibrary(a6)
+
 		move.l SonnetBase(pc),a1
 		add.l #$100000,a1
 		move.l #$190000,d0
@@ -619,15 +628,15 @@ GoWaitPort	move.l (a7),a0
 		move.l ThisTask(a6),a1
 		move.l TC_SIGALLOC(a1),d0
 		move.b MP_SIGBIT(a0),d1
-		moveq.l #1,d2
-		lsl.l d1,d2
+		moveq.l #0,d2
+		bset d1,d2
 		or.l d2,d0		
 		jsr _LVOWait(a6)
 		
 		move.l (a7),a0		
 		move.b MP_SIGBIT(a0),d1
-		moveq.l #1,d2
-		lsl.l d1,d2
+		moveq.l #0,d2
+		bset d1,d2
 		not.l d2
 		move.l d0,d1
 		and.l d2,d1
@@ -823,6 +832,28 @@ CopyRXMsg	move.l (a3)+,(a2)+
 		move.l d7,IFQPR(a2)			;Message the PPC
 FreeRXMsg	move.l a1,OFQPR(a2)			;Return Message Frame
 		bra NxtMsg
+
+;********************************************************************************************
+;********************************************************************************************
+
+WarpOpen:
+		move.l a6,d0				;Dummy Open() for warp.library
+		tst.l d0
+		beq.s NoA6
+		move.l 4.w,a6
+		move.l ThisTask(a6),a6
+		or.b #TF_PPC,TC_FLAGS(a6)
+		move.l d0,a6
+		addq.w #1,LIB_OPENCNT(a6)
+		bclr #LIBB_DELEXP,LIB_FLAGS(a6)
+		rts
+
+;********************************************************************************************
+
+WarpClose:
+		moveq.l #0,d0				;Dummy Close() for warp.library
+		subq.w #1,LIB_OPENCNT(a6)
+		bra.s NoExp
 
 ;********************************************************************************************
 ;********************************************************************************************
@@ -1075,16 +1106,15 @@ Stacker		move.l ThisTask(a6),a1
 ;		and.l #$fffff000,d0
 		move.l Port(a5),a0		
 		move.b MP_SIGBIT(a0),d1
-		moveq.l #1,d2
-		lsl.l d1,d2
-		or.l d2,d0
-		
+		moveq.l #0,d2
+		bset d1,d2
+		or.l d2,d0		
 		jsr _LVOWait(a6)
 
 		move.l Port(a5),a0		
 		move.b MP_SIGBIT(a0),d1
-		moveq.l #1,d2
-		lsl.l d1,d2
+		moveq.l #0,d2
+		bset d1,d2
 		not.l d2
 		move.l d0,d1
 		and.l d2,d1
@@ -1538,6 +1568,22 @@ DATATABLE:
 	INITWORD	LIB_REVISION,0
 	INITLONG	LIB_IDSTRING,IDString
 	ds.l	1
+	
+WARPDATATABLE:
+	INITBYTE	LN_TYPE,NT_LIBRARY
+	INITLONG	LN_NAME,WarpName
+	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
+	INITWORD	LIB_VERSION,5
+	INITWORD	LIB_REVISION,0
+	INITLONG	LIB_IDSTRING,WarpIDString
+	ds.l	1
+
+WARPFUNCTABLE:
+	dc.l	WarpOpen
+	dc.l	WarpClose
+	dc.l	Reserved
+	dc.l	Reserved
+	dc.l	-1
 
 FUNCTABLE:
 	dc.l	Open					;68K
@@ -1688,7 +1734,12 @@ FUNCTABLE:
 	dc.l	IsExceptionMode
 
 EndFlag		dc.l	-1
-LibName		dc.b	"sonnet.library",0,0
-IDString	dc.b	"$VER: sonnet.library 17.0 (07-Dec-15)",0
+LibName		dc.b	"sonnet.library",0
+		cnop	 0,4
+IDString	dc.b	"$VER: sonnet.library 17.0 (01-Apr-16)",0
+		cnop 	0,4
+WarpName	dc.b	"warp.library",0
+		cnop	0,4
+WarpIDString	dc.b	"$VER: fake warp.library 5.0 (01-Apr-16)",0
 		cnop	0,4
 EndCP		end

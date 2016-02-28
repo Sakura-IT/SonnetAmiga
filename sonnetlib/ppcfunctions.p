@@ -2804,8 +2804,7 @@ Run68K:
 		li	r31,FRun68K-FRun68K
 		bl	DebugStartFunction
 
-		mr	r31,r4
-		
+		mr	r31,r4		
 		mfctr	r25
 
 		bl Super
@@ -2821,7 +2820,7 @@ Run68K:
 		and	r23,r23,r4			#Keep it C000-FFFE		
 		stwbrx	r23,r24,r3
 		lwz	r30,0(r30)			
-			
+
 		mr	r4,r5
 		bl User
 			
@@ -2841,7 +2840,7 @@ Run68K:
 		bdnz+	.CopyPP
 		
 		loadreg	r5,'T68K'
-		stw	r5,MN_IDENTIFIER(r30)
+		stw	r5,MN_IDENTIFIER(r30)		
 		lwz	r5,RunningTask(r0)
 		stw	r5,MN_PPC(r30)
 		
@@ -3503,10 +3502,6 @@ PutPublicMsgPPC:
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
-
-		loadreg	r29,'ahah'
-		stw	r29,0x144(r0)
-
 
 		mr	r31,r4
 		mr	r30,r5
@@ -6850,9 +6845,6 @@ PutMsgPPC:
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
-
-		loadreg	r29,'ahah'
-		stw	r29,0x140(r0)
 
 		mr	r29,r3
 		mr	r31,r4
