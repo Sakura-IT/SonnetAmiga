@@ -586,10 +586,31 @@ PshMsg		cpushl dc,(a2)				;040+
 ;********************************************************************************************
 
 MsgMir68	move.l a1,-(a7)
+		move.l MN_ARG0(a1),a0
+		moveq.l #-1,d1
+GetPPCName	addq.l #1,d1
+		tst.b (a0)+
+		bne.s GetPPCName
+		
+		move.l d1,d2
+		subq.l #1,d2
+		addq.l #5,d1
+		sub.l d1,a7
+		move.l a7,a2
+		move.l MN_ARG0(a1),a0
+CopyPPCName	move.b (a0)+,(a2)+
+		dbf d2,CopyPPCName
+		move.l #"_68K",(a2)+
+		clr.b (a2)
+		move.l d1,d2
+		
 		move.l DosBase(pc),a6
 		lea Prc2Tags(pc),a1
+		move.l a7,12(a1)
 		move.l a1,d1
 		jsr _LVOCreateNewProc(a6)
+		
+		add.l d2,a7
 		move.l (a7)+,a1
 		move.l 4.w,a6
 		tst.l d0

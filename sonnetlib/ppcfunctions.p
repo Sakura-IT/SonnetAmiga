@@ -2852,8 +2852,10 @@ Run68K:
 		b	.FromRunPPC
 		
 .NotRunPPC:	lwz	r5,RunningTask(r0)
-		lwz	r5,TASKPPC_MIRROR68K(r5)
-		stw	r5,MN_MIRROR(r30)
+		lwz	r4,TASKPPC_MIRROR68K(r5)
+		stw	r4,MN_MIRROR(r30)
+		lwz	r4,LN_NAME(r5)
+		stw	r4,MN_ARG0(r30)
 		
 .FromRunPPC:	lwz	r4,MCPort(r0)
 		stw	r4,MN_MCPORT(r30)
