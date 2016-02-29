@@ -1366,18 +1366,21 @@ FreeVec32:
 ;********************************************************************************************
 
 AllocXMsg:
-		movem.l d2-d3,-(a7)
-		move.l a0,d2
-		add.l #$14,d0
-		move.l d0,d3
-		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE|MEMF_CLEAR,d1
+		movem.l d1-a6,-(a7)
+		cmp.l #192-MN_PPSTRUCT,d0
+		ble.s RightSize
+		
+		ILLEGAL						;Sizes above 172 unsupported
+		
+RightSize	move.l d0,d3
+		move.l #MEMF_PUBLIC|MEMF_REVERSE|MEMF_CLEAR,d1
 		jsr _LVOAllocVec32(a6)
 		tst.l d0
-		beq.s NoAl32
+		beq.s NoRoom
 		move.l d0,a0
 		move.l d2,MN_REPLYPORT(a0)
 		move.w d3,MN_LENGTH(a0)
-NoAl32		movem.l (a7)+,d2-d3
+NoRoom		movem.l (a7)+,d1-a6
 		rts
 
 ;********************************************************************************************
@@ -1511,20 +1514,34 @@ PutChProc:
 
 ;********************************************************************************************
 ;
-;	void PutXMsg(MsgPortPPC, message) // a0,a1 -> TO BE IMPLEMENTED
+;	void PutXMsg(MsgPortPPC, message) // a0,a1
 ;
 ;********************************************************************************************
 
 PutXMsg:
-		ILLEGAL
-		movem.l d0-a6,-(a7)			#STUB
-		move.l #"DONE",d6
-		move.l d6,MN_IDENTIFIER(a1)
-		move.l MN_PPC(a1),a1
-		moveq.l #TS_READY,d6
-		move.b d6,TC_STATE(a1)
-		move.l 4.w,a6
-		jsr _LVOCacheClearU(a6)
+		movem.l d0-a6,-(a7)
+		move.b #NT_XMSG68K,LN_TYPE(a1)
+		move.l a1,a3
+		move.l EUMBAddr(pc),a2
+		move.l IFQPR(a2),a1			;Get message frame
+
+		moveq.l #47,d0				;MsgLen/4-1
+		move.l a1,a2
+ClrXMsg		clr.l (a2)+
+		dbf d0,ClrXMsg
+
+		move.w #192,MN_LENGTH(a1)
+		move.l #"XPPC",MN_IDENTIFIER(a1)
+		move.b #NT_MESSAGE,LN_TYPE(a1)
+		move.l a0,MN_PPC(a1)
+
+		lea MN_PPSTRUCT(a1),a2
+		moveq.l #PP_SIZE/4-1,d0
+CpXMsg		move.l (a3)+,(a2)+
+		dbf d0,CpXMsg
+
+		move.l EUMBAddr(pc),a2
+		move.l a1,IFQPR(a2)			;Free send message to PPC
 		movem.l (a7)+,d0-a6
 		rts
 

@@ -6521,7 +6521,7 @@ SignalPPC:
 		stwu	r28,-4(r13)
 
 		li	r31,FSignalPPC-FRun68K
-#		bl	DebugStartFunction
+		bl	DebugStartFunction
 
 		mr	r31,r4
 		mr	r30,r5
@@ -6740,7 +6740,7 @@ ReplyMsgPPC:
 		stb	r0,LN_TYPE(r30)
 		addi	r4,r31,MP_PPC_INTMSG
 
-		cmpwi	r28,NT_MIRRORMSG
+		cmpwi	r28,NT_XMSG68K
 		bne-	.DoSem
 		lhz	r6,MN_LENGTH(r30)
 		mr	r5,r30

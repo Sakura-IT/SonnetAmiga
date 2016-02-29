@@ -1906,7 +1906,20 @@ EInt:		b	.FPUnav				#0
 		stb	r6,TC_STATE(r3)				
 		b	.PutMsgIt
 
-.NoXMsg:	loadreg	r4,'DONE'
+.NoXMsg:	loadreg	r4,'XPPC'
+		cmpw	r4,r6
+		bne	.NoXPPC
+
+		stw	r5,0x130(r0)
+
+		lwz	r4,MN_PPC(r5)
+		lwz	r3,MP_SIGTASK(r4)
+		mr.	r3,r3
+		beq	.NxtInQ
+		la	r5,MN_PPSTRUCT(r5)		
+		b	.PutMsgIt
+
+.NoXPPC:	loadreg	r4,'DONE'
 		cmpw	r4,r6
 		bne	.NxtInQ
 		
