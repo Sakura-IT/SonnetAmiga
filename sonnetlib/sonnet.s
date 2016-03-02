@@ -677,10 +677,11 @@ GtLoop2		move.l (a7),a0
 		beq.s DoRunk86
 		cmp.l #"END!",d0
 		bne.s GtLoop2
+		
 		move.l EUMBAddr(pc),a2
 		move.l a0,OFQPR(a2)			;Return Message to free state
 		move.l (a7)+,d0
-		rts
+		rts					;End task
 		
 DoRunk86	move.l (a7),MN_MIRROR(a0)	
 		bsr Runk86

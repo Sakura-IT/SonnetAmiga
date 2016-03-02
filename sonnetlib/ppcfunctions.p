@@ -750,7 +750,7 @@ AllocVecPPC:	prolog 228,'TOC'
 		
 		li	r31,FAllocVecPPC-FRun68K
 		bl	DebugStartFunction
-		
+				
 		mr	r31,r6
 		mr	r30,r5
 		mr	r29,r4
@@ -2582,6 +2582,131 @@ User:
 
 #********************************************************************************************
 #
+#	Support: MsgFrame = CreateMsgFramePPC(void) // r3
+#
+#********************************************************************************************
+
+CreateMsgFramePPC:
+		prolog 228,'TOC'
+		
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
+
+		bl Super
+		mr	r26,r3
+
+		lis	r3,EUMB
+		li	r27,OFTPR
+		lwbrx	r30,r27,r3			
+		addi	r28,r30,4
+		loadreg	r29,0xc000
+		or	r28,r28,r29
+		loadreg r29,0xffff			#fffeffff?
+		and	r28,r28,r29			#Keep it C000-FFFE		
+		stwbrx	r28,r27,r3
+		lwz	r30,0(r30)			
+			
+		mr	r4,r26
+		bl User
+
+		mr	r3,r30
+
+		lwz	r26,0(r13)
+		lwz	r27,4(r13)
+		lwz	r28,8(r13)
+		lwz	r29,12(r13)
+		lwz	r30,16(r13)
+		addi	r13,r13,20
+
+		epilog 'TOC'
+		
+#********************************************************************************************
+#
+#	Support: void SendMsgFramePPC(MsgFrame) // r4
+#
+#********************************************************************************************
+
+SendMsgFramePPC:
+		prolog 228,'TOC'
+		
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
+		
+		mr	r30,r4
+		
+		bl Super
+		mr	r26,r3
+		
+		lis	r3,EUMB
+		li	r27,OPHPR
+		lwbrx	r28,r27,r3		
+		stw	r30,0(r28)		
+		addi	r29,r28,4
+		loadreg	r4,0xbfff			#ffffbfff?
+		and	r29,r29,r4			#Keep it 8000-BFFE
+		stwbrx	r29,r27,r3			#triggers Interrupt
+
+		mr	r4,r26
+		bl User
+		
+		lwz	r26,0(r13)
+		lwz	r27,4(r13)
+		lwz	r28,8(r13)
+		lwz	r29,12(r13)
+		lwz	r30,16(r13)
+		addi	r13,r13,20
+
+		epilog	'TOC'
+		
+#********************************************************************************************
+#
+#	Support: void FreeMsgFramePPC(MsgFrame) // r4
+#
+#********************************************************************************************
+
+FreeMsgFramePPC:
+		prolog 228,'TOC'
+		
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
+		
+		mr	r30,r4
+		
+		bl Super
+		mr	r26,r3
+
+		lis	r3,EUMB				#Free the message
+		li	r27,IFHPR
+		lwbrx	r29,r27,r3		
+		stw	r30,0(r29)		
+		addi	r28,r29,4
+		loadreg	r29,0x3fff			#ffff3fff?
+		and	r28,r28,r29			#Keep it 0000-3FFE
+		stwbrx	r28,r27,r3
+
+		mr	r4,r26
+		bl User
+
+		lwz	r26,0(r13)
+		lwz	r27,4(r13)
+		lwz	r28,8(r13)
+		lwz	r29,12(r13)
+		lwz	r30,16(r13)
+		addi	r13,r13,20
+		
+		epilog	'TOC'
+
+#********************************************************************************************
+#
 #	void PutXMsgPPC(MsgPort, message) // r4,r5
 #
 #********************************************************************************************
@@ -2611,26 +2736,11 @@ PutXMsgPPC:
 		lhz	r29,MN_LENGTH(r31)
 		cmplwi	r29,156				#FIFO msg length - 32 -4 (for MN_MCPORT)
 		bgt	.ErrorX		
-				
-		bl Super
-		mr	r5,r3
-
-		lis	r3,EUMB
-		li	r24,OFTPR
-		lwbrx	r30,r24,r3			
-		addi	r23,r30,4
-		loadreg	r4,0xc000
-		or	r23,r23,r4
-		loadreg r4,0xffff			#fffeffff?
-		and	r23,r23,r4			#Keep it C000-FFFE		
-		stwbrx	r23,r24,r3
-		lwz	r30,0(r30)			
 			
-		mr	r4,r5
-		bl User
-
+		bl CreateMsgFramePPC
+		
+		mr	r30,r3
 		mfctr	r28
-
 		subi	r25,r30,4
 		li	r26,48				#FIFO msg length / 4
 		li	r27,0
@@ -2661,21 +2771,9 @@ PutXMsgPPC:
 		stw	r25,MN_REPLYPORT+32(r30)
 		stw	r22,MN_MIRROR(r30)
 		stw	r31,MN_PPC(r30)
-
-		bl Super
-		mr	r5,r3
+		mr	r4,r30
 		
-		lis	r3,EUMB
-		li	r24,OPHPR
-		lwbrx	r31,r24,r3		
-		stw	r30,0(r31)		
-		addi	r23,r31,4
-		loadreg	r4,0xbfff			#ffffbfff?
-		and	r23,r23,r4			#Keep it 8000-BFFE
-		stwbrx	r23,r24,r3			#triggers Interrupt
-
-		mr	r4,r5
-		bl User
+		bl SendMsgFramePPC
 
 		lwz	r22,0(r13)
 		lwz	r23,4(r13)
@@ -2750,28 +2848,15 @@ WaitFor68K:
 		stwu	r7,4(r4)
 		bdnz+	.CopyPPB
 
-		lwz	r4,MN_PPSTRUCT+6*4(r30)		#return d0 for Run68KLowLevel
-		mr	r29,r4
-
-		bl Super
-		mr	r4,r3
-
-		lis	r3,EUMB				#Free the message
-		li	r27,IFHPR
-		lwbrx	r31,r27,r3		
-		stw	r30,0(r31)		
-		addi	r28,r31,4
-		loadreg	r31,0x3fff			#ffff3fff?
-		and	r28,r28,r31			#Keep it 0000-3FFE
-		stwbrx	r28,r27,r3
-		sync
-
-		bl User
+		lwz	r28,MN_PPSTRUCT+6*4(r30)	#return d0 for Run68KLowLevel
+		lwz	r29,MN_PPSTRUCT+5*4(r30)
+		mr	r4,r30
 		
-		mr	r4,r29		
-		lwz	r5,MN_PPSTRUCT+5*4(r30)
-
+		bl FreeMsgFramePPC
+									
 		mtctr	r26
+		mr	r4,r28
+		mr	r5,r29
 
 .ASync:		li	r3,0				#Needs proper status still
 
@@ -2807,23 +2892,9 @@ Run68K:
 		mr	r31,r4		
 		mfctr	r25
 
-		bl Super
-		mr	r5,r3
-
-		lis	r3,EUMB
-		li	r24,OFTPR
-		lwbrx	r30,r24,r3			
-		addi	r23,r30,4
-		loadreg	r4,0xc000
-		or	r23,r23,r4
-		loadreg r4,0xffff			#fffeffff?
-		and	r23,r23,r4			#Keep it C000-FFFE		
-		stwbrx	r23,r24,r3
-		lwz	r30,0(r30)			
-
-		mr	r4,r5
-		bl User
-			
+		bl CreateMsgFramePPC
+		
+		mr	r30,r3			
 		subi	r5,r30,4		
 		li	r6,48
 		li	r7,0
@@ -2863,29 +2934,14 @@ Run68K:
 		stb	r5,LN_TYPE(r30)
 		li	r5,192
 		sth	r5,MN_LENGTH(r30)
-		
-		sync
-		
-		mr	r29,r31
-		
-		bl Super
-		mr	r5,r3
-		
-		lis	r3,EUMB
-		li	r24,OPHPR
-		lwbrx	r31,r24,r3		
-		stw	r30,0(r31)		
-		addi	r23,r31,4
-		loadreg	r4,0xbfff			#ffffbfff?
-		and	r23,r23,r4			#Keep it 8000-BFFE
-		stwbrx	r23,r24,r3			#triggers Interrupt
 
-		mr	r4,r5
-		bl User
+		mr	r4,r30
+		
+		bl SendMsgFramePPC
 
-		mr	r4,r29
+		mr	r4,r31
 
-		bl 	WaitFor68K
+		bl WaitFor68K
 
 		mr	r3,r5
 
@@ -5434,7 +5490,21 @@ DeleteTaskPPC:
 		
 		bl ReleaseSemaphorePPC
 
-		mr.	r29,r29				#This task?
+		lwz	r3,RunningTask(r0)
+		lwz	r26,TASKPPC_MIRROR68K(r3)		
+		mr.	r26,r26
+		beq	.NoMirror
+
+		bl CreateMsgFramePPC
+		
+		mr	r4,r3
+		stw	r26,MN_MIRROR(r4)
+		loadreg	r26,'END!'
+		stw	r26,MN_IDENTIFIER(r4)
+		
+		bl SendMsgFramePPC			#Send kill signal to mirror 68K task
+
+.NoMirror:	mr.	r29,r29				#This task?
 		beq-	.NotOwnTask2			#no? Skip next
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r31)
@@ -5666,7 +5736,7 @@ CreatePoolPPC:
 
 		li	r31,FCreatePoolPPC-FRun68K
 		bl	DebugStartFunction
-		
+				
 		li	r31,0
 		
 		cmplw	r5,r6
@@ -6428,25 +6498,10 @@ Run68KLowLevel:
 		mr	r25,r9
 		mfctr	r22
 
-		bl Super
-		mr	r5,r3
+		bl CreateMsgFramePPC
 
-		lis	r3,EUMB
-		li	r24,OFTPR
-		lwbrx	r30,r24,r3			
-		addi	r23,r30,4		
-		loadreg	r4,0xc000
-		or	r23,r23,r4
-		loadreg r4,0xffff				#fffeffff?
-		and	r23,r23,r4				#Keep it C000-FFFE		
-		stwbrx	r23,r24,r3
-		lwz	r30,0(r30)
-
-		mr	r4,r5
-		bl User
-
-		subi	r5,r30,4
-				
+		mr	r30,r3
+		subi	r5,r30,4				
 		li	r6,48
 		li	r7,0
 		mtctr	r6
@@ -6468,33 +6523,19 @@ Run68KLowLevel:
 		lwz	r4,MCPort(r0)
 		stw	r4,MN_MCPORT(r30)
 		lwz	r5,RunningTask(r0)
-		stw	r5,MN_PPC(r30)
-				
-		sync
-		
-		bl Super
-		mr	r25,r3
-		
-		lis	r3,EUMB
-		li	r24,OPHPR
-		lwbrx	r31,r24,r3		
-		stw	r30,0(r31)						
-		addi	r23,r31,4
-		loadreg	r4,0xbfff				#ffffbfff?
-		and	r23,r23,r4				#Keep it 8000-BFFE		
-		stwbrx	r23,r24,r3				#triggers Interrupt
+		stw	r5,MN_PPC(r30)				
+		mr	r4,r30
 
-		mr	r4,r25
-		bl User
+		bl SendMsgFramePPC
 
 		subi	r4,r30,MN_PPSTRUCT
 
 		bl	WaitFor68K
-		
+
 		mr	r3,r4					# return d0 - See WaitFor68K
-		
+
 		mtctr	r22
-		
+
 		lwz	r22,0(r13)
 		lwz	r23,4(r13)
 		lwz	r24,8(r13)
@@ -8877,6 +8918,8 @@ DebugEndFunction:
 		addi	r13,r13,16
 
 		epilog 'TOC'
+		
+#********************************************************************************************
 
 FRun68K:		.byte	"Run68K",0
 FWaitFor68K:		.byte	"WaitFor68K",0
