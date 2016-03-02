@@ -1803,14 +1803,30 @@ EInt:		b	.FPUnav				#0
 		lwz	r5,0(r5)
 		loadreg	r4,'TPPC'
 		lwz	r6,MN_IDENTIFIER(r5)
-		cmpw	r4,r6				#The one we want?
+		cmpw	r4,r6				#A RunPPC request
 		beq	.MsgTPPC
 		
 		loadreg	r4,'LLPP'			#Cross-signaling
-		cmpw	r4,r6				#CTRL-C for now
-		bne	.NoXSignal 			#(Restriction is in sonnet.s)
+		cmpw	r4,r6
+		beq	.XSignal
 	
-		lwz	r3,MN_ARG1(r5)			#68K mirror task's port
+		loadreg	r4,'XMSG'			#Reply (7) from XMSG from 68K
+		cmpw	r4,r6
+		beq 	.ReturnXMsg
+
+		loadreg	r4,'XPPC'			#Message (5) from 68K
+		cmpw	r4,r6
+		beq	.XMsgPPC
+		
+		loadreg	r4,'DONE'			#Reply from Run68K
+		cmpw	r4,r6
+		beq	.Done68
+		
+		b	.NxtInQ
+		
+#**********************************************************
+
+.XSignal:	lwz	r3,MN_ARG1(r5)			#68K mirror task's port
 		lwz	r4,RunningTask(r0)		#Check for it in the running task
 		lwz	r8,TASKPPC_STARTMSG(r4)
 		lwz	r8,MN_REPLYPORT(r8)
@@ -1864,11 +1880,10 @@ EInt:		b	.FPUnav				#0
 
 		b	.NxtInQ		
 		
-.NoXSignal:	loadreg r4,'XMSG'
-		cmpw	r4,r6
-		bne	.NoXMsg
-		lwz	r4,MN_REPLYPORT(r5)
-		addi	r7,r5,32
+#**********************************************************		
+		
+.ReturnXMsg:	lwz	r4,MN_REPLYPORT(r5)		#Handles the reply from an XMSG
+		addi	r7,r5,32			#(or a cross message from PPC to 68K)
 		stw	r4,MN_REPLYPORT(r7)
 		lwz	r8,MN_PPC(r5)
 		lhz	r4,MN_LENGTH(r7)
@@ -1906,31 +1921,23 @@ EInt:		b	.FPUnav				#0
 		stb	r6,TC_STATE(r3)				
 		b	.PutMsgIt
 
-.NoXMsg:	loadreg	r4,'XPPC'
-		cmpw	r4,r6
-		bne	.NoXPPC
-
-		stw	r5,0x130(r0)
-
-		lwz	r4,MN_PPC(r5)
+#**********************************************************
+		
+.XMsgPPC:	lwz	r4,MN_PPC(r5)			#Handles a cross message from 68K to PPC)
 		lwz	r3,MP_SIGTASK(r4)
 		mr.	r3,r3
 		beq	.NxtInQ
-		la	r5,MN_PPSTRUCT(r5)		
-		b	.PutMsgIt
+		la	r5,MN_PPSTRUCT(r5)		#PutMsg it to correct PPC task
+		b	.PutMsgIt			#Go to signailling code
 
-.NoXPPC:	loadreg	r4,'DONE'
-		cmpw	r4,r6
-		bne	.NxtInQ
+#**********************************************************
 		
-		lwz	r4,MN_PPC(r5)
-		
+.Done68:	lwz	r4,MN_PPC(r5)			#Handles the reply on a Run68K
 		li	r3,TS_READY
-		stb	r3,TC_STATE(r4)
+		stb	r3,TC_STATE(r4)		
+		mr	r3,r4				
+		lwz	r4,TASKPPC_MSGPORT(r3)
 		
-		mr	r3,r4
-				
-		lwz	r4,TASKPPC_MSGPORT(r3)				
 .PutMsgIt:	lbz	r6,MP_SIGBIT(r4)
 		li	r8,1
 		slw	r8,r8,r6		
@@ -1947,8 +1954,10 @@ EInt:		b	.FPUnav				#0
 		stw	r5,0(r3)
 									
 		b	.NxtInQ
+
+#**********************************************************
 		
-.MsgTPPC:	lwz	r4,PowerPCBase(r0)
+.MsgTPPC:	lwz	r4,PowerPCBase(r0)		#Handles a RunPPC
 		la	r4,LIST_NEWTASKS(r4)
 		
 		addi	r4,r4,4				#AddTailPPC
@@ -1957,9 +1966,11 @@ EInt:		b	.FPUnav				#0
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
+
+#**********************************************************
 		
-.NxtInQ:	lis	r3,EUMB
-		li	r4,IPHPR
+.NxtInQ:	lis	r3,EUMB				#Check if header (IPHPR) is equal to
+		li	r4,IPHPR			#tail (IPTPR). If so, queue is empty
 		lwbrx	r5,r4,r3
 		loadreg	r4,0xffff
 		and	r5,r5,r4
@@ -1969,6 +1980,8 @@ EInt:		b	.FPUnav				#0
 		
 		mr	r5,r9
 		b	.QNotEmpty
+
+#**********************************************************
 		
 .QEmpty:	li	r4,IPTPR
 		stwbrx	r9,r4,r3
