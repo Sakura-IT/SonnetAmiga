@@ -177,6 +177,17 @@ FndMem		move.l d0,d7
 		
 		move.w #VENDOR_3DFX,d0
 		move.w d0,d5
+		move.w #DEVICE_VOODOO45,d1
+		moveq.l #0,d2
+		jsr _LVOPCIFindCard(a6)
+		tst.l d0		
+		beq.s Nxt3DFX
+		move.l d0,a2
+		move.l PCI_SPACE0(a2),d4
+		bra.s FoundGfx
+	
+Nxt3DFX		move.w #VENDOR_3DFX,d0
+		move.w d0,d5
 		move.w #DEVICE_VOODOO3,d1
 		moveq.l #0,d2
 		jsr _LVOPCIFindCard(a6)
@@ -185,7 +196,7 @@ FndMem		move.l d0,d7
 		move.l d0,a2
 		move.l PCI_SPACE0(a2),d4
 		bra.s FoundGfx
-		
+			
 Not3DFX		move.w #VENDOR_ATI,d0			;Need more pciinfo
 		move.w d0,d5
 		move.w #DEVICE_RV280PRO,d1

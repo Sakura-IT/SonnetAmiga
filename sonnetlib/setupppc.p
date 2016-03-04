@@ -3542,6 +3542,8 @@ EInt:		b	.FPUnav				#0
 		beq	.stfsx
 		cmpwi	r0,0x32
 		beq	.lfd
+		cmpwi	r0,0x36
+		beq	.stfd
 		b	.HaltAlign
 
 .stfs:		lfdx	f1,r31,r6			#get value from fp register
@@ -3568,6 +3570,13 @@ EInt:		b	.FPUnav				#0
 .stfsx:		rlwinm	r8,r5,23,25,29			#get index register
 		lwzx	r8,r30,r8			#get index register value
 		b	.stfs
+		
+.stfd:		lwzx	r9,r31,r6
+		stwx	r9,r7,r8
+		addi	r6,r6,4
+		addi	r8,r8,4
+		lwzx	r9,r31,r6
+		stwx	r9,r7,r8
 		
 #***********************************************
 						
