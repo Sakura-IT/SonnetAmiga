@@ -1822,6 +1822,10 @@ EInt:		b	.FPUnav				#0
 		cmpw	r4,r6
 		beq	.Done68
 		
+		loadreg	r4,'DNLL'			#Reply from Run68KLowLevel
+		cmpw	r4,r6
+		beq	.Done68
+
 		b	.NxtInQ
 		
 #**********************************************************

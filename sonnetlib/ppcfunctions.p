@@ -2826,15 +2826,22 @@ WaitFor68K:
 
 		beq	.WasNoMsg
 
-.Sync:		loadreg	r4,'DONE'
+		loadreg	r4,'DONE'
 		lwz	r29,MN_IDENTIFIER(r30)
+		cmpw	r4,r29
+		beq	.WasDone
+		loadreg	r4,'DNLL'
 		cmpw	r4,r29
 		bne	.WasNoDone
 		
-		lwz	r4,RunningTask(r0)
+.WasDone:	lwz	r4,RunningTask(r0)
 		lwz	r26,TASKPPC_MIRROR68K(r4)
 		mr.	r26,r26
 		bne	.GotMirror
+		
+		loadreg	r6,'DNLL'
+		cmpw	r6,r29
+		beq	.GotMirror
 		
 		lwz	r26,MN_MIRROR(r30)
 		stw	r26,TASKPPC_MIRROR68K(r4)
@@ -7049,9 +7056,9 @@ SPrintF:
 		stwu	r4,-4(r13)
 		stwu	r3,-4(r13)
 		
-		lbz	r31,DebugLevel(r0)
-		li	r6,0
-		stb	r6,DebugLevel(r0)
+#		lbz	r31,DebugLevel(r0)
+#		li	r6,0
+#		stb	r6,DebugLevel(r0)
 
 		mr	r6,r4						#a0
 		mr	r7,r5						#a1
@@ -7060,7 +7067,7 @@ SPrintF:
 
 		bl 	Run68KLowLevel
 		
-		stb	r31,DebugLevel(r0)
+#		stb	r31,DebugLevel(r0)
 		
 		lwz	r3,0(r13)
 		lwz	r4,4(r13)
