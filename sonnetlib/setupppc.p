@@ -721,27 +721,24 @@ ClearInts:	lwz	r27,0xa0(r26)			#IACKR
 		blr
 
 #********************************************************************************************
-							#Invalidatem then enable L1 caches
-Caches:		mfspr	r4,HID0
+
+Caches:		mfspr	r4,HID0				#Invalidatem then enable L1 caches
 		ori	r4,r4,HID0_ICFI|HID0_DCFI
 		mtspr	HID0,r4
 		sync
 		
 #		blr					#REMOVE ME FOR L1 CACHE
-							#L1 cache off for now
-							#to fix coherancy problems
+
 		mfspr	r4,HID0
-#		ori	r4,r4,HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
 		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
 		sync
 		mtspr	HID0,r4
 		sync
 		 	
 #		blr					#REMOVE ME FOR L2 CACHE		
-		 					# Set up on chip L2 cache controller.
-#		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS|L2CR_L2WT
+
 		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS|L2CR_DO
-		mtl2cr	r4
+		mtl2cr	r4				# Set up on chip L2 cache controller.
 		sync
 		
 		mfl2cr	r5
@@ -3546,6 +3543,14 @@ EInt:		b	.FPUnav				#0
 		beq	.stfd
 		b	.HaltAlign
 
+.stfd:		lwzx	r9,r31,r6
+		stwx	r9,r7,r8
+		addi	r6,r6,4
+		addi	r8,r8,4
+		lwzx	r9,r31,r6
+		stwx	r9,r7,r8
+		b	.AligExit
+
 .stfs:		lfdx	f1,r31,r6			#get value from fp register
 		stfs	f1,AlignStore(r0)		#store it on correct aligned spot
 		lwz	r6,AlignStore(r0)		#Get the correct 32 bit value
@@ -3570,14 +3575,7 @@ EInt:		b	.FPUnav				#0
 .stfsx:		rlwinm	r8,r5,23,25,29			#get index register
 		lwzx	r8,r30,r8			#get index register value
 		b	.stfs
-		
-.stfd:		lwzx	r9,r31,r6
-		stwx	r9,r7,r8
-		addi	r6,r6,4
-		addi	r8,r8,4
-		lwzx	r9,r31,r6
-		stwx	r9,r7,r8
-		
+				
 #***********************************************
 						
 .AligExit:	loadreg	r7,'USER'			#Return to user
