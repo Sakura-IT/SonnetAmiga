@@ -31,7 +31,7 @@
 .global SetNiceValue,AllocPrivateMem,FreePrivateMem,SetExceptPPC,ObtainSemaphoreSharedPPC
 .global AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
 .global AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
-.global AddUniqueSemaphorePPC,IsExceptionMode
+.global AddUniqueSemaphorePPC,IsExceptionMode,CreateMsgFramePPC,SendMsgFramePPC,FreeMsgFramePPC
 
 .section "LibBody","acrx"
 
@@ -459,6 +459,7 @@ ClearExcMMU:
 #********************************************************************************************
 
 ConfirmInterrupt:
+		blr
 		stw	r3,-12(r1)
 		stw	r4,-8(r1)
 		lis	r3,EUMBEPICPROC
@@ -2594,9 +2595,16 @@ CreateMsgFramePPC:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
+		stwu	r4,-4(r13)
 
 		bl Super
 		mr	r26,r3
+
+.WaitCreateFrm:	li	r4,AtomicFrame
+		bl AtomicTest
+		
+		mr.	r3,r3
+		beq+	.WaitCreateFrm
 
 		lis	r3,EUMB
 		li	r27,OFTPR
@@ -2608,18 +2616,22 @@ CreateMsgFramePPC:
 		and	r28,r28,r29			#Keep it C000-FFFE		
 		stwbrx	r28,r27,r3
 		lwz	r30,0(r30)			
+		
+		li	r4,AtomicFrame
+		bl AtomicDone
 			
 		mr	r4,r26
 		bl User
 
 		mr	r3,r30
 
-		lwz	r26,0(r13)
-		lwz	r27,4(r13)
-		lwz	r28,8(r13)
-		lwz	r29,12(r13)
-		lwz	r30,16(r13)
-		addi	r13,r13,20
+		lwz	r4,0(r13)
+		lwz	r26,4(r13)
+		lwz	r27,8(r13)
+		lwz	r28,12(r13)
+		lwz	r29,16(r13)
+		lwz	r30,20(r13)
+		addi	r13,r13,24
 
 		epilog 'TOC'
 		
@@ -2643,6 +2655,12 @@ SendMsgFramePPC:
 		bl Super
 		mr	r26,r3
 		
+.WaitSendFrm:	li	r4,AtomicFrame
+		bl AtomicTest
+		
+		mr.	r3,r3
+		beq+	.WaitSendFrm
+		
 		lis	r3,EUMB
 		li	r27,OPHPR
 		lwbrx	r28,r27,r3		
@@ -2651,6 +2669,9 @@ SendMsgFramePPC:
 		loadreg	r4,0xbfff			#ffffbfff?
 		and	r29,r29,r4			#Keep it 8000-BFFE
 		stwbrx	r29,r27,r3			#triggers Interrupt
+
+		li	r4,AtomicFrame
+		bl AtomicDone
 
 		mr	r4,r26
 		bl User
@@ -2684,6 +2705,12 @@ FreeMsgFramePPC:
 		bl Super
 		mr	r26,r3
 
+.WaitFreeFrm:	li	r4,AtomicFrame
+		bl AtomicTest
+		
+		mr.	r3,r3
+		beq+	.WaitFreeFrm
+
 		lis	r3,EUMB				#Free the message
 		li	r27,IFHPR
 		lwbrx	r29,r27,r3		
@@ -2692,6 +2719,9 @@ FreeMsgFramePPC:
 		loadreg	r29,0x3fff			#ffff3fff?
 		and	r28,r28,r29			#Keep it 0000-3FFE
 		stwbrx	r28,r27,r3
+
+		li	r4,AtomicFrame
+		bl AtomicDone
 
 		mr	r4,r26
 		bl User
@@ -2928,7 +2958,7 @@ Run68K:
 		lwz	r5,MN_MIRROR(r5)
 		stw	r5,MN_MIRROR(r30)
 		b	.FromRunPPC
-		
+
 .NotRunPPC:	lwz	r5,RunningTask(r0)
 		lwz	r4,TASKPPC_MIRROR68K(r5)
 		stw	r4,MN_MIRROR(r30)

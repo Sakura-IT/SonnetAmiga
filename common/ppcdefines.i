@@ -56,6 +56,7 @@
 .set AlignStore2,136
 .set ViolationAddress,140			#Pointer
 .set MemSize,144
+.set AtomicFrame,148
 
 #LibBase:
 
@@ -195,6 +196,8 @@
 .set MEMF_CLEAR,		0x00010000
 .set MEMF_PPC,			0x00002000
 .set MEMF_REVERSE,		0x00040000
+
+.set MEMB_CHIP,			0x1
 
 .set SonnetBusClock,66666666			#66.6 MHz
 .set DecTimerFreq,(SonnetBusClock/4)		#Dec goes at 1/4 of Bus clock

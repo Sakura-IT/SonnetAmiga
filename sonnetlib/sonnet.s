@@ -42,7 +42,8 @@
 	XREF	SetNiceValue,AllocPrivateMem,FreePrivateMem,SetExceptPPC,ObtainSemaphoreSharedPPC
 	XREF	AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
 	XREF	AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
-	XREF	AddUniqueSemaphorePPC,IsExceptionMode
+	XREF	AddUniqueSemaphorePPC,IsExceptionMode,CreateMsgFramePPC,SendMsgFramePPC
+	XREF	FreeMsgFramePPC
 
 	XREF 	PPCCode,PPCLen,RunningTask,LIST_WAITINGTASKS,MCPort,Init
 	XREF	SysBase,PowerPCBase,DOSBase
@@ -656,9 +657,10 @@ CleanUp		move.l d6,a0
 		jsr _LVOPutMsg(a6)
 		bra.s CleanUp
 
-GoWaitPort	move.l (a7),a0
-		move.l ThisTask(a6),a1
-		move.l TC_SIGALLOC(a1),d0
+GoWaitPort	move.l (a7),a0		
+		move.l TC_SIGALLOC(a1),d0		
+		and.l #$fffff000,d0
+
 		move.b MP_SIGBIT(a0),d1
 		moveq.l #0,d2
 		bset d1,d2
@@ -681,8 +683,8 @@ GtLoop2		move.l (a7),a0
 		jsr _LVOGetMsg(a6)
 		move.l d0,d7
 		beq.s GoWaitPort
-				
-		move.l d0,a0
+
+		move.l d7,a0
 		move.l MN_IDENTIFIER(a0),d0
 		cmp.l #"T68K",d0
 		beq.s DoRunk86
@@ -718,32 +720,10 @@ Prc2Name	dc.b "Joshua",0
 SonInt:		movem.l d0-a6,-(a7)
 		move.l 4.w,a6
 		move.l EUMBAddr(pc),a2
-		move.l #$03000000,d2			;OMISR[OM0I|OM1I]
 		move.l OMISR(a2),d3
-		and.l d2,d3
-		beq.s NoSingl
-
-		move.l OMR0(a2),a0			;Port
-		move.l OMR1(a2),a1			;Message
-		move.l #$ffffffff,OMR0(a2)		;Destroy value
-		cmp.l #$ffffffff,a0
-		beq.s ClearInt
-
-DoPMsg		moveq.l #0,d4
-		move.w MN_LENGTH(a1),d4			;PPC should make it 32 byte aligned
-		beq.s NoSingl
-		lsr.l #4,d4
-		subq.l #1,d4
-		move.l a1,d3
-		bsr InvMsg				;PCI memory is cache inhibited for 68k
-		move.l d3,a1
-;		jsr _LVOPutMsg(a6)		
-ClearInt	move.l d2,OMISR(a2)
-
-NoSingl	 	move.l OMISR(a2),d3		
 		move.l #$20000000,d4			;OMISR[OPQI]
 		and.l d4,d3
-		beq.s DidInt
+		beq DidNotInt
 
 NxtMsg		move.l EUMBAddr(pc),a2
 		move.l OFQPR(a2),d3			;Get Message Frame
@@ -752,7 +732,7 @@ NxtMsg		move.l EUMBAddr(pc),a2
 
 		move.l d3,a1
 		moveq.l #11,d4
-		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
+;		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
 		move.l d3,a1
 		move.b LN_TYPE(a1),d0
 		cmp.b #NT_REPLYMSG,d0
@@ -772,7 +752,7 @@ NoXReply	move.l MN_IDENTIFIER(a1),d0
 		cmp.l #"XMSG",d0
 		beq MsgXMSG
 		cmp.l #"GETV",d0
-		beq.s LoadD
+		beq LoadD
 		and.l #$ffffff00,d0
 		cmp.l #$50555400,d0
 		beq.s StoreD		
@@ -792,6 +772,10 @@ InvMsg		cinvl dc,(a1)				;040+
 		rts
 
 IntData		dc.l 0
+
+DidNotInt	moveq.l #-1,d7
+		movem.l (a7)+,d0-a6
+		rts
 
 ;********************************************************************************************
 
@@ -990,7 +974,7 @@ Port	EQU -8
 
 RunPPC:		link a5,#-8
 		movem.l d1-a6,-(a7)
-		moveq.l #0,d0
+		moveq.l #0,d0		
 		move.l d0,Port(a5)
 		move.l a0,PStruct(a5)
 		move.l 4.w,a6
@@ -1135,9 +1119,10 @@ yProces		lea pr_MsgPort(a1),a1
 		move.l a1,Port(a5)
 
 Stacker		move.l ThisTask(a6),a1
-		move.l TC_SIGALLOC(a1),d0
-;		and.l #$fffff000,d0
-		move.l Port(a5),a0		
+		move.l TC_SIGALLOC(a1),d0		
+		and.l #$fffff000,d0
+
+		move.l Port(a5),a0
 		move.b MP_SIGBIT(a0),d1
 		moveq.l #0,d2
 		bset d1,d2
@@ -1152,15 +1137,16 @@ Stacker		move.l ThisTask(a6),a1
 		move.l d0,d1
 		and.l d2,d1
 		beq.s GtLoop
-		
+
 		move.l Port(a5),a3
 		bsr CrossSignals		
-		
+
 GtLoop		move.l Port(a5),a0
 		jsr _LVOGetMsg(a6)
 		
 		tst.l d0
 		beq.s Stacker
+
 		move.l d0,a0
 		move.l MN_IDENTIFIER(a0),d0
 		cmp.l #"FPPC",d0
@@ -1782,6 +1768,9 @@ FUNCTABLE:
 	dc.l	AddUniquePortPPC
 	dc.l	AddUniqueSemaphorePPC
 	dc.l	IsExceptionMode
+	dc.l	CreateMsgFramePPC
+	dc.l	SendMsgFramePPC
+	dc.l	FreeMsgFramePPC
 
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0
@@ -1792,4 +1781,5 @@ WarpName	dc.b	"warp.library",0
 		cnop	0,4
 WarpIDString	dc.b	"$VER: fake warp.library 5.0 (01-Apr-16)",0
 		cnop	0,4
+		
 EndCP		end

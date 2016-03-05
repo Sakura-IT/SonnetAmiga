@@ -136,27 +136,12 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		mr	r26,r9
 		mr	r27,r10
 
-.NotLinear2:	mr	r14,r4
-		mr	r15,r3
-		LIBCALLPOWERPC Super
-		mr	r12,r3
+.NotLinear2:	mr	r12,r3
 
-		lis	r7,EUMB					#Get Msg Frame for 
-		li	r8,OFTPR				#communication with 68K
-		lwbrx	r9,r8,r7			
-		addi	r10,r9,4		
-		loadreg	r11,0xc000
-		or	r10,r10,r11
-		loadreg r11,0xffff				#0xfffeffff?
-		and	r10,r10,r11				#Keep it C000-FFFE		
-		stwbrx	r10,r8,r7
-		lwz	r9,0(r9)
-		sync
-		
-		mr	r4,r12		
-		LIBCALLPOWERPC User		
-		mr	r4,r14
-		mr	r3,r15
+		LIBCALLPOWERPC CreateMsgFramePPC
+
+		mr	r9,r3
+		mr	r3,r12
 
 		subi	r10,r9,4		
 		li	r11,48
@@ -219,18 +204,9 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		lwz	r4,TASKPPC_TASKMEM(r4)
 		stw	r4,MN_ARG0(r9)
 
-		LIBCALLPOWERPC Super
-		mr	r5,r3
-
-		lis	r3,EUMB					#Send Msg to 68K
-		li	r24,OPHPR
-		lwbrx	r31,r24,r3		
-		stw	r9,0(r31)		
-		addi	r23,r31,4
-		loadreg	r4,0xbfff
-		and	r23,r23,r4				#Keep it 8000-BFFE
-		stwbrx	r23,r24,r3				#triggers Interrupt
-		sync
+		mr	r4,r9
+		
+		LIBCALLPOWERPC SendMsgFramePPC
 
 		loadreg	r1,SysStack-0x20			#System stack in unused mem
 		lwz	r13,SonnetBase(r0)
@@ -238,20 +214,10 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		subi	r13,r1,4
 		stwu	r1,-284(r1)
 
-		lwz	r9,RunningTask(r0)			#Free original 68K -> PPC
-		lwz	r9,TASKPPC_STARTMSG(r9)			#message
-		lis	r3,EUMB
-		li	r24,IFHPR
-		lwbrx	r31,r24,r3		
-		stw	r9,0(r31)		
-		addi	r23,r31,4
-		loadreg	r4,0x3fff
-		and	r23,r23,r4				#Keep it 0000-3FFE
-		stwbrx	r23,r24,r3
-		sync
+		lwz	r4,RunningTask(r0)			#Free original 68K -> PPC
+		lwz	r4,TASKPPC_STARTMSG(r4)			#message
 
-		mr	r4,r5
-		LIBCALLPOWERPC User
+		LIBCALLPOWERPC FreeMsgFramePPC
 
 		li	r7,TS_REMOVED
 		lwz	r9,RunningTask(r0)
@@ -1791,7 +1757,7 @@ EInt:		b	.FPUnav				#0
 		li	r4,IPTPR			#Get message from Inbound FIFO
 		lwbrx	r5,r4,r3
 .QNotEmpty:	addi	r9,r5,4				#Increase FIFO pointer
-		loadreg	r4,0x4000
+		loadreg	r4,0x4000			#Should this be atomic?
 		or	r9,r9,r4
 		loadreg r4,0x7fff
 		and	r9,r9,r4			#Keep it 4000-7FFE		
@@ -1871,7 +1837,7 @@ EInt:		b	.FPUnav				#0
 		b	.ChkRdySig				
 		
 .RelFrame:	lis	r3,EUMB				#Free the message
-		li	r4,IFHPR
+		li	r4,IFHPR			#Should this be atomic?
 		lwbrx	r6,r4,r3		
 		stw	r5,0(r6)		
 		addi	r8,r6,4
@@ -1899,7 +1865,7 @@ EInt:		b	.FPUnav				#0
 		mtctr	r3
 			
 		lis	r3,EUMB				#Free the message
-		li	r4,IFHPR
+		li	r4,IFHPR			#Should this be atomic?
 		lwbrx	r6,r4,r3		
 		stw	r5,0(r6)		
 		addi	r8,r6,4
@@ -3939,7 +3905,7 @@ EInt:		b	.FPUnav				#0
 		or	r23,r23,r20
 		loadreg r20,0xffff
 		and	r23,r23,r20			#Keep it C000-FFFE		
-		stwbrx	r23,r24,r28
+		stwbrx	r23,r24,r28			#Atomic?
 		lwz	r25,0(r25)
 
 		stw	r9,MN_IDENTIFIER(r25)
@@ -3960,7 +3926,7 @@ EInt:		b	.FPUnav				#0
 		lwbrx	r22,r24,r28		
 		stw	r25,0(r22)		
 		addi	r23,r22,4
-		loadreg	r20,0xbfff
+		loadreg	r20,0xbfff			#Atomic?
 		and	r23,r23,r20			#Keep it 8000-BFFE
 		stwbrx	r23,r24,r28			#triggers Interrupt
 
