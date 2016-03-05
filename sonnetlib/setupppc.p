@@ -1820,7 +1820,7 @@ EInt:		b	.FPUnav				#0
 		b	.ChkNextSig
 		
 .SetReady:	li	r3,TS_READY
-#		stb	r3,TC_STATE(r4)			#NOT WORKING!
+		stb	r3,TC_STATE(r4)
 		b	.ReUseLoop	
 		
 .ChkRdy:	lwz	r4,PowerPCBase(r0)

@@ -522,15 +522,43 @@ GetLoop		move.l d6,a0
 
 		move.l d0,d7
 		beq.s NextMsg
-				
-		move.l d0,a1
-		move.l MN_IDENTIFIER(a1),d0
+							
+		move.l d0,a1	
+		move.b LN_TYPE(a1),d0
+		cmp.b #NT_REPLYMSG,d0
+		bne.s NoXReply
+	
+		move.l -32+MN_IDENTIFIER(a1),d0
+		cmp.l #"XMSG",d0
+		beq.s MsgRXMSG
+		
+NoXReply	move.l MN_IDENTIFIER(a1),d0
 		cmp.l #"T68K",d0
 		beq MsgMir68
 		cmp.l #"LL68",d0
 		beq.s MsgLL68
 		cmp.l #"FREE",d0
-		beq.s MsgFree
+		beq MsgFree
+		bra.s GetLoop
+
+;********************************************************************************************		
+
+MsgRXMSG	lea -32(a1),a1
+		move.b #NT_REPLYMSG,LN_TYPE(a1)
+		move.l EUMBAddr(pc),a2
+		move.l MN_REPLYPORT(a1),d0
+		beq.s FreeRXMsg
+
+		move.l IFQPR(a2),a2
+		move.l a1,a3
+		move.l a2,d7
+		moveq.l #192/4-1,d0
+CopyRXMsg	move.l (a3)+,(a2)+
+		dbf d0,CopyRXMsg
+		
+		move.l EUMBAddr(pc),a2
+		move.l d7,IFQPR(a2)			;Message the PPC
+FreeRXMsg	move.l a1,OFQPR(a2)			;Return Message Frame
 		bra.s GetLoop
 		
 ;********************************************************************************************
@@ -723,7 +751,7 @@ SonInt:		movem.l d0-a6,-(a7)
 		move.l OMISR(a2),d3
 		move.l #$20000000,d4			;OMISR[OPQI]
 		and.l d4,d3
-		beq DidNotInt
+		beq.s DidNotInt
 
 NxtMsg		move.l EUMBAddr(pc),a2
 		move.l OFQPR(a2),d3			;Get Message Frame
@@ -734,15 +762,8 @@ NxtMsg		move.l EUMBAddr(pc),a2
 		moveq.l #11,d4
 ;		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
 		move.l d3,a1
-		move.b LN_TYPE(a1),d0
-		cmp.b #NT_REPLYMSG,d0
-		bne.s NoXReply
-	
-		move.l -32+MN_IDENTIFIER(a1),d0
-		cmp.l #"XMSG",d0
-		beq MsgRXMSG
 		
-NoXReply	move.l MN_IDENTIFIER(a1),d0
+		move.l MN_IDENTIFIER(a1),d0
 		cmp.l #"T68K",d0
 		beq MsgT68k
 		cmp.l #"END!",d0
@@ -829,26 +850,6 @@ MsgXMSG
 		move.l MN_MIRROR(a1),a0
 		lea 32(a1),a1
 		bra DoPutMsg
-		
-;********************************************************************************************		
-
-MsgRXMSG	lea -32(a1),a1
-		move.b #NT_REPLYMSG,LN_TYPE(a1)
-		move.l EUMBAddr(pc),a2
-		move.l MN_REPLYPORT(a1),d0
-		beq.s FreeRXMsg
-
-		move.l IFQPR(a2),a2
-		move.l a1,a3
-		move.l a2,d7
-		moveq.l #192/4-1,d0
-CopyRXMsg	move.l (a3)+,(a2)+
-		dbf d0,CopyRXMsg
-		
-		move.l EUMBAddr(pc),a2
-		move.l d7,IFQPR(a2)			;Message the PPC
-FreeRXMsg	move.l a1,OFQPR(a2)			;Return Message Frame
-		bra NxtMsg
 
 ;********************************************************************************************
 ;********************************************************************************************
