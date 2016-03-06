@@ -2583,6 +2583,41 @@ User:
 
 #********************************************************************************************
 #
+#	Support: void DisableIntPPC(void)
+#
+#********************************************************************************************
+
+DisableIntPPC:	
+		stwu	r28,-4(r13)
+		mfmsr	r28
+		ori	r28,r28,PSL_EE
+		xori	r28,r28,PSL_EE			#Disable()
+		mtmsr	r28
+		isync
+		sync
+		lwz	r28,0(r13)
+		addi	r13,r13,4
+		blr
+
+#********************************************************************************************
+#
+#	Support: void EnableIntPPC(void)
+#
+#********************************************************************************************
+
+EnableIntPPC:
+		stwu	r28,-4(r13)
+		mfmsr	r28
+		ori	r28,r28,PSL_EE			#Enable()
+		mtmsr	r28
+		isync
+		sync
+		lwz	r28,0(r13)
+		addi	r13,r13,4
+		blr
+
+#********************************************************************************************
+#
 #	Support: MsgFrame = CreateMsgFramePPC(void) // r3
 #
 #********************************************************************************************
@@ -2600,11 +2635,7 @@ CreateMsgFramePPC:
 		bl Super
 		mr	r26,r3
 
-.WaitCreateFrm:	li	r4,AtomicFrame
-		bl AtomicTest
-		
-		mr.	r3,r3
-		beq+	.WaitCreateFrm
+		bl DisableIntPPC
 
 		lis	r3,EUMB
 		li	r27,OFTPR
@@ -2616,10 +2647,9 @@ CreateMsgFramePPC:
 		and	r28,r28,r29			#Keep it C000-FFFE		
 		stwbrx	r28,r27,r3
 		lwz	r30,0(r30)			
-		
-		li	r4,AtomicFrame
-		bl AtomicDone
-			
+
+		bl EnableIntPPC
+
 		mr	r4,r26
 		bl User
 
@@ -2649,18 +2679,14 @@ SendMsgFramePPC:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
-		
+
 		mr	r30,r4
-		
+
 		bl Super
 		mr	r26,r3
-		
-.WaitSendFrm:	li	r4,AtomicFrame
-		bl AtomicTest
-		
-		mr.	r3,r3
-		beq+	.WaitSendFrm
-		
+
+		bl DisableIntPPC		
+
 		lis	r3,EUMB
 		li	r27,OPHPR
 		lwbrx	r28,r27,r3		
@@ -2670,12 +2696,11 @@ SendMsgFramePPC:
 		and	r29,r29,r4			#Keep it 8000-BFFE
 		stwbrx	r29,r27,r3			#triggers Interrupt
 
-		li	r4,AtomicFrame
-		bl AtomicDone
+		bl EnableIntPPC
 
 		mr	r4,r26
 		bl User
-		
+
 		lwz	r26,0(r13)
 		lwz	r27,4(r13)
 		lwz	r28,8(r13)
@@ -2705,11 +2730,7 @@ FreeMsgFramePPC:
 		bl Super
 		mr	r26,r3
 
-.WaitFreeFrm:	li	r4,AtomicFrame
-		bl AtomicTest
-		
-		mr.	r3,r3
-		beq+	.WaitFreeFrm
+		bl DisableIntPPC
 
 		lis	r3,EUMB				#Free the message
 		li	r27,IFHPR
@@ -2720,8 +2741,7 @@ FreeMsgFramePPC:
 		and	r28,r28,r29			#Keep it 0000-3FFE
 		stwbrx	r28,r27,r3
 
-		li	r4,AtomicFrame
-		bl AtomicDone
+		bl EnableIntPPC
 
 		mr	r4,r26
 		bl User
@@ -7085,10 +7105,6 @@ SPrintF:
 		stwu	r5,-4(r13)
 		stwu	r4,-4(r13)
 		stwu	r3,-4(r13)
-		
-#		lbz	r31,DebugLevel(r0)
-#		li	r6,0
-#		stb	r6,DebugLevel(r0)
 
 		mr	r6,r4						#a0
 		mr	r7,r5						#a1
@@ -7096,9 +7112,7 @@ SPrintF:
 		li	r5,_LVOSPrintF68K
 
 		bl 	Run68KLowLevel
-		
-#		stb	r31,DebugLevel(r0)
-		
+
 		lwz	r3,0(r13)
 		lwz	r4,4(r13)
 		lwz	r5,8(r13)

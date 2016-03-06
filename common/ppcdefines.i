@@ -56,7 +56,6 @@
 .set AlignStore2,136
 .set ViolationAddress,140			#Pointer
 .set MemSize,144
-.set AtomicFrame,148
 
 #LibBase:
 

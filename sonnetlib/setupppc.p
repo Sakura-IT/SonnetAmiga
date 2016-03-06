@@ -1757,7 +1757,7 @@ EInt:		b	.FPUnav				#0
 		li	r4,IPTPR			#Get message from Inbound FIFO
 		lwbrx	r5,r4,r3
 .QNotEmpty:	addi	r9,r5,4				#Increase FIFO pointer
-		loadreg	r4,0x4000			#Should this be atomic?
+		loadreg	r4,0x4000
 		or	r9,r9,r4
 		loadreg r4,0x7fff
 		and	r9,r9,r4			#Keep it 4000-7FFE		
@@ -1837,7 +1837,7 @@ EInt:		b	.FPUnav				#0
 		b	.ChkRdySig				
 		
 .RelFrame:	lis	r3,EUMB				#Free the message
-		li	r4,IFHPR			#Should this be atomic?
+		li	r4,IFHPR
 		lwbrx	r6,r4,r3		
 		stw	r5,0(r6)		
 		addi	r8,r6,4
@@ -1865,7 +1865,7 @@ EInt:		b	.FPUnav				#0
 		mtctr	r3
 			
 		lis	r3,EUMB				#Free the message
-		li	r4,IFHPR			#Should this be atomic?
+		li	r4,IFHPR
 		lwbrx	r6,r4,r3		
 		stw	r5,0(r6)		
 		addi	r8,r6,4
@@ -2053,24 +2053,8 @@ EInt:		b	.FPUnav				#0
 .EndOfWaitList:	lwz	r9,RunningTask(r0)
 
 		b	.TrySwitch
-
-		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_NEWTASKS(r4)
-		mr	r6,r4
-
-		lwz	r5,0(r4)			#RemHeadPPC
-		lwz	r3,0(r5)
-		mr.	r3,r3
-		beq-	.NoNode5
-		stw	r3,0(r4)
-		stw	r4,4(r3)
-		mr	r3,r5
-	
-.NoNode5:	mr.	r9,r3
-		beq	.ReturnToUser
 		
 .Dispatch:	lwz	r8,MN_ARG0(r9)		
-
 		li	r4,TS_RUN
 		stb	r4,TC_STATE(r8)
 		li	r4,NT_PPCTASK
@@ -2447,7 +2431,7 @@ EInt:		b	.FPUnav				#0
 		cmpw	r3,r4
 		
 		beq	.GoToWait
-		
+
 		lwz	r4,PowerPCBase(r0)
 		la	r4,LIST_NEWTASKS(r4)
 		mr	r6,r4
@@ -2691,6 +2675,9 @@ EInt:		b	.FPUnav				#0
 		stb	r9,ExceptionMode(r0)
 		stb	r9,PortInUse(r0)
 		
+		loadreg	r9,'USER'
+		stw	r9,0xf4(r0)
+		
 		mfspr	r9,HID0
 		ori	r9,r9,HID0_ICFI
 		isync
@@ -2803,8 +2790,8 @@ EInt:		b	.FPUnav				#0
 		stwu	r9,-4(r13)
 			
 		loadreg r0,'DECI'
-		stw	r0,0xf4(r0)			
-				
+		stw	r0,0xf4(r0)
+
 .ListLoop:	lwz	r9,PowerPCBase(r0)
 		la	r4,LIST_READYEXC(r9)
 
@@ -3659,7 +3646,7 @@ EInt:		b	.FPUnav				#0
 		lwz	r0,SonnetBase(r0)
 		loadreg	r1,SysStack-0x20		#System stack in unused mem
 		or	r1,r1,r0
-		
+
 		mflr	r0
 		stwu	r0,-4(r1)
 		mfcr	r0
@@ -3905,7 +3892,7 @@ EInt:		b	.FPUnav				#0
 		or	r23,r23,r20
 		loadreg r20,0xffff
 		and	r23,r23,r20			#Keep it C000-FFFE		
-		stwbrx	r23,r24,r28			#Atomic?
+		stwbrx	r23,r24,r28
 		lwz	r25,0(r25)
 
 		stw	r9,MN_IDENTIFIER(r25)
@@ -3926,7 +3913,7 @@ EInt:		b	.FPUnav				#0
 		lwbrx	r22,r24,r28		
 		stw	r25,0(r22)		
 		addi	r23,r22,4
-		loadreg	r20,0xbfff			#Atomic?
+		loadreg	r20,0xbfff
 		and	r23,r23,r20			#Keep it 8000-BFFE
 		stwbrx	r23,r24,r28			#triggers Interrupt
 
