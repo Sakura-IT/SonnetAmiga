@@ -2555,6 +2555,10 @@ WaitPortPPC:
 Super:
 		prolog 228,'TOC'
 
+		lwz	r3,PowerPCBase(r0)
+		li	r0,-1
+		stb	r0,FLAG_READY(r3)
+
 		li	r0,-1			#READ PVR (warp funcion -130)
 Violation:	mfpvr	r3			#IF user then exception; r0/r3=0
 		mr	r3,r0			#IF super then r0/r3=-1
@@ -2578,6 +2582,10 @@ User:
 		mtmsr	r0
 		isync
 		sync
+
+		lwz	r3,PowerPCBase(r0)
+		li	r0,0
+		stb	r0,FLAG_READY(r3)
 
 .WrongKey:	epilog 'TOC'
 
