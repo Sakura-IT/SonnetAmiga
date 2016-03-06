@@ -204,6 +204,11 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		lwz	r4,TASKPPC_TASKMEM(r4)
 		stw	r4,MN_ARG0(r9)
 
+		lwz	r4,RunningTask(r0)			#Free original 68K -> PPC
+		lwz	r4,TASKPPC_STARTMSG(r4)			#message
+
+		LIBCALLPOWERPC FreeMsgFramePPC
+
 		mr	r4,r9
 		
 		LIBCALLPOWERPC SendMsgFramePPC
@@ -213,11 +218,6 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		or	r1,r1,r13
 		subi	r13,r1,4
 		stwu	r1,-284(r1)
-
-		lwz	r4,RunningTask(r0)			#Free original 68K -> PPC
-		lwz	r4,TASKPPC_STARTMSG(r4)			#message
-
-		LIBCALLPOWERPC FreeMsgFramePPC
 
 		li	r7,TS_REMOVED
 		lwz	r9,RunningTask(r0)

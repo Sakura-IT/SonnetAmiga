@@ -2899,12 +2899,12 @@ WaitFor68K:
 		mr.	r30,r3
 
 		beq	.WasNoMsg
-
-		loadreg	r4,'DONE'
+		
 		lwz	r29,MN_IDENTIFIER(r30)
-		cmpw	r4,r29
-		beq	.WasDone
 		loadreg	r4,'DNLL'
+		cmpw	r4,r29
+		beq	.WasLL
+		loadreg	r4,'DONE'
 		cmpw	r4,r29
 		bne	.WasNoDone
 		
@@ -2912,11 +2912,7 @@ WaitFor68K:
 		lwz	r26,TASKPPC_MIRROR68K(r4)
 		mr.	r26,r26
 		bne	.GotMirror
-		
-		loadreg	r6,'DNLL'
-		cmpw	r6,r29
-		beq	.GotMirror
-		
+
 		lwz	r26,MN_MIRROR(r30)
 		stw	r26,TASKPPC_MIRROR68K(r4)
 		
@@ -2928,14 +2924,15 @@ WaitFor68K:
 .CopyPPB:	lwzu	r7,4(r29)
 		stwu	r7,4(r4)
 		bdnz+	.CopyPPB
+		
+		mtctr	r26
 
-		lwz	r28,MN_PPSTRUCT+6*4(r30)	#return d0 for Run68KLowLevel
+.WasLL:		lwz	r28,MN_PPSTRUCT+6*4(r30)	#return d0 for Run68KLowLevel
 		lwz	r29,MN_PPSTRUCT+5*4(r30)
 		mr	r4,r30
 		
 		bl FreeMsgFramePPC
-									
-		mtctr	r26
+
 		mr	r4,r28
 		mr	r5,r29
 
