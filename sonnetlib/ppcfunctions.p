@@ -2555,10 +2555,6 @@ WaitPortPPC:
 Super:
 		prolog 228,'TOC'
 
-		lwz	r3,PowerPCBase(r0)
-		li	r0,-1
-		stb	r0,FLAG_READY(r3)
-
 		li	r0,-1			#READ PVR (warp funcion -130)
 Violation:	mfpvr	r3			#IF user then exception; r0/r3=0
 		mr	r3,r0			#IF super then r0/r3=-1
@@ -2582,10 +2578,6 @@ User:
 		mtmsr	r0
 		isync
 		sync
-
-		lwz	r3,PowerPCBase(r0)
-		li	r0,0
-		stb	r0,FLAG_READY(r3)
 
 .WrongKey:	epilog 'TOC'
 
@@ -2640,6 +2632,10 @@ CreateMsgFramePPC:
 		stwu	r26,-4(r13)
 		stwu	r4,-4(r13)
 
+		lwz	r3,PowerPCBase(r0)
+		li	r26,-1
+		stb	r26,FLAG_READY(r3)
+
 		bl Super
 		mr	r26,r3
 
@@ -2660,6 +2656,10 @@ CreateMsgFramePPC:
 
 		mr	r4,r26
 		bl User
+
+		lwz	r3,PowerPCBase(r0)
+		li	r26,0
+		stb	r26,FLAG_READY(r3)
 
 		mr	r3,r30
 
@@ -2688,6 +2688,10 @@ SendMsgFramePPC:
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
 
+		lwz	r3,PowerPCBase(r0)
+		li	r26,-1
+		stb	r26,FLAG_READY(r3)
+
 		mr	r30,r4
 
 		bl Super
@@ -2708,6 +2712,10 @@ SendMsgFramePPC:
 
 		mr	r4,r26
 		bl User
+
+		lwz	r3,PowerPCBase(r0)
+		li	r26,0
+		stb	r26,FLAG_READY(r3)
 
 		lwz	r26,0(r13)
 		lwz	r27,4(r13)
@@ -2733,6 +2741,10 @@ FreeMsgFramePPC:
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
 		
+		lwz	r3,PowerPCBase(r0)
+		li	r26,-1
+		stb	r26,FLAG_READY(r3)
+		
 		mr	r30,r4
 		
 		bl Super
@@ -2753,6 +2765,10 @@ FreeMsgFramePPC:
 
 		mr	r4,r26
 		bl User
+
+		lwz	r3,PowerPCBase(r0)
+		li	r26,0
+		stb	r26,FLAG_READY(r3)
 
 		lwz	r26,0(r13)
 		lwz	r27,4(r13)
