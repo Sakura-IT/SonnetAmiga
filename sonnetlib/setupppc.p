@@ -2264,6 +2264,10 @@ EInt:		b	.FPUnav				#0
 		lwz	r9,0xf0(r0)				#Debug counter to check
 		addi	r9,r9,1					#Whether exception is still
 		stw	r9,0xf0(r0)				#running
+		
+		li	r8,TS_RUN
+		lwz	r9,RunningTask(r0)
+		stb	r8,TC_STATE(r9)
 
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
@@ -2311,6 +2315,10 @@ EInt:		b	.FPUnav				#0
 		lwz	r9,0xf0(r0)				#Debug counter to check
 		addi	r9,r9,1					#Whether exception is still
 		stw	r9,0xf0(r0)				#running
+
+		li	r8,TS_RUN
+		lwz	r9,RunningTask(r0)
+		stb	r8,TC_STATE(r9)
 
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
@@ -2466,11 +2474,11 @@ EInt:		b	.FPUnav				#0
 .SwitchOld:	lwz	r4,PowerPCBase(r0)
 		la	r4,LIST_READYTASKS(r4)		#Old = Context, New = PPStruct
 		lwz	r5,RunningTask(r0)
-		stw	r9,RunningTask(r0)		
-		li	r6,TS_RUN
-		stb	r6,TC_STATE(r9)						
+		stw	r9,RunningTask(r0)								
 		li	r6,TS_READY
 		stb	r6,TC_STATE(r5)
+		li	r6,TS_RUN
+		stb	r6,TC_STATE(r9)
 
 		bl	.StoreContext
 
