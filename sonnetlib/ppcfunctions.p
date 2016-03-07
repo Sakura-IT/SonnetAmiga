@@ -5599,6 +5599,10 @@ DeleteTaskPPC:
 
 		mr.	r3,r3			
 		beq+	.NotOwnTask2			#Wait Atomic
+		
+		lwz	r30,PowerPCBase(r0)
+		li	r0,-1
+		stb	r0,FLAG_READY(r30)
 
 		mr	r4,r31
 		
@@ -5612,6 +5616,9 @@ DeleteTaskPPC:
 
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r31)
+
+		li	r0,0
+		stb	r0,FLAG_READY(r30)
 
 		li	r4,Atomic
 		
@@ -6828,12 +6835,19 @@ GetMsgPPC:
 		mr.	r3,r3
 		bne+	.PortWait2
 
-.IntListEmpty:	addi	r4,r31,MP_MSGLIST
+.IntListEmpty:	lwz	r30,PowerPCBase(r0)
+		li	r0,-1
+		stb	r0,FLAG_READY(r30)
+
+		addi	r4,r31,MP_MSGLIST
 
 		bl RemHeadPPC
 
 		mr	r5,r3
 		addi	r4,r31,MP_PPC_SEM
+		
+		li	r0,0
+		stb	r0,FLAG_READY(r30)
 		
 		bl ReleaseSemaphorePPC
 
@@ -6936,11 +6950,16 @@ ReplyMsgPPC:
 		mr.	r3,r3
 		bne+	.WaitForPort2
 
-.IntListEmpty2:	addi	r4,r31,MP_MSGLIST
+.IntListEmpty2:	lwz	r29,PowerPCBase(r0)
+		li	r0,-1
+		stb	r0,FLAG_READY(r29)
+		addi	r4,r31,MP_MSGLIST
 		mr	r5,r30
 
 		bl AddTailPPC
 
+		li	r0,0
+		stb	r0,FLAG_READY(r29)
 		lwz	r4,MP_SIGTASK(r31)
 		mr.	r4,r4
 		beq-	.NoSig
@@ -7029,14 +7048,18 @@ PutMsgPPC:
 		mr.	r3,r3
 		bne+	.W8ForPort2
 
-.IntListEmpty3:	addi	r4,r31,MP_MSGLIST
-
+.IntListEmpty3:	lwz	r29,PowerPCBase(r0)
+		li	r0,-1
+		stb	r0,FLAG_READY(r29)
+		addi	r4,r31,MP_MSGLIST
 		li	r0,NT_MESSAGE
 		stb	r0,LN_TYPE(r30)
 		mr	r5,r30
 
 		bl AddTailPPC
 
+		li	r0,0
+		stb	r0,FLAG_READY(r29)
 		lwz	r4,MP_SIGTASK(r31)
 		mr.	r4,r4
 		beq-	.NoPutSig
