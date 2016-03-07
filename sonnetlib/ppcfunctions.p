@@ -6513,7 +6513,14 @@ SetTaskPriPPC:
 		stw	r4,TASKPPC_ELAPSED2(r30)
 		mr	r4,r30
 
+		lwz	r6,PowerPCBase(r0)
+		li	r0,-1
+		stb	r0,FLAG_READY(r6)
+
 		bl RemovePPC
+		
+		li	r0,0
+		stb	r0,FLAG_READY(r6)
 
 		mr	r5,r30
 		li	r0,TS_READY
@@ -6716,7 +6723,14 @@ SignalPPC:
 
 .GotSignal:	mr	r4,r30
 
+		lwz	r6,PowerPCBase(r0)
+		li	r0,-1
+		stb	r0,FLAG_READY(r6)
+
 		bl RemovePPC
+		
+		li	r0,0
+		stb	r0,FLAG_READY(r6)
 
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r30)
