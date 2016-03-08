@@ -2031,6 +2031,7 @@ EInt:		b	.FPUnav				#0
 		b	.NextOnList
 
 .GotOneWait:	mr	r6,r4
+		mr	r7,r5
 		
 		lwz	r3,0(r4)			#RemovePPC
 		lwz	r4,4(r4)
@@ -2047,6 +2048,8 @@ EInt:		b	.FPUnav				#0
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
+
+		mr	r4,r7
 
 		b	.NextOnList
 
