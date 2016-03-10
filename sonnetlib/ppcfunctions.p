@@ -6702,11 +6702,11 @@ SignalPPC:
 		cmplwi	r0,TS_WAIT
 		beq-	.ItsWaiting
 
-		cmplwi	r0,TS_CHANGING
-		bne-	.NotChanging
-
-		li	r0,TS_RUN
-		stb	r0,TC_STATE(r30)
+#		cmplwi	r0,TS_CHANGING
+#		bne-	.NotChanging
+#
+#		li	r0,TS_RUN
+#		stb	r0,TC_STATE(r30)
 .NotChanging:	lwz	r0,TC_SIGRECVD(r30)
 		or	r0,r0,r5
 		stw	r0,TC_SIGRECVD(r30)

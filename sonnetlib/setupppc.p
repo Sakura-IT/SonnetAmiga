@@ -2268,9 +2268,9 @@ EInt:		b	.FPUnav				#0
 		addi	r9,r9,1					#Whether exception is still
 		stw	r9,0xf0(r0)				#running
 		
-		li	r8,TS_RUN
-		lwz	r9,RunningTask(r0)
-		stb	r8,TC_STATE(r9)
+#		li	r8,TS_RUN
+#		lwz	r9,RunningTask(r0)
+#		stb	r8,TC_STATE(r9)
 
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
@@ -2319,9 +2319,9 @@ EInt:		b	.FPUnav				#0
 		addi	r9,r9,1					#Whether exception is still
 		stw	r9,0xf0(r0)				#running
 
-		li	r8,TS_RUN
-		lwz	r9,RunningTask(r0)
-		stb	r8,TC_STATE(r9)
+#		li	r8,TS_RUN
+#		lwz	r9,RunningTask(r0)
+#		stb	r8,TC_STATE(r9)
 
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
