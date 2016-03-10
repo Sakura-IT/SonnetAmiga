@@ -2018,10 +2018,10 @@ EInt:		b	.FPUnav				#0
 		mr.	r5,r5
 		beq	.EndOfWaitList
 		lwz	r6,TC_SIGRECVD(r4)
-		mr	r6,r6
+		mr.	r6,r6				####
 		beq	.NoSigs
-		rlwinm.	r0,r6,22,31,31
-		beq	.NoSigs
+#		rlwinm.	r0,r6,22,31,31
+#		beq	.NoSigs
 		stb	r9,TC_STATE(r4)
 .NoSigs:	lbz	r6,TC_STATE(r4)
 		cmpw	r9,r6
@@ -2267,10 +2267,6 @@ EInt:		b	.FPUnav				#0
 		lwz	r9,0xf0(r0)				#Debug counter to check
 		addi	r9,r9,1					#Whether exception is still
 		stw	r9,0xf0(r0)				#running
-		
-#		li	r8,TS_RUN
-#		lwz	r9,RunningTask(r0)
-#		stb	r8,TC_STATE(r9)
 
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
@@ -2319,10 +2315,6 @@ EInt:		b	.FPUnav				#0
 		addi	r9,r9,1					#Whether exception is still
 		stw	r9,0xf0(r0)				#running
 
-#		li	r8,TS_RUN
-#		lwz	r9,RunningTask(r0)
-#		stb	r8,TC_STATE(r9)
-
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
 		lwzu	r7,4(r13)
@@ -2356,7 +2348,7 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r0
 		isync
 
-		loadreg	r0,100
+		loadreg	r0,200
 		mtdec	r0
 		
 		mfsprg2	r0
@@ -2427,11 +2419,11 @@ EInt:		b	.FPUnav				#0
 		stw	r3,4(r5)
 		stw	r5,0(r3)
 
-		lwz	r4,TASKPPC_TASKPTR(r9)		
-		lwz	r3,0(r4)			#RemovePPC
-		lwz	r4,4(r4)
-		stw	r4,4(r3)
-		stw	r3,0(r4)
+#		lwz	r4,TASKPPC_TASKPTR(r9)		
+#		lwz	r3,0(r4)			#RemovePPC
+#		lwz	r4,4(r4)
+#		stw	r4,4(r3)
+#		stw	r3,0(r4)
 
 		li	r9,0
 		stw	r9,RunningTask(r0)
