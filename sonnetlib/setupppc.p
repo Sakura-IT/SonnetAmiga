@@ -44,9 +44,11 @@ PPCCode:	b	.SkipCom			#0x3000	System initialization
 
 		lhz	r3,20(r29)
 		cmpwi	r3,0x1002			#Check for ATI Gfx Card
+		beq	.MaxRam
+		cmpwi	r3,0x121b			#Check for VooDoo4/5
 		bne	.NoMaxRam	
 
-		lis	r4,0x800			#Max 128MB RAM on Sonnet when ATI present
+.MaxRam:	lis	r4,0x800			#Max 128MB RAM on Sonnet when ATI present
 		cmplw	r8,r4
 		ble	.NoMaxRam
 
@@ -812,9 +814,12 @@ mmuSetup:
 		b	.DoWT
 
 .DoInhibit:	loadreg	r6,PTE_CACHE_INHIBITED		
-.DoWT:		lwz	r3,RTGBase(r0)			#32MB Video RAM (ATi) or Config (Avenger)
+.DoWT:		cmpwi	r3,0x121b
+		lwz	r3,RTGBase(r0)			#32MB Video RAM (ATi) or Config (Avenger)
 		addis	r4,r3,0x200
-		mr	r24,r4
+		bne	.Voodoo3
+		addis	r4,r4,0x600
+.Voodoo3:	mr	r24,r4
 		addis	r5,r3,0x4000
 		li	r7,2
 		
@@ -822,16 +827,29 @@ mmuSetup:
 		
 		lhz	r3,RTGType(r0)
 		cmpwi	r3,0x121a
+		beq	.Is3DFX
+		cmpwi	r3,0x121b
 		bne	.No3DFX
 		
-		lwz	r3,RTGBase(r0)			#32MB Video RAM (Avenger)
+		lwz	r3,RTGBase(r0)			#32MB Video RAM (Napalm)
+		addis	r3,r3,0x800
+		addis	r4,r3,0x200
+		addis	r5,r3,0x4000
+		loadreg	r6,PTE_WRITE_THROUGH
+		li	r7,2
+		
+		bl	.DoTBLs
+		
+		b	.No3DFX
+		
+.Is3DFX:	lwz	r3,RTGBase(r0)			#32MB Video RAM (Avenger)
 		addis	r3,r3,0x200
 		addis	r4,r3,0x200
 		addis	r5,r3,0x4000
 		loadreg	r6,PTE_WRITE_THROUGH
 		li	r7,2
 		
-		bl	.DoTBLs		
+		bl	.DoTBLs
 		
 .No3DFX:	lhz	r3,RTGType(r0)
 		cmpwi	r3,0x1002

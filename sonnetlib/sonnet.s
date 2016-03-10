@@ -184,6 +184,7 @@ FndMem		move.l d0,d7
 		tst.l d0		
 		beq.s Nxt3DFX
 		move.l d0,a2
+		addq.l #1,d5
 		move.l PCI_SPACE0(a2),d4
 		bra.s FoundGfx
 	
