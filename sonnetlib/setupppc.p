@@ -1992,7 +1992,7 @@ EInt:		b	.FPUnav				#0
 .RDecInt:	lwz	r9,PowerPCBase(r0)
 		lbz	r9,FLAG_READY(r9)
 		mr.	r9,r9
-		bne	.QuickReturn
+		bne	.ReturnToUser
 
 		lwz	r9,TaskException(r0)
 		mr.	r9,r9
@@ -2339,53 +2339,6 @@ EInt:		b	.FPUnav				#0
 		mfsprg2	r0
 
 		rfi
-		
-#********************************************************************************************
-		
-.QuickReturn:		
-		lwz	r9,0xf0(r0)				#Debug counter to check
-		addi	r9,r9,1					#Whether exception is still
-		stw	r9,0xf0(r0)				#running
-
-		lwz	r9,0(r13)
-		lwzu	r8,4(r13)
-		lwzu	r7,4(r13)
-		lwzu	r6,4(r13)
-		lwzu	r5,4(r13)
-		lwzu	r4,4(r13)
-		lwzu	r3,4(r13)
-		addi	r13,r13,4
-	
-		excepilog 'TOC'
-
-		lwz	r1,0(r1)				#Restore user stack
-
-		mfsprg3	r0
-		mtxer	r0
-		mfsprg1 r0
-		mtsrr1	r0
-		mfsprg0	r0
-		mtsrr0	r0
-
-		li	r0,0
-		stb	r0,ExceptionMode(r0)
-		stb	r0,PortInUse(r0)
-		
-		loadreg	r0,'USER'
-		stw	r0,0xf4(r0)
-		
-#		mfspr	r0,HID0
-#		ori	r0,r0,HID0_ICFI
-#		isync
-#		mtspr	HID0,r0
-#		isync
-
-		loadreg	r0,QuickQuantum
-		mtdec	r0
-		
-		mfsprg2	r0
-
-		rfi	
 	
 #********************************************************************************************
 
