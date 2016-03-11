@@ -412,7 +412,7 @@ End:		mflr	r4
 
 		bl	Caches				#Setup the L1 and L2 cache
 
-		loadreg	r4,200
+		loadreg	r4,300
 		mtdec	r4
 
 		rfi					#To user code
@@ -1908,10 +1908,10 @@ EInt:		b	.FPUnav				#0
 		
 		lwz	r6,RunningTask(r0)
 		cmpw	r6,r3
-		beq	.PutMsgIt
-		
 		li	r6,TS_READY
-		stb	r6,TC_STATE(r3)				
+		bne	.MakeReady		
+		li	r6,TS_RUN
+.MakeReady:	stb	r6,TC_STATE(r3)		
 		b	.PutMsgIt
 
 #**********************************************************
@@ -1926,8 +1926,13 @@ EInt:		b	.FPUnav				#0
 #**********************************************************
 		
 .Done68:	lwz	r4,MN_PPC(r5)			#Handles the reply on a Run68K
+		lwz	r6,RunningTask(r0)
+		cmpw	r6,r4
+		li	r3,TS_RUN
+		beq	.IsRunning
+		
 		li	r3,TS_READY
-		stb	r3,TC_STATE(r4)		
+.IsRunning:	stb	r3,TC_STATE(r4)		
 		mr	r3,r4				
 		lwz	r4,TASKPPC_MSGPORT(r3)
 		
@@ -2019,11 +2024,12 @@ EInt:		b	.FPUnav				#0
 .DoneWaiting:	lwz	r6,WAITTIME_TASK(r4)		
 		lwz	r9,RunningTask(r0)
 		cmpw	r6,r9
+		li	r9,TS_RUN
 		beq	.SetSig
 
 		li	r9,TS_READY
-		stb	r9,TC_STATE(r6)	
-.SetSig:	lwz	r9,TC_SIGRECVD(r6)
+.SetSig:	stb	r9,TC_STATE(r6)	
+		lwz	r9,TC_SIGRECVD(r6)
 		ori	r9,r9,SIGF_WAIT
 		stw	r9,TC_SIGRECVD(r6)
 		
@@ -2052,7 +2058,7 @@ EInt:		b	.FPUnav				#0
 .NoSigs:	lbz	r6,TC_STATE(r4)
 		cmpw	r9,r6
 		beq	.GotOneWait
-		
+
 		mr	r4,r5		
 		b	.NextOnList
 
@@ -2463,7 +2469,6 @@ EInt:		b	.FPUnav				#0
 
 		lwz	r4,PowerPCBase(r0)
 		la	r4,LIST_NEWTASKS(r4)
-		mr	r6,r4
 		
 		lwz	r5,0(r4)			#RemHeadPPC
 		lwz	r3,0(r5)
@@ -2515,7 +2520,6 @@ EInt:		b	.FPUnav				#0
 .SwitchNew:	lwz	r4,PowerPCBase(r0)
 		la	r4,LIST_READYTASKS(r4)		
 		lwz	r5,RunningTask(r0)
-		stw	r9,RunningTask(r0)
 		li	r6,TS_READY
 		stb	r6,TC_STATE(r5)
 
