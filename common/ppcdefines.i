@@ -201,6 +201,7 @@
 .set DecTimerFreq,(SonnetBusClock/4)		#Dec goes at 1/4 of Bus clock
 .set SwitchFreq,50				#
 .set Quantum,(DecTimerFreq/SwitchFreq)		#
+.set QuickQuantum,50
 
 .set EXCATTR_CODE,		0x80101000		#
 .set EXCATTR_DATA,		0x80101001		#

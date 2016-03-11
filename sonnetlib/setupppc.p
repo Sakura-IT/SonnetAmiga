@@ -412,7 +412,7 @@ End:		mflr	r4
 
 		bl	Caches				#Setup the L1 and L2 cache
 
-		loadreg	r4,300
+		loadreg	r4,QuickQuantum
 		mtdec	r4
 
 		rfi					#To user code
@@ -2374,13 +2374,13 @@ EInt:		b	.FPUnav				#0
 		loadreg	r0,'USER'
 		stw	r0,0xf4(r0)
 		
-		mfspr	r0,HID0
-		ori	r0,r0,HID0_ICFI
-		isync
-		mtspr	HID0,r0
-		isync
+#		mfspr	r0,HID0
+#		ori	r0,r0,HID0_ICFI
+#		isync
+#		mtspr	HID0,r0
+#		isync
 
-		loadreg	r0,200
+		loadreg	r0,QuickQuantum
 		mtdec	r0
 		
 		mfsprg2	r0
