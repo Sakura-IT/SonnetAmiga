@@ -1393,8 +1393,9 @@ AllocXMsgPPC:
 		li	r31,FAllocXMsgPPC-FRun68K
 		bl	DebugStartFunction
 
-		mr	r31,r4
+		addi	r31,r4,MN_SIZE
 		mr	r30,r5
+		mr	r4,r31
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,32
 
@@ -2843,7 +2844,7 @@ PutXMsgPPC:
 		li	r31,FPutXMsgPPC-FRun68K
 		bl	DebugStartFunction
 
-		li	r31,NT_MESSAGE
+		li	r31,NT_XMSGPPC
 		stb	r31,LN_TYPE(r5)	
 		
 		mr	r31,r5
@@ -2914,7 +2915,10 @@ PutXMsgPPC:
 #
 #********************************************************************************************
 
-
+.WasNoDone:	stw	r30,0x140(r0)
+		loadreg	r0,'haha'
+		stw	r0,0x144(r0)
+		b	.WasNoDone
 WaitFor68K:	
 		prolog 228,'TOC'
 
@@ -2932,7 +2936,7 @@ WaitFor68K:
 
 		bl WaitPortPPC		
 
-.WasNoDone:	lwz	r4,RunningTask(r0)
+.WasNoDon:	lwz	r4,RunningTask(r0)
 		lwz	r4,TASKPPC_MSGPORT(r4)
 
 		bl GetMsgPPC
