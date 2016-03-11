@@ -1870,7 +1870,9 @@ EInt:		b	.FPUnav				#0
 .ReturnXMsg:	lwz	r4,MN_REPLYPORT(r5)		#Handles the reply from an XMSG
 		addi	r7,r5,32			#(or a cross message from PPC to 68K)
 		stw	r4,MN_REPLYPORT(r7)
-		lwz	r8,MN_PPC(r5)
+		lwz	r8,MN_PPC(r5)		
+		li	r4,NT_REPLYMSG
+		stb	r4,LN_TYPE(r7)
 		lhz	r4,MN_LENGTH(r7)
 		mfctr	r3
 		mtctr	r4
@@ -1881,7 +1883,13 @@ EInt:		b	.FPUnav				#0
 		stbu	r6,1(r8)
 		bdnz	.CopyXBack
 		mtctr	r3
-			
+				
+		lwz	r7,MN_PPC(r5)
+		stw	r5,0x110(r0)
+		stw	r7,0x114(r0)
+		loadreg	r3,'xxxx'
+		stw	r3,0x118(r0)
+		
 		lis	r3,EUMB				#Free the message
 		li	r4,IFHPR
 		lwbrx	r6,r4,r3		
@@ -1892,7 +1900,7 @@ EInt:		b	.FPUnav				#0
 		stwbrx	r8,r4,r3
 		sync
 		
-		addi	r5,r5,32
+		mr	r5,r7
 		lwz	r4,MN_REPLYPORT(r5)
 		lwz	r3,MP_SIGTASK(r4)
 		mr.	r3,r3
@@ -2038,8 +2046,8 @@ EInt:		b	.FPUnav				#0
 		lwz	r6,TC_SIGRECVD(r4)
 		mr.	r6,r6				####
 		beq	.NoSigs
-#		rlwinm.	r0,r6,22,31,31
-#		beq	.NoSigs
+		rlwinm.	r0,r6,22,31,31
+		beq	.NoSigs
 		stb	r9,TC_STATE(r4)
 .NoSigs:	lbz	r6,TC_STATE(r4)
 		cmpw	r9,r6
@@ -2437,11 +2445,11 @@ EInt:		b	.FPUnav				#0
 		stw	r3,4(r5)
 		stw	r5,0(r3)
 
-#		lwz	r4,TASKPPC_TASKPTR(r9)		
-#		lwz	r3,0(r4)			#RemovePPC
-#		lwz	r4,4(r4)
-#		stw	r4,4(r3)
-#		stw	r3,0(r4)
+		lwz	r4,TASKPPC_TASKPTR(r9)		
+		lwz	r3,0(r4)			#RemovePPC
+		lwz	r4,4(r4)
+		stw	r4,4(r3)
+		stw	r3,0(r4)
 
 		li	r9,0
 		stw	r9,RunningTask(r0)

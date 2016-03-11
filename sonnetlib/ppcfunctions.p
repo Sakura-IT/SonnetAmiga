@@ -1384,7 +1384,6 @@ FlushL1DCache:
 #
 #********************************************************************************************
 
-
 AllocXMsgPPC:
 		prolog 228,'TOC'
 		
@@ -1394,26 +1393,25 @@ AllocXMsgPPC:
 		li	r31,FAllocXMsgPPC-FRun68K
 		bl	DebugStartFunction
 
-		addi	r31,r4,20
+		mr	r31,r4
 		mr	r30,r5
-		mr	r4,r31
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,32
-		
-		bl AllocVec68K				#Check for r4 =< 192
-		
+
+		bl AllocVecPPC
+
 		mr.	r3,r3
 		beq-	.NoMaam
 		stw	r30,MN_REPLYPORT(r3)
 		sth	r31,MN_LENGTH(r3)
-		
+
 .NoMaam:	li	r31,FAllocXMsgPPC-FRun68K
 		bl	DebugEndFunction
 
 		lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
-		
+
 		epilog 'TOC'
 
 #********************************************************************************************
@@ -1425,7 +1423,7 @@ AllocXMsgPPC:
 FreeXMsgPPC:
 		prolog 228,'TOC'
 		
-		bl FreeVec68K
+		bl FreeVecPPC
 		
 		epilog 'TOC'		
 
