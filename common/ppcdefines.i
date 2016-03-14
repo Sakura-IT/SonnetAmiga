@@ -56,6 +56,7 @@
 .set AlignStore2,136
 .set ViolationAddress,140			#Pointer
 .set MemSize,144
+.set RunPPCStart,148
 
 #LibBase:
 .set LIST_WAITINGTASKS,128
@@ -672,6 +673,7 @@
 .set TASKPPC_MIRROR68K,252
 .set TASKPPC_TASKMEM,256
 .set TASKPPC_CTMEM,260
+.set TASKPPC_INTPORT,700
 .set TASKPPC_SSPPC_RESERVE,800
 .set TASKPPC_PORT,832
 .set TASKPPC_ALLTASK,932

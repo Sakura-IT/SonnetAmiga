@@ -74,7 +74,7 @@ Loop1:		slw.	r26,r26,r28
 		blt	Fndbit
 		addi	r25,r25,-1
 		bdnz	Loop1
-		b	Pause
+		b	.IdleLoop
 
 Fndbit:		slw.	r26,r26,r28
 		beq	SetLen
@@ -120,117 +120,6 @@ Start:		loadreg	r0,'REDY'			#Dummy entry at absolute 0x7400
 		nop
 		nop
 		b	.IdleLoop
-	
-		trap					#For PP_THROW
-	
-StartCode:	blrl
-
-ExitCode:	lwz	r17,RunningTask(r0)
-		lwz	r17,TASKPPC_STARTMSG(r17)
-		lwz	r17,PP_FLAGS(r17)
-		rlwinm.	r17,r17,(32-PPB_LINEAR),31,31
-		beq	.NotLinear2
-
-		mr	r22,r5
-		mr	r23,r6
-		mr	r24,r7
-		mr	r25,r8
-		mr	r26,r9
-		mr	r27,r10
-
-.NotLinear2:	mr	r12,r3
-
-		LIBCALLPOWERPC CreateMsgFramePPC
-
-		mr	r9,r3
-		mr	r3,r12
-
-		subi	r10,r9,4		
-		li	r11,48
-		li	r7,0
-		mtctr	r11
-.ClearLLMsg:	stwu	r7,4(r10)
-		bdnz	.ClearLLMsg
-		
-		loadreg r7,'FPPC'
-		stw	r7,MN_IDENTIFIER(r9)
-		li	r7,192
-		sth	r7,MN_LENGTH(r9)
-		li	r7,NT_MESSAGE
-		stb	r7,LN_TYPE(r9)
-		
-		lwz	r7,RunningTask(r0)		
-		lwz	r7,TASKPPC_STARTMSG(r7)						
-		lwz	r7,MN_REPLYPORT(r7)		
-		stw	r7,MN_REPLYPORT(r9)
-		stw	r2,PP_REGS+12*4(r9)
-		stw	r3,PP_REGS+0*4(r9)
-		stw	r4,PP_REGS+1*4(r9)
-		stw	r5,PP_REGS+8*4(r9)
-		stw	r6,PP_REGS+9*4(r9)
-		stw	r22,PP_REGS+2*4(r9)
-		stw	r23,PP_REGS+3*4(r9)
-		stw	r24,PP_REGS+4*4(r9)
-		stw	r25,PP_REGS+5*4(r9)
-		stw	r26,PP_REGS+6*4(r9)
-		stw	r27,PP_REGS+7*4(r9)
-		stw	r28,PP_REGS+10*4(r9)
-		stw	r29,PP_REGS+11*4(r9)
-		stw	r30,PP_REGS+13*4(r9)
-		stw	r31,PP_REGS+14*4(r9)		
-		stfd	f1,PP_FREGS+0*8(r9)
-		stfd	f2,PP_FREGS+1*8(r9)
-		stfd	f3,PP_FREGS+2*8(r9)
-		stfd	f4,PP_FREGS+3*8(r9)
-		stfd	f5,PP_FREGS+4*8(r9)
-		stfd	f6,PP_FREGS+5*8(r9)
-		stfd	f7,PP_FREGS+6*8(r9)
-		stfd	f8,PP_FREGS+7*8(r9)
-		lwz	r8,MCPort(r0)
-		stw	r8,MN_MCPORT(r9)
-		
-		lwz	r4,RunningTask(r0)
-		lwz	r4,TASKPPC_TASKPTR(r4)
-		
-		lwz	r3,0(r4)			#RemovePPC
-		lwz	r4,4(r4)
-		stw	r4,4(r3)
-		stw	r3,0(r4)
-		
-		lwz	r4,PowerPCBase(r0)		#Tasks -1
-		lwz	r3,NumAllTasks(r4)
-		subi	r3,r3,1
-		stw	r3,NumAllTasks(r4)		
-
-		lwz	r4,RunningTask(r0)
-		lwz	r4,TASKPPC_TASKMEM(r4)
-		stw	r4,MN_ARG0(r9)
-
-		lwz	r4,RunningTask(r0)			#Free original 68K -> PPC
-		lwz	r4,TASKPPC_STARTMSG(r4)			#message
-
-		LIBCALLPOWERPC FreeMsgFramePPC
-
-		mr	r4,r9
-		
-		LIBCALLPOWERPC SendMsgFramePPC
-
-		loadreg	r1,SysStack-0x20			#System stack in unused mem
-		lwz	r13,SonnetBase(r0)
-		or	r1,r1,r13
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
-
-		li	r7,TS_REMOVED
-		lwz	r9,RunningTask(r0)
-		stb	r7,TC_STATE(r9)
-
-		li	r0,0
-		stw	r0,RunningTask(r0)
-
-Pause:		nop
-		nop
-		b	Pause
 
 End:		mflr	r4
 		
@@ -409,6 +298,8 @@ End:		mflr	r4
 		stw	r6,ViolationAddress(r0)
 		addi	r6,r4,TaskExit
 		stw	r6,TaskExitCode(r0)
+		addi	r6,r4,TaskStart
+		stw	r6,RunPPCStart(r0)
 
 		bl	Caches				#Setup the L1 and L2 cache
 
@@ -2120,52 +2011,16 @@ EInt:		b	.FPUnav				#0
 		subi	r13,r1,4
 		stwu	r1,-284(r1)		
 		
-		loadreg	r6,IdleTask+(StartCode-Start)
-		lwz	r4,SonnetBase(r0)
-		or	r6,r6,r4
+		lwz	r6,RunPPCStart(r0)
 		mtsprg0	r6
 
-		la	r6,TASKPPC_PORT(r8)		#Setup a Semaphore & MsgPort
-		addi	r4,r6,MP_PPC_INTMSG
-		stw	r4,LH_TAILPRED(r4) 
-		li	r0,0 
-		stwu	r0,LH_TAIL(r4) 
-		stwu	r4,LH_HEAD-4(r4) 
- 
-		addi	r4,r6,MP_MSGLIST
-		stw	r4,LH_TAILPRED(r4) 
-		li	r0,0 
-		stwu	r0,LH_TAIL(r4) 
-		stwu	r4,LH_HEAD-4(r4) 
- 
  		loadreg	r0,SYS_SIGALLOC
 		stw	r0,TC_SIGALLOC(r8)
- 
-		li	r0,SIGB_DOS 			#SIGBIT = DOS
-		stb	r0,MP_SIGBIT(r6)			 
-		addi	r4,r6,MP_PPC_SEM
 
-		addi	r5,r4,SS_WAITQUEUE
-		stw	r5,8(r5)
-		li	r0,0
-		stwu	r0,4(r5)
-		stwu	r5,-4(r5)
-		li	r0,0
-		stw	r0,SS_OWNER(r4)
-		sth	r0,SS_NESTCOUNT(r4)
-		li	r0,-1
-		sth	r0,SS_QUEUECOUNT(r4)	 
- 
- 		la	r3,TASKPPC_SSPPC_RESERVE(r8)
- 		stw	r3,SSPPC_RESERVE(r4)
- 
-		stw	r8,MP_SIGTASK(r6)
-		li	r0,PA_SIGNAL 
-		stb	r0,MP_FLAGS(r6)
-		li	r0,NT_MSGPORTPPC 
-		stb	r0,LN_TYPE(r6)
+		la	r6,TASKPPC_PORT(r8)
+		bl	.IntCrMsgPort
+
 		stw	r6,TASKPPC_MSGPORT(r8)
-
 		stw	r8,RunningTask(r0)
 		
 		la	r5,TASKPPC_ALLTASK(r8)
@@ -2293,6 +2148,47 @@ EInt:		b	.FPUnav				#0
 		
 		rfi
 		
+#********************************************************************************************	
+
+.IntCrMsgPort:		
+		addi	r4,r6,MP_PPC_INTMSG		#Setup a Semaphore & MsgPort
+		stw	r4,LH_TAILPRED(r4) 
+		li	r0,0 
+		stwu	r0,LH_TAIL(r4) 
+		stwu	r4,LH_HEAD-4(r4) 
+
+		addi	r4,r6,MP_MSGLIST
+		stw	r4,LH_TAILPRED(r4) 
+		li	r0,0 
+		stwu	r0,LH_TAIL(r4) 
+		stwu	r4,LH_HEAD-4(r4) 
+
+		li	r0,SIGB_DOS 			#SIGBIT = DOS
+		stb	r0,MP_SIGBIT(r6)			 
+		addi	r4,r6,MP_PPC_SEM
+
+		addi	r5,r4,SS_WAITQUEUE
+		stw	r5,8(r5)
+		li	r0,0
+		stwu	r0,4(r5)
+		stwu	r5,-4(r5)
+		li	r0,0
+		stw	r0,SS_OWNER(r4)
+		sth	r0,SS_NESTCOUNT(r4)
+		li	r0,-1
+		sth	r0,SS_QUEUECOUNT(r4)	 
+
+ 		la	r3,TASKPPC_SSPPC_RESERVE(r8)
+ 		stw	r3,SSPPC_RESERVE(r4)
+
+		stw	r8,MP_SIGTASK(r6)
+		li	r0,PA_SIGNAL 
+		stb	r0,MP_FLAGS(r6)
+		li	r0,NT_MSGPORTPPC 
+		stb	r0,LN_TYPE(r6)
+
+		blr
+
 #********************************************************************************************
 		
 .ReturnToUser:		
@@ -3733,6 +3629,7 @@ EInt:		b	.FPUnav				#0
 		stwx	r3,r30,r8			#Update Destination Reg
 .NoUpdate:	lwzx	r2,r30,r6			#Get value to store
 		
+		li	r7,0
 		mr.	r9,r9
 		beq	.GoLoad				#Load or store?
 		
@@ -3766,7 +3663,8 @@ EInt:		b	.FPUnav				#0
 		b	.DoStore
 .StoreByte:	loadreg	r9,'PUTB'
 
-.DoStore:	bl	.DoSixtyEight			#Send message to 68K
+.DoStore:	li	r7,-1
+		bl	.DoSixtyEight			#Send message to 68K
 		
 		b	.DoneDSI			#We're done
 
@@ -3903,6 +3801,8 @@ EInt:		b	.FPUnav				#0
 		and	r23,r23,r20			#Keep it 8000-BFFE
 		stwbrx	r23,r24,r28			#triggers Interrupt
 
+		mr.	r7,r7
+		bne	.NoWaitSE
 		loadreg	r9,'DONE'
 .WaitPFIFO:	lwz	r21,MN_IDENTIFIER(r25)
 		cmpw	r21,r9
@@ -3910,7 +3810,7 @@ EInt:		b	.FPUnav				#0
 		
 		lwz	r10,MN_IDENTIFIER+4(r25)	#Returned value for load in r10
 		
-		blr
+.NoWaitSE:	blr
 
 #********************************************************************************************
 

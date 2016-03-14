@@ -5,12 +5,14 @@
 .set FunctionsLen,(EndFunctions-SetCache)
 .set ViolationOS,(Violation-SetCache)
 .set TaskExit,(DeleteTaskPPC-SetCache)
+.set TaskStart,(StartCode-SetCache)
 
 .global FunctionsLen
 .global ViolationOS
 .global LibFunctions
 .global TaskExit
 .global CPUInfo
+.global TaskStart
 
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
@@ -2915,10 +2917,6 @@ PutXMsgPPC:
 #
 #********************************************************************************************
 
-.WasNoDone:	stw	r30,0x140(r0)
-		loadreg	r0,'haha'
-		stw	r0,0x144(r0)
-		b	.WasNoDone
 WaitFor68K:	
 		prolog 228,'TOC'
 
@@ -2936,7 +2934,7 @@ WaitFor68K:
 
 		bl WaitPortPPC		
 
-.WasNoDon:	lwz	r4,RunningTask(r0)
+.WasNoDone:	lwz	r4,RunningTask(r0)
 		lwz	r4,TASKPPC_MSGPORT(r4)
 
 		bl GetMsgPPC
@@ -8969,6 +8967,10 @@ DebugStartFunction:
 		lwz	r31,RunningTask(r0)
 		lwz	r31,LN_NAME(r31)
 		stw	r31,0(r5)
+		lwz	r31,0(r31)
+		loadreg	r3,'Scum'
+		cmpw	r31,r3
+		bne	.NoDebugStart		
 		
 		stw	r30,8(r5)
 		stw	r29,12(r5)
@@ -9023,8 +9025,13 @@ DebugEndFunction:
 		lwz	r31,RunningTask(r0)
 		lwz	r31,LN_NAME(r31)
 		stw	r31,0(r5)
+		lwz	r31,0(r31)
 		
 		stw	r3,8(r5)
+		
+		loadreg	r3,'Scum'
+		cmpw	r31,r3
+		bne	.NoDebugEnd
 			
 		bl	SPrintF
 
@@ -9035,6 +9042,120 @@ DebugEndFunction:
 		addi	r13,r13,16
 
 		epilog 'TOC'
+		
+#********************************************************************************************
+#
+#	Start/Exit code for RunPPC
+#
+#********************************************************************************************		
+
+		trap					#For PP_THROW
+	
+StartCode:	blrl
+
+ExitCode:	lwz	r17,RunningTask(r0)
+		lwz	r17,TASKPPC_STARTMSG(r17)
+		lwz	r17,PP_FLAGS(r17)
+		rlwinm.	r17,r17,(32-PPB_LINEAR),31,31
+		beq	.NotLinear2
+
+		mr	r22,r5
+		mr	r23,r6
+		mr	r24,r7
+		mr	r25,r8
+		mr	r26,r9
+		mr	r27,r10
+
+.NotLinear2:	mr	r12,r3
+
+		bl CreateMsgFramePPC
+
+		mr	r9,r3
+		mr	r3,r12
+
+		subi	r10,r9,4		
+		li	r11,48
+		li	r7,0
+		mtctr	r11
+.ClearEndMsg:	stwu	r7,4(r10)
+		bdnz	.ClearEndMsg
+
+		loadreg r7,'FPPC'
+		stw	r7,MN_IDENTIFIER(r9)
+		li	r7,192
+		sth	r7,MN_LENGTH(r9)
+		li	r7,NT_MESSAGE
+		stb	r7,LN_TYPE(r9)
+
+		lwz	r7,RunningTask(r0)		
+		lwz	r7,TASKPPC_STARTMSG(r7)						
+		lwz	r7,MN_REPLYPORT(r7)		
+		stw	r7,MN_REPLYPORT(r9)
+		stw	r2,PP_REGS+12*4(r9)
+		stw	r3,PP_REGS+0*4(r9)
+		stw	r4,PP_REGS+1*4(r9)
+		stw	r5,PP_REGS+8*4(r9)
+		stw	r6,PP_REGS+9*4(r9)
+		stw	r22,PP_REGS+2*4(r9)
+		stw	r23,PP_REGS+3*4(r9)
+		stw	r24,PP_REGS+4*4(r9)
+		stw	r25,PP_REGS+5*4(r9)
+		stw	r26,PP_REGS+6*4(r9)
+		stw	r27,PP_REGS+7*4(r9)
+		stw	r28,PP_REGS+10*4(r9)
+		stw	r29,PP_REGS+11*4(r9)
+		stw	r30,PP_REGS+13*4(r9)
+		stw	r31,PP_REGS+14*4(r9)		
+		stfd	f1,PP_FREGS+0*8(r9)
+		stfd	f2,PP_FREGS+1*8(r9)
+		stfd	f3,PP_FREGS+2*8(r9)
+		stfd	f4,PP_FREGS+3*8(r9)
+		stfd	f5,PP_FREGS+4*8(r9)
+		stfd	f6,PP_FREGS+5*8(r9)
+		stfd	f7,PP_FREGS+6*8(r9)
+		stfd	f8,PP_FREGS+7*8(r9)
+		lwz	r8,MCPort(r0)
+		stw	r8,MN_MCPORT(r9)
+
+		lwz	r4,RunningTask(r0)
+		lwz	r4,TASKPPC_TASKPTR(r4)
+
+		bl RemovePPC
+
+		lwz	r4,PowerPCBase(r0)			#Tasks -1
+		lwz	r3,NumAllTasks(r4)
+		subi	r3,r3,1
+		stw	r3,NumAllTasks(r4)		
+
+		lwz	r4,RunningTask(r0)
+		lwz	r4,TASKPPC_TASKMEM(r4)
+		stw	r4,MN_ARG0(r9)
+
+		lwz	r4,RunningTask(r0)			#Free original 68K -> PPC
+		lwz	r4,TASKPPC_STARTMSG(r4)			#message
+
+		bl FreeMsgFramePPC
+
+		mr	r4,r9
+		
+		bl SendMsgFramePPC
+
+		loadreg	r1,SysStack-0x20			#System stack in unused mem
+		lwz	r13,SonnetBase(r0)
+		or	r1,r1,r13
+		subi	r13,r1,4
+		stwu	r1,-284(r1)
+
+		li	r7,TS_REMOVED
+		lwz	r9,RunningTask(r0)
+		stb	r7,TC_STATE(r9)
+
+		li	r0,0
+		stw	r0,RunningTask(r0)
+
+Pause:		nop
+		nop
+		b	Pause
 		
 #********************************************************************************************
 
