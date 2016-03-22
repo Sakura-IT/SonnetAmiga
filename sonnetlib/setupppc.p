@@ -1694,6 +1694,10 @@ EInt:		b	.FPUnav				#0
 		cmpw	r4,r6
 		beq	.Done68
 		
+		loadreg	r4,'END!'
+		cmpw	r4,r6
+		beq	.Done68
+		
 		loadreg	r4,'DNLL'			#Reply from Run68KLowLevel
 		cmpw	r4,r6
 		beq	.Done68
@@ -1702,10 +1706,9 @@ EInt:		b	.FPUnav				#0
 		
 #**********************************************************
 
-.XSignal:	lwz	r3,MN_ARG1(r5)			#68K mirror task's port
+.XSignal:	lwz	r3,MN_ARG1(r5)			#68K mirror task
 		lwz	r4,RunningTask(r0)		#Check for it in the running task
-		lwz	r8,TASKPPC_STARTMSG(r4)
-		lwz	r8,MN_REPLYPORT(r8)
+		lwz	r8,TASKPPC_MIRROR68K(r4)
 		cmpw	r8,r3
 		bne	.ChkWait
 	
@@ -1721,8 +1724,7 @@ EInt:		b	.FPUnav				#0
 .ChkNextSig:	lwz	r7,0(r4)
 		mr.	r7,r7				#Check for the end of the list
 		beq	.ChkRdy
-		lwz	r8,TASKPPC_STARTMSG(r4)
-		lwz	r8,MN_REPLYPORT(r8)
+		lwz	r8,TASKPPC_MIRROR68K(r4)
 		cmpw	r8,r3
 		beq	.SetReady
 		mr	r4,r7
@@ -1738,8 +1740,7 @@ EInt:		b	.FPUnav				#0
 .ChkRdySig:	lwz	r7,0(r4)
 		mr.	r7,r7				#Check for the end of the list
 		beq	.RelFrame
-		lwz	r8,TASKPPC_STARTMSG(r4)
-		lwz	r8,MN_REPLYPORT(r8)
+		lwz	r8,TASKPPC_MIRROR68K(r4)
 		cmpw	r8,r3
 		beq	.ReUseLoop
 		mr	r4,r7
@@ -1776,11 +1777,7 @@ EInt:		b	.FPUnav				#0
 		mtctr	r3
 				
 		lwz	r7,MN_PPC(r5)
-		stw	r5,0x110(r0)
-		stw	r7,0x114(r0)
-		loadreg	r3,'xxxx'
-		stw	r3,0x118(r0)
-		
+
 		lis	r3,EUMB				#Free the message
 		li	r4,IFHPR
 		lwbrx	r6,r4,r3		
@@ -1846,7 +1843,11 @@ EInt:		b	.FPUnav				#0
 
 #**********************************************************
 		
-.MsgTPPC:	lwz	r4,PowerPCBase(r0)		#Handles a RunPPC
+.MsgTPPC:	lwz	r4,MN_PPC(r5)
+		mr.	r4,r4
+		bne	.Done68
+		
+		lwz	r4,PowerPCBase(r0)		#Handles a RunPPC
 		la	r4,LIST_NEWTASKS(r4)
 		
 		addi	r4,r4,4				#AddTailPPC
@@ -1884,8 +1885,14 @@ EInt:		b	.FPUnav				#0
 		lbz	r9,FLAG_READY(r9)
 		mr.	r9,r9
 		bne	.ReturnToUser
+		lwz	r9,RunningTask(r0)
+		mr.	r9,r9
+		beq	.NoAtomicTask
+		lbz	r9,TC_STATE(r9)
+		cmpwi	r9,TS_ATOMIC
+		beq	.ReturnToUser
 
-		lwz	r9,TaskException(r0)
+.NoAtomicTask:	lwz	r9,TaskException(r0)
 		mr.	r9,r9
 		bne	.TaskException
 
@@ -1987,13 +1994,15 @@ EInt:		b	.FPUnav				#0
 		stb	r4,LN_TYPE(r8)
 		la	r4,TASKPPC_CTMEM(r8)
 		stw	r4,TASKPPC_CONTEXTMEM(r8)
-		stw	r9,TASKPPC_STARTMSG(r8)
+		lwz	r31,MN_ARG2(r9)
+		stw	r31,TASKPPC_MIRROR68K(r8)
+		lwz	r31,MN_MIRROR(r9)
+		stw	r31,TASKPPC_MIRRORPORT(r8)		
 		la	r31,TASKPPC_NAME(r8)
 		stw	r31,LN_NAME(r8)
 		lwz	r31,MN_ARG1(r9)
 		stw	r31,TASKPPC_STACKSIZE(r8)
-		stw	r8,TASKPPC_TASKMEM(r8)
-		addi	r4,r8,1024		
+		addi	r4,r8,2048		
 		stw	r4,TC_SPLOWER(r8)
 		add	r4,r4,r31
 		stw	r4,TC_SPUPPER(r8)
@@ -2044,78 +2053,7 @@ EInt:		b	.FPUnav				#0
 		addi	r3,r3,1
 		stw	r3,NumAllTasks(r4)
 
-		mr	r8,r9
-		
-		lwz	r2,PP_REGS+12*4(r8)
-		lwz	r3,PP_REGS+0*4(r8)
-		lwz	r4,PP_REGS+1*4(r8)
-		lwz	r5,PP_REGS+8*4(r8)
-		lwz	r6,PP_REGS+9*4(r8)
-		lwz	r22,PP_REGS+2*4(r8)
-		lwz	r23,PP_REGS+3*4(r8)
-		lwz	r24,PP_REGS+4*4(r8)
-		lwz	r25,PP_REGS+5*4(r8)
-		lwz	r26,PP_REGS+6*4(r8)
-		lwz	r27,PP_REGS+7*4(r8)
-		lwz	r28,PP_REGS+10*4(r8)
-		lwz	r29,PP_REGS+11*4(r8)
-		lwz	r30,PP_REGS+13*4(r8)
-		lwz	r31,PP_REGS+14*4(r8)
-		lfd	f1,PP_FREGS+0*8(r8)
-		lfd	f2,PP_FREGS+1*8(r8)
-		lfd	f3,PP_FREGS+2*8(r8)
-		lfd	f4,PP_FREGS+3*8(r8)
-		lfd	f5,PP_FREGS+4*8(r8)
-		lfd	f6,PP_FREGS+5*8(r8)
-		lfd	f7,PP_FREGS+6*8(r8)
-		lfd	f8,PP_FREGS+7*8(r8)
-		lwz	r9,PP_OFFSET(r8)
-		
-		mr	r17,r8
-		lwz	r8,PP_CODE(r8)		
-		add	r8,r8,r9
-		mr.	r9,r9					#Check if it is a PPC library
-		beq	.NoLibCall				#call from M68K code
-		
-		lwz	r8,2(r8)				#If so, get offset
-		
-.NoLibCall:	mtlr	r8
-		
-		lwz	r11,Break(r0)
-		mr.	r11,r11
-		beq	.NoBreak				#Should be beq
-		
-		mr	r11,r8
-		ori	r11,r11,3
-		mtspr	IABR,r11				#Set breakpoint
-		isync
-		
-.NoBreak:	li	r0,0
-		mr	r7,r0
-		mr	r8,r0
-		mr	r9,r0
-		mr	r10,r0
-		mr 	r11,r0
-		mr	r12,r0
-		mr	r14,r0
-		mr	r15,r0
-		mr	r18,r0
-		mr	r19,r0
-		mr	r20,r0
-		mr	r21,r0
-		
-		lwz	r16,PP_FLAGS(r17)
-		rlwinm.	r16,r16,(32-PPB_LINEAR),31,31
-		beq	.NotLinear
-
-		mr	r5,r22
-		mr	r6,r23
-		mr	r7,r24
-		mr	r8,r25
-		mr	r9,r26
-		mr	r10,r27
-		
-.NotLinear:	loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
+		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
 		mtsrr1	r0		
 		mfsprg0	r0
 		mtsrr0	r0
@@ -2127,24 +2065,13 @@ EInt:		b	.FPUnav				#0
 		isync
 
 		li	r0,0
-		
-		lwz	r16,PP_FLAGS(r17)
-		rlwinm.	r16,r16,(32-PPB_THROW),31,31
-		beq	.NoThrow
-		
-		mfsrr0	r16
-		subi	r16,r16,4				#Set start on a TRAP instruction
-		mtsrr0	r16
-
-.NoThrow:	mr	r16,r0
-		mr	r17,r0
 		stb	r0,ExceptionMode(r0)
 		stb	r0,PortInUse(r0)
+		
+		mr	r30,r9
 
 		loadreg	r0,Quantum
 		mtdec	r0
-
-		loadreg	r0,'WARP'
 		
 		rfi
 		
