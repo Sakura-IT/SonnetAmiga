@@ -889,6 +889,7 @@ FreeVecPPC:	prolog 228,'TOC'
 
 AllocVec68K:	prolog 228,'TOC'
 
+		stwu	r31,-4(r13)
 		stwu	r9,-4(r13)
 		stwu	r8,-4(r13)
 
@@ -898,9 +899,10 @@ AllocVec68K:	prolog 228,'TOC'
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC|MEMF_REVERSE	#Fixed for now
 		
 		addi	r8,r4,0x38					#d0
+		mr	r31,r8
 		mr	r9,r5						#d1
 		lwz	r4,SysBase(r0)
-		li	r5,_LVOAllocVec
+		li	r5,_LVOAllocMem
 			
 		bl 	Run68KLowLevel
 										
@@ -912,10 +914,12 @@ AllocVec68K:	prolog 228,'TOC'
 		and.	r3,r3,r5
 		
 		stw	r4,-4(r3)
+		stw	r31,-8(r3)
 		
 .AllocErr:	lwz	r8,0(r13)
 		lwz	r9,4(r13)
-		addi	r13,r13,8
+		lwz	r31,8(r13)
+		addi	r13,r13,12
 		
 		epilog 'TOC'
 
@@ -927,18 +931,23 @@ AllocVec68K:	prolog 228,'TOC'
 
 FreeVec68K:	prolog 228,'TOC'
 
+		stwu	r31,-4(r13)
+		stwu	r8,-4(r13)
 		stwu	r7,-4(r13)
 
 		lwz	r7,-4(r4)					#a1
+		lwz	r8,-8(r4)					#d0
 		lwz	r4,SysBase(r0)
-		li	r5,_LVOFreeVec
+		li	r5,_LVOFreeMem
 
 		bl 	Run68KLowLevel
 
 		li	r3,MEMERR_SUCCESS
 
 		lwz	r7,0(r13)
-		addi	r13,r13,4
+		lwz	r8,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
 		
 		epilog 'TOC'
 
@@ -2938,23 +2947,17 @@ WaitFor68K:
 		loadreg	r4,'DNLL'
 		cmpw	r4,r29
 		beq	.WasLL
-		loadreg	r4,'END!'
-		cmpw	r4,r29
-		beq	.KillRunPPC
-		loadreg	r4,'TPPC'
-		cmpw	r4,r29
-		beq	.RunPPC
 		loadreg	r4,'DONE'
 		cmpw	r4,r29
 		bne	.WasNoDone
 		
 .WasDone:	lwz	r4,RunningTask(r0)
-		lwz	r26,TASKPPC_MIRRORPORT(r4)
+		lwz	r26,TASKPPC_MIRROR68K(r4)
 		mr.	r26,r26
 		bne	.GotMirror
 
 		lwz	r26,MN_MIRROR(r30)
-		stw	r26,TASKPPC_MIRRORPORT(r4)
+		stw	r26,TASKPPC_MIRROR68K(r4)
 		
 .GotMirror:	mfctr	r26
 		subi	r4,r31,4
@@ -2987,10 +2990,6 @@ WaitFor68K:
 		addi	r13,r13,24
 		
 		epilog 'TOC'
-
-.RunPPC:	bl	.StartRunPPC
-		
-		b	.WasNoDone
 
 #********************************************************************************************
 #
@@ -3036,7 +3035,16 @@ Run68K:
 		stw	r5,MN_IDENTIFIER(r30)		
 		lwz	r5,RunningTask(r0)
 		stw	r5,MN_PPC(r30)
-		lwz	r4,TASKPPC_MIRRORPORT(r5)
+		
+		lwz	r5,TASKPPC_STARTMSG(r5)
+		mr.	r5,r5				#Task made by CreateTaskPPC?
+		beq	.NotRunPPC
+		lwz	r5,MN_MIRROR(r5)
+		stw	r5,MN_MIRROR(r30)
+		b	.FromRunPPC
+
+.NotRunPPC:	lwz	r5,RunningTask(r0)
+		lwz	r4,TASKPPC_MIRROR68K(r5)
 		stw	r4,MN_MIRROR(r30)
 		lwz	r4,LN_NAME(r5)
 		stw	r4,MN_ARG0(r30)
@@ -5605,7 +5613,7 @@ DeleteTaskPPC:
 		bl ReleaseSemaphorePPC
 
 		lwz	r3,RunningTask(r0)
-		lwz	r26,TASKPPC_MIRRORPORT(r3)		
+		lwz	r26,TASKPPC_MIRROR68K(r3)		
 		mr.	r26,r26
 		beq	.NoMirror
 
@@ -8962,7 +8970,7 @@ DebugStartFunction:
 		lwz	r31,0(r31)
 		loadreg	r3,'Scum'
 		cmpw	r31,r3
-#		bne	.NoDebugStart		
+		bne	.NoDebugStart		
 		
 		stw	r30,8(r5)
 		stw	r29,12(r5)
@@ -9023,9 +9031,9 @@ DebugEndFunction:
 		
 		loadreg	r3,'Scum'
 		cmpw	r31,r3
-#		bne	.NoDebugEnd
+		bne	.NoDebugEnd
 			
-		bl SPrintF
+		bl	SPrintF
 
 .NoDebugEnd:	lwz	r30,0(r13)
 		lwz	r5,4(r13)
@@ -9037,107 +9045,14 @@ DebugEndFunction:
 		
 #********************************************************************************************
 #
-#	Start/Exit code for RunPPC Tasks
+#	Start/Exit code for RunPPC
 #
 #********************************************************************************************		
 
-StartCode:	bl	.StartRunPPC
-
-.WasNoEMsg:	lwz	r4,RunningTask(r0)
-		lwz	r4,TASKPPC_MSGPORT(r4)		
-		
-		bl WaitPortPPC
-		
-.NextEMsg:	lwz	r4,RunningTask(r0)
-		lwz	r4,TASKPPC_MSGPORT(r4)
-
-		bl GetMsgPPC
-
-		mr.	r30,r3
-
-		beq	.WasNoEMsg
-		
-		lwz	r29,MN_IDENTIFIER(r30)
-		loadreg	r4,'END!'
-		cmpw	r4,r29
-		beq	.KillRunPPC
-		loadreg r4,'TPPC'
-		cmpw	r4,r29
-		bne	.NextEMsg
-
-		b	StartCode
-		
-#********************************************************************************************
-
-.StartRunPPC:	prolog	1024,'TOC'
-		
-		stwu	r0,-4(r13)
-		stwu	r3,-4(r13)
-		stwu	r4,-4(r13)
-		stwu	r5,-4(r13)
-		stwu	r6,-4(r13)
-		stwu	r7,-4(r13)
-		stwu	r8,-4(r13)
-		stwu	r9,-4(r13)
-		stwu	r10,-4(r13)
-		stwu	r11,-4(r13)
-		stwu	r12,-4(r13)
-		stwu	r14,-4(r13)
-		stwu	r15,-4(r13)
-		stwu	r16,-4(r13)
-		stwu	r17,-4(r13)
-		stwu	r18,-4(r13)
-		stwu	r19,-4(r13)
-		stwu	r20,-4(r13)
-		stwu	r21,-4(r13)
-		stwu	r22,-4(r13)
-		stwu	r23,-4(r13)
-		stwu	r24,-4(r13)
-		stwu	r25,-4(r13)
-		stwu	r26,-4(r13)
-		stwu	r27,-4(r13)
-		stwu	r28,-4(r13)
-		stwu	r29,-4(r13)
-		stwu	r30,-4(r13)
-		stwu	r31,-4(r13)
-		
-		stfdu	f0,-8(r13)
-		stfdu	f1,-8(r13)
-		stfdu	f2,-8(r13)
-		stfdu	f3,-8(r13)
-		stfdu	f4,-8(r13)
-		stfdu	f5,-8(r13)
-		stfdu	f6,-8(r13)
-		stfdu	f7,-8(r13)
-		stfdu	f8,-8(r13)
-		stfdu	f9,-8(r13)
-		stfdu	f10,-8(r13)
-		stfdu	f11,-8(r13)
-		stfdu	f12,-8(r13)
-		stfdu	f13,-8(r13)
-		stfdu	f14,-8(r13)
-		stfdu	f15,-8(r13)
-		stfdu	f16,-8(r13)
-		stfdu	f17,-8(r13)
-		stfdu	f18,-8(r13)
-		stfdu	f19,-8(r13)
-		stfdu	f20,-8(r13)
-		stfdu	f21,-8(r13)
-		stfdu	f22,-8(r13)
-		stfdu	f23,-8(r13)
-		stfdu	f24,-8(r13)
-		stfdu	f25,-8(r13)
-		stfdu	f26,-8(r13)
-		stfdu	f27,-8(r13)
-		stfdu	f28,-8(r13)
-		stfdu	f29,-8(r13)
-		stfdu	f30,-8(r13)
-		stfdu	f31,-8(r13)
-
-		mr	r9,r30
+StartCode:	mr	r9,r30
 		mr	r8,r9
-		lwz	r2,RunningTask(r0)
-		stw	r9,TASKPPC_STARTMSG(r2)
+#		lwz	r2,RunningTask(r0)
+#		stw	r9,TASKPPC_STARTMSG(r2)
 		lwz	r2,PP_REGS+12*4(r8)
 		lwz	r3,PP_REGS+0*4(r8)
 		lwz	r4,PP_REGS+1*4(r8)
@@ -9206,11 +9121,11 @@ StartCode:	bl	.StartRunPPC
 		mr	r16,r17
 		beq	.NoThrow
 
-		trap						#For PP_THROW
+		trap					#For PP_THROW
 	
 .NoThrow:	blrl
 
-ExitCode:	lwz	r17,RunningTask(r0)
+		lwz	r17,RunningTask(r0)
 		lwz	r17,TASKPPC_STARTMSG(r17)
 		lwz	r17,PP_FLAGS(r17)
 		rlwinm.	r17,r17,(32-PPB_LINEAR),31,31
@@ -9275,106 +9190,27 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		stw	r8,MN_MCPORT(r9)
 
 		lwz	r4,RunningTask(r0)
-		stw	r4,MN_PPC(r9)
-		
-		lwz	r4,RunningTask(r0)			#Free original 68K -> PPC
-		lwz	r4,TASKPPC_STARTMSG(r4)			#message
-
-		bl FreeMsgFramePPC
-		
-		mr	r4,r9
-		
-		bl SendMsgFramePPC
-		
-		lfd	f31,0(r13)
-		lfdu	f30,8(r13)
-		lfdu	f29,8(r13)
-		lfdu	f28,8(r13)
-		lfdu	f27,8(r13)
-		lfdu	f26,8(r13)
-		lfdu	f25,8(r13)
-		lfdu	f24,8(r13)
-		lfdu	f23,8(r13)
-		lfdu	f22,8(r13)
-		lfdu	f21,8(r13)
-		lfdu	f20,8(r13)
-		lfdu	f19,8(r13)
-		lfdu	f18,8(r13)
-		lfdu	f17,8(r13)
-		lfdu	f16,8(r13)
-		lfdu	f15,8(r13)
-		lfdu	f14,8(r13)
-		lfdu	f13,8(r13)
-		lfdu	f12,8(r13)
-		lfdu	f11,8(r13)
-		lfdu	f10,8(r13)
-		lfdu	f9,8(r13)
-		lfdu	f8,8(r13)
-		lfdu	f7,8(r13)
-		lfdu	f6,8(r13)
-		lfdu	f5,8(r13)
-		lfdu	f4,8(r13)
-		lfdu	f3,8(r13)
-		lfdu	f2,8(r13)
-		lfdu	f1,8(r13)
-		lfdu	f0,8(r13)
-		
-		lwzu	r31,8(r13)
-		lwzu	r30,4(r13)
-		lwzu	r29,4(r13)
-		lwzu	r28,4(r13)
-		lwzu	r27,4(r13)
-		lwzu	r26,4(r13)
-		lwzu	r25,4(r13)
-		lwzu	r24,4(r13)
-		lwzu	r23,4(r13)
-		lwzu	r22,4(r13)
-		lwzu	r21,4(r13)
-		lwzu	r20,4(r13)
-		lwzu	r19,4(r13)
-		lwzu	r18,4(r13)
-		lwzu	r17,4(r13)
-		lwzu	r16,4(r13)
-		lwzu	r15,4(r13)
-		lwzu	r14,4(r13)
-		lwzu	r12,4(r13)
-		lwzu	r11,4(r13)
-		lwzu	r10,4(r13)
-		lwzu	r9,4(r13)
-		lwzu	r8,4(r13)
-		lwzu	r7,4(r13)
-		lwzu	r6,4(r13)
-		lwzu	r5,4(r13)
-		lwzu	r4,4(r13)
-		lwzu	r3,4(r13)
-		lwzu	r0,4(r13)
-		
-		addi	r13,r13,4
-		
-		epilog 'TOC'
-		
-#********************************************************************************************		
-
-.KillRunPPC:	li	r7,TS_ATOMIC
-		lwz	r9,RunningTask(r0)
-		stb	r7,TC_STATE(r9)
-		mr	r4,r30
-
-		bl FreeMsgFramePPC
-
-		lwz	r4,RunningTask(r0)
 		lwz	r4,TASKPPC_TASKPTR(r4)
 
 		bl RemovePPC
 
-		lwz	r4,RunningTask(r0)		
-
-		bl FreeVec68K
-
 		lwz	r4,PowerPCBase(r0)			#Tasks -1
 		lwz	r3,NumAllTasks(r4)
 		subi	r3,r3,1
-		stw	r3,NumAllTasks(r4)
+		stw	r3,NumAllTasks(r4)		
+
+		lwz	r4,RunningTask(r0)
+		lwz	r4,TASKPPC_TASKMEM(r4)
+		stw	r4,MN_ARG0(r9)
+
+		lwz	r4,RunningTask(r0)			#Free original 68K -> PPC
+		lwz	r4,TASKPPC_STARTMSG(r4)			#message
+
+		bl FreeMsgFramePPC
+
+		mr	r4,r9
+		
+		bl SendMsgFramePPC
 
 		loadreg	r1,SysStack-0x20			#System stack in unused mem
 		lwz	r13,SonnetBase(r0)
@@ -9383,6 +9219,7 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		stwu	r1,-284(r1)
 
 		li	r7,TS_REMOVED
+		lwz	r9,RunningTask(r0)
 		stb	r7,TC_STATE(r9)
 
 		li	r0,0
