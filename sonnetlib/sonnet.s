@@ -420,8 +420,34 @@ PPCInit		move.l SonnetBase(pc),a1
 		move.l d0,OTWR(a3)
 		add.b #$40,d0				;Translated to PPC PCI Memory
 		move.l d0,OMBAR(a3)
-
+		
+		jsr _LVODisable(a6)
+		
+		move.l #_LVOAddTask,a0			;Set system patches
+		lea StartCode(pc),a3
+		move.l a3,d0
+		move.l a6,a1
+		jsr _LVOSetFunction(a6)
+		lea AddTaskAddress(pc),a3
+		move.l d0,(a3)
+		
+		move.l #_LVORemTask,a0
+		lea ExitCode(pc),a3
+		move.l a3,d0
+		move.l a6,a1
+		jsr _LVOSetFunction(a6)
+		lea RemTaskAddress(pc),a3
+		move.l d0,(a3)
 		jsr _LVOCacheClearU(a6)
+
+		lea MirrorList(pc),a3			;Make a list for PPC Mirror Tasks
+		move.l a3,LH_TAILPRED(a3)
+		addq.l #4,a3
+		clr.l (a3)
+		move.l a3,-(a3)
+
+		jsr _LVOEnable(a6)
+
 		bra Clean
 
 ;********************************************************************************************
@@ -958,6 +984,91 @@ G3		move.l #CPUF_G3,d0
 G4		move.l #CPUF_G4,d0
 ExCPU		movem.l (a7)+,d1-a6
 		rts
+		
+;********************************************************************************************
+;
+;		System Patches
+;
+;********************************************************************************************
+;********************************************************************************************
+;
+;		RemTask() Patch
+;
+;********************************************************************************************
+
+ExitCode	movem.l d0-a6,-(a7)
+		bsr.s CommonCode
+		movem.l (a7)+,d0-a6
+		move.l RemTaskAddress(pc),-(a7)
+		rts
+
+ExitCode2	movem.l d0-a6,-(a7)
+		bsr.s CommonCode
+		movem.l (a7)+,d0-a6
+		move.l RemSysTask(pc),-(a7)
+		rts
+
+CommonCode	move.l 4.w,a6
+		move.l a1,d1
+		bne.s NotSelf
+
+		move.l ThisTask(a6),d1
+		move.l d1,a1
+NotSelf		cmp.b #NT_PROCESS,LN_TYPE(a1)
+		bne.s DoneMList
+		
+CorrectType	lea MirrorList(pc),a2
+		move.l MLH_HEAD(a2),a2
+NextMList	tst.l LN_SUCC(a2)
+		beq.s DoneMList
+		cmp.l MT_TASK(a2),d1
+		beq KillPPC
+		move.l LN_SUCC(a2),a2
+		bra.s NextMList
+
+KillPPC		move.l EUMBAddr(pc),a3
+		move.l IFQPR(a3),a1
+		move.l #"END!",MN_IDENTIFIER(a1)
+		move.l MT_MIRROR(a2),MN_PPC(a1)
+		move.l a1,IFQPR(a3)
+
+		jsr _LVODisable(a6)
+
+		move.l a2,a1
+		jsr _LVORemove(a6)
+
+		jsr _LVOEnable(a6)
+
+		move.l MT_PORT(a2),a0
+		jsr _LVODeleteMsgPort(a6)
+
+		move.l a2,a1
+		jsr _LVOFreeVec(a6)
+
+DoneMList	rts
+		
+;********************************************************************************************
+;
+;		Addtask() Patch
+;
+;********************************************************************************************
+
+StartCode	movem.l d0/a1,-(a7)
+		cmp.b #NT_PROCESS,LN_TYPE(a1)
+		bne.s ExitTrue
+		move.l a3,d0
+		beq.s DoPatch		
+		and.l #$ff000000,d0
+		bne.s ExitTrue
+		lea RemSysTask(pc),a1
+		move.l a3,(a1)
+		lea ExitCode2(pc),a3
+		bra.s ExitTrue
+
+DoPatch		lea ExitCode(pc),a3
+ExitTrue	movem.l (a7)+,d0/a1
+		move.l AddTaskAddress(pc),-(a7)
+		rts
 
 ;********************************************************************************************
 ;
@@ -969,12 +1080,17 @@ MN_IDENTIFIER	EQU MN_SIZE
 MN_MIRROR	EQU MN_IDENTIFIER+4
 MN_PPC		EQU MN_MIRROR+4
 MN_PPSTRUCT	EQU MN_PPC+4
+MT_TASK		EQU MLN_SIZE
+MT_MIRROR	EQU MT_TASK+4
+MT_PORT		EQU MT_MIRROR+4
+MT_SIZE		EQU MT_PORT+4
 
 
-PStruct	EQU -4
-Port	EQU -8
+PStruct		EQU -4
+Port		EQU -8
+MirrorNode	EQU -12
 
-RunPPC:		link a5,#-8
+RunPPC:		link a5,#-12
 		movem.l d1-a6,-(a7)
 		moveq.l #0,d0		
 		move.l d0,Port(a5)
@@ -982,9 +1098,11 @@ RunPPC:		link a5,#-8
 		move.l 4.w,a6
 		move.l ThisTask(a6),a1
 		cmp.b #NT_PROCESS,LN_TYPE(a1)
-xTask		bne.s xTask
+		beq.s IsProc
+		
+		ILLEGAL						;Only DOS processes supported
 
-		jsr _LVOCreateMsgPort(a6)
+IsProc		jsr _LVOCreateMsgPort(a6)
 		tst.l d0
 		bne.s xProces
 		
@@ -1594,6 +1712,10 @@ GfxType		ds.l	1
 ComProc		ds.l	1
 SonAddr		ds.l	1
 EUMBAddr	ds.l	1
+MirrorList	ds.l	3
+RemTaskAddress	ds.l	1
+AddTaskAddress	ds.l	1
+RemSysTask	ds.l	1
 MyInterrupt	ds.b	IS_SIZE
 
 	cnop	0,4

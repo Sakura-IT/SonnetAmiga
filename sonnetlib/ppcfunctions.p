@@ -9049,10 +9049,105 @@ DebugEndFunction:
 #
 #********************************************************************************************		
 
-StartCode:	mr	r9,r30
+StartCode:	bl	.StartRunPPC
+
+		b	.KillRunPPC
+
+.WasNoEMsg:	lwz	r4,RunningTask(r0)
+		lwz	r4,TASKPPC_MSGPORT(r4)		
+		
+		bl WaitPortPPC
+		
+.NextEMsg:	lwz	r4,RunningTask(r0)
+		lwz	r4,TASKPPC_MSGPORT(r4)
+
+		bl GetMsgPPC
+
+		mr.	r30,r3
+
+		beq	.WasNoEMsg
+		
+		lwz	r29,MN_IDENTIFIER(r30)
+		loadreg	r4,'END!'
+		cmpw	r4,r29
+		beq	.KillRunPPC
+		loadreg r4,'TPPC'
+		cmpw	r4,r29
+		bne	.NextEMsg
+
+		b	StartCode
+		
+#********************************************************************************************
+
+.StartRunPPC:	prolog	1024,'TOC'
+		
+		stwu	r0,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r4,-4(r13)
+		stwu	r5,-4(r13)
+		stwu	r6,-4(r13)
+		stwu	r7,-4(r13)
+		stwu	r8,-4(r13)
+		stwu	r9,-4(r13)
+		stwu	r10,-4(r13)
+		stwu	r11,-4(r13)
+		stwu	r12,-4(r13)
+		stwu	r14,-4(r13)
+		stwu	r15,-4(r13)
+		stwu	r16,-4(r13)
+		stwu	r17,-4(r13)
+		stwu	r18,-4(r13)
+		stwu	r19,-4(r13)
+		stwu	r20,-4(r13)
+		stwu	r21,-4(r13)
+		stwu	r22,-4(r13)
+		stwu	r23,-4(r13)
+		stwu	r24,-4(r13)
+		stwu	r25,-4(r13)
+		stwu	r26,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r31,-4(r13)
+		
+		stfdu	f0,-8(r13)
+		stfdu	f1,-8(r13)
+		stfdu	f2,-8(r13)
+		stfdu	f3,-8(r13)
+		stfdu	f4,-8(r13)
+		stfdu	f5,-8(r13)
+		stfdu	f6,-8(r13)
+		stfdu	f7,-8(r13)
+		stfdu	f8,-8(r13)
+		stfdu	f9,-8(r13)
+		stfdu	f10,-8(r13)
+		stfdu	f11,-8(r13)
+		stfdu	f12,-8(r13)
+		stfdu	f13,-8(r13)
+		stfdu	f14,-8(r13)
+		stfdu	f15,-8(r13)
+		stfdu	f16,-8(r13)
+		stfdu	f17,-8(r13)
+		stfdu	f18,-8(r13)
+		stfdu	f19,-8(r13)
+		stfdu	f20,-8(r13)
+		stfdu	f21,-8(r13)
+		stfdu	f22,-8(r13)
+		stfdu	f23,-8(r13)
+		stfdu	f24,-8(r13)
+		stfdu	f25,-8(r13)
+		stfdu	f26,-8(r13)
+		stfdu	f27,-8(r13)
+		stfdu	f28,-8(r13)
+		stfdu	f29,-8(r13)
+		stfdu	f30,-8(r13)
+		stfdu	f31,-8(r13)
+
+		mr	r9,r30
 		mr	r8,r9
-#		lwz	r2,RunningTask(r0)
-#		stw	r9,TASKPPC_STARTMSG(r2)
+		lwz	r2,RunningTask(r0)
+		stw	r9,TASKPPC_STARTMSG(r2)
 		lwz	r2,PP_REGS+12*4(r8)
 		lwz	r3,PP_REGS+0*4(r8)
 		lwz	r4,PP_REGS+1*4(r8)
@@ -9190,16 +9285,6 @@ StartCode:	mr	r9,r30
 		stw	r8,MN_MCPORT(r9)
 
 		lwz	r4,RunningTask(r0)
-		lwz	r4,TASKPPC_TASKPTR(r4)
-
-		bl RemovePPC
-
-		lwz	r4,PowerPCBase(r0)			#Tasks -1
-		lwz	r3,NumAllTasks(r4)
-		subi	r3,r3,1
-		stw	r3,NumAllTasks(r4)		
-
-		lwz	r4,RunningTask(r0)
 		lwz	r4,TASKPPC_TASKMEM(r4)
 		stw	r4,MN_ARG0(r9)
 
@@ -9212,6 +9297,96 @@ StartCode:	mr	r9,r30
 		
 		bl SendMsgFramePPC
 
+		lfd	f31,0(r13)
+		lfdu	f30,8(r13)
+		lfdu	f29,8(r13)
+		lfdu	f28,8(r13)
+		lfdu	f27,8(r13)
+		lfdu	f26,8(r13)
+		lfdu	f25,8(r13)
+		lfdu	f24,8(r13)
+		lfdu	f23,8(r13)
+		lfdu	f22,8(r13)
+		lfdu	f21,8(r13)
+		lfdu	f20,8(r13)
+		lfdu	f19,8(r13)
+		lfdu	f18,8(r13)
+		lfdu	f17,8(r13)
+		lfdu	f16,8(r13)
+		lfdu	f15,8(r13)
+		lfdu	f14,8(r13)
+		lfdu	f13,8(r13)
+		lfdu	f12,8(r13)
+		lfdu	f11,8(r13)
+		lfdu	f10,8(r13)
+		lfdu	f9,8(r13)
+		lfdu	f8,8(r13)
+		lfdu	f7,8(r13)
+		lfdu	f6,8(r13)
+		lfdu	f5,8(r13)
+		lfdu	f4,8(r13)
+		lfdu	f3,8(r13)
+		lfdu	f2,8(r13)
+		lfdu	f1,8(r13)
+		lfdu	f0,8(r13)
+		
+		lwzu	r31,8(r13)
+		lwzu	r30,4(r13)
+		lwzu	r29,4(r13)
+		lwzu	r28,4(r13)
+		lwzu	r27,4(r13)
+		lwzu	r26,4(r13)
+		lwzu	r25,4(r13)
+		lwzu	r24,4(r13)
+		lwzu	r23,4(r13)
+		lwzu	r22,4(r13)
+		lwzu	r21,4(r13)
+		lwzu	r20,4(r13)
+		lwzu	r19,4(r13)
+		lwzu	r18,4(r13)
+		lwzu	r17,4(r13)
+		lwzu	r16,4(r13)
+		lwzu	r15,4(r13)
+		lwzu	r14,4(r13)
+		lwzu	r12,4(r13)
+		lwzu	r11,4(r13)
+		lwzu	r10,4(r13)
+		lwzu	r9,4(r13)
+		lwzu	r8,4(r13)
+		lwzu	r7,4(r13)
+		lwzu	r6,4(r13)
+		lwzu	r5,4(r13)
+		lwzu	r4,4(r13)
+		lwzu	r3,4(r13)
+		lwzu	r0,4(r13)
+		
+		addi	r13,r13,4
+		
+		epilog 'TOC'
+		
+#********************************************************************************************		
+
+.KillRunPPC:	li	r7,TS_ATOMIC
+		lwz	r9,RunningTask(r0)
+		stb	r7,TC_STATE(r9)
+#		mr	r4,r30
+#
+#		bl FreeMsgFramePPC
+
+		lwz	r4,RunningTask(r0)
+		lwz	r4,TASKPPC_TASKPTR(r4)
+
+		bl RemovePPC
+
+		lwz	r4,RunningTask(r0)		
+
+#		bl FreeVec68K
+
+		lwz	r4,PowerPCBase(r0)			#Tasks -1
+		lwz	r3,NumAllTasks(r4)
+		subi	r3,r3,1
+		stw	r3,NumAllTasks(r4)
+
 		loadreg	r1,SysStack-0x20			#System stack in unused mem
 		lwz	r13,SonnetBase(r0)
 		or	r1,r1,r13
@@ -9219,7 +9394,6 @@ StartCode:	mr	r9,r30
 		stwu	r1,-284(r1)
 
 		li	r7,TS_REMOVED
-		lwz	r9,RunningTask(r0)
 		stb	r7,TC_STATE(r9)
 
 		li	r0,0
@@ -9228,7 +9402,7 @@ StartCode:	mr	r9,r30
 Pause:		nop
 		nop
 		b	Pause
-		
+				
 #********************************************************************************************
 
 FRun68K:		.byte	"Run68K",0

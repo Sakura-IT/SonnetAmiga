@@ -1884,6 +1884,11 @@ EInt:		b	.FPUnav				#0
 		lbz	r9,FLAG_READY(r9)
 		mr.	r9,r9
 		bne	.ReturnToUser
+		
+		lwz	r9,RunningTask(r0)
+		lbz	r9,TC_STATE(r9)
+		cmpwi	r9,TS_ATOMIC
+		beq	.ReturnToUser
 
 		lwz	r9,TaskException(r0)
 		mr.	r9,r9
@@ -2010,7 +2015,7 @@ EInt:		b	.FPUnav				#0
 		
 		stw	r13,-4(r1)
 		subi	r13,r1,4
-		stwu	r1,-284(r1)		
+		stwu	r1,-1024(r1)		
 		
 		lwz	r6,RunPPCStart(r0)
 		mtsprg0	r6
