@@ -889,7 +889,6 @@ FreeVecPPC:	prolog 228,'TOC'
 
 AllocVec68K:	prolog 228,'TOC'
 
-		stwu	r31,-4(r13)
 		stwu	r9,-4(r13)
 		stwu	r8,-4(r13)
 
@@ -899,10 +898,9 @@ AllocVec68K:	prolog 228,'TOC'
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC|MEMF_REVERSE	#Fixed for now
 		
 		addi	r8,r4,0x38					#d0
-		mr	r31,r8
 		mr	r9,r5						#d1
 		lwz	r4,SysBase(r0)
-		li	r5,_LVOAllocMem
+		li	r5,_LVOAllocVec
 			
 		bl 	Run68KLowLevel
 										
@@ -914,12 +912,10 @@ AllocVec68K:	prolog 228,'TOC'
 		and.	r3,r3,r5
 		
 		stw	r4,-4(r3)
-		stw	r31,-8(r3)
 		
 .AllocErr:	lwz	r8,0(r13)
 		lwz	r9,4(r13)
-		lwz	r31,8(r13)
-		addi	r13,r13,12
+		addi	r13,r13,8
 		
 		epilog 'TOC'
 
@@ -931,23 +927,18 @@ AllocVec68K:	prolog 228,'TOC'
 
 FreeVec68K:	prolog 228,'TOC'
 
-		stwu	r31,-4(r13)
-		stwu	r8,-4(r13)
 		stwu	r7,-4(r13)
 
 		lwz	r7,-4(r4)					#a1
-		lwz	r8,-8(r4)					#d0
 		lwz	r4,SysBase(r0)
-		li	r5,_LVOFreeMem
+		li	r5,_LVOFreeVec
 
 		bl 	Run68KLowLevel
 
 		li	r3,MEMERR_SUCCESS
 
 		lwz	r7,0(r13)
-		lwz	r8,4(r13)
-		lwz	r31,8(r13)
-		addi	r13,r13,12
+		addi	r13,r13,4
 		
 		epilog 'TOC'
 
@@ -2947,17 +2938,23 @@ WaitFor68K:
 		loadreg	r4,'DNLL'
 		cmpw	r4,r29
 		beq	.WasLL
+		loadreg	r4,'END!'
+		cmpw	r4,r29
+		beq	.KillRunPPC
+		loadreg	r4,'TPPC'
+		cmpw	r4,r29
+		beq	.RunPPC
 		loadreg	r4,'DONE'
 		cmpw	r4,r29
 		bne	.WasNoDone
 		
 .WasDone:	lwz	r4,RunningTask(r0)
-		lwz	r26,TASKPPC_MIRROR68K(r4)
+		lwz	r26,TASKPPC_MIRRORPORT(r4)
 		mr.	r26,r26
 		bne	.GotMirror
 
 		lwz	r26,MN_MIRROR(r30)
-		stw	r26,TASKPPC_MIRROR68K(r4)
+		stw	r26,TASKPPC_MIRRORPORT(r4)
 		
 .GotMirror:	mfctr	r26
 		subi	r4,r31,4
@@ -2990,6 +2987,10 @@ WaitFor68K:
 		addi	r13,r13,24
 		
 		epilog 'TOC'
+
+.RunPPC:	bl	.StartRunPPC
+		
+		b	.WasNoDone
 
 #********************************************************************************************
 #
@@ -3035,16 +3036,7 @@ Run68K:
 		stw	r5,MN_IDENTIFIER(r30)		
 		lwz	r5,RunningTask(r0)
 		stw	r5,MN_PPC(r30)
-		
-		lwz	r5,TASKPPC_STARTMSG(r5)
-		mr.	r5,r5				#Task made by CreateTaskPPC?
-		beq	.NotRunPPC
-		lwz	r5,MN_MIRROR(r5)
-		stw	r5,MN_MIRROR(r30)
-		b	.FromRunPPC
-
-.NotRunPPC:	lwz	r5,RunningTask(r0)
-		lwz	r4,TASKPPC_MIRROR68K(r5)
+		lwz	r4,TASKPPC_MIRRORPORT(r5)
 		stw	r4,MN_MIRROR(r30)
 		lwz	r4,LN_NAME(r5)
 		stw	r4,MN_ARG0(r30)
@@ -5613,7 +5605,7 @@ DeleteTaskPPC:
 		bl ReleaseSemaphorePPC
 
 		lwz	r3,RunningTask(r0)
-		lwz	r26,TASKPPC_MIRROR68K(r3)		
+		lwz	r26,TASKPPC_MIRRORPORT(r3)		
 		mr.	r26,r26
 		beq	.NoMirror
 
@@ -8970,7 +8962,7 @@ DebugStartFunction:
 		lwz	r31,0(r31)
 		loadreg	r3,'Scum'
 		cmpw	r31,r3
-		bne	.NoDebugStart		
+#		bne	.NoDebugStart		
 		
 		stw	r30,8(r5)
 		stw	r29,12(r5)
@@ -9031,9 +9023,9 @@ DebugEndFunction:
 		
 		loadreg	r3,'Scum'
 		cmpw	r31,r3
-		bne	.NoDebugEnd
+#		bne	.NoDebugEnd
 			
-		bl	SPrintF
+		bl SPrintF
 
 .NoDebugEnd:	lwz	r30,0(r13)
 		lwz	r5,4(r13)
@@ -9045,13 +9037,11 @@ DebugEndFunction:
 		
 #********************************************************************************************
 #
-#	Start/Exit code for RunPPC
+#	Start/Exit code for RunPPC Tasks
 #
 #********************************************************************************************		
 
 StartCode:	bl	.StartRunPPC
-
-		b	.KillRunPPC
 
 .WasNoEMsg:	lwz	r4,RunningTask(r0)
 		lwz	r4,TASKPPC_MSGPORT(r4)		
@@ -9079,70 +9069,72 @@ StartCode:	bl	.StartRunPPC
 		
 #********************************************************************************************
 
-.StartRunPPC:	prolog	1024,'TOC'
+.StartRunPPC:		
+		mflr	r0	
+		stwu	r0,-4(r1)
+		stwu	r2,-4(r1)
+		stwu	r3,-4(r1)
+		stwu	r4,-4(r1)
+		stwu	r5,-4(r1)
+		stwu	r6,-4(r1)
+		stwu	r7,-4(r1)
+		stwu	r8,-4(r1)
+		stwu	r9,-4(r1)
+		stwu	r10,-4(r1)
+		stwu	r11,-4(r1)
+		stwu	r12,-4(r1)
+		stwu	r13,-4(r1)
+		stwu	r14,-4(r1)
+		stwu	r15,-4(r1)
+		stwu	r16,-4(r1)
+		stwu	r17,-4(r1)
+		stwu	r18,-4(r1)
+		stwu	r19,-4(r1)
+		stwu	r20,-4(r1)
+		stwu	r21,-4(r1)
+		stwu	r22,-4(r1)
+		stwu	r23,-4(r1)
+		stwu	r24,-4(r1)
+		stwu	r25,-4(r1)
+		stwu	r26,-4(r1)
+		stwu	r27,-4(r1)
+		stwu	r28,-4(r1)
+		stwu	r29,-4(r1)
+		stwu	r30,-4(r1)
+		stwu	r31,-4(r1)
 		
-		stwu	r0,-4(r13)
-		stwu	r3,-4(r13)
-		stwu	r4,-4(r13)
-		stwu	r5,-4(r13)
-		stwu	r6,-4(r13)
-		stwu	r7,-4(r13)
-		stwu	r8,-4(r13)
-		stwu	r9,-4(r13)
-		stwu	r10,-4(r13)
-		stwu	r11,-4(r13)
-		stwu	r12,-4(r13)
-		stwu	r14,-4(r13)
-		stwu	r15,-4(r13)
-		stwu	r16,-4(r13)
-		stwu	r17,-4(r13)
-		stwu	r18,-4(r13)
-		stwu	r19,-4(r13)
-		stwu	r20,-4(r13)
-		stwu	r21,-4(r13)
-		stwu	r22,-4(r13)
-		stwu	r23,-4(r13)
-		stwu	r24,-4(r13)
-		stwu	r25,-4(r13)
-		stwu	r26,-4(r13)
-		stwu	r27,-4(r13)
-		stwu	r28,-4(r13)
-		stwu	r29,-4(r13)
-		stwu	r30,-4(r13)
-		stwu	r31,-4(r13)
-		
-		stfdu	f0,-8(r13)
-		stfdu	f1,-8(r13)
-		stfdu	f2,-8(r13)
-		stfdu	f3,-8(r13)
-		stfdu	f4,-8(r13)
-		stfdu	f5,-8(r13)
-		stfdu	f6,-8(r13)
-		stfdu	f7,-8(r13)
-		stfdu	f8,-8(r13)
-		stfdu	f9,-8(r13)
-		stfdu	f10,-8(r13)
-		stfdu	f11,-8(r13)
-		stfdu	f12,-8(r13)
-		stfdu	f13,-8(r13)
-		stfdu	f14,-8(r13)
-		stfdu	f15,-8(r13)
-		stfdu	f16,-8(r13)
-		stfdu	f17,-8(r13)
-		stfdu	f18,-8(r13)
-		stfdu	f19,-8(r13)
-		stfdu	f20,-8(r13)
-		stfdu	f21,-8(r13)
-		stfdu	f22,-8(r13)
-		stfdu	f23,-8(r13)
-		stfdu	f24,-8(r13)
-		stfdu	f25,-8(r13)
-		stfdu	f26,-8(r13)
-		stfdu	f27,-8(r13)
-		stfdu	f28,-8(r13)
-		stfdu	f29,-8(r13)
-		stfdu	f30,-8(r13)
-		stfdu	f31,-8(r13)
+		stfdu	f0,-8(r1)
+		stfdu	f1,-8(r1)
+		stfdu	f2,-8(r1)
+		stfdu	f3,-8(r1)
+		stfdu	f4,-8(r1)
+		stfdu	f5,-8(r1)
+		stfdu	f6,-8(r1)
+		stfdu	f7,-8(r1)
+		stfdu	f8,-8(r1)
+		stfdu	f9,-8(r1)
+		stfdu	f10,-8(r1)
+		stfdu	f11,-8(r1)
+		stfdu	f12,-8(r1)
+		stfdu	f13,-8(r1)
+		stfdu	f14,-8(r1)
+		stfdu	f15,-8(r1)
+		stfdu	f16,-8(r1)
+		stfdu	f17,-8(r1)
+		stfdu	f18,-8(r1)
+		stfdu	f19,-8(r1)
+		stfdu	f20,-8(r1)
+		stfdu	f21,-8(r1)
+		stfdu	f22,-8(r1)
+		stfdu	f23,-8(r1)
+		stfdu	f24,-8(r1)
+		stfdu	f25,-8(r1)
+		stfdu	f26,-8(r1)
+		stfdu	f27,-8(r1)
+		stfdu	f28,-8(r1)
+		stfdu	f29,-8(r1)
+		stfdu	f30,-8(r1)
+		stfdu	f31,-8(r1)
 
 		mr	r9,r30
 		mr	r8,r9
@@ -9216,11 +9208,11 @@ StartCode:	bl	.StartRunPPC
 		mr	r16,r17
 		beq	.NoThrow
 
-		trap					#For PP_THROW
+		trap						#For PP_THROW
 	
 .NoThrow:	blrl
 
-		lwz	r17,RunningTask(r0)
+ExitCode:	lwz	r17,RunningTask(r0)
 		lwz	r17,TASKPPC_STARTMSG(r17)
 		lwz	r17,PP_FLAGS(r17)
 		rlwinm.	r17,r17,(32-PPB_LINEAR),31,31
@@ -9285,93 +9277,95 @@ StartCode:	bl	.StartRunPPC
 		stw	r8,MN_MCPORT(r9)
 
 		lwz	r4,RunningTask(r0)
-		lwz	r4,TASKPPC_TASKMEM(r4)
-		stw	r4,MN_ARG0(r9)
-
+		stw	r4,MN_PPC(r9)
+		
 		lwz	r4,RunningTask(r0)			#Free original 68K -> PPC
 		lwz	r4,TASKPPC_STARTMSG(r4)			#message
 
 		bl FreeMsgFramePPC
-
+		
 		mr	r4,r9
 		
 		bl SendMsgFramePPC
-
-		lfd	f31,0(r13)
-		lfdu	f30,8(r13)
-		lfdu	f29,8(r13)
-		lfdu	f28,8(r13)
-		lfdu	f27,8(r13)
-		lfdu	f26,8(r13)
-		lfdu	f25,8(r13)
-		lfdu	f24,8(r13)
-		lfdu	f23,8(r13)
-		lfdu	f22,8(r13)
-		lfdu	f21,8(r13)
-		lfdu	f20,8(r13)
-		lfdu	f19,8(r13)
-		lfdu	f18,8(r13)
-		lfdu	f17,8(r13)
-		lfdu	f16,8(r13)
-		lfdu	f15,8(r13)
-		lfdu	f14,8(r13)
-		lfdu	f13,8(r13)
-		lfdu	f12,8(r13)
-		lfdu	f11,8(r13)
-		lfdu	f10,8(r13)
-		lfdu	f9,8(r13)
-		lfdu	f8,8(r13)
-		lfdu	f7,8(r13)
-		lfdu	f6,8(r13)
-		lfdu	f5,8(r13)
-		lfdu	f4,8(r13)
-		lfdu	f3,8(r13)
-		lfdu	f2,8(r13)
-		lfdu	f1,8(r13)
-		lfdu	f0,8(r13)
 		
-		lwzu	r31,8(r13)
-		lwzu	r30,4(r13)
-		lwzu	r29,4(r13)
-		lwzu	r28,4(r13)
-		lwzu	r27,4(r13)
-		lwzu	r26,4(r13)
-		lwzu	r25,4(r13)
-		lwzu	r24,4(r13)
-		lwzu	r23,4(r13)
-		lwzu	r22,4(r13)
-		lwzu	r21,4(r13)
-		lwzu	r20,4(r13)
-		lwzu	r19,4(r13)
-		lwzu	r18,4(r13)
-		lwzu	r17,4(r13)
-		lwzu	r16,4(r13)
-		lwzu	r15,4(r13)
-		lwzu	r14,4(r13)
-		lwzu	r12,4(r13)
-		lwzu	r11,4(r13)
-		lwzu	r10,4(r13)
-		lwzu	r9,4(r13)
-		lwzu	r8,4(r13)
-		lwzu	r7,4(r13)
-		lwzu	r6,4(r13)
-		lwzu	r5,4(r13)
-		lwzu	r4,4(r13)
-		lwzu	r3,4(r13)
-		lwzu	r0,4(r13)
+		lfd	f31,0(r1)
+		lfdu	f30,8(r1)
+		lfdu	f29,8(r1)
+		lfdu	f28,8(r1)
+		lfdu	f27,8(r1)
+		lfdu	f26,8(r1)
+		lfdu	f25,8(r1)
+		lfdu	f24,8(r1)
+		lfdu	f23,8(r1)
+		lfdu	f22,8(r1)
+		lfdu	f21,8(r1)
+		lfdu	f20,8(r1)
+		lfdu	f19,8(r1)
+		lfdu	f18,8(r1)
+		lfdu	f17,8(r1)
+		lfdu	f16,8(r1)
+		lfdu	f15,8(r1)
+		lfdu	f14,8(r1)
+		lfdu	f13,8(r1)
+		lfdu	f12,8(r1)
+		lfdu	f11,8(r1)
+		lfdu	f10,8(r1)
+		lfdu	f9,8(r1)
+		lfdu	f8,8(r1)
+		lfdu	f7,8(r1)
+		lfdu	f6,8(r1)
+		lfdu	f5,8(r1)
+		lfdu	f4,8(r1)
+		lfdu	f3,8(r1)
+		lfdu	f2,8(r1)
+		lfdu	f1,8(r1)
+		lfdu	f0,8(r1)
 		
-		addi	r13,r13,4
+		lwzu	r31,8(r1)
+		lwzu	r30,4(r1)
+		lwzu	r29,4(r1)
+		lwzu	r28,4(r1)
+		lwzu	r27,4(r1)
+		lwzu	r26,4(r1)
+		lwzu	r25,4(r1)
+		lwzu	r24,4(r1)
+		lwzu	r23,4(r1)
+		lwzu	r22,4(r1)
+		lwzu	r21,4(r1)
+		lwzu	r20,4(r1)
+		lwzu	r19,4(r1)
+		lwzu	r18,4(r1)
+		lwzu	r17,4(r1)
+		lwzu	r16,4(r1)
+		lwzu	r15,4(r1)
+		lwzu	r14,4(r1)
+		lwzu	r13,4(r1)
+		lwzu	r12,4(r1)
+		lwzu	r11,4(r1)
+		lwzu	r10,4(r1)
+		lwzu	r9,4(r1)
+		lwzu	r8,4(r1)
+		lwzu	r7,4(r1)
+		lwzu	r6,4(r1)
+		lwzu	r5,4(r1)
+		lwzu	r4,4(r1)
+		lwzu	r3,4(r1)
+		lwzu	r2,4(r1)
+		lwzu	r0,4(r1)
+		mtlr	r0
 		
-		epilog 'TOC'
+		addi	r1,r1,4
+		
+		blr
 		
 #********************************************************************************************		
 
 .KillRunPPC:	li	r7,TS_ATOMIC
 		lwz	r9,RunningTask(r0)
 		stb	r7,TC_STATE(r9)
-#		mr	r4,r30
-#
-#		bl FreeMsgFramePPC
+		mr	r4,r30
+
+		bl FreeMsgFramePPC
 
 		lwz	r4,RunningTask(r0)
 		lwz	r4,TASKPPC_TASKPTR(r4)
@@ -9380,7 +9374,7 @@ StartCode:	bl	.StartRunPPC
 
 		lwz	r4,RunningTask(r0)		
 
-#		bl FreeVec68K
+		bl FreeVec68K
 
 		lwz	r4,PowerPCBase(r0)			#Tasks -1
 		lwz	r3,NumAllTasks(r4)
@@ -9402,7 +9396,7 @@ StartCode:	bl	.StartRunPPC
 Pause:		nop
 		nop
 		b	Pause
-				
+		
 #********************************************************************************************
 
 FRun68K:		.byte	"Run68K",0

@@ -1694,6 +1694,10 @@ EInt:		b	.FPUnav				#0
 		cmpw	r4,r6
 		beq	.Done68
 		
+		loadreg	r4,'END!'
+		cmpw	r4,r6
+		beq	.Done68
+		
 		loadreg	r4,'DNLL'			#Reply from Run68KLowLevel
 		cmpw	r4,r6
 		beq	.Done68
@@ -1702,10 +1706,9 @@ EInt:		b	.FPUnav				#0
 		
 #**********************************************************
 
-.XSignal:	lwz	r3,MN_ARG1(r5)			#68K mirror task's port
+.XSignal:	lwz	r3,MN_ARG1(r5)			#68K mirror task
 		lwz	r4,RunningTask(r0)		#Check for it in the running task
-		lwz	r8,TASKPPC_STARTMSG(r4)
-		lwz	r8,MN_REPLYPORT(r8)
+		lwz	r8,TASKPPC_MIRROR68K(r4)
 		cmpw	r8,r3
 		bne	.ChkWait
 	
@@ -1721,8 +1724,7 @@ EInt:		b	.FPUnav				#0
 .ChkNextSig:	lwz	r7,0(r4)
 		mr.	r7,r7				#Check for the end of the list
 		beq	.ChkRdy
-		lwz	r8,TASKPPC_STARTMSG(r4)
-		lwz	r8,MN_REPLYPORT(r8)
+		lwz	r8,TASKPPC_MIRROR68K(r4)
 		cmpw	r8,r3
 		beq	.SetReady
 		mr	r4,r7
@@ -1738,8 +1740,7 @@ EInt:		b	.FPUnav				#0
 .ChkRdySig:	lwz	r7,0(r4)
 		mr.	r7,r7				#Check for the end of the list
 		beq	.RelFrame
-		lwz	r8,TASKPPC_STARTMSG(r4)
-		lwz	r8,MN_REPLYPORT(r8)
+		lwz	r8,TASKPPC_MIRROR68K(r4)
 		cmpw	r8,r3
 		beq	.ReUseLoop
 		mr	r4,r7
@@ -1776,11 +1777,7 @@ EInt:		b	.FPUnav				#0
 		mtctr	r3
 				
 		lwz	r7,MN_PPC(r5)
-		stw	r5,0x110(r0)
-		stw	r7,0x114(r0)
-		loadreg	r3,'xxxx'
-		stw	r3,0x118(r0)
-		
+
 		lis	r3,EUMB				#Free the message
 		li	r4,IFHPR
 		lwbrx	r6,r4,r3		
@@ -1846,7 +1843,11 @@ EInt:		b	.FPUnav				#0
 
 #**********************************************************
 		
-.MsgTPPC:	lwz	r4,PowerPCBase(r0)		#Handles a RunPPC
+.MsgTPPC:	lwz	r4,MN_PPC(r5)
+		mr.	r4,r4
+		bne	.Done68
+		
+		lwz	r4,PowerPCBase(r0)		#Handles a RunPPC
 		la	r4,LIST_NEWTASKS(r4)
 		
 		addi	r4,r4,4				#AddTailPPC
@@ -1884,13 +1885,14 @@ EInt:		b	.FPUnav				#0
 		lbz	r9,FLAG_READY(r9)
 		mr.	r9,r9
 		bne	.ReturnToUser
-		
 		lwz	r9,RunningTask(r0)
+		mr.	r9,r9
+		beq	.NoAtomicTask
 		lbz	r9,TC_STATE(r9)
 		cmpwi	r9,TS_ATOMIC
 		beq	.ReturnToUser
 
-		lwz	r9,TaskException(r0)
+.NoAtomicTask:	lwz	r9,TaskException(r0)
 		mr.	r9,r9
 		bne	.TaskException
 
@@ -1985,21 +1987,22 @@ EInt:		b	.FPUnav				#0
 
 		b	.TrySwitch
 		
-.Dispatch:	lwz	r8,MN_ARG0(r9)
-		mr	r30,r9		
+.Dispatch:	lwz	r8,MN_ARG0(r9)		
 		li	r4,TS_RUN
 		stb	r4,TC_STATE(r8)
 		li	r4,NT_PPCTASK
 		stb	r4,LN_TYPE(r8)
 		la	r4,TASKPPC_CTMEM(r8)
 		stw	r4,TASKPPC_CONTEXTMEM(r8)
-		stw	r9,TASKPPC_STARTMSG(r8)
+		lwz	r31,MN_ARG2(r9)
+		stw	r31,TASKPPC_MIRROR68K(r8)
+		lwz	r31,MN_MIRROR(r9)
+		stw	r31,TASKPPC_MIRRORPORT(r8)		
 		la	r31,TASKPPC_NAME(r8)
 		stw	r31,LN_NAME(r8)
 		lwz	r31,MN_ARG1(r9)
 		stw	r31,TASKPPC_STACKSIZE(r8)
-		stw	r8,TASKPPC_TASKMEM(r8)
-		addi	r4,r8,1024		
+		addi	r4,r8,2048		
 		stw	r4,TC_SPLOWER(r8)
 		add	r4,r4,r31
 		stw	r4,TC_SPUPPER(r8)
@@ -2049,7 +2052,7 @@ EInt:		b	.FPUnav				#0
 		lwz	r3,NumAllTasks(r4)
 		addi	r3,r3,1
 		stw	r3,NumAllTasks(r4)
-		
+
 		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
 		mtsrr1	r0		
 		mfsprg0	r0
@@ -2062,12 +2065,15 @@ EInt:		b	.FPUnav				#0
 		isync
 
 		li	r0,0
-		
-.NoThrow:	stb	r0,ExceptionMode(r0)
+		stb	r0,ExceptionMode(r0)
 		stb	r0,PortInUse(r0)
+		
+		mr	r30,r9
 
 		loadreg	r0,Quantum
 		mtdec	r0
+		
+		nop
 		
 		rfi
 		

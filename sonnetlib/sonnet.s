@@ -447,7 +447,7 @@ PPCInit		move.l SonnetBase(pc),a1
 		move.l a3,-(a3)
 
 		jsr _LVOEnable(a6)
-
+		
 		bra Clean
 
 ;********************************************************************************************
@@ -731,7 +731,6 @@ GoWaitPort	move.l (a7),a0
 		and.l d2,d1
 		beq.s GtLoop2
 
-		move.l a0,a3
 		bsr CrossSignals
 		
 GtLoop2		move.l (a7),a0
@@ -1070,7 +1069,7 @@ ExitTrue	movem.l (a7)+,d0/a1
 		move.l AddTaskAddress(pc),-(a7)
 		rts
 
-;********************************************************************************************
+;*********************************************************************************************
 ;
 ;	status = RunPPC(PPStruct) // d0=a0
 ;
@@ -1085,7 +1084,6 @@ MT_MIRROR	EQU MT_TASK+4
 MT_PORT		EQU MT_MIRROR+4
 MT_SIZE		EQU MT_PORT+4
 
-
 PStruct		EQU -4
 Port		EQU -8
 MirrorNode	EQU -12
@@ -1099,24 +1097,56 @@ RunPPC:		link a5,#-12
 		move.l ThisTask(a6),a1
 		cmp.b #NT_PROCESS,LN_TYPE(a1)
 		beq.s IsProc
-		
+
 		ILLEGAL						;Only DOS processes supported
 
-IsProc		jsr _LVOCreateMsgPort(a6)
+IsProc		move.l ThisTask(a6),d6
+		lea MirrorList(pc),a2
+		move.l MLH_HEAD(a2),a2
+NextMirList	tst.l LN_SUCC(a2)
+		beq.s DoneMirList
+		move.l MT_MIRROR(a2),d5
+		move.l MT_PORT(a2),Port(a5)
+		move.l a2,MirrorNode(a5)
+		cmp.l MT_TASK(a2),d6
+		beq PPCRunning				
+		move.l LN_SUCC(a2),a2
+		bra.s NextMirList
+
+DoneMirList	jsr _LVOCreateMsgPort(a6)
 		tst.l d0
-		bne.s xProces
+		bne.s GotMsgPort
 		
 		moveq.l #PPERR_ASYNCERR,d7
 		bra EndIt
 
-xProces		move.l d0,Port(a5)
+GotMsgPort	move.l d0,Port(a5)
+		move.l #MEMF_PUBLIC|MEMF_REVERSE|MEMF_CLEAR,d1
+		moveq.l #MT_SIZE,d0
+		jsr _LVOAllocVec(a6)
+		tst.l d0
+		beq GtLoop
+		move.l d0,a1
+		move.l ThisTask(a6),MT_TASK(a1)
+		move.l Port(a5),MT_PORT(a1)
+		
+		jsr _LVODisable(a6)
+		
+		move.l a1,MirrorNode(a5)
+		lea MirrorList(pc),a0
+		jsr _LVOAddHead(a6)
+
+		jsr _LVOEnable(a6)
+
 		move.l ThisTask(a6),a1
+		moveq.l #0,d5
 		move.l TC_SPUPPER(a1),d0
 		move.l TC_SPLOWER(a1),d1
 		sub.l d1,d0
-		or.l #$10000,d0				;Set stack at least at 64k
+		lsl.l #1,d0				;Double the 68K stack
+		or.l #$80000,d0				;Set stack at least at 512k
 		move.l d0,d7
-		add.l #1024,d0
+		add.l #2048,d0
 
 		move.l _PowerPCBase(pc),a6
 		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE,d1
@@ -1163,7 +1193,7 @@ GetCLIName	lsl.l #2,d0
 		move.b -1(a1),d0
 		bra.s CpName
 
-DoNameCp	moveq.l #1019-TASKPPC_NAME,d0		;Name len limit		
+DoNameCp	move.l #(2043-TASKPPC_NAME),d0		;Name len limit		
 CpName		move.b (a1)+,(a2)
 		tst.b (a2)
 		beq.s EndName
@@ -1171,8 +1201,9 @@ CpName		move.b (a1)+,(a2)
 		dbf d0,CpName
 
 EndName		move.l #"_PPC",(a2)			;Check Alignment?
+		move.b #0,4(a2)
 							;Also push dcache
-		move.l EUMBAddr(pc),a2
+PPCRunning	move.l EUMBAddr(pc),a2
 		move.l IFQPR(a2),a1
 
 		moveq.l #47,d0				;MsgLen/4-1
@@ -1188,6 +1219,9 @@ ClrMsg		clr.l (a2)+
 		move.l d1,MN_MIRROR(a1)
 		move.l d6,MN_ARG0(a1)			;Mem
 		move.l d7,MN_ARG1(a1)			;Len
+		move.l d5,MN_PPC(a1)
+		move.l ThisTask(a6),d0
+		move.l d0,MN_ARG2(a1)
 
 		lea MN_PPSTRUCT(a1),a2
 		moveq.l #PP_SIZE/4-1,d0
@@ -1212,9 +1246,9 @@ CpMsg2		move.l (a0)+,(a2)+
 ;********************************************************************************************
 
 WaitForPPC:
-		ILLEGAL
+		ILLEGAL					;Asynchronous calls not yet supported
 
-		link a5,#-8
+		link a5,#-12
 		movem.l d1-a6,-(a7)
 		moveq.l #0,d0
 		move.l d0,Port(a5)
@@ -1258,8 +1292,7 @@ Stacker		move.l ThisTask(a6),a1
 		and.l d2,d1
 		beq.s GtLoop
 
-		move.l Port(a5),a3
-		bsr CrossSignals		
+		bsr CrossSignals
 
 GtLoop		move.l Port(a5),a0
 		jsr _LVOGetMsg(a6)
@@ -1273,14 +1306,12 @@ GtLoop		move.l Port(a5),a0
 		beq.s DizDone
 		cmp.l #"T68K",d0
 		bne.s GtLoop
-		bsr.s Runk86
+		bsr.s Runk862
 		bra.s GtLoop
 
 DizDone		move.l a0,-(a7)
-		move.l MN_ARG0(a0),a1			;Releases memory from RunPPC created
-		move.l _PowerPCBase(pc),a6		;PPC task
-		jsr _LVOFreeVec32(a6)
-		move.l 4.w,a6
+		move.l MirrorNode(a5),a1
+		move.l MN_PPC(a0),MT_MIRROR(a1)		
 		move.l PStruct(a5),a1
 		lea PP_REGS(a1),a1
 		move.l (a7)+,a0
@@ -1296,17 +1327,13 @@ CpBck		move.l (a0)+,(a1)+
 
 Cannot		moveq.l #-1,d7
 Success		move.l 4.w,a6
-		move.l Port(a5),d0
-		beq.s EndIt
-		bsr.s FreePrt
 EndIt		move.l d7,d0
 		movem.l (a7)+,d1-a6
 		unlk a5
 		rts
 
-FreePrt		move.l d0,a0
-		jmp _LVODeleteMsgPort(a6)
-
+Runk862		move.l MirrorNode(a5),a1
+		move.l MN_PPC(a0),MT_MIRROR(a1)
 Runk86		btst #AFB_FPU40,AttnFlags+1(a6)
 		beq.s NoFPU
 		fmove.d fp0,-(a7)
@@ -1321,6 +1348,7 @@ NoFPU		movem.l d0-a6,-(a7)			;68k routines called from PPC
 		move.l a0,-(a7)
 		lea MN_PPSTRUCT(a0),a1
 		pea xBack(pc)
+							
 		move.l PP_CODE(a1),a0
 		add.l PP_OFFSET(a1),a0
 		move.l a0,-(a7)
@@ -1419,6 +1447,7 @@ ClearMsg	clr.l (a2)+
 
 		move.l #"LLPP",MN_IDENTIFIER(a1)
 		move.l d0,MN_ARG0(a1)
+		move.l ThisTask(a6),a3
 		move.l a3,MN_ARG1(a1)		
 		move.l EUMBAddr(pc),a2
 		move.l a1,IFQPR(a2)			;Signal PPC with Frame
@@ -1712,9 +1741,9 @@ GfxType		ds.l	1
 ComProc		ds.l	1
 SonAddr		ds.l	1
 EUMBAddr	ds.l	1
-MirrorList	ds.l	3
-RemTaskAddress	ds.l	1
 AddTaskAddress	ds.l	1
+RemTaskAddress	ds.l	1
+MirrorList	ds.l	3
 RemSysTask	ds.l	1
 MyInterrupt	ds.b	IS_SIZE
 
