@@ -1157,6 +1157,7 @@ GetSysTimePPC:
 		mulhw	r3,r0,r7
 		bl	.Link17
 		stw	r3,TV_MICRO(r6)
+		
 		lwz	r31,0(r13)
 		lwzu	r6,4(r13)
 		lwzu	r7,4(r13)
@@ -1852,8 +1853,8 @@ ObtainSemaphorePPC:
 		stwu	r4,-4(r13)
 		stwu	r3,-4(r13)
 		
-		li	r31,FObtainSemaphorePPC-FRun68K
-		bl	DebugStartFunction
+#		li	r31,FObtainSemaphorePPC-FRun68K
+#		bl	DebugStartFunction
 
 		mr	r30,r4
 
@@ -1916,8 +1917,9 @@ ObtainSemaphorePPC:
 		addi	r5,r5,1
 		sth	r5,SS_NESTCOUNT(r30)
 		
-.DoneWait:	li	r31,FObtainSemaphorePPC-FRun68K
-		bl	DebugEndFunction
+.DoneWait:	
+#		li	r31,FObtainSemaphorePPC-FRun68K
+#		bl	DebugEndFunction
 
 		lwz	r3,0(r13)
 		lwz	r4,4(r13)
@@ -2038,8 +2040,8 @@ ReleaseSemaphorePPC:
 		stwu	r4,-4(r13)
 		stwu	r3,-4(r13)
 
-		li	r31,FReleaseSemaphorePPC-FRun68K
-		bl	DebugStartFunction
+#		li	r31,FReleaseSemaphorePPC-FRun68K
+#		bl	DebugStartFunction
 
 		mr	r31,r4
 
@@ -2196,8 +2198,8 @@ ReleaseSemaphorePPC:
 
 .Released:	lwz	r3,0(r13)
 
-		li	r31,FReleaseSemaphorePPC-FRun68K
-		bl	DebugEndFunction
+#		li	r31,FReleaseSemaphorePPC-FRun68K
+#		bl	DebugEndFunction
 
 		lwz	r3,0(r13)
 		lwz	r4,4(r13)
@@ -6232,8 +6234,8 @@ AllocatePPC:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 
-		li	r31,FAllocatePPC-FRun68K
-		bl	DebugStartFunction
+#		li	r31,FAllocatePPC-FRun68K
+#		bl	DebugStartFunction
 
 		mr.	r3,r5
 		beq-	.ExitAlloc
@@ -6303,7 +6305,7 @@ AllocatePPC:
 		mtctr	r29
 		
 .ExitAlloc:	li	r31,FAllocatePPC-FRun68K
-		bl	DebugEndFunction
+#		bl	DebugEndFunction
 
 		lwz	r28,0(r13)
 		lwz	r29,4(r13)
@@ -6329,8 +6331,8 @@ DeallocatePPC:
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
 
-		li	r31,FDeallocatePPC-FRun68K
-		bl	DebugStartFunction
+#		li	r31,FDeallocatePPC-FRun68K
+#		bl	DebugStartFunction
 
 		mr.	r31,r6		
 		beq 	.ExitDealloc
@@ -7359,12 +7361,21 @@ GetHALInfo:
 
 #********************************************************************************************
 #
-#	void ChangeMMU(MMUMode) // r4
+#	void ChangeMMU(MMUMode) // r4				#STUB
 #
 #********************************************************************************************
 
-ChangeMMU:
-		blr
+ChangeMMU:	prolog 228,'TOC'
+
+		stwu	r31,-4(r13)
+		
+		li	r31,FChangeMMU-FRun68K
+		bl	DebugStartFunction
+
+		lwz	r31,0(r13)
+		addi	r13,r13,4
+		
+		epilog	'TOC'
 		
 		prolog 228,'TOC'
 
@@ -9023,9 +9034,8 @@ RawDoFmtPPC:	prolog 228,'TOC'
 #********************************************************************************************
 
 DebugStartFunction:
-		stw	r30,-4(r13)		
-		lbz	r30,DebugLevel(r0)
-		mr.	r30,r30
+		lbz	r0,DebugLevel(r0)
+		mr.	r0,r0
 		beq	.NoDebug
 
 		prolog 228,'TOC'
@@ -9086,8 +9096,7 @@ DebugStartFunction:
 
 		epilog 'TOC'
 		
-.NoDebug:	lwz	r30,-4(r13)
-		blr
+.NoDebug:	blr
 		
 #********************************************************************************************
 #
@@ -9096,9 +9105,8 @@ DebugStartFunction:
 #********************************************************************************************
 
 DebugEndFunction:
-		stw	r30,-4(r13)
-		lbz	r30,DebugLevel(r0)
-		mr.	r30,r30
+		lbz	r0,DebugLevel(r0)
+		mr.	r0,r0
 		beq	.NoDebug
 
 		prolog 228,'TOC'

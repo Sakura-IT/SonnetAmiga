@@ -1597,8 +1597,9 @@ EInt:		b	.FPUnav				#0
 		b	.PrInt				#1c
 		b	.MachCheck			#20
 		b	.SysCall			#24
+		b	.PerfMon			#28
 
-		mtsprg2	r0				#28
+		mtsprg2	r0				#2c
 		
 		li	r0,-1
 		stb	r0,ExceptionMode(r0)
@@ -2751,58 +2752,7 @@ EInt:		b	.FPUnav				#0
 		
 #********************************************************************************************
 
-.BreakPoint:	mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		xori	r0,r0,HID0_DCE
-		sync	
-		mtspr	HID0,r0
-		isync
-		
-		loadreg	r3,'IABR'
-		stw	r3,0xf4(r0)
-		mfsrr0	r3
-		stw	r3,0xf8(r0)
-		mfsrr1	r3
-		stw	r3,0xfc(r0)
-.HaltIABR:	b	.HaltIABR
-
-#********************************************************************************************
-
-.MachCheck:	mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		xori	r0,r0,HID0_DCE
-		sync	
-		mtspr	HID0,r0
-		isync
-		
-		loadreg	r3,'CHCK'
-		stw	r3,0xf4(r0)
-		mfsrr0	r3
-		stw	r3,0xf8(r0)
-		mfsrr1	r3
-		stw	r3,0xfc(r0)
-.HaltMCheck:	b	.HaltMCheck
-
-#********************************************************************************************
-
-.SysCall:	mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		xori	r0,r0,HID0_DCE
-		sync	
-		mtspr	HID0,r0
-		isync
-		
-		loadreg	r3,'SYSC'
-		stw	r3,0xf4(r0)
-		mfsrr0	r3
-		stw	r3,0xf8(r0)
-		mfsrr1	r3
-		stw	r3,0xfc(r0)
-.HaltSysCall:	b	.HaltSysCall
-
-#********************************************************************************************
-
-.Trace:		mtsprg0	r0				#Program Exception
+.BreakPoint:	mtsprg0	r0				#Breakpoint Exception
 		
 		li	r0,-1
 		stb	r0,ExceptionMode(r0)
@@ -2810,7 +2760,7 @@ EInt:		b	.FPUnav				#0
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0
-		sync				#Reenable MMU & FPU
+		sync					#Reenable MMU & FPU
 		isync
 
 		mtsprg3	r1
@@ -2824,7 +2774,149 @@ EInt:		b	.FPUnav				#0
 
 		stw	r13,-4(r1)
 		subi	r13,r1,4
-		stwu	r1,-1080(r1)				
+		stwu	r1,-1080(r1)
+		stwu	r26,-4(r13)			#Make place on stack (36) for Exc Type
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r2,-4(r13)
+		stwu	r0,-4(r13)		
+		mfcr	r0
+		stwu	r0,-4(r13)
+
+		loadreg	r29,'IABR'
+		stw	r29,0xf4(r0)
+				
+		lwz	r31,PowerPCBase(r0)
+		la	r31,LIST_EXCIABR(r31)
+		loadreg	r0,EXCF_IABR
+		stw	r0,36(r13)			#NOT VERY NICE!!
+
+		b	.ExcReUse
+
+#********************************************************************************************
+
+.MachCheck:	mtsprg0	r0				#Machine Check Exception
+		
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
+
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0
+		sync					#Reenable MMU & FPU
+		isync
+
+		mtsprg3	r1
+		lwz	r0,SonnetBase(r0)
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		or	r1,r1,r0
+		mfsprg3	r0
+		stwu	r0,-4(r1)			#Store user stack
+		
+		mfsprg0	r0
+
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-1080(r1)
+		stwu	r26,-4(r13)			#Make place on stack (36) for Exc Type
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r2,-4(r13)
+		stwu	r0,-4(r13)		
+		mfcr	r0
+		stwu	r0,-4(r13)
+
+		loadreg	r29,'CHCK'
+		stw	r29,0xf4(r0)
+				
+		lwz	r31,PowerPCBase(r0)
+		la	r31,LIST_EXCMCHECK(r31)
+		li	r0,EXCF_MCHECK
+		stw	r0,36(r13)			#NOT VERY NICE!!
+
+		b	.ExcReUse
+
+#********************************************************************************************
+
+.SysCall:	mtsprg0	r0				#System Call Exception
+		
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
+
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0
+		sync					#Reenable MMU & FPU
+		isync
+
+		mtsprg3	r1
+		lwz	r0,SonnetBase(r0)
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		or	r1,r1,r0
+		mfsprg3	r0
+		stwu	r0,-4(r1)			#Store user stack
+		
+		mfsprg0	r0
+
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-1080(r1)
+		stwu	r26,-4(r13)			#Make place on stack (36) for Exc Type
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r2,-4(r13)
+		stwu	r0,-4(r13)		
+		mfcr	r0
+		stwu	r0,-4(r13)
+
+		loadreg	r29,'SYSC'
+		stw	r29,0xf4(r0)
+				
+		lwz	r31,PowerPCBase(r0)
+		la	r31,LIST_EXCSYSTEMCALL(r31)
+		li	r0,EXCF_SYSTEMCALL
+		stw	r0,36(r13)			#NOT VERY NICE!!
+
+		b	.ExcReUse
+
+#********************************************************************************************
+
+.Trace:		mtsprg0	r0				#Trace Exception
+		
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
+
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0
+		sync					#Reenable MMU & FPU
+		isync
+
+		mtsprg3	r1
+		lwz	r0,SonnetBase(r0)
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		or	r1,r1,r0
+		mfsprg3	r0
+		stwu	r0,-4(r1)			#Store user stack
+		
+		mfsprg0	r0
+
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-1080(r1)
+		stwu	r26,-4(r13)			#Make place on stack (36) for Exc Type
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
@@ -2841,14 +2933,21 @@ EInt:		b	.FPUnav				#0
 				
 		lwz	r31,PowerPCBase(r0)
 		la	r31,LIST_EXCTRACE(r31)
-.NextTExc:	lwz	r31,0(r31)			#Are there handlers in place?
-
+		li	r0,EXCF_TRACE
+		stw	r0,36(r13)			#NOT VERY NICE!!
+		
+.ExcReUse:	lwz	r31,0(r31)
+		lwz	r0,0(r31)
+		mr. 	r0,r0
+		beq	.NoHandler
+		b	.FirstHandler			#Are there handlers in place?
+		
+.NextTExc:	lwz	r31,0(r31)
 		lwz	r0,0(r31)
 		mr.	r0,r0
 		beq	.LastTrHandler
 		
-		mr	r30,r31
-												
+.FirstHandler:	mr	r30,r31												
 		lwz	r0,EXCDATA_TASK(r30)
 		mr.	r0,r0
 		beq 	.DoTExc
@@ -2865,7 +2964,7 @@ EInt:		b	.FPUnav				#0
 		mtlr	r0		
 		lwz	r0,EXCDATA_FLAGS(r30)
 		rlwinm.	r0,r0,(32-EXC_LARGECONTEXT),31,31
-		li	r0,EXCF_TRACE
+		lwz	r0,36(r13)			#NOT VERY NICE!!
 		bne-	.LargeTContext
 		
 		mtsprg3	r2
@@ -3142,7 +3241,7 @@ EInt:		b	.FPUnav				#0
 		lwz	r29,24(r13)
 		lwz	r30,28(r13)
 		lwz	r31,32(r13)
-		addi	r13,r13,36
+		addi	r13,r13,40			#Skipping one spot (was for Exc Type)
 
 		lwz	r1,0(r1)
 		lwz	r13,-4(r1)
@@ -3164,26 +3263,65 @@ EInt:		b	.FPUnav				#0
 		
 		rfi
 		
-#********************************************************************************************
-
-.FPUnav:	mfspr	r0,HID0
+.NoHandler:	mfspr	r0,HID0
 		ori	r0,r0,HID0_DCE
 		xori	r0,r0,HID0_DCE
 		sync	
 		mtspr	HID0,r0
 		isync
 		
-		loadreg	r3,'NOFP'
-		stw	r3,0xf4(r0)
-		mfsrr0	r3
-		stw	r3,0xf8(r0)
-		mfsrr1	r3
-		stw	r3,0xfc(r0)
-.HaltFP:	b	.HaltFP
+.HaltPPC:	b	.HaltPPC
+		
+#********************************************************************************************
+
+.FPUnav:	mtsprg0	r0				#FPU Unavailable Exception
+		
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
+
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0
+		sync					#Reenable MMU & FPU
+		isync
+
+		mtsprg3	r1
+		lwz	r0,SonnetBase(r0)
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		or	r1,r1,r0
+		mfsprg3	r0
+		stwu	r0,-4(r1)			#Store user stack
+		
+		mfsprg0	r0
+
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-1080(r1)
+		stwu	r26,-4(r13)			#Make place on stack (36) for Exc Type
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r2,-4(r13)
+		stwu	r0,-4(r13)		
+		mfcr	r0
+		stwu	r0,-4(r13)
+
+		loadreg	r29,'NOFP'
+		stw	r29,0xf4(r0)
+				
+		lwz	r31,PowerPCBase(r0)
+		la	r31,LIST_EXCFPUN(r31)
+		li	r0,EXCF_FPUN
+		stw	r0,36(r13)			#NOT VERY NICE!!
+
+		b	.ExcReUse
 
 #********************************************************************************************
 
-.Alignment:	mtsprg0	r0
+.Alignment:	mtsprg0	r0				#FPU Alignment Exception
 		mtsprg1	r1
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
@@ -3429,25 +3567,102 @@ EInt:		b	.FPUnav				#0
 
 #********************************************************************************************
 
-.ISI:		mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		xori	r0,r0,HID0_DCE
-		sync	
-		mtspr	HID0,r0
-		isync
+.ISI:		mtsprg0	r0				#Instruction Storage Exception
 		
-		loadreg	r3,'ISI!'
-		stw	r3,0xf4(r0)
-		mfsrr0	r3
-		stw	r3,0xf8(r0)
-		mflr	r3
-		stw	r3,0xfc(r0)
-.HaltISI:	b	.HaltISI
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
+
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0
+		sync					#Reenable MMU & FPU
+		isync
+
+		mtsprg3	r1
+		lwz	r0,SonnetBase(r0)
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		or	r1,r1,r0
+		mfsprg3	r0
+		stwu	r0,-4(r1)			#Store user stack
+		
+		mfsprg0	r0
+
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-1080(r1)
+		stwu	r26,-4(r13)			#Make place on stack (36) for Exc Type
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r2,-4(r13)
+		stwu	r0,-4(r13)		
+		mfcr	r0
+		stwu	r0,-4(r13)
+
+		loadreg	r29,'ISI!'
+		stw	r29,0xf4(r0)
+				
+		lwz	r31,PowerPCBase(r0)
+		la	r31,LIST_EXCIACCESS(r31)
+		li	r0,EXCF_IACCESS
+		stw	r0,36(r13)			#NOT VERY NICE!!
+
+		b	.ExcReUse
 
 #********************************************************************************************
 
+.PerfMon:	mtsprg0	r0				#Performance Monitor Exception
+		
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
+
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0
+		sync					#Reenable MMU & FPU
+		isync
+
+		mtsprg3	r1
+		lwz	r0,SonnetBase(r0)
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		or	r1,r1,r0
+		mfsprg3	r0
+		stwu	r0,-4(r1)			#Store user stack
+		
+		mfsprg0	r0
+
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-1080(r1)
+		stwu	r26,-4(r13)			#Make place on stack (36) for Exc Type
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r2,-4(r13)
+		stwu	r0,-4(r13)		
+		mfcr	r0
+		stwu	r0,-4(r13)
+
+		loadreg	r29,'PRFM'
+		stw	r29,0xf4(r0)
+				
+		lwz	r31,PowerPCBase(r0)
+		la	r31,LIST_EXCPERFMON(r31)
+		loadreg	r0,EXCF_PERFMON
+		stw	r0,36(r13)			#NOT VERY NICE!!
+
+		b	.ExcReUse
+	
+#********************************************************************************************
+
 .DSI:		mtsprg0	r0
-		mtsprg1	r1				
+		mtsprg1	r1				#Data Storage Exception
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU & FPU
@@ -3787,22 +4002,27 @@ EInt:		b	.FPUnav				#0
 		cmplw	r0,r31
 		beq	.Privvy
 
-		lis	r31,SRR1_TRAP-12
-		mfsrr1	r0
+#		lis	r31,SRR1_TRAP-12
+#		mfsrr1	r0
 		
-		and.	r0,r0,r31
-		beq	.HaltErr			#skip ILLEGAL and PRIVILEGED
+#		and.	r0,r0,r31
+#		beq	.HaltErr			#skip ILLEGAL and PRIVILEGED
 
 		lwz	r31,PowerPCBase(r0)
 		la	r31,LIST_EXCPROGRAM(r31)
+		lwz	r31,0(r31)
+		lwz	r0,0(r31)
+		mr.	r0,r0
+		beq	.HaltErr
+		b	.FirstEHandler		
+	
 .NextPExc:	lwz	r31,0(r31)			#Are there handlers in place?
 
 		lwz	r0,0(r31)
 		mr.	r0,r0
 		beq	.LastPrHandler
 		
-		mr	r30,r31
-
+.FirstEHandler:	mr	r30,r31
 		lwz	r0,EXCDATA_TASK(r30)
 		mr.	r0,r0
 		beq 	.DoExc
@@ -4143,9 +4363,11 @@ EInt:		b	.FPUnav				#0
 #********************************************************************************************
 	
 EIntEnd:
-		mflr	r4				#Setup a small jumptable for exceptions
-		loadreg r5,0x48002b28
+		mflr	r4				#Setup a small jumptable for exceptions			
+		loadreg r5,0x48002b2c
 		stw	r5,0x500(r0)			#External Interrupt
+		loadreg	r5,0x48002128
+		stw	r5,0xf00(r0)			#Performance Monitor
 		loadreg	r5,0x48002424
 		stw	r5,0xc00(r0)			#System Call
 		loadreg	r5,0x48002e20
