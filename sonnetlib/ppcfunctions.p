@@ -426,45 +426,38 @@ SetCache:
 #
 #********************************************************************************************
 
-SetExcMMU:	stwu	r31,-4(r13)
+SetExcMMU:
+		prolog 228,'TOC'			#DUMMY pending better MMU support
+
+		stwu	r31,-4(r13)
+
 		li	r31,FSetExcMMU-FRun68K
 		bl	DebugStartFunction
-		lwz	r31,0(r13)
-		addi	r31,r31,4
-		blr					#DUMMY pending better MMU support
 
-		stw	r4,-8(r1)
-		mfmsr	r4
-		ori	r4,r4,(PSL_IR|PSL_DR)
-		mtmsr	r4				#Reenable MMU
-		isync
-		sync
-		lwz	r4,-8(r1)
-		blr
-	
+		lwz	r31,0(r13)
+		addi	r13,r13,4
+
+		epilog	'TOC'
+
 #********************************************************************************************
 #
 #	void ClearExcMMU(void) // Only from within Exception Handler (STUB)
 #
 #********************************************************************************************
 
-ClearExcMMU:	stwu	r31,-4(r13)
+ClearExcMMU:	
+		prolog 228,'TOC'			#DUMMY pending better MMU support
+
+		stwu	r31,-4(r13)
+
 		li	r31,FClearExcMMU-FRun68K
 		bl	DebugStartFunction
-		lwz	r31,0(r13)
-		addi	r31,r31,4
-		blr					#DUMMY pending better MMU support
 
-		stw	r4,-8(r1)
-		mfmsr	r4
-		ori	r4,r4,(PSL_IR|PSL_DR)
-		xori	r4,r4,(PSL_IR|PSL_DR)
-		mtmsr	r4				#Disable MMU
-		isync
-		sync
-		lwz	r4,-8(r1)		
-		blr	
-	
+		lwz	r31,0(r13)
+		addi	r13,r13,4
+
+		epilog	'TOC'
+
 #********************************************************************************************
 #
 #	void ConfirmInterrupt(void)
