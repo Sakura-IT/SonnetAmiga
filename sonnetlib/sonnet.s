@@ -566,6 +566,10 @@ NoXReply	move.l MN_IDENTIFIER(a1),d0
 		beq.s MsgLL68
 		cmp.l #"FREE",d0
 		beq MsgFree
+		cmp.l #"DBG!",d0
+		beq PrintDebug
+		cmp.l #"DBG2",d0
+		beq PrintDebug2
 		bra.s GetLoop
 
 ;********************************************************************************************		
@@ -586,7 +590,7 @@ CopyRXMsg	move.l (a3)+,(a2)+
 		move.l EUMBAddr(pc),a2
 		move.l d7,IFQPR(a2)			;Message the PPC
 FreeRXMsg	move.l a1,OFQPR(a2)			;Return Message Frame
-		bra.s GetLoop
+		bra GetLoop
 		
 ;********************************************************************************************
 
@@ -685,6 +689,21 @@ CopyPPCName	move.b (a0)+,(a2)+
 		move.l d0,a0
 		lea pr_MsgPort(a0),a0
 		jsr _LVOPutMsg(a6)
+		bra GetLoop
+
+;********************************************************************************************
+
+PrintDebug2	lea DebugString2(pc),a0
+		bra.s DebugEnd
+		
+PrintDebug	lea DebugString(pc),a0
+DebugEnd	move.l a1,a3
+		lea MN_PPSTRUCT(a1),a1
+		move.l _PowerPCBase(pc),a6
+		bsr SPrintF68K
+		move.l EUMBAddr(pc),a2
+		move.l a3,OFQPR(a2)
+		move.l 4.w,a6
 		bra GetLoop
 		
 ;********************************************************************************************		
@@ -1934,5 +1953,8 @@ WarpName	dc.b	"warp.library",0
 		cnop	0,4
 WarpIDString	dc.b	"$VER: fake warp.library 5.0 (01-Apr-16)",0
 		cnop	0,4
-		
+DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
+		cnop	0,4
+DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
+		cnop	0,4
 EndCP		end
