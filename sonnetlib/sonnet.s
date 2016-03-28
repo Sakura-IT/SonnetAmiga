@@ -576,22 +576,25 @@ NoXReply	move.l MN_IDENTIFIER(a1),d0
 
 MsgRXMSG	lea -32(a1),a1
 		move.b #NT_REPLYMSG,LN_TYPE(a1)
-		move.l EUMBAddr(pc),a2
 		move.l MN_REPLYPORT(a1),d0
 		beq.s FreeRXMsg
 
-		move.l IFQPR(a2),a2
+		bsr CreateMsgFrame
+
 		move.l a1,a3
-		move.l a2,d7
+		move.l a0,d7
 		moveq.l #192/4-1,d0
-CopyRXMsg	move.l (a3)+,(a2)+
+CopyRXMsg	move.l (a3)+,(a0)+
 		dbf d0,CopyRXMsg
-		
-		move.l EUMBAddr(pc),a2
-		move.l d7,IFQPR(a2)			;Message the PPC
-FreeRXMsg	move.l a1,OFQPR(a2)			;Return Message Frame
+
+		move.l d7,a0
+		bsr SendMsgFrame
+
+FreeRXMsg	move.l a1,a0
+		bsr FreeMsgFrame
+
 		bra GetLoop
-		
+
 ;********************************************************************************************
 
 MsgLL68		move.l MN_PPSTRUCT+0*4(a1),a6
@@ -606,27 +609,30 @@ MsgLL68		move.l MN_PPSTRUCT+0*4(a1),a6
 		move.l MN_PPSTRUCT+3*4(a1),a1
 		rts
 
-RtnLL		move.l (a7)+,a1
-		move.l EUMBAddr(pc),a2
-		move.l IFQPR(a2),a2
-		move.l d0,MN_PPSTRUCT+6*4(a2)
-		move.l #"DNLL",MN_IDENTIFIER(a2)
-		move.l MN_PPC(a1),MN_PPC(a2)
-		
-		move.l MN_PPSTRUCT+0*4(a1),MN_PPSTRUCT+0*4(a2)
-		move.l MN_PPSTRUCT+1*4(a1),MN_PPSTRUCT+1*4(a2)
-
-		move.l 4.w,a6
-		move.l a2,d7
+RtnLL		move.l 4.w,a6
+		move.l (a7)+,a1
 		move.l a1,d5
+		bsr CreateMsgFrame
+		
+		move.l a0,d7
+		move.l d0,MN_PPSTRUCT+6*4(a0)
+		move.l #"DNLL",MN_IDENTIFIER(a0)
+		move.l MN_PPC(a1),MN_PPC(a0)		
+		move.l MN_PPSTRUCT+0*4(a1),MN_PPSTRUCT+0*4(a0)
+		move.l MN_PPSTRUCT+1*4(a1),MN_PPSTRUCT+1*4(a0)
+
+		move.l d7,a1
 		lea PushMsg(pc),a5
 		jsr _LVOSupervisor(a6)
-		move.l 4.w,a6
-		move.l EUMBAddr(pc),a2
-		move.l d7,IFQPR(a2)			;Message the PPC
-		move.l d5,OFQPR(a2)			;Return Message Frame
+
+		move.l d7,a0
+		bsr SendMsgFrame
+
+		move.l d5,a0
+		bsr FreeMsgFrame
+
 		bra GetLoop
-		
+
 ;********************************************************************************************
 
 MsgFree		move.l MN_PPSTRUCT+0*4(a1),a6		;Asynchronous FreeMem call from the PPC.
@@ -639,10 +645,9 @@ MsgFree		move.l MN_PPSTRUCT+0*4(a1),a6		;Asynchronous FreeMem call from the PPC.
 		move.l MN_PPSTRUCT+3*4(a1),a1
 		rts
 
-RtnFree		move.l (a7)+,a1
-		move.l EUMBAddr(pc),a2
-		move.l a1,OFQPR(a2)			;Return Message Frame
-		move.l 4.w,a6
+RtnFree		move.l 4.w,a6
+		move.l (a7)+,a0
+		bsr FreeMsgFrame
 		bra GetLoop
 		
 ;********************************************************************************************
@@ -701,8 +706,8 @@ DebugEnd	move.l a1,a3
 		lea MN_PPSTRUCT(a1),a1
 		move.l _PowerPCBase(pc),a6
 		bsr SPrintF68K
-		move.l EUMBAddr(pc),a2
-		move.l a3,OFQPR(a2)
+		move.l a3,a0
+		bsr FreeMsgFrame
 		move.l 4.w,a6
 		bra GetLoop
 		
@@ -763,9 +768,9 @@ GtLoop2		move.l (a7),a0
 		beq.s DoRunk86
 		cmp.l #"END!",d0
 		bne.s GtLoop2
-		
-		move.l EUMBAddr(pc),a2
-		move.l a0,OFQPR(a2)			;Return Message to free state
+
+		bsr FreeMsgFrame
+
 		move.l (a7)+,d0
 		rts					;End task
 		
@@ -798,12 +803,11 @@ SonInt:		movem.l d0-a6,-(a7)
 		and.l d4,d3
 		beq.s DidNotInt
 
-NxtMsg		move.l EUMBAddr(pc),a2
-		move.l OFQPR(a2),d3			;Get Message Frame
+NxtMsg		bsr GetMsgFrame
+		move.l a1,d3
 		cmp.l #-1,d3
 		beq.s DidInt
 
-		move.l d3,a1
 		moveq.l #11,d4
 ;		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
 		move.l d3,a1
@@ -858,8 +862,9 @@ StoreD		move.l MN_IDENTIFIER(a1),d7		;Handles indirect access from PPC
 		move.l d0,(a0)
 Putted		move.l #"DONE",d7
 		move.l d7,MN_IDENTIFIER(a1)
-		move.l EUMBAddr(pc),a2
-		move.l a1,OFQPR(a2)			;Return Message Frame
+		move.l a1,a0
+		bsr FreeMsgFrame
+
 		bra NxtMsg
 
 PutB		move.b d0,(a0)
@@ -873,10 +878,11 @@ LoadD		move.l #"DONE",d0
 
 		move.l (a3),MN_IDENTIFIER+4(a1)
 		move.l d0,MN_IDENTIFIER(a1)
-		move.l EUMBAddr(pc),a2
-		move.l a1,OFQPR(a2)			;Return Message Frame
+		move.l a1,a0
+		bsr FreeMsgFrame
+
 		bra NxtMsg
-		
+
 ;********************************************************************************************		
 		
 MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
@@ -1002,7 +1008,58 @@ G3		move.l #CPUF_G3,d0
 G4		move.l #CPUF_G4,d0
 ExCPU		movem.l (a7)+,d1-a6
 		rts
+;********************************************************************************************
+;
+;	MessageFrame = CreateMsgFrame(void) // a0
+;
+;********************************************************************************************
+
+CreateMsgFrame:
+		move.l a2,-(a7)
+		move.l EUMBAddr(pc),a2
+		move.l IFQPR(a2),a0
+		move.l (a7)+,a2
+		rts
+
+;********************************************************************************************
+;
+;	void SendMsgFrame(MessageFrame)) // a0
+;
+;********************************************************************************************
+
+SendMsgFrame:
+		move.l a2,-(a7)
+		move.l EUMBAddr(pc),a2
+		move.l a0,IFQPR(a2)
+		move.l (a7)+,a2
+		rts
+
+;********************************************************************************************
+;
+;	void FreeMsgFrame(MessageFrame) // a0
+;
+;********************************************************************************************
 		
+FreeMsgFrame:
+		move.l a2,-(a7)
+		move.l EUMBAddr(pc),a2
+		move.l a0,OFQPR(a2)
+		move.l (a7)+,a2
+		rts
+		
+;********************************************************************************************
+;
+;	MessageFrame = GetMsgFrame(void) // a1
+;
+;********************************************************************************************
+
+GetMsgFrame:
+		move.l a2,-(a7)
+		move.l EUMBAddr(pc),a2
+		move.l OFQPR(a2),a1
+		move.l (a7)+,a2
+		rts
+
 ;********************************************************************************************
 ;
 ;		System Patches
@@ -1044,11 +1101,10 @@ NextMList	tst.l LN_SUCC(a2)
 		move.l LN_SUCC(a2),a2
 		bra.s NextMList
 
-KillPPC		move.l EUMBAddr(pc),a3
-		move.l IFQPR(a3),a1
-		move.l #"END!",MN_IDENTIFIER(a1)
-		move.l MT_MIRROR(a2),MN_PPC(a1)
-		move.l a1,IFQPR(a3)
+KillPPC		bsr CreateMsgFrame
+		move.l #"END!",MN_IDENTIFIER(a0)
+		move.l MT_MIRROR(a2),MN_PPC(a0)
+		bsr SendMsgFrame
 
 		jsr _LVODisable(a6)
 
@@ -1222,40 +1278,39 @@ CpName		move.b (a1)+,(a2)
 EndName		move.l #"_PPC",(a2)			;Check Alignment?
 		move.b #0,4(a2)
 							;Also push dcache
-PPCRunning	move.l EUMBAddr(pc),a2
-		move.l IFQPR(a2),a1
+PPCRunning	bsr CreateMsgFrame
 
 		moveq.l #47,d0				;MsgLen/4-1
-		move.l a1,a2
+		move.l a0,a2
 ClrMsg		clr.l (a2)+
 		dbf d0,ClrMsg
 
-		move.w #192,MN_LENGTH(a1)
-		move.l #"TPPC",MN_IDENTIFIER(a1)
-		move.b #NT_MESSAGE,LN_TYPE(a1)
+		move.w #192,MN_LENGTH(a0)
+		move.l #"TPPC",MN_IDENTIFIER(a0)
+		move.b #NT_MESSAGE,LN_TYPE(a0)
 		move.l Port(a5),d1
-		move.l d1,MN_REPLYPORT(a1)
-		move.l d1,MN_MIRROR(a1)
-		move.l d6,MN_ARG0(a1)			;Mem
-		move.l d7,MN_ARG1(a1)			;Len
-		move.l d5,MN_PPC(a1)
+		move.l d1,MN_REPLYPORT(a0)
+		move.l d1,MN_MIRROR(a0)
+		move.l d6,MN_ARG0(a0)			;Mem
+		move.l d7,MN_ARG1(a0)			;Len
+		move.l d5,MN_PPC(a0)
 		move.l ThisTask(a6),d0
-		move.l d0,MN_ARG2(a1)
+		move.l d0,MN_ARG2(a0)
 
-		lea MN_PPSTRUCT(a1),a2
+		lea MN_PPSTRUCT(a0),a2
 		moveq.l #PP_SIZE/4-1,d0
-		move.l PStruct(a5),a0
-		
-		tst.l PP_STACKPTR(a0)			;Unsupported, but not yet encountered
+		move.l PStruct(a5),a1
+
+		tst.l PP_STACKPTR(a1)			;Unsupported, but not yet encountered
 		beq.s CpMsg2
-		
+
 		ILLEGAL
-		
-CpMsg2		move.l (a0)+,(a2)+
+
+CpMsg2		move.l (a1)+,(a2)+
 		dbf d0,CpMsg2
 
-		move.l EUMBAddr(pc),a2
-		move.l a1,IFQPR(a2)
+		bsr SendMsgFrame
+
 		bra.s Stacker
 
 ;********************************************************************************************
@@ -1335,13 +1390,13 @@ DizDone		move.l a0,-(a7)
 		lea PP_REGS(a1),a1
 		move.l (a7)+,a0
 		move.l a0,a2
-		lea MN_PPSTRUCT+PP_REGS(a0),a0
+		lea MN_PPSTRUCT+PP_REGS(a2),a2
 		moveq.l #(PP_SIZE-PP_REGS)/4-1,d0
-CpBck		move.l (a0)+,(a1)+
+CpBck		move.l (a2)+,(a1)+
 		dbf d0,CpBck
 		moveq.l #PPERR_SUCCESS,d7
-		move.l EUMBAddr(pc),a1
-		move.l a2,OFQPR(a1)			;Return Message Frame
+		bsr FreeMsgFrame
+
 		bra.s Success
 
 Cannot		moveq.l #-1,d7
@@ -1421,24 +1476,26 @@ xBack		move.l a6,-(a7)
 		fmove.d fp6,(a6)+
 		fmove.d fp7,(a6)+
 
-NoFPU4		move.l (a7),a1
-		move.l EUMBAddr(pc),a2
-		move.l IFQPR(a2),-(a7)
-		move.l (a7),a2
+NoFPU4		move.l 4.w,a6
+		move.l (a7),a1
+		bsr CreateMsgFrame
+		
+		move.l a0,a3
 		moveq.l #47,d1
-DoReslt		move.l (a1)+,(a2)+
+DoReslt		move.l (a1)+,(a3)+
 		dbf d1,DoReslt
 		
-		move.l (a7)+,a2
-		move.l #"DONE",MN_IDENTIFIER(a2)
-		move.l a2,d7
-		move.l (a7),a1
+		move.l #"DONE",MN_IDENTIFIER(a0)
+		move.l a0,d7
+		move.l a0,a1
 		lea PushMsg(pc),a5
-		move.l 4.w,a6
 		jsr _LVOSupervisor(a6)
-		move.l EUMBAddr(pc),a2
-		move.l d7,IFQPR(a2)			;Message the PPC
-		move.l (a7),OFQPR(a2)			;Return Message Frame
+		
+		move.l d7,a0
+		bsr SendMsgFrame
+		
+		move.l (a7),a0
+		bsr FreeMsgFrame
 
 		move.l (a7)+,a6
 		movem.l (a7)+,d0-a5
@@ -1456,21 +1513,19 @@ DoReslt		move.l (a1)+,(a2)+
 		fmove.d (a7)+,fp0
 NoFPU2		rts
 
-CrossSignals	move.l EUMBAddr(pc),a2			;Get Frame
-		move.l IFQPR(a2),a1
+CrossSignals	bsr CreateMsgFrame
 
 		moveq.l #47,d1				;MsgLen/4-1
-		move.l a1,a2
+		move.l a0,a2
 ClearMsg	clr.l (a2)+
 		dbf d1,ClearMsg
 
-		move.l #"LLPP",MN_IDENTIFIER(a1)
-		move.l d0,MN_ARG0(a1)
+		move.l #"LLPP",MN_IDENTIFIER(a0)
+		move.l d0,MN_ARG0(a0)
 		move.l ThisTask(a6),a3
-		move.l a3,MN_ARG1(a1)		
-		move.l EUMBAddr(pc),a2
-		move.l a1,IFQPR(a2)			;Signal PPC with Frame
-
+		move.l a3,MN_ARG1(a0)
+		bsr SendMsgFrame
+		
 		rts
 
 ;********************************************************************************************
@@ -1707,28 +1762,26 @@ PutChProc:
 
 PutXMsg:
 		movem.l d0-a6,-(a7)
+		move.l a0,d7
 		move.b #NT_XMSG68K,LN_TYPE(a1)
-		move.l a1,a3
-		move.l EUMBAddr(pc),a2
-		move.l IFQPR(a2),a1			;Get message frame
+		bsr CreateMsgFrame		
 
 		moveq.l #47,d0				;MsgLen/4-1
-		move.l a1,a2
+		move.l a0,a2
 ClrXMsg		clr.l (a2)+
 		dbf d0,ClrXMsg
 
-		move.w #192,MN_LENGTH(a1)
-		move.l #"XPPC",MN_IDENTIFIER(a1)
-		move.b #NT_MESSAGE,LN_TYPE(a1)
-		move.l a0,MN_PPC(a1)
+		move.w #192,MN_LENGTH(a0)
+		move.l #"XPPC",MN_IDENTIFIER(a0)
+		move.b #NT_MESSAGE,LN_TYPE(a0)
+		move.l d7,MN_PPC(a0)
 
-		lea MN_PPSTRUCT(a1),a2
+		lea MN_PPSTRUCT(a0),a2
 		moveq.l #PP_SIZE/4-1,d0
-CpXMsg		move.l (a3)+,(a2)+
+CpXMsg		move.l (a1)+,(a2)+
 		dbf d0,CpXMsg
 
-		move.l EUMBAddr(pc),a2
-		move.l a1,IFQPR(a2)			;Free send message to PPC
+		bsr SendMsgFrame
 		movem.l (a7)+,d0-a6
 		rts
 
