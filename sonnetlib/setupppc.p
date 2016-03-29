@@ -1752,7 +1752,7 @@ EInt:		b	.FPUnav				#0
 		lwbrx	r6,r4,r3		
 		stw	r5,0(r6)		
 		addi	r8,r6,4
-		loadreg	r7,0x3fff			#ffff3fff?
+		loadreg	r7,0x3fff
 		and	r8,r8,r7			#Keep it 0000-3FFE
 		stwbrx	r8,r4,r3
 
@@ -1832,6 +1832,10 @@ EInt:		b	.FPUnav				#0
 		lwz	r0,TC_SIGRECVD(r3)
 		or	r0,r0,r8
 		stw	r0,TC_SIGRECVD(r3)
+		lwz	r8,MN_ARG1(r5)
+		lwz	r0,TC_SIGALLOC(r3)
+		or	r0,r0,r8
+		stw	r0,TC_SIGALLOC(r3)
 				
 		addi	r4,r4,4				#PutMsg r5 to currenttask
 		lwz	r3,4(r4)			#AddTailPPC

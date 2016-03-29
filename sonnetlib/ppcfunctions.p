@@ -2995,6 +2995,8 @@ WaitFor68K:
 
 		lwz	r26,MN_MIRROR(r30)
 		stw	r26,TASKPPC_MIRRORPORT(r4)
+		lwz	r26,MN_ARG2(r30)
+		stw	r26,TASKPPC_MIRROR68K(r4)
 		
 .GotMirror:	mfctr	r26
 		subi	r4,r31,4
@@ -3080,6 +3082,10 @@ Run68K:
 		stw	r4,MN_MIRROR(r30)
 		lwz	r4,LN_NAME(r5)
 		stw	r4,MN_ARG0(r30)
+		lwz	r4,TC_SIGALLOC(r5)
+		stw	r4,MN_ARG1(r30)
+		lwz	r4,TC_SIGRECVD(r5)
+		stw	r4,MN_ARG2(r30)
 		
 .FromRunPPC:	lwz	r4,MCPort(r0)
 		stw	r4,MN_MCPORT(r30)
@@ -9147,7 +9153,7 @@ DebugEndFunction:
 					
 		bl SendMsgFramePPC
 
-.NoDebugEnd:	lwz	r30,0(r13)
+		lwz	r30,0(r13)
 		lwz	r29,4(r13)
 		lwz	r28,8(r13)
 		lwz	r5,12(r13)

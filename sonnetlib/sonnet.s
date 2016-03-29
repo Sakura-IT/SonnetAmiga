@@ -617,7 +617,8 @@ RtnLL		move.l 4.w,a6
 		move.l a0,d7
 		move.l d0,MN_PPSTRUCT+6*4(a0)
 		move.l #"DNLL",MN_IDENTIFIER(a0)
-		move.l MN_PPC(a1),MN_PPC(a0)		
+		move.l MN_PPC(a1),MN_PPC(a0)
+		clr.l MN_ARG1(a0)		
 		move.l MN_PPSTRUCT+0*4(a1),MN_PPSTRUCT+0*4(a0)
 		move.l MN_PPSTRUCT+1*4(a1),MN_PPSTRUCT+1*4(a0)
 
@@ -692,6 +693,11 @@ CopyPPCName	move.b (a0)+,(a2)+
 		tst.l d0
 		beq.s MsgMir68
 		move.l d0,a0
+		
+		jsr _LVODisable(a6)
+		move.l MN_ARG1(a1),TC_SIGALLOC(a0)
+		jsr _LVOEnable(a6)
+		
 		lea pr_MsgPort(a0),a0
 		jsr _LVOPutMsg(a6)
 		bra GetLoop
@@ -716,6 +722,7 @@ DebugEnd	move.l a1,a3
 
 MirrorTask	move.l 4.w,a6				;Mirror task for PPC task
 		move.l ThisTask(a6),a0
+		
 		or.b #TF_PPC,TC_FLAGS(a0)
 		lea pr_MsgPort(a0),a0
 		move.l a0,d6
@@ -736,7 +743,8 @@ CleanUp		move.l d6,a0
 		jsr _LVOPutMsg(a6)
 		bra.s CleanUp
 
-GoWaitPort	move.l (a7),a0		
+GoWaitPort	move.l (a7),a0
+		move.l ThisTask(a6),a1
 		move.l TC_SIGALLOC(a1),d0		
 		and.l #$fffff000,d0
 
@@ -887,7 +895,14 @@ LoadD		move.l #"DONE",d0
 		
 MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
 		move.l a0,d0
-		beq CommandMaster		
+		beq CommandMaster
+		
+		move.l d0,a2
+		move.l MP_SIGTASK(a2),a2
+		move.l MN_ARG1(a1),d0
+		or.l d0,TC_SIGALLOC(a2)
+		move.l MN_ARG2(a1),d0
+		or.l d0,TC_SIGRECVD(a2)				
 		bra DoPutMsg
 
 ;********************************************************************************************
@@ -1292,8 +1307,12 @@ ClrMsg		clr.l (a2)+
 		move.l d1,MN_REPLYPORT(a0)
 		move.l d1,MN_MIRROR(a0)
 		move.l d6,MN_ARG0(a0)			;Mem
-		move.l d7,MN_ARG1(a0)			;Len
 		move.l d5,MN_PPC(a0)
+		tst.l d5
+		beq.s IssaNew
+		move.l ThisTask(a6),a2
+		move.l TC_SIGALLOC(a2),d7		
+IssaNew		move.l d7,MN_ARG1(a0)			;Len
 		move.l ThisTask(a6),d0
 		move.l d0,MN_ARG2(a0)
 
@@ -1301,10 +1320,17 @@ ClrMsg		clr.l (a2)+
 		moveq.l #PP_SIZE/4-1,d0
 		move.l PStruct(a5),a1
 
-		tst.l PP_STACKPTR(a1)			;Unsupported, but not yet encountered
-		beq.s CpMsg2
-
+		tst.l PP_STACKPTR(a1)			;Unsupported, but not yet encountered		
+		
+		beq.s NoStackPtr
+				
 		ILLEGAL
+		
+NoStackPtr	move.l PP_FLAGS(a1),d1			;Unsupported, but not yet encountered
+		btst.l #0,d1
+		beq.s CpMsg2
+		
+		ILLEGAL				
 
 CpMsg2		move.l (a1)+,(a2)+
 		dbf d0,CpMsg2
@@ -1486,6 +1512,9 @@ DoReslt		move.l (a1)+,(a3)+
 		dbf d1,DoReslt
 		
 		move.l #"DONE",MN_IDENTIFIER(a0)
+		move.l ThisTask(a6),a1
+		move.l a1,MN_ARG2(a0)
+		move.l TC_SIGALLOC(a1),MN_ARG1(a0)
 		move.l a0,d7
 		move.l a0,a1
 		lea PushMsg(pc),a5
@@ -1524,6 +1553,7 @@ ClearMsg	clr.l (a2)+
 		move.l d0,MN_ARG0(a0)
 		move.l ThisTask(a6),a3
 		move.l a3,MN_ARG1(a0)
+		
 		bsr SendMsgFrame
 		
 		rts
