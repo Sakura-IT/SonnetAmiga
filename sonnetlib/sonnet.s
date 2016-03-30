@@ -894,13 +894,15 @@ LoadD		move.l #"DONE",d0
 ;********************************************************************************************		
 		
 MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
-		move.l a0,d0
+		move.l a0,d1
 		beq CommandMaster
+		cmp.l #"END!",d0
+		beq DoPutMsg
 		
-		move.l d0,a2
+		move.l d1,a2
 		move.l MP_SIGTASK(a2),a2
 		move.l MN_ARG1(a1),d0
-		or.l d0,TC_SIGALLOC(a2)
+;		or.l d0,TC_SIGALLOC(a2)			;Pending Fix
 		move.l MN_ARG2(a1),d0
 		or.l d0,TC_SIGRECVD(a2)				
 		bra DoPutMsg
