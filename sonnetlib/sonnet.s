@@ -809,7 +809,7 @@ SonInt:		movem.l d0-a6,-(a7)
 		move.l OMISR(a2),d3
 		move.l #$20000000,d4			;OMISR[OPQI]
 		and.l d4,d3
-		beq.s DidNotInt
+		beq DidNotInt
 
 NxtMsg		bsr GetMsgFrame
 		move.l a1,d3
@@ -829,6 +829,8 @@ NxtMsg		bsr GetMsgFrame
 		beq MsgFPPC
 		cmp.l #"XMSG",d0
 		beq MsgXMSG
+		cmp.l #"SIG!",d0
+		beq MsgSignal68k
 		cmp.l #"GETV",d0
 		beq LoadD
 		and.l #$ffffff00,d0
@@ -918,7 +920,17 @@ MsgXMSG
 		move.l MN_MIRROR(a1),a0
 		lea 32(a1),a1
 		bra DoPutMsg
+		
+;********************************************************************************************		
 
+MsgSignal68k	move.l MN_PPSTRUCT+4(a1),d0
+		move.l a1,d7
+		move.l MN_PPSTRUCT(a1),a1
+		jsr _LVOSignal(a6)
+		move.l d7,a0
+		bsr FreeMsgFrame
+		bra NxtMsg
+		
 ;********************************************************************************************
 ;********************************************************************************************
 

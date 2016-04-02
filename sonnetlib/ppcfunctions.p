@@ -3129,24 +3129,25 @@ Run68K:
 Signal68K:
 		prolog 228,'TOC'
 		
-		stwu	r8,-4(r13)
-		stwu	r7,-4(r13)
 		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
 		
-		li	r31,FSignal68K-FRun68K
-		bl	DebugStartFunction
+		mr	r31,r4
+		mr	r30,r5
 		
-		mr	r8,r5						#d0
-		mr	r7,r4						#a1
-		lwz	r4,SysBase(r0)
-		li	r5,_LVOSignal
+		bl CreateMsgFramePPC
 		
-		bl Run68KLowLevel
+		mr	r4,r3
+		loadreg	r5,'SIG!'
+		stw	r5,MN_IDENTIFIER(r4)
+		stw	r31,MN_PPSTRUCT(r4)
+		stw	r30,MN_PPSTRUCT+4(r4)
 		
-		lwz	r31,0(r13)
-		lwz	r7,4(r13)
-		lwz	r8,8(r13)
-		addi	r13,r13,12
+		bl SendMsgFramePPC
+		
+		lwz	r30,0(r13)
+		lwz	r31,4(r13)
+		addi	r13,r13,8
 		
 		epilog 'TOC'	
 
