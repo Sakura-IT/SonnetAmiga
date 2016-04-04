@@ -4083,7 +4083,7 @@ CreateTaskPPC:
 		beq-	.Error01			#Error NoCode 
  
 		mr	r25,r3 
-		li	r4,256				#Original 246 bytes
+		li	r4,TASKPPC_LENGTH		#Original 246 bytes
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0				#default alignment 
  

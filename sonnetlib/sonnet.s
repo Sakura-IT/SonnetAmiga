@@ -438,6 +438,15 @@ PPCInit		move.l SonnetBase(pc),a1
 		jsr _LVOSetFunction(a6)
 		lea RemTaskAddress(pc),a3
 		move.l d0,(a3)
+				
+		move.l #_LVOOpenLibrary,a0
+		lea OpenCode(pc),a3
+		move.l a3,d0
+		move.l a6,a1
+		jsr _LVOSetFunction(a6)
+		lea OpenLibAddress(pc),a3
+		move.l d0,(a3)
+		
 		jsr _LVOCacheClearU(a6)
 
 		lea MirrorList(pc),a3			;Make a list for PPC Mirror Tasks
@@ -1172,6 +1181,71 @@ DoPatch		lea ExitCode(pc),a3
 ExitTrue	movem.l (a7)+,d0/a1
 		move.l AddTaskAddress(pc),-(a7)
 		rts
+		
+;********************************************************************************************
+;
+;		OpenLibrary() Patch
+;
+;********************************************************************************************
+
+OpenCode	lea -8(a7),a7
+		movem.l d0-a6,-(a7)
+		move.l a1,d3		
+		lea ramlib(pc),a1
+		jsr _LVOFindTask(a6)
+		move.l d3,a1
+		move.l d0,d3
+		beq.s NoRamLib1
+		move.l d0,64(a7)
+		move.l d0,a4
+		move.b TC_FLAGS(a4),d3
+NoRamLib1	move.l d3,60(a7)
+		moveq.l #0,d4
+		move.l d4,d1
+		move.l d4,d2
+		lea WhiteList(pc),a2
+		or.b #TF_PPC,d3
+NextBWList	move.b (a2)+,d1
+NextWhite	move.b (a2)+,d2
+		move.l a2,a3
+		add.l d2,a3
+		move.l (a2),d5
+		cmp.l (a1),d5
+		bne.s DoNextW
+		move.l 4(a2),d5
+		cmp.l 4(a1),d5
+		beq.s SetFlag
+		
+DoNextW		move.l a3,a2
+		dbf d1,NextWhite
+		tst.l d4
+		beq.s DoBlack
+		bra.s NoChange
+
+SetFlag		move.l a4,d0
+		beq.s NoChange
+		move.b d3,TC_FLAGS(a4)
+NoChange	movem.l (a7)+,d0-a6
+		pea OpenLibReturn(pc)
+		move.l OpenLibAddress(pc),-(a7)
+		rts
+		
+DoBlack		move.l d4,d1
+		move.l d4,d2
+		moveq.l #-1,d4
+		lea BlackList(pc),a2
+		and.b #~TF_PPC,d3
+		bra.s NextBWList
+
+OpenLibReturn	movem.l d1/a4,-(a7)
+		move.l 12(a7),d1
+		beq.s NoRamLib2
+		move.l d1,a4
+		move.l 8(a7),d1
+		move.b d1,TC_FLAGS(a4)
+NoRamLib2	movem.l (a7)+,d1/a4
+		lea 8(a7),a7
+		rts
 
 ;*********************************************************************************************
 ;
@@ -1859,6 +1933,7 @@ SonAddr		ds.l	1
 EUMBAddr	ds.l	1
 AddTaskAddress	ds.l	1
 RemTaskAddress	ds.l	1
+OpenLibAddress	ds.l	1
 MirrorList	ds.l	3
 RemSysTask	ds.l	1
 MyInterrupt	ds.b	IS_SIZE
@@ -2054,4 +2129,26 @@ DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx
 		cnop	0,4
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		cnop	0,4
+		
+ramlib		dc.b "ramlib",0		
+		
+WhiteList	dc.b 11,w1-WhiteList-2,"mpega.library",0
+w1		dc.b w2-w1-1,"Warp3DPPC.library",0
+w2		dc.b w3-w2-1,"agleppc.library",0
+w3		dc.b w4-w3-1,"aglppc.library",0
+w4		dc.b w5-w4-1,"aglsmapppc.library",0
+w5		dc.b w6-w5-1,"agluppc.library",0
+w6		dc.b w7-w6-1,"aglutppc.library",0
+w7		dc.b w8-w7-1,"warpsdl.library",0
+w8		dc.b w9-w8-1,"fsoundPPC.library",0
+w9		dc.b w10-w9-1,"chunkyppc.library",0
+w10		dc.b w11-w10-1,"ppc.library",0
+w11		dc.b w12-w11-1,"asyncio.library",0
+w12		dc.b -1
+		
+BlackList	dc.b 0,b1-BlackList-2,"hyperionvideo.library",0
+b1		dc.b -1		
+		
+		cnop	0,4
+		
 EndCP		end
