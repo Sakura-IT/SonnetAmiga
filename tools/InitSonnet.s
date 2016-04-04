@@ -45,18 +45,22 @@ Cp		move.l (a1)+,(a2)+
 		move.l a1,_LVOAllocMem+2(a6)			;Patch the AllocMem() function
 
 		jsr _LVOCacheClearU(a6)				;Clear all caches
-	
+
 NoPatch		movem.l (a7)+,d0-a6
 		rts						;Exit
 		
 ;********************************************************************************************
 
 NewAlloc:	tst.w d1					;Patch code - Test for attribute $0000 (Any)
-		beq.s Best					;Redirect
-		btst #0,d1					;If not FAST requested, exit
-		beq.s NoFast
+		beq.s Best
+		btst #2,d1					;If FAST requested, redirect
+		bne.s Best					
+		btst #0,d1					;If not PUBLIC requested, exit
+		beq NoFast
 		btst #1,d1					;If CHIP requested, exit
-		bne.s NoFast
+		bne NoFast
+		nop						;Let everything else through..?		
+		
 Best		move.l d7,-(a7)
 		move.l a3,-(a7)
 		move.l a2,-(a7)
@@ -77,6 +81,12 @@ FindEnd		move.b (a2)+,d7
 		move.l -5(a2),d7
 		cmp.l #"2005",d7				;Task has name with 2005 at end?
 		beq.s DoBit					;if yes, then redirect to PPC memory
+		cmp.l #"_68K",d7
+		beq.s DoBit
+		cmp.l #"sk_0",d7
+		beq.s DoBit
+		cmp.l #"sk_1",d7
+		beq.s DoBit
 		bra.s NoBit
 
 IsHell		lsl.l #2,d7
