@@ -447,6 +447,14 @@ PPCInit		move.l SonnetBase(pc),a1
 		lea OpenLibAddress(pc),a3
 		move.l d0,(a3)
 		
+		move.l #_LVOAllocMem,a0
+		lea NewAlloc(pc),a3
+		move.l a3,d0
+		move.l a6,a1
+		jsr _LVOSetFunction(a6)
+		lea AllocMemAddress(pc),a3
+		move.l d0,(a3)
+
 		jsr _LVOCacheClearU(a6)
 
 		lea MirrorList(pc),a3			;Make a list for PPC Mirror Tasks
@@ -841,7 +849,7 @@ NxtMsg		bsr GetMsgFrame
 		cmp.l #"SIG!",d0
 		beq MsgSignal68k
 		cmp.l #"GETV",d0
-		beq LoadD
+		beq.s LoadD
 		and.l #$ffffff00,d0
 		cmp.l #$50555400,d0
 		beq.s StoreD		
@@ -1135,7 +1143,7 @@ CorrectType	lea MirrorList(pc),a2
 NextMList	tst.l LN_SUCC(a2)
 		beq.s DoneMList
 		cmp.l MT_TASK(a2),d1
-		beq KillPPC
+		beq.s KillPPC
 		move.l LN_SUCC(a2),a2
 		bra.s NextMList
 
@@ -1246,6 +1254,79 @@ OpenLibReturn	movem.l d1/a4,-(a7)
 NoRamLib2	movem.l (a7)+,d1/a4
 		lea 8(a7),a7
 		rts
+
+;********************************************************************************************
+;
+;		AllocMem() Patch
+;
+;********************************************************************************************
+
+NewAlloc	cmp.l #$f4248,d0				;HARDCODED FreeSpace PATCH!!
+		beq NoFast
+
+		tst.w d1					;Patch code - Test for attribute $0000 (Any)
+		beq.s Best
+		btst #2,d1					;If FAST requested, redirect
+		bne.s Best					
+		btst #0,d1					;If not PUBLIC requested, exit
+		beq NoFast
+		btst #1,d1					;If CHIP requested, exit
+		bne NoFast
+		nop						;Let everything else through..?		
+		
+Best		move.l d7,-(a7)
+		move.l a3,-(a7)
+		move.l a2,-(a7)
+		move.l ThisTask(a6),a3
+		move.b TC_FLAGS(a3),d7
+		btst #2,d7					;Check if task was tagged by sonnet.library
+		bne.s DoBit					;If yes, then redirect to PPC memory
+		
+		move.l pr_CLI(a3),d7				;Was this task started by CLI?
+		bne.s IsHell					;If yes, go there
+		
+		move.l LN_NAME(a3),d7				;Has the task a name?
+		beq.s NoBit					;If no then exit
+		move.l d7,a2
+
+FindEnd		move.b (a2)+,d7
+		bne.s FindEnd
+		move.l -5(a2),d7
+		cmp.l #"2005",d7				;Task has name with 2005 at end?
+		beq.s DoBit					;if yes, then redirect to PPC memory
+		cmp.l #"_68K",d7
+		beq.s DoBit
+		cmp.l #"sk_0",d7
+		beq.s DoBit
+		cmp.l #"sk_1",d7
+		beq.s DoBit
+		bra.s NoBit
+
+IsHell		lsl.l #2,d7
+		move.l d7,a3
+		move.l cli_CommandName(a3),d7			;Get name of task started by CLI
+		beq.s NoBit
+		lsl.l #2,d7
+		move.l d7,a3
+		clr.l d7
+		move.b (a3),d7
+		subq.l #4,d7
+		bmi.s NoBit
+		move.l 1(a3,d7.l),d7
+		cmp.l #"2005",d7				;Check if CLI or Shell CommandName ends with 2005
+		beq.s DoBit					;If yes, then redirect to PPC memory
+		bra.s NoBit	
+
+DoBit		bset #13,d1					;Set attribute $2000
+		bset #18,d1					;MEMF_REVERSE
+NoBit		move.l (a7)+,a2
+		move.l (a7)+,a3
+		move.l (a7)+,d7
+NoFast		move.l AllocMemAddress(pc),-(a7)
+		rts
+
+ClrBit		bclr #13,d1
+		bra.s NoBit
 
 ;*********************************************************************************************
 ;
@@ -1934,6 +2015,7 @@ EUMBAddr	ds.l	1
 AddTaskAddress	ds.l	1
 RemTaskAddress	ds.l	1
 OpenLibAddress	ds.l	1
+AllocMemAddress	ds.l	1
 MirrorList	ds.l	3
 RemSysTask	ds.l	1
 MyInterrupt	ds.b	IS_SIZE
@@ -2119,7 +2201,7 @@ FUNCTABLE:
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0
 		cnop	 0,4
-IDString	dc.b	"$VER: sonnet.library 17.0 (01-Apr-16)",0
+IDString	dc.b	"$VER: sonnet.library 17.1 (01-Jun-16)",0
 		cnop 	0,4
 WarpName	dc.b	"warp.library",0
 		cnop	0,4
