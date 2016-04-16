@@ -1496,25 +1496,25 @@ IssaNew		move.l d7,MN_ARG1(a0)			;Len
 		moveq.l #PP_SIZE/4-1,d0
 		move.l PStruct(a5),a1
 
-		tst.l PP_STACKPTR(a1)			;Unsupported, but not yet encountered		
-		
-		beq.s NoStackPtr
-				
-		ILLEGAL
-		
-NoStackPtr	move.l PP_FLAGS(a1),d1			;Asynchronous RunPPC Call
-		btst.l #PPF_ASYNC,d1
+		move.l a1,a3
+		tst.l PP_STACKPTR(a1)			;Unsupported, but not yet encountered
 		beq.s CpMsg2
-		
-		move.l MirrorNode(a5),a3
-		move.l d1,MT_FLAGS(a3)
 
-CpMsg2		move.l (a1)+,(a2)+
+		ILLEGAL
+
+CpMsg2		move.l (a3)+,(a2)+
 		dbf d0,CpMsg2
 
 		bsr SendMsgFrame
-
-		bra.s Stacker
+		
+		move.l PP_FLAGS(a1),d1			;Asynchronous RunPPC Call
+		btst.l #PPF_ASYNC,d1
+		beq Stacker
+		
+		move.l MirrorNode(a5),a3
+		move.l d1,MT_FLAGS(a3)
+		moveq.l #PPERR_SUCCESS,d7
+		bra EndIt
 
 ;********************************************************************************************
 ;
