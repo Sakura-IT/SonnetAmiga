@@ -1341,7 +1341,9 @@ MN_PPSTRUCT	EQU MN_PPC+4
 MT_TASK		EQU MLN_SIZE
 MT_MIRROR	EQU MT_TASK+4
 MT_PORT		EQU MT_MIRROR+4
-MT_SIZE		EQU MT_PORT+4
+MT_FLAGS	EQU MT_PORT+4
+MT_SIZE		EQU MT_FLAGS+4
+
 
 PStruct		EQU -4
 Port		EQU -8
@@ -1372,11 +1374,16 @@ NextMirList	tst.l LN_SUCC(a2)
 		move.l LN_SUCC(a2),a2
 		bra.s NextMirList
 
+PPCRunning	tst.l MT_FLAGS(a2)
+		beq NoASyncErr
+		bra.s GiveASyncErr
+		
+		
 DoneMirList	jsr _LVOCreateMsgPort(a6)
 		tst.l d0
 		bne.s GotMsgPort
 		
-		moveq.l #PPERR_ASYNCERR,d7
+GiveASyncErr	moveq.l #PPERR_ASYNCERR,d7
 		bra EndIt
 
 GotMsgPort	move.l d0,Port(a5)
@@ -1388,6 +1395,8 @@ GotMsgPort	move.l d0,Port(a5)
 		move.l d0,a1
 		move.l ThisTask(a6),MT_TASK(a1)
 		move.l Port(a5),MT_PORT(a1)
+		moveq.l #0,d5
+		move.l d5,MT_FLAGS(a1)
 		
 		jsr _LVODisable(a6)
 		
@@ -1398,7 +1407,6 @@ GotMsgPort	move.l d0,Port(a5)
 		jsr _LVOEnable(a6)
 
 		move.l ThisTask(a6),a1
-		moveq.l #0,d5
 		move.l TC_SPUPPER(a1),d0
 		move.l TC_SPLOWER(a1),d1
 		sub.l d1,d0
@@ -1462,7 +1470,7 @@ CpName		move.b (a1)+,(a2)
 EndName		move.l #"_PPC",(a2)			;Check Alignment?
 		move.b #0,4(a2)
 							;Also push dcache
-PPCRunning	bsr CreateMsgFrame
+NoASyncErr	bsr CreateMsgFrame
 
 		moveq.l #47,d0				;MsgLen/4-1
 		move.l a0,a2
@@ -1495,11 +1503,12 @@ IssaNew		move.l d7,MN_ARG1(a0)			;Len
 				
 		ILLEGAL
 		
-NoStackPtr	move.l PP_FLAGS(a1),d1			;Unsupported, but not yet encountered
-		btst.l #0,d1
+NoStackPtr	move.l PP_FLAGS(a1),d1			;Asynchronous RunPPC Call
+		btst.l #PPF_ASYNC,d1
 		beq.s CpMsg2
 		
-		ILLEGAL				
+		move.l MirrorNode(a5),a3
+		move.l d1,MT_FLAGS(a3)
 
 CpMsg2		move.l (a1)+,(a2)+
 		dbf d0,CpMsg2
@@ -1514,32 +1523,29 @@ CpMsg2		move.l (a1)+,(a2)+
 ;
 ;********************************************************************************************
 
-WaitForPPC:
-		ILLEGAL					;Asynchronous calls not yet supported
-
-		link a5,#-12
+WaitForPPC:	link a5,#-12
 		movem.l d1-a6,-(a7)
-		moveq.l #0,d0
-		move.l d0,Port(a5)
 		move.l a0,PStruct(a5)
-		move.l 4.w,a6
-		cmp.b #NT_PROCESS,LN_TYPE(a1)
-		beq.s yProces
 
-		move.l ThisTask(a6),a1
-		move.l LN_NAME(a1),a1
-		jsr _LVOFindPort(a6)
-		tst.l d0
-		bne.s FndPort
+		move.l 4.w,a6		
+		move.l ThisTask(a6),d6
+		lea MirrorList(pc),a2
+		move.l MLH_HEAD(a2),a2
+NextMirList2	tst.l LN_SUCC(a2)
+		beq.s WaitForPPCErr
+		move.l MT_MIRROR(a2),d5
+		move.l MT_PORT(a2),Port(a5)
+		move.l a2,MirrorNode(a5)
+		cmp.l MT_TASK(a2),d6
+		beq NowCheckFlag
+		move.l LN_SUCC(a2),a2
+		bra.s NextMirList2
 
-		moveq.l #PPERR_WAITERR,d7
+NowCheckFlag	tst.l MT_FLAGS(a2)
+		bne.s Stacker
+		
+WaitForPPCErr	moveq.l #PPERR_WAITERR,d7
 		bra EndIt
-
-FndPort		move.l d0,Port(a5)
-		bra.s Stacker
-
-yProces		lea pr_MsgPort(a1),a1
-		move.l a1,Port(a5)
 
 Stacker		move.l ThisTask(a6),a1
 		move.l TC_SIGALLOC(a1),d0		
@@ -2027,7 +2033,7 @@ DATATABLE:
 	INITLONG	LN_NAME,LibName
 	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITWORD	LIB_VERSION,17
-	INITWORD	LIB_REVISION,0
+	INITWORD	LIB_REVISION,1
 	INITLONG	LIB_IDSTRING,IDString
 	ds.l	1
 	
