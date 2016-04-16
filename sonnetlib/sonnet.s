@@ -1377,8 +1377,7 @@ NextMirList	tst.l LN_SUCC(a2)
 PPCRunning	tst.l MT_FLAGS(a2)
 		beq NoASyncErr
 		bra.s GiveASyncErr
-		
-		
+
 DoneMirList	jsr _LVOCreateMsgPort(a6)
 		tst.l d0
 		bne.s GotMsgPort
@@ -1542,10 +1541,13 @@ NextMirList2	tst.l LN_SUCC(a2)
 		bra.s NextMirList2
 
 NowCheckFlag	tst.l MT_FLAGS(a2)
-		bne.s Stacker
+		bne.s DidAsync
 		
 WaitForPPCErr	moveq.l #PPERR_WAITERR,d7
 		bra EndIt
+
+DidAsync	moveq.l #0,d0
+		move.l d0,MT_FLAGS(a2)
 
 Stacker		move.l ThisTask(a6),a1
 		move.l TC_SIGALLOC(a1),d0		
