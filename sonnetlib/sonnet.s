@@ -1764,7 +1764,7 @@ NoRun		move.l (a7)+,d1
 
 CreatePPCTask:	movem.l d1-a6,-(a7)
 
-		ILLEGAL
+		move.l a0,d1						;d1 = r4
 
 		RUNPOWERPC	_PowerPCBase,CreateTaskPPC
 
