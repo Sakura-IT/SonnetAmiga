@@ -1508,7 +1508,7 @@ CpMsg2		move.l (a3)+,(a2)+
 		bsr SendMsgFrame
 		
 		move.l PP_FLAGS(a1),d1			;Asynchronous RunPPC Call
-		btst.l #PPF_ASYNC,d1
+		btst.l #PPB_ASYNC,d1
 		beq Stacker
 		
 		move.l MirrorNode(a5),a3
