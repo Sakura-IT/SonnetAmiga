@@ -307,10 +307,15 @@ NoCmm		move.l #WP_TRIG01,WP_CONTROL(a3)	;Negate HRESET
 Wait		move.l $3004(a1),d5
 		cmp.l #"Boon",d5
 		beq.s PPCReady
+		cmp.l #"Err2",d5
+		beq.s NoSonRam
 		cmp.l #"Err1",d5
 		bne.s Wait
 		
 		lea PPCMMUError(pc),a2
+		bra PrintError
+
+NoSonRam	lea SonnetMemError(pc),a2
 		bra PrintError
 
 PPCReady	move.l #StackSize,d7			;Set stack
@@ -2362,6 +2367,7 @@ MemVGAError	dc.b	"Could not allocate VGA memory",0
 PPCMMUError	dc.b	"Error during MMU setup of PPC",0
 GenMemError	dc.b	"General memory allocation error",0
 LSetupError	dc.b	"Error during library function setup",0
+SonnetMemError	dc.b	"No memory detected on the Sonnet card",0
 
 ramlib		dc.b "ramlib",0		
 		

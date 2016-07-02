@@ -42,7 +42,14 @@ PPCCode:	b	.SkipCom			#0x3000	System initialization
 		bl	ConfigMem			#Result = Sonnet Mem Len in r8
 		bl	InstallExceptions		#Put exceptions in place
 
-		lhz	r3,20(r29)
+		mr.	r8,r8
+		bne	.GotRam
+
+.ErrorRam:	loadreg	r0,'Err2'
+		stw	r0,4(r29)
+		b	.ErrorRam
+
+.GotRam:	lhz	r3,20(r29)
 		cmpwi	r3,0x1002			#Check for ATI Gfx Card
 		beq	.MaxRam
 		cmpwi	r3,0x121b			#Check for VooDoo4/5
@@ -856,10 +863,7 @@ mmuSetup:
 		
 .Exithtab:	or	r15,r15,r9
 		sync
-		mtspr	SDR1,r15			#set SDR1
-		
-		stw	r15,0x190(r0)
-		
+		mtspr	SDR1,r15			#set SDR1	
 		isync
 
 		rlwinm	r6,r6,30,0,31			#r6 = pt_size, r7 = pt_loc
@@ -2943,9 +2947,7 @@ EInt:		b	.FPUnav				#0
 		li	r0,EXCF_TRACE
 		stw	r0,36(r13)			#NOT VERY NICE!!
 		
-.ExcReUse:	b	.ExcReUse
-		
-		lwz	r31,0(r31)
+.ExcReUse:	lwz	r31,0(r31)
 		lwz	r0,0(r31)
 		mr. 	r0,r0
 		beq	.NoHandler
@@ -4046,9 +4048,6 @@ EInt:		b	.FPUnav				#0
 		mtsprg0	r31
 		lwz	r0,EXCDATA_CODE(r30)
 		
-		stw	r0,0x15c(r0)
-		stw	r30,0x170(r0)
-		
 		mtlr	r0		
 		lwz	r0,EXCDATA_FLAGS(r30)
 		rlwinm.	r0,r0,(32-EXC_LARGECONTEXT),31,31
@@ -4064,20 +4063,6 @@ EInt:		b	.FPUnav				#0
 		mr	r3,r13
 		mtsprg2	r1				
 		
-		
-		lwz	r31,7184(r2)
-		lwz	r30,7204(r2)
-		stw	r30,0x1a0(r0)
-		stw	r31,0x160(r0)
-		lwz	r31,0(r31)
-		stw	r31,0x180(r0)
-		lwz	r30,5076(r31)
-		stw	r30,0x150(r0)
-		lwz	r30,5040(r31)
-		stw	r30,0x154(r0)
-		lwz	r30,5184(r31)
-		stw	r30,0x158(r0)
-		
 		lwz	r0,4+XCO_SIZE(r13)
 		lwz	r27,16+XCO_SIZE(r13)
 		lwz	r28,20+XCO_SIZE(r13)
@@ -4086,10 +4071,6 @@ EInt:		b	.FPUnav				#0
 		lwz	r31,32+XCO_SIZE(r13)
 		
 		blrl					#DO NOT TRASH R13 IN HANDLER!
-
-
-		loadreg	r0,'tst!'
-		stw	r0,0x164(r0)
 
 		addi	r13,r13,XCO_SIZE
 		
