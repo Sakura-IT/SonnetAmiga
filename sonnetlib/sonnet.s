@@ -14,6 +14,7 @@
 	include powerpc/tasksPPC.i
 	include	dos/dostags.i
 	include dos/dos_lib.i
+	include intuition/intuition_lib.i
 	include exec/ports.i
 	include dos/dosextens.i
 	include	exec/interrupts.i
@@ -43,7 +44,7 @@
 	XREF	AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
 	XREF	AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
 	XREF	AddUniqueSemaphorePPC,IsExceptionMode,CreateMsgFramePPC,SendMsgFramePPC
-	XREF	FreeMsgFramePPC
+	XREF	FreeMsgFramePPC,WarpIllegal
 
 	XREF 	PPCCode,PPCLen,RunningTask,LIST_WAITINGTASKS,MCPort,Init
 	XREF	SysBase,PowerPCBase,DOSBase
@@ -79,21 +80,28 @@ LIBINIT:
 		move.l 4.w,a6
 		lea Buffer(pc),a4
 		move.l a0,(a4)				;SegList
+		move.l a6,LExecBase-Buffer(a4)
 
 		lea DosLib(pc),a1
 		moveq.l #37,d0
 		jsr _LVOOpenLibrary(a6)
 		tst.l d0
-		beq.s Clean				;Open dos.library
-		move.l d0,DosBase-Buffer(a4)
-
+		bne.s GotDOS				;Open dos.library
+		
+		lea LDOSError(pc),a2
+		bra PrintError
+		
+GotDOS		move.l d0,DosBase-Buffer(a4)
 		lea ExpLib(pc),a1
 		moveq.l #37,d0
 		jsr _LVOOpenLibrary(a6)			;Open expansion.library
 		tst.l d0
-		beq.s Clean
-		move.l d0,ExpBase-Buffer(a4)
+		bne.s GotExp
 
+		lea LExpError(pc),a2
+		bra PrintError		
+	
+GotExp		move.l d0,ExpBase-Buffer(a4)
 		move.l d0,a6
 		sub.l a0,a0
 		move.l #VENDOR_ELBOX,d0			;ELBOX
@@ -106,11 +114,14 @@ LIBINIT:
 		move.l #VENDOR_ELBOX,d0			;ELBOX
 		moveq.l #60,d1				;Mediator 1200TX
 		jsr _LVOFindConfigDev(a6)		;Find 1200TX mediator
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		tst.l d0
-		beq.s Clean
+		bne.s FoundMed
+		
+		lea MedError(pc),a2
+		bra PrintError
 
-FoundMed	move.l 4.w,a6
+FoundMed	move.l LExecBase(pc),a6
 		move.l d0,a1
 		move.l cd_BoardAddr(a1),d0		;Start address Configspace Mediator
 		move.l d0,MediatorBase-Buffer(a4)
@@ -121,7 +132,7 @@ FoundMed	move.l 4.w,a6
 		tst.l d0
 		bne.s Clean
 
-		moveq.l #0,d0
+		moveq.l #9,d0
 		lea pcilib(pc),a1
 		jsr _LVOOpenLibrary(a6)
 		move.l d0,PCIBase-Buffer(a4)
@@ -132,7 +143,10 @@ FoundMed	move.l 4.w,a6
 		tst.l d0
 		bne.s FndMem
 
-Clean		move.l 4.w,a6
+		lea MemMedError(pc),a2
+		bra PrintError
+
+Clean		move.l LExecBase(pc),a6
 		move.l ROMMem(pc),d0
 		beq.s NoROM
 		bsr.s FreeROM
@@ -166,17 +180,23 @@ FndMem		move.l d0,d7
 		jsr _LVOEnable(a6)			;mem list corruption
 
 		move.l PCIBase(pc),d0
-		beq.s Clean
-		move.l d0,a6
+		bne.s GotPCI
 
+		lea LPCIError(pc),a2
+		bra PrintError
+		
+GotPCI		move.l d0,a6
 		move.w #VENDOR_MOTOROLA,d0
 		move.w #DEVICE_MPC107,d1
 		moveq.l #0,d2
 		jsr _LVOPCIFindCard(a6)
 		move.l d0,d6
-		beq.s Clean
+		bne.s GotSonnetCard
+	
+		lea SonnetError(pc),a2
+		bra PrintError		
 		
-		move.w #VENDOR_3DFX,d0
+GotSonnetCard	move.w #VENDOR_3DFX,d0
 		move.w d0,d5
 		move.w #DEVICE_VOODOO45,d1
 		moveq.l #0,d2
@@ -216,11 +236,15 @@ NxtATI		move.w #VENDOR_ATI,d0
 		moveq.l #0,d2
 		jsr _LVOPCIFindCard(a6)
 		tst.l d0
-		beq Clean
-		move.l d0,a2
+		bne.s GotVGA
+		
+		lea VGAError(pc),a2
+		bra PrintError
+		
+GotVGA		move.l d0,a2
 		move.l PCI_SPACE0(a2),d4
 		
-FoundGfx	move.l 4.w,a6
+FoundGfx	move.l LExecBase(pc),a6
 		move.l d4,GfxMem-Buffer(a4)
 		move.w d5,GfxType-Buffer(a4)
 		move.l d6,a2
@@ -233,9 +257,12 @@ FoundGfx	move.l 4.w,a6
 		move.l #$10000,d0
 		jsr _LVOAllocAbs(a6)			;Allocate fake ROM in VGA Mem
 		tst.l d0
-		beq Clean
+		bne.s GotVGAMem
 
-		move.l d0,ROMMem-Buffer(a4)
+		lea MemVGAError(pc),a2
+		bra PrintError
+
+GotVGAMem	move.l d0,ROMMem-Buffer(a4)
 		move.l d0,a5
 		move.l a5,a1
 		lea $100(a5),a5
@@ -279,9 +306,14 @@ NoCmm		move.l #WP_TRIG01,WP_CONTROL(a3)	;Negate HRESET
 
 Wait		move.l $3004(a1),d5
 		cmp.l #"Boon",d5
+		beq.s PPCReady
+		cmp.l #"Err1",d5
 		bne.s Wait
+		
+		lea PPCMMUError(pc),a2
+		bra PrintError
 
-		move.l #StackSize,d7			;Set stack
+PPCReady	move.l #StackSize,d7			;Set stack
 		move.l $3008(a1),d5
 		move.l d5,SonnetBase-Buffer(a4)
 		add.l d7,d5
@@ -293,8 +325,12 @@ Wait		move.l $3004(a1),d5
 		move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_REVERSE,d1
 		jsr _LVOAllocVec(a6)
 		tst.l d0
-		beq Clean
-		move.l d0,a0
+		bne.s GotMemName
+		
+		lea GenMemError(pc),a2
+		bra PrintError
+
+GotMemName	move.l d0,a0
 		lea MemName(pc),a1
 		move.l (a1),(a0)
 		move.l 4(a1),4(a0)
@@ -337,10 +373,13 @@ NoPCILb		jsr _LVOEnqueue(a6)
 		move.l #FunctionsLen,d0
 		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE|MEMF_CLEAR,d1
 		bsr AllocVec32
-
 		tst.l d0
-		beq Clean
-		move.l d0,PPCCodeMem-Buffer(a4)
+		bne GotFuncMem
+	
+		lea GenMemError(pc),a2
+		bra PrintError
+		
+GotFuncMem	move.l d0,PPCCodeMem-Buffer(a4)
 		move.l d0,a1
 		lea LibFunctions(pc),a0
 		move.l #FunctionsLen,d1
@@ -351,9 +390,13 @@ MoveSon		move.l (a0)+,(a1)+
 
 		bsr MakeLibrary
 		tst.l d0
-		beq NoLib
+		bne.s GotLibMade
 
-		move.l SonnetBase(pc),a1
+		jsr _LVOEnable(a6)
+		lea LSetupError(pc),a2
+		bra PrintError
+
+GotLibMade	move.l SonnetBase(pc),a1
 		move.l d0,PowerPCBase(a1)
 		move.l a5,PPCMemHeader(a1)		;Memheader at $8
 		move.l a1,(a1)				;Sonnet relocated mem at $0
@@ -402,8 +445,8 @@ MoveSon		move.l (a0)+,(a1)+
 		move.l DosBase(pc),a6
 		jsr _LVOCreateNewProc(a6)
 
-		move.l 4.w,a6
-NoLib		jsr _LVOEnable(a6)
+		move.l LExecBase(pc),a6
+		jsr _LVOEnable(a6)
 
 PPCInit		move.l SonnetBase(pc),a1
 		move.l Init(a1),d0
@@ -469,6 +512,30 @@ PPCInit		move.l SonnetBase(pc),a1
 
 ;********************************************************************************************
 
+PrintError	move.l LExecBase(pc),a6
+		lea IntuitionLib(pc),a1
+		moveq.l #33,d0
+		jsr _LVOOpenLibrary(a6)
+		tst.l d0
+		beq Clean
+		move.l d0,a6
+		lea LibName(pc),a0
+		lea Requester(pc),a1
+		move.l a0,8(a1)
+		move.l a2,12(a1)
+		lea RContinue(pc),a0
+		move.l a0,16(a1)
+		sub.l a0,a0
+		move.l a0,a2
+		move.l a0,a3
+		jsr _LVOEasyRequestArgs(a6)
+		move.l a6,a1
+		move.l LExecBase(pc),a6
+		jsr _LVOCloseLibrary(a6)
+		bra Clean
+		
+;********************************************************************************************
+
 MakeLibrary
 		movem.l d1-a6,-(a7)
 		sub.l a0,a1
@@ -530,6 +597,8 @@ NoFun		movem.l (a7)+,d1-a6
 
 ;********************************************************************************************
 
+IntuitionLib	dc.b "intuition.library",0
+		cnop	0,2
 DosLib		dc.b "dos.library",0
 		cnop 	0,2
 ExpLib		dc.b "expansion.library",0
@@ -1296,6 +1365,8 @@ FindEnd		move.b (a2)+,d7
 		beq.s DoBit					;if yes, then redirect to PPC memory
 		cmp.l #"_68K",d7
 		beq.s DoBit
+		cmp.l #"_PPC",d7
+		beq.s DoBit
 		cmp.l #"sk_0",d7
 		beq.s DoBit
 		cmp.l #"sk_1",d7
@@ -2014,6 +2085,7 @@ MediatorBase	ds.l	1
 DosBase		ds.l	1
 ExpBase		ds.l	1
 PCIBase		ds.l	1
+LExecBase	ds.l	1
 ROMMem		ds.l	1
 GfxMem		ds.l	1
 GfxType		ds.l	1
@@ -2035,7 +2107,7 @@ DATATABLE:
 	INITLONG	LN_NAME,LibName
 	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITWORD	LIB_VERSION,17
-	INITWORD	LIB_REVISION,1
+	INITWORD	LIB_REVISION,2
 	INITLONG	LIB_IDSTRING,IDString
 	ds.l	1
 	
@@ -2049,10 +2121,75 @@ WARPDATATABLE:
 	ds.l	1
 
 WARPFUNCTABLE:
-	dc.l	WarpOpen
+	dc.l	WarpOpen				;for WarpDT
 	dc.l	WarpClose
 	dc.l	Reserved
 	dc.l	Reserved
+	dc.l	WarpIllegal				;Debug for iFusion
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
+;	dc.l	WarpIllegal
 	dc.l	-1
 
 FUNCTABLE:
@@ -2208,18 +2345,24 @@ FUNCTABLE:
 
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0
-		cnop	 0,4
-IDString	dc.b	"$VER: sonnet.library 17.1 (01-Jun-16)",0
-		cnop 	0,4
+IDString	dc.b	"$VER: sonnet.library 17.2 (01-Jul-16)",0
 WarpName	dc.b	"warp.library",0
-		cnop	0,4
 WarpIDString	dc.b	"$VER: fake warp.library 5.0 (01-Apr-16)",0
-		cnop	0,4
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
-		cnop	0,4
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
-		cnop	0,4
 		
+LDOSError	dc.b	"Could not open dos.library V37+",0
+LExpError	dc.b	"Could not open expansion.library V37+",0
+LPCIError	dc.b	"Could not open pci.library V9+",0
+MedError	dc.b	"Could not find a supported Mediator board",0
+MemMedError	dc.b	"No system VGA memory detected (pcidma)",0
+SonnetError	dc.b	"No Sonnet card detected",0
+VGAError	dc.b	"No supported VGA card detected",0
+MemVGAError	dc.b	"Could not allocate VGA memory",0
+PPCMMUError	dc.b	"Error during MMU setup of PPC",0
+GenMemError	dc.b	"General memory allocation error",0
+LSetupError	dc.b	"Error during library function setup",0
+
 ramlib		dc.b "ramlib",0		
 		
 WhiteList	dc.b 11,w1-WhiteList-2,"mpega.library",0
@@ -2239,6 +2382,11 @@ w12		dc.b -1
 BlackList	dc.b 0,b1-BlackList-2,"hyperionvideo.library",0
 b1		dc.b -1		
 		
+RContinue	dc.b	"Continue",0
+
 		cnop	0,4
+
+Requester	dc.l	$14
+		ds.l	4
 		
 EndCP		end

@@ -857,6 +857,9 @@ mmuSetup:
 .Exithtab:	or	r15,r15,r9
 		sync
 		mtspr	SDR1,r15			#set SDR1
+		
+		stw	r15,0x190(r0)
+		
 		isync
 
 		rlwinm	r6,r6,30,0,31			#r6 = pt_size, r7 = pt_loc
@@ -957,7 +960,9 @@ mmuSetup:
 .ExitTBL:	mtlr	r22
 		blr
 
-.ExitTBLErr:	loadreg	r0,'TBL!'
+.ExitTBLErr:	loadreg	r0,'Err1'
+		stw	r0,4(r29)
+		loadreg	r0,'TBL!'
 		stw	r0,0xf4(r0)
 		b	.ExitTBLErr
 
@@ -997,9 +1002,8 @@ ConfigMem:	mflr	r15			#Code lifted from the Sonnet Driver
 		mr	r25,r25			#nop ?
 		bl	ConfigWrite32		#set MCCR4 to 0x100000 BUFTYPE[1] = 
 
-		setpcireg MCCR3	
-		lis	r25,0x2
-		ori	r25,r25,0xa29c		#0x2A29C  0101 010 001 010 011 100,
+		setpcireg MCCR3
+		loadreg	r25,0x0002a29c		#0x2A29C  0101 010 001 010 011 100,	
 						#RP1  RAS Precharge = 4 3b100
 						#(4 clocks are 110 per pdf, seems docu is wrong)
 						#RCD2 RAS to CAS delay = 3
@@ -1011,14 +1015,13 @@ ConfigMem:	mflr	r15			#Code lifted from the Sonnet Driver
 						#31-19 = 0
 		bl	ConfigWrite32		#set MCCR3 to 0x2A29C
 	
-		setpcireg MCCR2	
-		lis	r25,0xe000
-		ori	r25,r25,0x1040
+		setpcireg MCCR2
+		loadreg	r25,0xe0001040	
 		bl	ConfigWrite32		#set MCCR2 to 0xE0001040
 						#MCCR2 Memory Control Config Reg   = 0xe0001040
 						#    Read Modify Write parity      = 0x0 Disabled
 						#    RSV_PG Reserve one open page  = 0x0 Four open page mode
-						#    Refresh Interval              = 0x0208 = 520 decimal
+						#    Refresh Interval              = 0x0208 = 520 decimal (is actually 0x410...)
 						#    EDO Enable                    = 0x0 standard DRAM
 						#    ECC enable                    = 0x0 Disabled
 						#    Inline Read Parity enable     = 0x0 Disabled
@@ -1088,22 +1091,22 @@ ConfigMem:	mflr	r15			#Code lifted from the Sonnet Driver
 		li	r19,0
 
 loc_3BD8:	setpcireg MBEN			#Memory Bank Enable Register
-		mr	r25, r5
+		mr	r25,r5
 		bl	ConfigWrite8		#enable Bank 0
 
-		stw	r4, 0(r3)		#try to store "Boon" at address 0x0
+		stw	r4,0(r3)		#try to store "Boon" at address 0x0
 		eieio
 	
-		stw	r3, 4(r3)		#try to store 0x0 at 0x4
+		stw	r3,4(r3)		#try to store 0x0 at 0x4
 		eieio
-		lwz	r7, 0(r3)		#read from 0x0
-		cmplw	r4, r7			#is it "Boon", long compare
+		lwz	r7,0(r3)		#read from 0x0
+		cmplw	r4,r7			#is it "Boon", long compare
 		bne	loc_4184
 	
-		or	r14, r14, r5		#continue if found
+		or	r14,r14,r5		#continue if found
 	
 		setpcireg MCCR1			#0x800000f0
-		loadreg r25,0xffeaffff		#-22,65535
+		loadreg r25,0xffeaffff
 		bl	ConfigWrite32		#set all banks to 12 or 13 row bits
 
 		lis	r6,0x40
@@ -2940,7 +2943,9 @@ EInt:		b	.FPUnav				#0
 		li	r0,EXCF_TRACE
 		stw	r0,36(r13)			#NOT VERY NICE!!
 		
-.ExcReUse:	lwz	r31,0(r31)
+.ExcReUse:	b	.ExcReUse
+		
+		lwz	r31,0(r31)
 		lwz	r0,0(r31)
 		mr. 	r0,r0
 		beq	.NoHandler
@@ -4040,6 +4045,10 @@ EInt:		b	.FPUnav				#0
 .DoExc:		mflr	r29
 		mtsprg0	r31
 		lwz	r0,EXCDATA_CODE(r30)
+		
+		stw	r0,0x15c(r0)
+		stw	r30,0x170(r0)
+		
 		mtlr	r0		
 		lwz	r0,EXCDATA_FLAGS(r30)
 		rlwinm.	r0,r0,(32-EXC_LARGECONTEXT),31,31
@@ -4055,6 +4064,20 @@ EInt:		b	.FPUnav				#0
 		mr	r3,r13
 		mtsprg2	r1				
 		
+		
+		lwz	r31,7184(r2)
+		lwz	r30,7204(r2)
+		stw	r30,0x1a0(r0)
+		stw	r31,0x160(r0)
+		lwz	r31,0(r31)
+		stw	r31,0x180(r0)
+		lwz	r30,5076(r31)
+		stw	r30,0x150(r0)
+		lwz	r30,5040(r31)
+		stw	r30,0x154(r0)
+		lwz	r30,5184(r31)
+		stw	r30,0x158(r0)
+		
 		lwz	r0,4+XCO_SIZE(r13)
 		lwz	r27,16+XCO_SIZE(r13)
 		lwz	r28,20+XCO_SIZE(r13)
@@ -4063,6 +4086,10 @@ EInt:		b	.FPUnav				#0
 		lwz	r31,32+XCO_SIZE(r13)
 		
 		blrl					#DO NOT TRASH R13 IN HANDLER!
+
+
+		loadreg	r0,'tst!'
+		stw	r0,0x164(r0)
 
 		addi	r13,r13,XCO_SIZE
 		

@@ -35,6 +35,8 @@
 .global AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
 .global AddUniqueSemaphorePPC,IsExceptionMode,CreateMsgFramePPC,SendMsgFramePPC,FreeMsgFramePPC
 
+.global	WarpIllegal
+
 .section "LibBody","acrx"
 
 #********************************************************************************************
@@ -3086,6 +3088,13 @@ Run68K:
 		stw	r4,MN_ARG1(r30)
 		lwz	r4,TC_SIGRECVD(r5)
 		stw	r4,MN_ARG2(r30)
+		
+		lwz	r4,PP_FLAGS(r30)
+		cmpwi	r4,0
+		beq	.FromRunPPC
+		
+		loadreg	r4,'asnc'
+		stw	r4,0x130(r0)
 		
 .FromRunPPC:	lwz	r4,MCPort(r0)
 		stw	r4,MN_MCPORT(r30)
@@ -9525,6 +9534,10 @@ ExitCode:	lwz	r17,RunningTask(r0)
 Pause:		nop
 		nop
 		b	Pause
+		
+		
+WarpIllegal:	.long	0
+		b	WarpIllegal		
 		
 #********************************************************************************************
 
