@@ -661,6 +661,8 @@ NoXReply	move.l MN_IDENTIFIER(a1),d0
 		beq PrintDebug
 		cmp.l #"DBG2",d0
 		beq PrintDebug2
+		cmp.l #"CRSH",d0
+		beq Crashed
 		bra.s GetLoop
 
 ;********************************************************************************************		
@@ -892,6 +894,30 @@ Prc2Name	dc.b "Joshua",0
 		cnop 0,4
 				
 ;********************************************************************************************
+;********************************************************************************************
+
+
+Crashed		movem.l d0-a6,-(a7)
+		move.l a1,a0
+		bsr FreeMsgFrame
+		move.l DosBase(pc),a6
+		lea ConWindow(pc),a0
+		move.l a0,d1
+		move.l #MODE_NEWFILE,d2
+		jsr _LVOOpen(a6)
+		move.l d0,d1
+		beq.s VeryBad
+		
+		lea CrashMessage(pc),a0
+		move.l a0,d2		
+		move.l SonnetBase(pc),a0
+		move.l a0,d3
+		add.l #$2100,d3
+		jsr _LVOVFPrintf(a6)
+		
+VeryBad		movem.l (a7)+,d0-a6
+		bra NextMsg
+
 ;********************************************************************************************
 
 SonInt:		movem.l d0-a6,-(a7)
@@ -2386,8 +2412,36 @@ w11		dc.b w12-w11-1,"asyncio.library",0
 w12		dc.b -1
 		
 BlackList	dc.b 0,b1-BlackList-2,"hyperionvideo.library",0
-b1		dc.b -1		
+b1		dc.b -1
+
+ConWindow	dc.b	"CON:0/20/680/250/Sonnet - PowerPC Exception/AUTO/CLOSE/WAIT/"
+		dc.b	"INACTIVE",0		
+
+		cnop	0,4
 		
+CrashMessage	dc.b	"Task name: '%s'  Task address: %08lx  Exception: %s",10
+		dc.b	"SRR0: %08lx    SRR1:  %08lx     MSR:   %08lx    HID0: %08lx",10
+		dc.b	"PVR:  %08lx    DAR:   %08lx     DSISR: %08lx    SDR1: %08lx",10
+		dc.b	"DEC:  %08lx    TBU:   %08lx     TBL:   %08lx    XER:  %08lx",10
+		dc.b	"CR:   %08lx    FPSCR: %08lx     LR:    %08lx    CTR:  %08lx",10
+		dc.b	"R0-R3:   %08lx %08lx %08lx %08lx   IBAT0: %08lx %08lx",10
+		dc.b	"R4-R7:   %08lx %08lx %08lx %08lx   IBAT1: %08lx %08lx",10
+		dc.b	"R8-R11:  %08lx %08lx %08lx %08lx   IBAT2: %08lx %08lx",10
+		dc.b	"R12-R15: %08lx %08lx %08lx %08lx   IBAT3: %08lx %08lx",10
+		dc.b	"R16-R19: %08lx %08lx %08lx %08lx   DBAT0: %08lx %08lx",10
+		dc.b	"R20-R23: %08lx %08lx %08lx %08lx   DBAT1: %08lx %08lx",10
+		dc.b	"R24-R27: %08lx %08lx %08lx %08lx   DBAT2: %08lx %08lx",10
+		dc.b	"R28-R31: %08lx %08lx %08lx %08lx   DBAT3: %08lx %08lx",10,10,0
+
+		dc.b	"F0-F3:    %s   %s   %s   %s",10		;Unused at the moment
+		dc.b	"F4-F7:    %s   %s   %s   %s",10
+		dc.b	"F8-F11:   %s   %s   %s   %s",10
+		dc.b	"F12-F15:  %s   %s   %s   %s",10
+		dc.b	"F16-F19:  %s   %s   %s   %s",10
+		dc.b	"F20-F23:  %s   %s   %s   %s",10
+		dc.b	"F24-F27:  %s   %s   %s   %s",10
+		dc.b	"F28-F31:  %s   %s   %s   %s",10,0
+				
 RContinue	dc.b	"Continue",0
 
 		cnop	0,4

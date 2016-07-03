@@ -2853,6 +2853,9 @@ EInt:		b	.FPUnav				#0
 		li	r0,EXCF_MCHECK
 		stw	r0,36(r13)			#NOT VERY NICE!!
 
+		li	r0,.EMachCheck-.EMonitor
+		mtsprg1	r0
+
 		b	.ExcReUse
 
 #********************************************************************************************
@@ -2899,6 +2902,9 @@ EInt:		b	.FPUnav				#0
 		la	r31,LIST_EXCSYSTEMCALL(r31)
 		li	r0,EXCF_SYSTEMCALL
 		stw	r0,36(r13)			#NOT VERY NICE!!
+		
+		li	r0,.ESC-.EMonitor
+		mtsprg1	r0
 
 		b	.ExcReUse
 
@@ -3281,7 +3287,24 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r0
 		isync
 		
-.HaltPPC:	b	.HaltPPC
+		lwz	r0,0(r13)
+		mtcr	r0
+		lwz	r0,4(r13)
+		mtsprg0	r0
+		lwz	r2,8(r13)
+		lwz	r3,12(r13)
+		lwz	r27,16(r13)
+		lwz	r28,20(r13)
+		lwz	r29,24(r13)
+		lwz	r30,28(r13)
+		lwz	r31,32(r13)
+		addi	r13,r13,40			#Skipping one spot (was for Exc Type)
+
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r1,0(r1)	
+			
+		b	.CrashReport
 		
 #********************************************************************************************
 
@@ -3327,6 +3350,9 @@ EInt:		b	.FPUnav				#0
 		la	r31,LIST_EXCFPUN(r31)
 		li	r0,EXCF_FPUN
 		stw	r0,36(r13)			#NOT VERY NICE!!
+
+		li	r0,.EFP-.EMonitor
+		mtsprg1	r0
 
 		b	.ExcReUse
 
@@ -3620,6 +3646,9 @@ EInt:		b	.FPUnav				#0
 		la	r31,LIST_EXCIACCESS(r31)
 		li	r0,EXCF_IACCESS
 		stw	r0,36(r13)			#NOT VERY NICE!!
+		
+		li	r0,.EISI-.EMonitor
+		mtsprg1	r0
 
 		b	.ExcReUse
 
@@ -3659,7 +3688,7 @@ EInt:		b	.FPUnav				#0
 		stwu	r0,-4(r13)		
 		mfcr	r0
 		stwu	r0,-4(r13)
-
+				
 		loadreg	r29,'PRFM'
 		stw	r29,0xf4(r0)
 				
@@ -3667,6 +3696,9 @@ EInt:		b	.FPUnav				#0
 		la	r31,LIST_EXCPERFMON(r31)
 		loadreg	r0,EXCF_PERFMON
 		stw	r0,36(r13)			#NOT VERY NICE!!
+
+		li	r0,.EMonitor-.EMonitor
+		mtsprg1	r0
 
 		b	.ExcReUse
 	
@@ -3919,7 +3951,53 @@ EInt:		b	.FPUnav				#0
 		
 .HaltDSI:	loadreg	r7,'DSI!'
 		stw	r7,0xf4(r0)
-		b	.HaltDSI
+				
+		lwz	r31,0(r1)			#Load registers with correct values
+		mtsprg0	r31
+		lwz	r31,4(r1)
+		mtsprg1	r31
+		lwz	r2,8(r1)
+		lwz	r3,12(r1)
+		lwz	r4,16(r1)
+		lwz	r5,20(r1)
+		lwz	r6,24(r1)
+		lwz	r7,28(r1)
+		lwz	r8,32(r1)
+		lwz	r9,36(r1)
+		lwz	r10,40(r1)
+		lwz	r11,44(r1)
+		lwz	r12,48(r1)
+		lwz	r13,52(r1)
+		lwz	r14,56(r1)
+		lwz	r15,60(r1)
+		lwz	r16,64(r1)
+		lwz	r17,68(r1)
+		lwz	r18,72(r1)
+		lwz	r19,76(r1)
+		lwz	r20,80(r1)
+		lwz	r21,84(r1)
+		lwz	r22,88(r1)
+		lwz	r23,92(r1)
+		lwz	r24,96(r1)
+		lwz	r25,100(r1)
+		lwz	r26,104(r1)
+		lwz	r27,108(r1)
+		lwz	r28,112(r1)
+		lwz	r29,116(r1)
+		lwz	r30,120(r1)
+		lwz	r31,124(r1)
+		lwz	r0,132(r1)
+		mtcr	r0
+		lwz	r0,136(r1)
+		mtlr	r0
+		mfsprg1	r1
+				
+		li	r0,.EDSI-.EMonitor
+		mtsprg1	r0
+		
+		mfsprg0	r0
+		
+		b	.CrashReport
 
 #*************************************************
 
@@ -4365,12 +4443,189 @@ EInt:		b	.FPUnav				#0
 		
 .HaltErr:	loadreg r3,'HALT'			#DEBUG
 		stw	r3,0xf4(r0)			#Error
-		mfsrr0	r3
-		stw	r3,0xf8(r0)			#Current PC
-		mflr	r3
-		stw	r3,0xfc(r0)			#Original calling function
+		
+		li	r0,.EProgram-.EMonitor
+		mtsprg1	r0
+		
+		lwz	r0,0(r13)
+		mtcr	r0
+		lwz	r0,4(r13)
+		lwz	r2,8(r13)
+		lwz	r3,12(r13)
+		lwz	r27,16(r13)
+		lwz	r28,20(r13)
+		lwz	r29,24(r13)
+		lwz	r30,28(r13)
+		lwz	r31,32(r13)
+		addi	r13,r13,36
 
-.xxHaltErr2:	b .xxHaltErr2
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r1,0(r1)
+
+.CrashReport:	mtsprg2	r30
+		mflr	r30
+		bl .GotStrings
+
+.EMonitor:	.string	"Perfomance Monitor"
+.ESC:		.string	"System Call"
+.EMachCheck:	.string	"Machine Check"
+.EProgram:	.string	"Program"
+.EDSI:		.string	"Data Storage"
+.EISI:		.string	"Instruction Storage"
+.EFP:		.string	"FPU Unavailable"
+
+		.align	2
+				
+.GotStrings:	mtsprg3	r31
+		li	r31,0x2100
+		addi	r31,r31,18*4
+		stwu	r0,4(r31)
+		stwu	r1,4(r31)
+		stwu	r2,4(r31)
+		stwu	r3,4(r31)
+		mfibatu	r0,0
+		stwu	r0,4(r31)
+		mfibatl	r0,0
+		stwu	r0,4(r31)		
+		stwu	r4,4(r31)
+		stwu	r5,4(r31)
+		stwu	r6,4(r31)
+		stwu	r7,4(r31)
+		mfibatu	r0,1
+		stwu	r0,4(r31)
+		mfibatl	r0,1
+		stwu	r0,4(r31)
+		stwu	r8,4(r31)
+		stwu	r9,4(r31)
+		stwu	r10,4(r31)
+		stwu	r11,4(r31)
+		mfibatu	r0,2
+		stwu	r0,4(r31)
+		mfibatl	r0,2
+		stwu	r0,4(r31)
+		stwu	r12,4(r31)
+		stwu	r13,4(r31)
+		stwu	r14,4(r31)
+		stwu	r15,4(r31)
+		mfibatu	r0,3
+		stwu	r0,4(r31)
+		mfibatl	r0,3
+		stwu	r0,4(r31)
+		stwu	r16,4(r31)
+		stwu	r17,4(r31)
+		stwu	r18,4(r31)
+		stwu	r19,4(r31)
+		mfdbatu	r0,0
+		stwu	r0,4(r31)
+		mfdbatl	r0,0
+		stwu	r0,4(r31)
+		stwu	r20,4(r31)
+		stwu	r21,4(r31)
+		stwu	r22,4(r31)
+		stwu	r23,4(r31)
+		mfdbatu	r0,1
+		stwu	r0,4(r31)
+		mfdbatl	r0,1
+		stwu	r0,4(r31)
+		stwu	r24,4(r31)
+		stwu	r25,4(r31)
+		stwu	r26,4(r31)
+		stwu	r27,4(r31)
+		mfdbatu	r0,2
+		stwu	r0,4(r31)
+		mfdbatl	r0,2
+		stwu	r0,4(r31)
+		stwu	r28,4(r31)
+		stwu	r29,4(r31)
+		mfsprg2	r0
+		stwu	r0,4(r31)
+		mfsprg3	r0
+		stwu	r0,4(r31)
+		mfdbatu	r0,3
+		stwu	r0,4(r31)
+		mfdbatl	r0,3
+		stwu	r0,4(r31)
+		li	r31,0x2100
+		lwz	r29,RunningTask(r0)
+		stw	r29,4(r31)
+		lwz	r29,LN_NAME(r29)
+		stw	r29,0(r31)
+		addi	r31,r31,4
+		lwz	r29,SonnetBase(r0)
+		mflr	r28
+		or	r28,r28,r29
+		mfsprg1	r29
+		add	r28,r28,r29
+		stwu	r28,4(r31)
+		mfsrr0	r0
+		stwu	r0,4(r31)
+		mfsrr1	r0
+		stwu	r0,4(r31)
+		mfmsr	r0
+		stwu	r0,4(r31)
+		mfspr	r0,HID0
+		stwu	r0,4(r31)
+		mfpvr	r0
+		stwu	r0,4(r31)
+		mfdar	r0
+		stwu	r0,4(r31)
+		mfdsisr	r0
+		stwu	r0,4(r31)
+		mfspr	r0,SDR1
+		stwu	r0,4(r31)
+		mfdec	r0
+		stwu	r0,4(r31)
+		mftbu	r0
+		stwu	r0,4(r31)
+		mftbl	r0
+		stwu	r0,4(r31)
+		mfxer	r0
+		stwu	r0,4(r31)
+		mfcr	r0
+		mffs	f0
+		stfdu	f0,4(r31)
+		stw	r0,0(r31)
+		addi	r31,r31,4		
+		stwu	r30,4(r31)
+		mfctr	r0
+		stwu	r0,4(r31)
+		
+		lis	r28,EUMB
+		li	r24,OFTPR
+		lwbrx	r25,r24,r28			
+		addi	r23,r25,4
+		loadreg	r20,0xc000
+		or	r23,r23,r20
+		loadreg r20,0xffff
+		and	r23,r23,r20			#Keep it C000-FFFE		
+		stwbrx	r23,r24,r28
+		lwz	r25,0(r25)
+
+		loadreg	r9,'CRSH'
+
+		stw	r9,MN_IDENTIFIER(r25)
+		
+		lwz	r20,MCPort(r0)
+		stw	r20,MN_MCPORT(r25)
+		li	r20,NT_MESSAGE
+		stb	r20,LN_TYPE(r25)
+		li	r20,192
+		sth	r20,MN_LENGTH(r25)
+
+		sync
+
+		lis	r28,EUMB
+		li	r24,OPHPR
+		lwbrx	r22,r24,r28		
+		stw	r25,0(r22)		
+		addi	r23,r22,4
+		loadreg	r20,0xbfff
+		and	r23,r23,r20			#Keep it 8000-BFFE
+		stwbrx	r23,r24,r28			#triggers Interrupt
+		
+.RealHalt:	b	.RealHalt
+		
 		
 #********************************************************************************************
 	
