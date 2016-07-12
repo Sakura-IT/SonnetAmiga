@@ -17,7 +17,7 @@
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 .global	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
-.global NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FlushL1DCache,FreeSignalPPC
+.global NextTagItemPPC,GetTagDataPPC,FindTagItemPPC,FreeSignalPPC
 .global	AllocXMsgPPC,FreeXMsgPPC,CreateMsgPortPPC,DeleteMsgPortPPC,AllocSignalPPC
 .global SetSignalPPC,LockTaskList,UnLockTaskList
 .global	InitSemaphorePPC,FreeSemaphorePPC,ObtainSemaphorePPC,AttemptSemaphorePPC
@@ -130,7 +130,7 @@ SetCache:
 		b	.DoneCache
 
 
-.L2DISABLE:	bl FlushL1DCache
+.L2DISABLE:	bl FlushDCache
 
 		bl Super
 
@@ -185,7 +185,7 @@ SetCache:
 		mr	r29,r5
 		mr	r31,r6
 		
-		bl FlushL1DCache
+		bl FlushDCache
 		
 		mr	r4,r29
 		mr	r5,r31
@@ -224,7 +224,7 @@ SetCache:
 		mr.	r29,r29
 		bne	.DoneCache
 		
-		bl FlushL1DCache
+		bl FlushDCache
 		
 		bl Super
 		
@@ -410,7 +410,7 @@ SetCache:
 		mr.	r29,r29
 		bne	.DoneCache
 
-		bl FlushL1DCache
+		bl FlushDCache
 
 .DoneCache:	mtctr	r28
 
@@ -1321,65 +1321,79 @@ FindTagItemPPC:
 
 #********************************************************************************************
 #
-#	Support: void FlushL1DCache(void)
+#	Support: void FlushDCache(void)
 #
 #********************************************************************************************
 
-FlushL1DCache:
+FlushDCache:
 		prolog 228,'TOC'
 		
 		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
 		
-		mfctr	r7
+		mfctr	r28		
+		
+		lwz	r3,PowerPCBase(r0)
+		mr	r30,r3
+		li	r29,-1
+		stb	r29,FLAG_READY(r3)			
 		
 		bl	Super
-
-		mfmsr	r6
-		xori	r6,r6,PSL_EE			#Disable Interrupts
-		mtmsr	r6
-		isync
-		sync
 		
-		loadreg	r6,0x400			#L1 Cache size/Cache line size
-		lwz	r5,L2Size(r0)
+		mfdec	r26
+		lis	r29,0xf00
+		mtdec	r29
+		
+		loadreg	r29,0x400			#L1 Cache size/Cache line size
+		lwz	r27,L2Size(r0)
 		li	r4,5
-		srw	r5,r5,r4
-		or	r6,r6,r5			#Or with the L2 Cache size/Cache line size
-		mr	r5,r6
+		srw	r27,r27,r4
+		add	r29,r29,r27			#Add with the L2 Cache size/Cache line size
+		mr	r27,r29
 		
-		mtctr	r6
+		mtctr	r29
 		
-		lwz	r6,MemSize(r0)
+		lwz	r29,MemSize(r0)
 		loadreg	r4,0x400000
-		sub	r6,r6,r4
-		lwz	r4,SonnetBase(r0)
-		or	r4,r4,r6
+		sub	r29,r29,r4
+		lwz	r4,SonnetBase(r0)		
+		add	r4,r4,r29
 		mr	r31,r4
 	
-.Fl1:		lwz	r6,0(r4)
+.Fl1:		lwz	r29,0(r4)
 		addi	r4,r4,L1_CACHE_LINE_SIZE
 		bdnz+	.Fl1
 	
 		mr	r4,r31
-		mtctr	r5
+		mtctr	r27
 		
 .Fl2:		dcbf	r0,r4
 		addi	r4,r4,L1_CACHE_LINE_SIZE
 		bdnz+	.Fl2
-
-		mfmsr	r6
-		ori	r6,r6,PSL_EE			#Enable Interrupts
-		mtmsr	r6
-		isync
+		
 		sync
+		
+		mtdec	r26
 
 		mr	r4,r3
 		bl	User
 
-		mtctr	r7
+		li	r29,0
+		stb	r29,FLAG_READY(r30)
+
+		mtctr	r28
 		
-		lwz	r31,0(r13)
-		addi	r13,r13,4
+		lwz	r26,0(r13)
+		lwz	r27,4(r13)
+		lwz	r28,8(r13)
+		lwz	r29,12(r13)
+		lwz	r30,16(r13)
+		lwz	r31,20(r13)
+		addi	r13,r13,24
 		
 		epilog 'TOC'
 
