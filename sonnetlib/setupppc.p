@@ -2953,6 +2953,9 @@ EInt:		b	.FPUnav				#0
 		li	r0,EXCF_TRACE
 		stw	r0,36(r13)			#NOT VERY NICE!!
 		
+		li	r0,.ETrace-.EMonitor
+		mtsprg1	r0
+		
 .ExcReUse:	lwz	r31,0(r31)
 		lwz	r0,0(r31)
 		mr. 	r0,r0
@@ -3300,12 +3303,9 @@ EInt:		b	.FPUnav				#0
 		lwz	r31,32(r13)
 		addi	r13,r13,40			#Skipping one spot (was for Exc Type)
 
-#		lwz	r1,0(r1)
-#		lwz	r13,-4(r1)
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
 #		lwz	r1,0(r1)	
-
-		li	r0,.ETrace-.EMonitor
-		mtsprg1	r0
 			
 		b	.CrashReport
 		
