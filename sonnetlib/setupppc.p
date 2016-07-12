@@ -3300,9 +3300,12 @@ EInt:		b	.FPUnav				#0
 		lwz	r31,32(r13)
 		addi	r13,r13,40			#Skipping one spot (was for Exc Type)
 
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r1,0(r1)	
+#		lwz	r1,0(r1)
+#		lwz	r13,-4(r1)
+#		lwz	r1,0(r1)	
+
+		li	r0,.ETrace-.EMonitor
+		mtsprg1	r0
 			
 		b	.CrashReport
 		
@@ -4474,6 +4477,7 @@ EInt:		b	.FPUnav				#0
 .EDSI:		.string	"Data Storage"
 .EISI:		.string	"Instruction Storage"
 .EFP:		.string	"FPU Unavailable"
+.ETrace:	.string "Trace"
 
 		.align	2
 				
