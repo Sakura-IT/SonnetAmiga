@@ -469,8 +469,55 @@ PPCInit		move.l SonnetBase(pc),a1
 		move.l d0,OMBAR(a3)
 		
 		jsr _LVODisable(a6)
+
+		sub.l a1,a1				;Built-in RamLibPatch (16k stack) 
+		jsr _LVOFindTask(a6)			;as this is LibInit, we are running inside the ramlib process
+		tst.l d0
+		beq.s VeryStrange
 		
-		move.l #_LVOAddTask,a0			;Set system patches
+		move.l d0,a3
+		move.l TC_SPUPPER(a3),d0
+		move.l TC_SPLOWER(a3),d1
+		sub.l d1,d0
+		move.l #$4000,d6
+		cmp.l d6,d0
+		bge.s VeryStrange
+		
+		move.l d6,d0
+		moveq.l #MEMF_PUBLIC,d1
+		jsr _LVOAllocVec(a6)
+		tst.l d0
+		beq.s VeryStrange
+		
+		move.l d0,-(a7)
+		add.l d6,d0
+		move.l d0,-(a7)
+		move.l TC_SPUPPER(a3),d1
+		move.l TC_SPREG(a3),d2
+		move.l d2,a0
+		sub.l d2,d1
+		sub.l d1,d0
+		move.l d0,a1
+		move.l a1,-(a7)
+		move.l d1,d0
+		
+		jsr _LVOCopyMem(a6)
+		
+		move.l (a7)+,TC_SPREG(a3)
+		move.l (a7)+,d0
+		move.l TC_SPUPPER(a3),d2
+		move.l d0,TC_SPUPPER(a3)
+		move.l (a7)+,TC_SPLOWER(a3)
+		move.l a7,d1
+		move.l d0,d3
+		sub.l d1,d2
+		sub.l d2,d3
+		lsr.l #2,d0
+		move.l d0,pr_StackBase(a3)
+		move.l d6,pr_StackSize(a3)
+		move.l d3,a7				;Set new stack pointer		
+		
+VeryStrange	move.l #_LVOAddTask,a0			;Set system patches
 		lea StartCode(pc),a3
 		move.l a3,d0
 		move.l a6,a1
@@ -1511,7 +1558,7 @@ GotMsgPort	move.l d0,Port(a5)
 		move.l TC_SPLOWER(a1),d1
 		sub.l d1,d0
 		lsl.l #1,d0				;Double the 68K stack
-;		or.l #$80000,d0				;Set stack at least at 512k
+		or.l #$80000,d0				;Set stack at least at 512k
 		move.l d0,d7
 		add.l #2048,d0
 
@@ -2137,7 +2184,7 @@ DATATABLE:
 	INITLONG	LN_NAME,LibName
 	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITWORD	LIB_VERSION,17
-	INITWORD	LIB_REVISION,2
+	INITWORD	LIB_REVISION,3
 	INITLONG	LIB_IDSTRING,IDString
 	ds.l	1
 	
@@ -2375,7 +2422,7 @@ FUNCTABLE:
 
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0
-IDString	dc.b	"$VER: sonnet.library 17.2 (01-Jul-16)",0
+IDString	dc.b	"$VER: sonnet.library 17.3 (16-Jul-16)",0
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: fake warp.library 5.0 (01-Apr-16)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
