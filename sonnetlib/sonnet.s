@@ -165,9 +165,9 @@ Exit		move.l _PowerPCBase(pc),d0
 
 ClsLib  	move.l d0,a1
 		jmp _LVOCloseLibrary(a6)
+
 FreeROM		move.l d0,a1
-		move.l #$10000,d0
-		jmp _LVOFreeMem(a6)
+		jmp _LVOFreeVec(a6)
 
 FndMem		move.l d0,d7
 
@@ -249,20 +249,19 @@ FoundGfx	move.l LExecBase(pc),a6
 		move.w d5,GfxType-Buffer(a4)
 		move.l d6,a2
 		move.l a2,SonAddr-Buffer(a4)
-		move.l d7,a0
-		move.l MH_UPPER(a0),d1
-		sub.l #$10000,d1
-		and.w #0,d1
-		move.l d1,a1
-		move.l #$10000,d0
-		jsr _LVOAllocAbs(a6)			;Allocate fake ROM in VGA Mem
-		tst.l d0
+		
+		move.l #$20000,d0
+		move.l #MEMF_PUBLIC|MEMF_PPC,d1
+		jsr _LVOAllocVec(a6)
+		tst.l d0				;Allocate fake ROM in VGA Mem
 		bne.s GotVGAMem
 
 		lea MemVGAError(pc),a2
 		bra PrintError
 
 GotVGAMem	move.l d0,ROMMem-Buffer(a4)
+		add.l #$10000,d0
+		and.w #0,d0
 		move.l d0,a5
 		move.l a5,a1
 		lea $100(a5),a5
@@ -1512,7 +1511,7 @@ GotMsgPort	move.l d0,Port(a5)
 		move.l TC_SPLOWER(a1),d1
 		sub.l d1,d0
 		lsl.l #1,d0				;Double the 68K stack
-		or.l #$80000,d0				;Set stack at least at 512k
+;		or.l #$80000,d0				;Set stack at least at 512k
 		move.l d0,d7
 		add.l #2048,d0
 
