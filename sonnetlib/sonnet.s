@@ -44,7 +44,13 @@
 	XREF	AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
 	XREF	AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
 	XREF	AddUniqueSemaphorePPC,IsExceptionMode,CreateMsgFramePPC,SendMsgFramePPC
-	XREF	FreeMsgFramePPC,WarpIllegal
+	XREF	FreeMsgFramePPC
+	
+	IFD	_IFUSION_
+	
+	XREF	WarpIllegal
+	
+	ENDC
 
 	XREF 	PPCCode,PPCLen,RunningTask,LIST_WAITINGTASKS,MCPort,Init
 	XREF	SysBase,PowerPCBase,DOSBase
@@ -2202,71 +2208,77 @@ WARPFUNCTABLE:
 	dc.l	WarpClose
 	dc.l	Reserved
 	dc.l	Reserved
+	
+	IFD	_IFUSION_	
+	
 	dc.l	WarpIllegal				;Debug for iFusion
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
-;	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	dc.l	WarpIllegal
+	
+	ENDC	
+	
 	dc.l	-1
 
 FUNCTABLE:
@@ -2422,7 +2434,7 @@ FUNCTABLE:
 
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0
-IDString	dc.b	"$VER: sonnet.library 17.3 (16-Jul-16)",0
+IDString	dc.b	"$VER: sonnet.library 17.3 (22-Aug-16)",0
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: fake warp.library 5.0 (01-Apr-16)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
@@ -2443,7 +2455,7 @@ SonnetMemError	dc.b	"No memory detected on the Sonnet card",0
 
 ramlib		dc.b "ramlib",0		
 		
-WhiteList	dc.b 11,w1-WhiteList-2,"mpega.library",0
+WhiteList	dc.b 12,w1-WhiteList-2,"mpega.library",0
 w1		dc.b w2-w1-1,"Warp3DPPC.library",0
 w2		dc.b w3-w2-1,"agleppc.library",0
 w3		dc.b w4-w3-1,"aglppc.library",0
@@ -2455,10 +2467,12 @@ w8		dc.b w9-w8-1,"fsoundPPC.library",0
 w9		dc.b w10-w9-1,"chunkyppc.library",0
 w10		dc.b w11-w10-1,"ppc.library",0
 w11		dc.b w12-w11-1,"asyncio.library",0
-w12		dc.b -1
+w12		dc.b w13-w12-1,"jpeg.library",0
+w13		dc.b -1
 		
-BlackList	dc.b 0,b1-BlackList-2,"hyperionvideo.library",0
-b1		dc.b -1
+BlackList	dc.b 1,b1-BlackList-2,"hyperionvideo.library",0
+b1		dc.b b2-b1-1,"Picasso96API.library",0
+b2		dc.b -1
 
 ConWindow	dc.b	"CON:0/20/680/250/Sonnet - PowerPC Exception/AUTO/CLOSE/WAIT/"
 		dc.b	"INACTIVE",0		

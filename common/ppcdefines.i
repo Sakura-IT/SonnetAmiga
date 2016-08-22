@@ -193,6 +193,7 @@
 .set IdleTask,			0x7400
 
 .set MEMF_PUBLIC,		0x00000001
+.set MEMF_CHIP,			0x00000002
 .set MEMF_FAST,			0x00000004
 .set MEMF_CLEAR,		0x00010000
 .set MEMF_PPC,			0x00002000
@@ -429,6 +430,18 @@
 .set EPIC_IVPR3,0x50260		#Interrupt Vector/Priority Register 3
 .set EPIC_IVPR4,0x50280		#Interrupt Vector/Priority Register 4
 .set EPIC_IIVPR3,0x510c0	#I2C Interrupt Vector/Priority Register 3
+
+.set I2C_ADR,			0x3000		#I2C Address Register
+.set I2C_FDR,			0x3004		#I2C Frequency Divider Register
+.set I2C_CCR,			0x3008		#I2C Control Register
+.set I2C_CSR,			0x300c		#I2C Status Register
+.set I2C_CDR,			0x3010		#I2C Data Register
+.set I2C_CCR_MEN,		0x80		#Control Register - Module Enable
+.set I2C_CCR_MSTA,		0x20		#Control Register - Master/Slave Mode Start
+.set I2C_CCR_MTX,		0x10		#Control Register - Transmit/Receive Mode Select
+.set I2C_CCR_TXAK,		0x8		#Control Register - Transfer Acknowledge
+.set I2C_CCR_RSTA,		0x4		#Control Register - Repeat Start
+.set I2C_CSR_MIF,		0x2		#Status Register - Module Interrupt
 
 .set HW_TRACEON,1				#enable singlestep mode
 .set HW_TRACEOFF,2				#disable singlestep mode

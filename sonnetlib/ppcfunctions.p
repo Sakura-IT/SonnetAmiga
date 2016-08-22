@@ -1212,43 +1212,41 @@ GetSysTimePPC:
 #********************************************************************************************
 
 NextTagItemPPC:
-		stwu	r8,-4(r13)
-		stwu	r7,-4(r13)
-		stwu	r6,-4(r13)
-		stwu	r5,-4(r13)		
-		li	r6,1
-.NextTag:	lwz	r5,0(r4)
+		lwz	r3,0(r4)
+		mr.	r3,r3
+		beq-	.EndTag
+.NextTag:	lwz	r5,0(r3)
 		mr.	r5,r5
-		beq	.EndTag
-
-		subf.	r7,r6,r5
-		beq-	.IgnoreTag
-
-		subf.	r7,r6,r7
+		blt-	.GotTag
+		beq-	.NoTag
+		cmplwi	r5,3
+		bgt-	.GotTag
+		cmplwi	r5,2
+		blt-	.IgnoreTag
 		beq-	.ChainTag
 
-		subf.	r7,r6,r7
-		beq-	.SkipTags
-
-.EndTag:	mr	r3,r5
-		lwz	r5,0(r13)
-		lwzu	r6,4(r13)
-		lwzu	r7,4(r13)
-		lwzu	r8,4(r13)
-		addi	r13,r13,4
-		blr
-
-.IgnoreTag:	addi	r4,r4,8
+		lwz	r5,4(r3)		#Skip tags
+		rlwinm	r5,r5,3,0,28
+		addi	r5,r5,8
+		add	r3,r3,r5
 		b	.NextTag
 
-.ChainTag:	lwz	r4,4(r4)
-		b	.NextTag
+.ChainTag:	lwz	r3,4(r3)
+		mr.	r3,r3
+		bne+	.NextTag
+		stw	r3,0(r4)
+		b	.EndTag
 
-.SkipTags:	lwz	r7,4(r4)
-		li	r8,3
-		slw	r7,r7,r8
-		add 	r4,r4,r7
+.IgnoreTag:	addi	r3,r3,8
 		b	.NextTag
+			
+.GotTag:	addi	r5,r3,8
+		stw	r5,0(r4)
+		b	.EndTag
+			
+.NoTag:		li	r3,0
+		stw	r3,0(r4)
+.EndTag:	blr	
 
 #********************************************************************************************
 #
@@ -1257,35 +1255,26 @@ NextTagItemPPC:
 #********************************************************************************************		
 		
 GetTagDataPPC:	
-		stwu	r8,-4(r13)
-		stwu	r7,-4(r13)
-		stwu	r6,-4(r13)
-		stwu	r5,-4(r13)
-		stwu	r4,-4(r13)
-		mr	r8,r5
-		mr	r5,r6
-		li	r6,1
+		prolog 228,'TOC'
+
+		stwu	r31,-4(r13)
 		
-		mflr	r7
+		mr	r31,r5
+		mr	r5,r6
 		
 		bl FindTagItemPPC
-
-		mtlr	r7
+		
 		mr.	r3,r3
-		bne	.Done
-
-		mr	r3,r8
-		b	.Done2
-
-.Done:		lwz	r3,4(r3)		
-.Done2:		lwz	r4,0(r13)
-		lwzu	r5,4(r13)
-		lwzu	r6,4(r13)
-		lwzu	r7,4(r13)
-		lwzu	r8,4(r13)
+		beq-	.NoTagFound
+		lwz	r3,4(r3)
+		b	.Done
+		
+.NoTagFound:	mr	r3,r31
+.Done:		lwz	r31,0(r13)
 		addi	r13,r13,4
 
-		blr
+		epilog 'TOC'
+
 
 #********************************************************************************************
 #
@@ -1293,31 +1282,27 @@ GetTagDataPPC:
 #
 #********************************************************************************************		
 
-FindTagItemPPC:	
-		stwu	r8,-4(r13)
-		stwu	r7,-4(r13)
-		stwu	r6,-4(r13)
+FindTagItemPPC:
+		prolog 228,'TOC'
+
+		stwu	r31,-4(r13)
+		mr	r31,r4
 		stwu	r5,-4(r13)
-		stwu	r4,-4(r13)
-		mr	r8,r4
-		mr	r4,r5
-		li	r6,1
+.TagLoop2:	mr	r4,r13
 		
-.TagLoop2:	mflr	r7
-
 		bl NextTagItemPPC
-
-		mtlr	r7
+	
 		mr.	r3,r3
-		beq	.Done2
+		beq-	.Done2
+		lwz	r4,0(r3)
+		cmplw	r4,r31
+		bne+	.TagLoop2
 		
-		cmpw	r8,r3
-		beq	.Done3
-		addi	r4,r4,8
-		b	.TagLoop2
+.Done2:		addi	r13,r13,4
+		lwz	r31,0(r13)
+		addi	r13,r13,4
 		
-.Done3:		mr	r3,r4
-		b	.Done2
+		epilog 'TOC'
 
 #********************************************************************************************
 #
@@ -3107,8 +3092,8 @@ Run68K:
 		cmpwi	r4,0
 		beq	.FromRunPPC
 		
-		loadreg	r4,'asnc'
-		stw	r4,0x130(r0)
+		loadreg	r4,'asnc'			#DEBUG
+		stw	r4,0x130(r0)			#DEBUG
 		
 .FromRunPPC:	lwz	r4,MCPort(r0)
 		stw	r4,MN_MCPORT(r30)
@@ -3117,7 +3102,23 @@ Run68K:
 		li	r5,192
 		sth	r5,MN_LENGTH(r30)
 
-		mr	r4,r30
+		lwz	r4,SysBase(r0)
+		lwz	r5,PP_CODE(r30)
+		cmpw	r4,r5
+		bne	.NotAllocMem
+		
+		loadreg	r4,_LVOAllocMem
+		lwz	r5,PP_OFFSET(r30)
+		cmpw	r4,r5
+		bne	.NotAllocMem
+		
+		lwz	r4,PP_REGS+4(r30)
+		andi.	r5,r4,MEMF_CHIP
+		bne	.NotAllocMem
+		ori	r4,r4,MEMF_PPC
+		stw	r4,PP_REGS+4(r30)			
+
+.NotAllocMem:	mr	r4,r30
 		
 		bl SendMsgFramePPC
 
