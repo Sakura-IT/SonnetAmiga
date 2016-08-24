@@ -958,18 +958,10 @@ GetInfo:
 		prolog 228,'TOC'
 
 		stwu	r31,-4(r13)
-		stwu	r8,-4(r13)
-		stwu	r7,-4(r13)
-		stwu	r6,-4(r13)
-		stwu	r5,-4(r13)
 		stwu	r4,-4(r13)
 		
 		li	r31,FGetInfo-FRun68K
 		bl	DebugStartFunction
-
-		li	r6,1
-
-		mr	r5,r4
 
 		bl Super
 
@@ -985,28 +977,23 @@ GetInfo:
 		stw	r3,L2STATE(r0)
 		
 		bl User	
-		
-		mr	r4,r5
-		
-.TagLoop:	bl NextTagItemPPC
 
-		mr.	r3,r3
-		beq	.NoTags		
+.NextInList:	mr	r4,r13
+		
+		bl NextTagItemPPC
+
+		mr.	r4,r3
+		beq	.NoTags
+		lwz	r3,0(r4)		
 		rlwinm	r7,r3,0,0,19
 		loadreg	r8,0x80102000
 		cmpw	r7,r8		
 		beq+	.UserTag
-.NextInList:	addi	r4,r4,8
-		b	.TagLoop
+		b	.NextInList
 		
 .NoTags:	li	r31,FGetInfo-FRun68K
 		bl	DebugEndFunction
 
-		lwz	r4,0(r13)
-		lwzu	r5,4(r13)
-		lwzu	r6,4(r13)
-		lwzu	r7,4(r13)
-		lwzu	r8,4(r13)
 		lwzu	r31,4(r13)
 		addi	r13,r13,4
 		
@@ -1014,7 +1001,8 @@ GetInfo:
 		
 #********************************************************************************************
 
-.UserTag:	rlwinm.	r7,r3,0,27,31
+.UserTag:	li	r6,1
+		rlwinm.	r7,r3,0,27,31
 		beq	.INFO_CPU		
 		subf.	r7,r6,r7
 		beq	.INFO_PVR
@@ -3092,8 +3080,7 @@ Run68K:
 		cmpwi	r4,0
 		beq	.FromRunPPC
 		
-		loadreg	r4,'asnc'			#DEBUG
-		stw	r4,0x130(r0)			#DEBUG
+		.long	0				#ILLEGAL (DEBUG)
 		
 .FromRunPPC:	lwz	r4,MCPort(r0)
 		stw	r4,MN_MCPORT(r30)
@@ -3110,10 +3097,15 @@ Run68K:
 		loadreg	r4,_LVOAllocMem
 		lwz	r5,PP_OFFSET(r30)
 		cmpw	r4,r5
+		beq	.DoingMem
+		
+		loadreg	r4,_LVOAllocVec
+		cmpw	r4,r5
 		bne	.NotAllocMem
 		
-		lwz	r4,PP_REGS+4(r30)
-		andi.	r5,r4,MEMF_CHIP
+.DoingMem:	lwz	r4,PP_REGS+4(r30)
+		loadreg	r5,MEMF_CHIP
+		and.	r5,r4,r5
 		bne	.NotAllocMem
 		ori	r4,r4,MEMF_PPC
 		stw	r4,PP_REGS+4(r30)			
