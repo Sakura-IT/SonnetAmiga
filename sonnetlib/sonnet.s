@@ -1551,6 +1551,7 @@ CSExit		movem.l (a7)+,d1-a6
 ;
 ;********************************************************************************************
 
+MN_STARTALLOC	EQU LN_NAME
 MN_IDENTIFIER	EQU MN_SIZE
 MN_MIRROR	EQU MN_IDENTIFIER+4
 MN_PPC		EQU MN_MIRROR+4
@@ -1701,13 +1702,17 @@ ClrMsg		clr.l (a2)+
 		move.l d1,MN_MIRROR(a0)
 		move.l d6,MN_ARG0(a0)			;Mem
 		move.l d5,MN_PPC(a0)
-		tst.l d5
-		beq.s IssaNew
 		move.l ThisTask(a6),a2
-		move.l TC_SIGALLOC(a2),d7		
-IssaNew		move.l d7,MN_ARG1(a0)			;Len
-		move.l ThisTask(a6),d0
-		move.l d0,MN_ARG2(a0)
+		move.l TC_SIGALLOC(a2),d0
+		tst.l d5
+		bne OldPPCTask
+
+		move.l d0,MN_STARTALLOC(a0)
+		bra SetSigAlloc
+		
+OldPPCTask	move.l d0,d7
+SetSigAlloc	move.l d7,MN_ARG1(a0)			;Len
+		move.l a2,MN_ARG2(a0)
 
 		lea MN_PPSTRUCT(a0),a2
 		moveq.l #PP_SIZE/4-1,d0

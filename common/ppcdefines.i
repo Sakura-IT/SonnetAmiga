@@ -737,6 +737,7 @@
 
 .set pr_MsgPort,92
 
+.set MN_STARTALLOC,10
 .set MN_REPLYPORT,14
 .set MN_LENGTH,18
 .set MN_SIZE,20

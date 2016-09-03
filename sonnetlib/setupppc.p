@@ -1835,14 +1835,20 @@ EInt:		b	.FPUnav				#0
 .PutMsgIt:	lbz	r6,MP_SIGBIT(r4)
 		li	r8,1
 		slw	r8,r8,r6		
-		addi	r4,r4,MP_MSGLIST						
+		addi	r4,r4,MP_MSGLIST
 		lwz	r0,TC_SIGRECVD(r3)
 		or	r0,r0,r8
 		stw	r0,TC_SIGRECVD(r3)
+		
+		lwz	r8,MN_IDENTIFIER(r5)
+		loadreg	r6,'DONE'
+		cmpw	r6,r8
+		bne	.NoSigUpdate
+				
 		lwz	r8,MN_ARG1(r5)
 		stw	r8,TC_SIGALLOC(r3)
 
-		addi	r4,r4,4				#PutMsg r5 to currenttask
+.NoSigUpdate:	addi	r4,r4,4				#PutMsg r5 to currenttask
 		lwz	r3,4(r4)			#AddTailPPC
 		stw	r5,4(r4)
 		stw	r4,0(r5)
@@ -2033,7 +2039,7 @@ EInt:		b	.FPUnav				#0
 		lwz	r6,RunPPCStart(r0)
 		mtsprg0	r6
 
- 		loadreg	r0,SYS_SIGALLOC
+ 		lwz	r0,MN_STARTALLOC(r9)
 		stw	r0,TC_SIGALLOC(r8)
 
 		la	r6,TASKPPC_PORT(r8)
