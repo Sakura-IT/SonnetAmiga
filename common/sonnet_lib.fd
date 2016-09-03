@@ -16,6 +16,9 @@ GetPPCState()()
 SetCache68K(flags,addr,length)(d0/a0/d1)
 CreatePPCTask(taglist)(a0)
 CausePPCInterrupt()()
+##private
+ChangeStack68K(stacksize)()
+##public
 ##abi PPC
 ##bias 300
 Run68K(PPStruct)()

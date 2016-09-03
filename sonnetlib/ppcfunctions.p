@@ -8567,8 +8567,8 @@ WaitTime:
 		stw	r13,-4(r1)
 		subi	r13,r1,4
 		stwu	r1,-44(r1)
-		
-		loadreg	r5,SonnetBusClock
+	
+		loadreg	r5,SonnetBusClock*4
 		
 		mr	r6,r4
 		mulhw	r3,r5,r6

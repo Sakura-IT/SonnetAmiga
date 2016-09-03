@@ -873,10 +873,14 @@ MirrorTask	move.l 4.w,a6				;Mirror task for PPC task
 		move.l a0,d6
 		jsr _LVOWaitPort(a6)
 
-Error		jsr _LVOCreateMsgPort(a6)
+		jsr _LVOCreateMsgPort(a6)
 		tst.l d0
-		beq.s Error
-		move.l d0,-(a7)
+		bne GotTaskMsgPort
+			
+		lea GenMemError(pc),a2
+		bra PrintError				;Lazy - jumps to Clean....Will crash.
+		
+GotTaskMsgPort	move.l d0,-(a7)
 		
 CleanUp		move.l d6,a0
 		jsr _LVOGetMsg(a6)
@@ -929,8 +933,8 @@ GtLoop2		move.l (a7),a0
 		
 DoRunk86	move.l (a7),MN_MIRROR(a0)	
 		bsr Runk86
-		bra.s GoWaitPort
-		
+		bra.s GoWaitPort	
+
 ;********************************************************************************************
 
 		cnop 0,4
@@ -1070,10 +1074,10 @@ MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
 		cmp.l #"END!",d0
 		beq DoPutMsg
 		
-		move.l d1,a2
+		move.l d1,a2		
 		move.l MP_SIGTASK(a2),a2
 		move.l MN_ARG1(a1),d0
-;		or.l d0,TC_SIGALLOC(a2)			;Pending Fix
+		move.l d0,TC_SIGALLOC(a2)
 		move.l MN_ARG2(a1),d0
 		or.l d0,TC_SIGRECVD(a2)				
 		bra DoPutMsg
@@ -1365,6 +1369,9 @@ NoRamLib1	move.l d3,60(a7)
 		move.l d4,d2
 		lea WhiteList(pc),a2
 		or.b #TF_PPC,d3
+		cmp.l #"data",(a1)
+		beq.s  SetFlag
+
 NextBWList	move.b (a2)+,d1
 NextWhite	move.b (a2)+,d2
 		move.l a2,a3
@@ -1440,6 +1447,8 @@ Best		move.l d7,-(a7)
 		move.l LN_NAME(a3),d7				;Has the task a name?
 		beq.s NoBit					;If no then exit
 		move.l d7,a2
+		cmp.l #"ahi.",(a2)
+		beq DoBit
 
 FindEnd		move.b (a2)+,d7
 		bne.s FindEnd
@@ -1481,6 +1490,60 @@ NoFast		move.l AllocMemAddress(pc),-(a7)
 
 ClrBit		bclr #13,d1
 		bra.s NoBit
+		
+;********************************************************************************************
+;
+;	Status = ChangeStack68K(NewStackSize) // d0=d1
+;
+;********************************************************************************************
+
+ChangeStack68K:
+		movem.l d1-a6,-(a7)
+
+		move.l d1,d7
+		move.l LExecBase(pc),a6
+		sub.l a1,a1
+		jsr _LVOFindTask(a6)
+		move.l d0,a0
+		moveq.l #0,d0
+		move.l LN_NAME(a0),a3
+		cmp.l #"raml",(a3)
+		beq CSExit
+		move.l TC_SPUPPER(a0),d6
+		move.l d6,d5
+		move.l TC_SPLOWER(a0),d4
+		move.l d6,d3
+		sub.l d4,d5
+		cmp.l #$100000,d5
+		bhi BigEnuf
+		move.l #$100000,d5
+BigEnuf		move.l d5,d0
+		move.l #MEMF_PUBLIC|MEMF_PPC,d1
+		jsr _LVOAllocVec(a6)
+		tst.l d0
+		beq.s CSExit
+
+		lea StackSwpStruct(pc),a0
+		move.l d0,stk_Lower(a0)
+		move.l a7,d2
+		sub.l d2,d3
+		add.l d5,d0
+		move.l d0,d2
+		sub.l d3,d2
+		move.l d2,stk_Pointer(a0)
+		move.l d0,stk_Upper(a0)
+		move.l d0,a3
+		move.l d6,a5
+
+		lsr.l #2,d3
+StackCP		move.l -(a5),-(a3)
+		dbf d3,StackCP
+
+		jsr _LVOStackSwap(a6)
+		moveq.l #-1,d0
+
+CSExit		movem.l (a7)+,d1-a6
+		rts
 
 ;*********************************************************************************************
 ;
@@ -1765,6 +1828,7 @@ EndIt		move.l d7,d0
 
 Runk862		move.l MirrorNode(a5),a1
 		move.l MN_PPC(a0),MT_MIRROR(a1)
+		
 Runk86		btst #AFB_FPU40,AttnFlags+1(a6)
 		beq.s NoFPU
 		fmove.d fp0,-(a7)
@@ -1999,7 +2063,7 @@ FreeXMsg:
 
 ;********************************************************************************************
 ;
-;	void SetCache68k(cacheflags, start, length) // d0,a0,d1
+;	void SetCache68K(cacheflags, start, length) // d0,a0,d1
 ;
 ;********************************************************************************************
 
@@ -2181,6 +2245,7 @@ OpenLibAddress	ds.l	1
 AllocMemAddress	ds.l	1
 MirrorList	ds.l	3
 RemSysTask	ds.l	1
+StackSwpStruct	ds.l	3
 MyInterrupt	ds.b	IS_SIZE
 
 	cnop	0,4
@@ -2300,8 +2365,8 @@ FUNCTABLE:
 	dc.l	SetCache68K
 	dc.l	CreatePPCTask
 	dc.l	CausePPCInterrupt
+	dc.l	ChangeStack68K
 
-	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved
@@ -2493,14 +2558,14 @@ CrashMessage	dc.b	"Task name: '%s'  Task address: %08lx  Exception: %s",10
 		dc.b	"R24-R27: %08lx %08lx %08lx %08lx   DBAT2: %08lx %08lx",10
 		dc.b	"R28-R31: %08lx %08lx %08lx %08lx   DBAT3: %08lx %08lx",10,10,0
 
-		dc.b	"F0-F3:    %s   %s   %s   %s",10		;Unused at the moment
-		dc.b	"F4-F7:    %s   %s   %s   %s",10
-		dc.b	"F8-F11:   %s   %s   %s   %s",10
-		dc.b	"F12-F15:  %s   %s   %s   %s",10
-		dc.b	"F16-F19:  %s   %s   %s   %s",10
-		dc.b	"F20-F23:  %s   %s   %s   %s",10
-		dc.b	"F24-F27:  %s   %s   %s   %s",10
-		dc.b	"F28-F31:  %s   %s   %s   %s",10,0
+;		dc.b	"F0-F3:    %s   %s   %s   %s",10		;Unused at the moment
+;		dc.b	"F4-F7:    %s   %s   %s   %s",10
+;		dc.b	"F8-F11:   %s   %s   %s   %s",10
+;		dc.b	"F12-F15:  %s   %s   %s   %s",10
+;		dc.b	"F16-F19:  %s   %s   %s   %s",10
+;		dc.b	"F20-F23:  %s   %s   %s   %s",10
+;		dc.b	"F24-F27:  %s   %s   %s   %s",10
+;		dc.b	"F28-F31:  %s   %s   %s   %s",10,0
 				
 RContinue	dc.b	"Continue",0
 

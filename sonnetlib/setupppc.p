@@ -1840,10 +1840,8 @@ EInt:		b	.FPUnav				#0
 		or	r0,r0,r8
 		stw	r0,TC_SIGRECVD(r3)
 		lwz	r8,MN_ARG1(r5)
-		lwz	r0,TC_SIGALLOC(r3)
-		or	r0,r0,r8
-		stw	r0,TC_SIGALLOC(r3)
-				
+		stw	r8,TC_SIGALLOC(r3)
+
 		addi	r4,r4,4				#PutMsg r5 to currenttask
 		lwz	r3,4(r4)			#AddTailPPC
 		stw	r5,4(r4)
@@ -3709,6 +3707,7 @@ EInt:		b	.FPUnav				#0
 
 .DSI:		mtsprg0	r0
 		mtsprg1	r1				#Data Storage Exception
+		
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU & FPU

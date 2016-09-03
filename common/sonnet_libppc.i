@@ -1,5 +1,5 @@
 ##
-##      $VER: sonnet_lib.i 1.0 (15.05.15)
+##      $VER: sonnet_lib.i 1.1 (28.08.16)
 ##
 ##      Library offsets for sonnet.library V1
 ##
@@ -20,6 +20,7 @@
 .set _LVOSetCache68K         ,       -96
 .set _LVOCreatePPCTask       ,       -102
 .set _LVOCausePPCInterrupt   ,       -108
+.set _LVOChangeStack68K      ,       -114    #PRIVATE!
 
 ####  PPC Library offsets
 
