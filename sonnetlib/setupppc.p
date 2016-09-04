@@ -291,8 +291,8 @@ End:		mflr	r4
 
 		mfspr	r4,HID0
 		ori	r4,r4,HID0_DCFI|HID0_ICFI
+		isync
 		mtspr	HID0,r4
-		sync
 
 		mtsrr0	r29
 		
@@ -432,10 +432,10 @@ Reset:		mflr	r15
 		loadreg	r3,HID0_NHR			#Set HID0 to known state 
 		mfspr	r4,HID0
 		and	r3,r4, r3			#Clear other bits
-		mtspr	HID0,r3
 		sync
+		mtspr	HID0,r3
 		
-		loadreg	r3,PSL_FP					#Set MPU/MSR to a known state. Turn on FP
+		loadreg	r3,PSL_FP			#Set MPU/MSR to a known state. Turn on FP
 		or	r3,r1,r3
 		mtmsr 	r3
 		isync
@@ -590,8 +590,8 @@ ClearInts:	lwz	r27,0xa0(r26)			#IACKR
 
 Caches:		mfspr	r4,HID0				#Invalidatem then enable L1 caches
 		ori	r4,r4,HID0_ICFI|HID0_DCFI
+		isync
 		mtspr	HID0,r4
-		sync
 		
 #		blr					#REMOVE ME FOR L1 CACHE
 
@@ -599,7 +599,6 @@ Caches:		mfspr	r4,HID0				#Invalidatem then enable L1 caches
 		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
 		sync
 		mtspr	HID0,r4
-		sync
 		 	
 #		blr					#REMOVE ME FOR L2 CACHE		
 
@@ -826,9 +825,8 @@ mmuSetup:
 		tlbsync
 
 		loadreg	r0,PSL_IR|PSL_DR|PSL_FP		#Turn on MMU
-		sync
 		mtmsr	r0		
-		sync
+		isync
 
 		mtlr	r30
 
@@ -1620,7 +1618,6 @@ EInt:		b	.FPUnav				#0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
 		isync					#Also reenable FPU
-		sync
 
 		mtsprg3	r1				
 		lwz	r0,SonnetBase(r0)		#Store user stack pointer
@@ -2078,7 +2075,6 @@ EInt:		b	.FPUnav				#0
 		ori	r0,r0,HID0_ICFI
 		isync
 		mtspr	HID0,r0
-		isync
 
 		li	r0,0
 		stb	r0,ExceptionMode(r0)
@@ -2172,7 +2168,6 @@ EInt:		b	.FPUnav				#0
 		ori	r0,r0,HID0_ICFI
 		isync
 		mtspr	HID0,r0
-		isync
 
 		loadreg	r0,Quantum
 		mtdec	r0
@@ -2509,7 +2504,6 @@ EInt:		b	.FPUnav				#0
 		ori	r9,r9,HID0_ICFI
 		isync
 		mtspr	HID0,r9
-		isync
 
 		loadreg	r9,Quantum
 		mtdec	r9
@@ -2565,7 +2559,6 @@ EInt:		b	.FPUnav				#0
 		ori	r0,r0,HID0_ICFI
 		isync
 		mtspr	HID0,r0
-		isync
 
 		loadreg	r0,Quantum
 		mtdec	r0
@@ -2594,7 +2587,6 @@ EInt:		b	.FPUnav				#0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
 		isync					#Also reenable FPU
-		sync
 
 		mtsprg3	r1				#Store user stack pointer
 		lwz	r0,SonnetBase(r0)
@@ -2773,9 +2765,8 @@ EInt:		b	.FPUnav				#0
 		stb	r0,ExceptionMode(r0)
 
 		mfmsr	r0
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
 		mtmsr	r0
-		sync					#Reenable MMU & FPU
 		isync
 
 		mtsprg3	r1
@@ -2820,9 +2811,8 @@ EInt:		b	.FPUnav				#0
 		stb	r0,ExceptionMode(r0)
 
 		mfmsr	r0
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r0
-		sync					#Reenable MMU & FPU
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
+		mtmsr	r0				
 		isync
 
 		mtsprg3	r1
@@ -2870,9 +2860,8 @@ EInt:		b	.FPUnav				#0
 		stb	r0,ExceptionMode(r0)
 
 		mfmsr	r0
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
 		mtmsr	r0
-		sync					#Reenable MMU & FPU
 		isync
 
 		mtsprg3	r1
@@ -2920,9 +2909,8 @@ EInt:		b	.FPUnav				#0
 		stb	r0,ExceptionMode(r0)
 
 		mfmsr	r0
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r0
-		sync					#Reenable MMU & FPU
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
+		mtmsr	r0					
 		isync
 
 		mtsprg3	r1
@@ -3279,7 +3267,6 @@ EInt:		b	.FPUnav				#0
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
-		isync
 		mtspr	HID0,r0
 		isync
 
@@ -3292,7 +3279,6 @@ EInt:		b	.FPUnav				#0
 		xori	r0,r0,HID0_DCE
 		sync	
 		mtspr	HID0,r0
-		isync
 		
 		lwz	r0,0(r13)
 		mtcr	r0
@@ -3309,8 +3295,8 @@ EInt:		b	.FPUnav				#0
 
 		lwz	r1,0(r1)
 		lwz	r13,-4(r1)
-#		lwz	r1,0(r1)	
-			
+		lwz	r1,0(r1)
+
 		b	.CrashReport
 		
 #********************************************************************************************
@@ -3321,9 +3307,8 @@ EInt:		b	.FPUnav				#0
 		stb	r0,ExceptionMode(r0)
 
 		mfmsr	r0
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r0
-		sync					#Reenable MMU & FPU
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
+		mtmsr	r0					
 		isync
 
 		mtsprg3	r1
@@ -3368,9 +3353,8 @@ EInt:		b	.FPUnav				#0
 .Alignment:	mtsprg0	r0				#FPU Alignment Exception
 		mtsprg1	r1
 		mfmsr	r0
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r0				#Reenable MMU & FPU
-		sync
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
+		mtmsr	r0				
 		isync
 
 		lwz	r0,SonnetBase(r0)
@@ -3521,7 +3505,7 @@ EInt:		b	.FPUnav				#0
 .stfsx:		rlwinm	r8,r5,23,25,29			#get index register
 		lwzx	r8,r30,r8			#get index register value
 		b	.stfs
-				
+
 #***********************************************
 						
 .AligExit:	loadreg	r7,'USER'			#Return to user
@@ -3617,9 +3601,8 @@ EInt:		b	.FPUnav				#0
 		stb	r0,ExceptionMode(r0)
 
 		mfmsr	r0
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r0
-		sync					#Reenable MMU & FPU
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
+		mtmsr	r0					
 		isync
 
 		mtsprg3	r1
@@ -3667,9 +3650,8 @@ EInt:		b	.FPUnav				#0
 		stb	r0,ExceptionMode(r0)
 
 		mfmsr	r0
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r0
-		sync					#Reenable MMU & FPU
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
+		mtmsr	r0					
 		isync
 
 		mtsprg3	r1
@@ -3715,9 +3697,8 @@ EInt:		b	.FPUnav				#0
 		mtsprg1	r1				#Data Storage Exception
 		
 		mfmsr	r0
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r0				#Reenable MMU & FPU
-		sync
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
+		mtmsr	r0				
 		isync
 		
 		lwz	r0,SonnetBase(r0)
@@ -3955,7 +3936,6 @@ EInt:		b	.FPUnav				#0
 		xori	r0,r0,HID0_DCE
 		sync	
 		mtspr	HID0,r0
-		isync
 		
 .HaltDSI:	loadreg	r7,'DSI!'
 		stw	r7,0xf4(r0)
@@ -4055,16 +4035,14 @@ EInt:		b	.FPUnav				#0
 
 #********************************************************************************************
 
-.PrInt:		
-		mtsprg0	r0				#Program Exception
+.PrInt:		mtsprg0	r0				#Program Exception
 		
 		li	r0,-1
 		stb	r0,ExceptionMode(r0)		
 		
 		mfmsr	r0
-		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r0				#Reenable MMU & FPU
-		sync
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
+		mtmsr	r0				
 		isync
 
 		mtsprg3	r1
@@ -4075,7 +4053,7 @@ EInt:		b	.FPUnav				#0
 		stwu	r0,-4(r1)			#Store user stack
 		
 		mfsprg0	r0
-		
+				
 		stw	r13,-4(r1)
 		subi	r13,r1,4
 		stwu	r1,-1080(r1)				
@@ -4092,7 +4070,7 @@ EInt:		b	.FPUnav				#0
 
 		loadreg	r29,'TRAP'
 		stw	r29,0xf4(r0)
-
+		
 		mfsrr0	r31
 		stw	r31,0xf8(r0)
 		lwz	r0,ViolationAddress(r0)
@@ -4176,7 +4154,7 @@ EInt:		b	.FPUnav				#0
 		stw	r2,8(r13)								
 		cmpwi	r3,EXCRETURN_ABORT
 		beq	.LastPrHandler
-				
+		
 		b	.NextPExc
 		
 .LargeContext:	mr	r31,r13
@@ -4442,8 +4420,8 @@ EInt:		b	.FPUnav				#0
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
-		mtspr	HID0,r0
 		isync
+		mtspr	HID0,r0
 		
 		mfsprg0	r0
 		
@@ -4632,7 +4610,7 @@ EInt:		b	.FPUnav				#0
 		loadreg	r20,0xbfff
 		and	r23,r23,r20			#Keep it 8000-BFFE
 		stwbrx	r23,r24,r28			#triggers Interrupt
-		
+
 .RealHalt:	b	.RealHalt
 		
 		
