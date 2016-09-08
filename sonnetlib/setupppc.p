@@ -2038,6 +2038,7 @@ EInt:		b	.FPUnav				#0
 
  		lwz	r0,MN_STARTALLOC(r9)
 		stw	r0,TC_SIGALLOC(r8)
+		stw	r0,MN_ARG1(r9)
 
 		la	r6,TASKPPC_PORT(r8)
 		bl	.IntCrMsgPort

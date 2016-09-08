@@ -3073,9 +3073,7 @@ Run68K:
 		stw	r4,MN_ARG0(r30)
 		lwz	r4,TC_SIGALLOC(r5)
 		stw	r4,MN_ARG1(r30)
-		lwz	r4,TC_SIGRECVD(r5)
-		stw	r4,MN_ARG2(r30)
-		
+
 		lwz	r4,PP_FLAGS(r30)
 		cmpwi	r4,0
 		beq	.FromRunPPC
@@ -9189,9 +9187,29 @@ DebugEndFunction:
 StartCode:	bl	.StartRunPPC
 
 .WasNoEMsg:	lwz	r4,RunningTask(r0)
-		lwz	r4,TASKPPC_MSGPORT(r4)		
+		lwz	r4,TC_SIGALLOC(r4)
+		loadreg	r28,0xfffff100
+		and.	r4,r4,r28
+
+		bl WaitPPC
+
+.debugxxx:	mr	r5,r3
+		lwz	r4,RunningTask(r0)
+		lwz	r28,TASKPPC_MSGPORT(r4)
+		lbz	r29,MP_SIGBIT(r31)
+		loadreg	r28,0xfffffffe
+		rlwnm	r28,r28,r29,0,31
+		and.	r29,r5,r28
+		beq	.NextEMsg
 		
-		bl WaitPortPPC
+		loadreg r28,0xfffff000
+		and.	r5,r5,r28
+		beq	.NextEMsg
+
+		lwz	r4,TASKPPC_MIRRORPORT(r4)
+		lwz	r4,MP_SIGTASK(r4)
+		
+		bl Signal68K		
 		
 .NextEMsg:	lwz	r4,RunningTask(r0)
 		lwz	r4,TASKPPC_MSGPORT(r4)
@@ -9199,7 +9217,6 @@ StartCode:	bl	.StartRunPPC
 		bl GetMsgPPC
 
 		mr.	r30,r3
-
 		beq	.WasNoEMsg
 		
 		lwz	r29,MN_IDENTIFIER(r30)
@@ -9210,8 +9227,9 @@ StartCode:	bl	.StartRunPPC
 		cmpw	r4,r29
 		bne	.NextEMsg
 
-		b	StartCode
-		
+		bl	.StartRunPPC
+		b	.NextEMsg
+
 #********************************************************************************************
 
 .StartRunPPC:		
@@ -9285,6 +9303,8 @@ StartCode:	bl	.StartRunPPC
 		mr	r8,r9
 		lwz	r2,RunningTask(r0)
 		stw	r9,TASKPPC_STARTMSG(r2)
+		lwz	r3,MN_ARG1(r8)
+		stw	r3,TC_SIGALLOC(r2)
 		lwz	r2,PP_REGS+12*4(r8)
 		lwz	r3,PP_REGS+0*4(r8)
 		lwz	r4,PP_REGS+1*4(r8)
@@ -9391,7 +9411,9 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		li	r7,NT_MESSAGE
 		stb	r7,LN_TYPE(r9)
 
-		lwz	r7,RunningTask(r0)		
+		lwz	r7,RunningTask(r0)
+		lwz	r8,TC_SIGALLOC(r7)
+		stw	r8,MN_ARG1(r9)
 		lwz	r7,TASKPPC_STARTMSG(r7)						
 		lwz	r7,MN_REPLYPORT(r7)		
 		stw	r7,MN_REPLYPORT(r9)

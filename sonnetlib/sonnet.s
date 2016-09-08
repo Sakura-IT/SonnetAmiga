@@ -837,12 +837,9 @@ CopyPPCName	move.b (a0)+,(a2)+
 		move.l 4.w,a6
 		tst.l d0
 		beq.s MsgMir68
-		move.l d0,a0
-		
-		jsr _LVODisable(a6)
-		move.l MN_ARG1(a1),TC_SIGALLOC(a0)
-		jsr _LVOEnable(a6)
-		
+
+		move.l d0,a0		
+		move.l MN_ARG1(a1),TC_SIGALLOC(a0)		
 		lea pr_MsgPort(a0),a0
 		jsr _LVOPutMsg(a6)
 		bra GetLoop
@@ -893,14 +890,8 @@ CleanUp		move.l d6,a0
 		bra.s CleanUp
 
 GoWaitPort	move.l (a7),a0
-		move.l ThisTask(a6),a1
-		move.l TC_SIGALLOC(a1),d0		
-		and.l #$fffff000,d0
-
-		move.b MP_SIGBIT(a0),d1
-		moveq.l #0,d2
-		bset d1,d2
-		or.l d2,d0		
+		move.l ThisTask(a6),a1		
+		move.l #$fffff000,d0
 		jsr _LVOWait(a6)
 		
 		move.l (a7),a0		
@@ -933,7 +924,7 @@ GtLoop2		move.l (a7),a0
 		
 DoRunk86	move.l (a7),MN_MIRROR(a0)	
 		bsr Runk86
-		bra.s GoWaitPort	
+		bra.s GtLoop2	
 
 ;********************************************************************************************
 
@@ -1074,17 +1065,20 @@ MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
 		cmp.l #"END!",d0
 		beq DoPutMsg
 		
-		move.l d1,a2		
+		move.l d1,a2
 		move.l MP_SIGTASK(a2),a2
 		move.l MN_ARG1(a1),d0
 		move.l d0,TC_SIGALLOC(a2)
-		move.l MN_ARG2(a1),d0
-		or.l d0,TC_SIGRECVD(a2)				
 		bra DoPutMsg
 
 ;********************************************************************************************
 
-MsgFPPC		jsr _LVOReplyMsg(a6)			;Ends the RunPPC function
+MsgFPPC		move.l a1,a2
+		move.l MN_ARG1(a1),d0
+		move.l MN_REPLYPORT(a1),a2
+		move.l MP_SIGTASK(a2),a2
+		move.l d0,TC_SIGALLOC(a2)
+		jsr _LVOReplyMsg(a6)			;Ends the RunPPC function
 		bra NxtMsg
 		
 ;********************************************************************************************		
@@ -1772,14 +1766,7 @@ DidAsync	moveq.l #0,d0
 		move.l d0,MT_FLAGS(a2)
 
 Stacker		move.l ThisTask(a6),a1
-		move.l TC_SIGALLOC(a1),d0		
-		and.l #$fffff000,d0
-
-		move.l Port(a5),a0
-		move.b MP_SIGBIT(a0),d1
-		moveq.l #0,d2
-		bset d1,d2
-		or.l d2,d0		
+		move.l #$fffff000,d0
 		jsr _LVOWait(a6)
 
 		move.l Port(a5),a0		
@@ -1950,6 +1937,7 @@ ClearMsg	clr.l (a2)+
 		dbf d1,ClearMsg
 
 		move.l #"LLPP",MN_IDENTIFIER(a0)
+		and.l #$fffff000,d0
 		move.l d0,MN_ARG0(a0)
 		move.l ThisTask(a6),a3
 		move.l a3,MN_ARG1(a0)
