@@ -238,7 +238,11 @@ End:		mflr	r4
 		la	r4,LIST_WAITTIME(r3)
 		bl	.MakeList
 		
+				
+		li	r6,100
+		stw	r6,IdDefTasks(r3)
 		li	r6,0
+		stw	r6,IdSysTasks(r3)
 		stb	r6,FLAG_WAIT(r3)
 		stb	r6,FLAG_READY(r3)
 		stw	r6,AlignmentExcHigh(r3)
@@ -2000,7 +2004,12 @@ EInt:		b	.FPUnav				#0
 
 		b	.TrySwitch
 		
-.Dispatch:	lwz	r8,MN_ARG0(r9)		
+.Dispatch:	lwz	r8,MN_ARG0(r9)
+		lwz	r31,PowerPCBase(r0)
+		lwz	r4,IdDefTasks(r31)
+		addi	r4,r4,1
+		stw	r4,IdDefTasks(r31)
+		stw	r4,TASKPPC_ID(r8)
 		li	r4,TS_RUN
 		stb	r4,TC_STATE(r8)
 		li	r4,NT_PPCTASK
@@ -2047,7 +2056,7 @@ EInt:		b	.FPUnav				#0
 		stw	r8,RunningTask(r0)
 		
 		la	r5,TASKPPC_ALLTASK(r8)
-		stw	r8,14(r5)		
+		stw	r8,TASKPTR_TASK(r5)		
 		stw	r5,TASKPPC_TASKPTR(r8)
 		lwz	r3,LN_NAME(r8)			#Copy Name pointer 
 		stw	r3,LN_NAME(r5)

@@ -1720,9 +1720,9 @@ LockTaskList:
 
 		bl ObtainSemaphorePPC
 
-		lwz	r3,PowerPCBase(r0)
-		addi	r3,r3,LIST_ALLTASKS
-		
+		lwz	r31,PowerPCBase(r0)
+		lwz	r3,LIST_ALLTASKS(r31)
+
 		lwz	r31,0(r13)
 		addi	r13,r13,4
 		
@@ -4598,7 +4598,7 @@ CreateTaskPPC:
 		beq-	.Error13			#Error NoMem 
  
 		mr	r5,r3 
-		stw	r31,14(r5)			#Store Taskpointer 
+		stw	r31,TASKPTR_TASK(r5)		#Store Taskpointer 
 		stw	r5,TASKPPC_TASKPTR(r31)
 		lwz	r3,LN_NAME(r31)			#Copy Name pointer 
 		stw	r3,LN_NAME(r5) 
@@ -4649,20 +4649,19 @@ CreateTaskPPC:
 		andi.	r0,r3,1<<TASKPPC_SYSTEM
 		bne-	.SystemTask			#Yes -> Skip next
 
-		lwz	r5,IdDefTasks(r0)		#Normal Tasks +1
+		lwz	r5,IdDefTasks(r23)		#Normal Tasks +1
 		addi	r5,r5,1
-		stw	r5,IdDefTasks(r0)
+		stw	r5,IdDefTasks(r23)
 		b	.SkipSystem
 
-.SystemTask:	lwz	r5,IdSysTasks(r0)		#System Tasks +1
+.SystemTask:	lwz	r5,IdSysTasks(r23)		#System Tasks +1
 		addi	r5,r5,1
-		stw	r5,IdSysTasks(r0)
+		stw	r5,IdSysTasks(r23)
 
 .SkipSystem:	stw	r5,TASKPPC_ID(r31)
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r31)
-		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_READYTASKS(r4)
+		la	r4,LIST_READYTASKS(r23)
 		mr	r5,r31				#Task
 		loadreg	r0,Quantum
 		stw	r0,TASKPPC_QUANTUM(r31)
@@ -8566,7 +8565,7 @@ WaitTime:
 		subi	r13,r1,4
 		stwu	r1,-44(r1)
 	
-		loadreg	r5,SonnetBusClock*4
+		loadreg	r5,SonnetBusClock
 		
 		mr	r6,r4
 		mulhw	r3,r5,r6

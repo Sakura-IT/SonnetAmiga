@@ -890,8 +890,9 @@ CleanUp		move.l d6,a0
 		bra.s CleanUp
 
 GoWaitPort	move.l (a7),a0
-		move.l ThisTask(a6),a1		
-		move.l #$fffff000,d0
+		move.l ThisTask(a6),a1
+		move.l TC_SIGALLOC(a1),d0
+		and.l #$fffff000,d0
 		jsr _LVOWait(a6)
 		
 		move.l (a7),a0		
@@ -1766,7 +1767,8 @@ DidAsync	moveq.l #0,d0
 		move.l d0,MT_FLAGS(a2)
 
 Stacker		move.l ThisTask(a6),a1
-		move.l #$fffff000,d0
+		move.l TC_SIGALLOC(a1),d0
+		and.l #$fffff000,d0
 		jsr _LVOWait(a6)
 
 		move.l Port(a5),a0		
