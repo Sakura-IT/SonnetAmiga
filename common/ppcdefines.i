@@ -1,10 +1,10 @@
 #Sonnet Memory Map
 #0x00000000	Zero Page				0x003000	12288
 #0x00003000	Exceptions/Scheduler			0x004000	16384
-#0x00007000	Semaphores				0x000200	512
-#0x00007200	Semaphore memory			0x000200	512
-#0x00007400	Idle Task				0x000c00	3072
-#0x00008000	System Stack				0x008000	32768
+#0x00008000	Semaphores				0x000200	512
+#0x00008200	Semaphore memory			0x000200	512
+#0x00008400	Idle Task				0x000c00	3072
+#0x00009000	System Stack				0x008000	32768
 #0x00010000	Free memory				0x0e0000	917504
 #0x00100000	Message FIFOs				0x010000	65536	Must be 0x100000 aligned
 #0x00110000	Message Frames 2x4096xPP_SIZE+48	0x180000
@@ -31,19 +31,13 @@
 .set L2STATE,52
 .set CPUSDR1,56					#Pointer
 .set TaskException,60				#Pointer
-.set DState,64
-.set DLockState,65
 .set ExceptionMode,66
-.set RescheduleFlag,67				#626
 .set SnoopSem,68				#Pointer
-.set CurrentPort,72				#610
 .set L2Size,76
 .set MemSem,88
 .set PowerPCBase,92
 .set Break,96
-.set LowActivityPrio,100			#658
-.set LowActivityPrioOffset,104			#670
-.set PortInUse,108				#628	; See CurrentPort
+.set AtomicUser,100
 .set DebugLevel,109				#18737
 .set RTGType,112
 .set RTGBase,116
@@ -84,13 +78,28 @@
 
 .set AlignmentExcHigh,600
 .set AlignmentExcLow,604
-.set DataExcHigh,608
-.set DataExcLow,612
+.set CurrentPort,610
+.set DataExcHigh,616
+.set DataExcLow,620
+.set DState,624
+.set DLockState,625
+.set RescheduleFlag,626
 .set FLAG_WAIT,627
-.set FLAG_READY,628
-.set NumAllTasks,630
+.set PortInUse,628				#See CurrentPort
+.set BusyCounter,629
+.set FLAG_READY,630
+
+.set NumAllTasks,632
+
+.set StartTBL,638
+.set CurrentTBL,642
+.set CPULoad,646
+.set SystemLoad,650
+.set Table_NICE,654
+.set LowActivityPrio,658
 .set IdSysTasks,662
 .set IdDefTasks,666
+.set LowActivityPrioOffset,670
 
 .set EXCDATA_TYPE,8				#Always NT_INTERRUPT
 .set EXCDATA_PRI,9				#This
@@ -189,8 +198,8 @@
 .set _LVOAllocVec,		-684
 .set _LVOFreeVec,		-690
 
-.set SysStack,			0x10000			#Length max $8000
-.set IdleTask,			0x7400
+.set SysStack,			0x10000			#Length max $7000
+.set IdleTask,			0x8400
 
 .set MEMF_PUBLIC,		0x00000001
 .set MEMF_CHIP,			0x00000002
@@ -671,6 +680,7 @@
 .set TASKPPC_TIMESTAMP2,160
 .set TASKPPC_ELAPSED,164
 .set TASKPPC_ELAPSED2,168
+.set TASKPPC_TOTALELAPSED,172
 .set TASKPPC_QUANTUM,176
 .set TASKPPC_PRIORITY,180
 .set TASKPPC_PRIOFFSET,184

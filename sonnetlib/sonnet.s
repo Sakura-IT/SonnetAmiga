@@ -882,17 +882,16 @@ GotTaskMsgPort	move.l d0,-(a7)
 CleanUp		move.l d6,a0
 		jsr _LVOGetMsg(a6)
 		tst.l d0
-		beq.s GoWaitPort
+		beq.s GtLoop2
 		
 		move.l d0,a1
 		move.l (a7),a0
 		jsr _LVOPutMsg(a6)
 		bra.s CleanUp
 
-GoWaitPort	move.l (a7),a0
-		move.l ThisTask(a6),a1
+GoWaitPort	move.l ThisTask(a6),a1
 		move.l TC_SIGALLOC(a1),d0
-		and.l #$fffff000,d0
+		and.l #$fffff010,d0
 		jsr _LVOWait(a6)
 		
 		move.l (a7),a0		
@@ -904,9 +903,19 @@ GoWaitPort	move.l (a7),a0
 		and.l d2,d1
 		beq.s GtLoop2
 
-		bsr CrossSignals
+		move.l ThisTask(a6),a1
+		move.l LN_NAME(a1),a1
+		cmp.l #"Time",8(a1)			;ScummVMWOS patch pending fix
+		bne.s NoTimer
+
+		nop
+;		bset #28,d0
+;		bset #29,d0
+
+NoTimer		bsr CrossSignals
 		
 GtLoop2		move.l (a7),a0
+
 		jsr _LVOGetMsg(a6)
 		move.l d0,d7
 		beq.s GoWaitPort
@@ -1065,7 +1074,7 @@ MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
 		beq CommandMaster
 		cmp.l #"END!",d0
 		beq DoPutMsg
-		
+
 		move.l d1,a2
 		move.l MP_SIGTASK(a2),a2
 		move.l MN_ARG1(a1),d0
@@ -1074,8 +1083,7 @@ MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
 
 ;********************************************************************************************
 
-MsgFPPC		move.l a1,a2
-		move.l MN_ARG1(a1),d0
+MsgFPPC		move.l MN_ARG1(a1),d0
 		move.l MN_REPLYPORT(a1),a2
 		move.l MP_SIGTASK(a2),a2
 		move.l d0,TC_SIGALLOC(a2)
@@ -1726,7 +1734,7 @@ CpMsg2		move.l (a3)+,(a2)+
 		
 		move.l PP_FLAGS(a1),d1			;Asynchronous RunPPC Call
 		btst.l #PPB_ASYNC,d1
-		beq Stacker
+		beq GtLoop
 		
 		move.l MirrorNode(a5),a3
 		move.l d1,MT_FLAGS(a3)
@@ -1768,7 +1776,7 @@ DidAsync	moveq.l #0,d0
 
 Stacker		move.l ThisTask(a6),a1
 		move.l TC_SIGALLOC(a1),d0
-		and.l #$fffff000,d0
+		and.l #$fffff010,d0
 		jsr _LVOWait(a6)
 
 		move.l Port(a5),a0		

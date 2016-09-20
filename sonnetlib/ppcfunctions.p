@@ -53,11 +53,13 @@ SetCache:
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
 		
 		li	r31,FSetCache-FRun68K
 		bl	DebugStartFunction
 		
 		mfctr	r28
+		lwz	r27,PowerPCBase(r0)
 
 		cmplwi	r4,CACHE_DCACHEFLUSH
 		beq-	.DCACHEFLUSH
@@ -178,7 +180,7 @@ SetCache:
 		mr.	r6,r6
 		beq-	.DoneCache
 
-		lbz	r29,DLockState(r0)
+		lbz	r29,DLockState(r27)
 		mr.	r29,r29
 		bne	.DoneCache
 
@@ -216,11 +218,11 @@ SetCache:
 		bl User
 		
 		li	r0,-1
-		stb	r0,DLockState(r0)
+		stb	r0,DLockState(r27)
 
 		b	.DoneCache
 				
-.DCACHEOFF:	lbz	r29,DState(r0)			#ExceptionMode should be Neg?
+.DCACHEOFF:	lbz	r29,DState(r27)			#ExceptionMode should be Neg?
 		mr.	r29,r29
 		bne	.DoneCache
 		
@@ -238,7 +240,7 @@ SetCache:
 		mr	r4,r3
 		
 		li	r0,-1
-		stb	r0,DState(r0)
+		stb	r0,DState(r27)
 		
 		bl User
 
@@ -258,7 +260,7 @@ SetCache:
 		b	.DoneCache
 
 .DCACHEUNLOCK:	li	r0,0
-		stb	r0,DLockState(r0)
+		stb	r0,DLockState(r27)
 		
 		bl Super
 
@@ -276,7 +278,7 @@ SetCache:
 		b	.DoneCache
 
 .DCACHEON:	li	r0,0
-		stb	r0,DState(r0)		
+		stb	r0,DState(r27)		
 		
 		bl Super
 
@@ -376,10 +378,10 @@ SetCache:
 		mr.	r6,r6
 		beq-	.DCACHEFLUSHALL
 		
-		lbz	r29,DState(r0)
+		lbz	r29,DState(r27)
 		mr.	r29,r29
 		bne	.DoneCache
-		lbz	r29,DLockState(r0)
+		lbz	r29,DLockState(r27)
 		mr.	r29,r29
 		bne	.DoneCache
 
@@ -403,10 +405,10 @@ SetCache:
 		b	.DoneCache
 
 .DCACHEFLUSHALL:
-		lbz	r29,DState(r0)
+		lbz	r29,DState(r27)
 		mr.	r29,r29
 		bne	.DoneCache
-		lbz	r29,DLockState(r0)
+		lbz	r29,DLockState(r27)
 		mr.	r29,r29
 		bne	.DoneCache
 
@@ -414,11 +416,12 @@ SetCache:
 
 .DoneCache:	mtctr	r28
 
-		lwz	r28,0(r13)
-		lwz	r29,4(r13)
-		lwz	r30,8(r13)
-		lwz	r31,12(r13)
-		addi	r13,r13,16
+		lwz	r27,0(r13)
+		lwz	r28,4(r13)
+		lwz	r29,8(r13)
+		lwz	r30,12(r13)
+		lwz	r31,16(r13)
+		addi	r13,r13,20
 		
 		epilog 'TOC'
 
@@ -958,10 +961,13 @@ GetInfo:
 		prolog 228,'TOC'
 
 		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
 		stwu	r4,-4(r13)
 		
 		li	r31,FGetInfo-FRun68K
 		bl	DebugStartFunction
+		
+		lwz	r30,PowerPCBase(r0)
 
 		bl Super
 
@@ -994,6 +1000,7 @@ GetInfo:
 .NoTags:	li	r31,FGetInfo-FRun68K
 		bl	DebugEndFunction
 
+		lwzu	r30,4(r13)
 		lwzu	r31,4(r13)
 		addi	r13,r13,4
 		
@@ -1030,10 +1037,14 @@ GetInfo:
 		beq	.INFO_L2SIZE
 		b	.NextInList
 		
-.INFO_CPULOAD:
-.INFO_SYSTEMLOAD:
-		b	.NextInList
+.INFO_CPULOAD:	lwz	r7,CPULoad(r30)
+		stw	r7,4(r4)
+		b	.NextInList	
 
+.INFO_SYSTEMLOAD:
+		lwz	r7,SystemLoad(r30)
+		stw	r7,4(r4)
+		b	.NextInList
 
 .INFO_CPU:	lwz	r7,CPUInfo(r0)
 		rlwinm	r7,r7,16,28,31
@@ -1310,10 +1321,9 @@ FlushDCache:
 		
 		mfctr	r28		
 		
-		lwz	r3,PowerPCBase(r0)
-		mr	r30,r3
+		lwz	r30,PowerPCBase(r0)
 		li	r29,-1
-		stb	r29,FLAG_READY(r3)			
+		stb	r29,FLAG_READY(r30)			
 		
 		bl	Super
 		
@@ -1619,7 +1629,10 @@ AllocSignalPPC:
 		lwz	r3,0(r13)
 		addi	r13,r13,4
 		
-.EndSig:	lwz	r31,0(r13)
+.EndSig:	li	r31,FAllocSignalPPC-FRun68K
+		bl	DebugEndFunction
+	
+		lwz	r31,0(r13)
 		addi	r13,r13,4		
 		epilog 'TOC'	
 
@@ -2476,7 +2489,7 @@ WaitPortPPC:
 		li	r31,FWaitPortPPC-FRun68K
 		bl	DebugStartFunction
 		
-		mr	r28,r3
+		lwz	r28,PowerPCBase(r0)
 		mr	r31,r4
 
 		addi	r4,r31,MP_PPC_SEM
@@ -2494,28 +2507,28 @@ WaitPortPPC:
 		mr.	r3,r3
 		beq+	.WaitInLine
 		
-		lbz	r3,PortInUse(r0)
+		lbz	r3,PortInUse(r28)
 		mr.	r3,r3
 		beq-	.PortGood
 
 		li	r4,Atomic
 		bl AtomicDone
 
-.PortUseWait:	lbz	r3,PortInUse(r0)
+.PortUseWait:	lbz	r3,PortInUse(r28)
 		mr.	r3,r3
 		bne+	.PortUseWait
 		b	.WaitInLine
 		
-.PortGood:	stw	r31,CurrentPort(r0)
+.PortGood:	stw	r31,CurrentPort(r28)
 		li	r0,-1
-		stb	r0,PortInUse(r0)
+		stb	r0,PortInUse(r28)
 
 		li	r4,Atomic
 		bl AtomicDone
 
 		bl CauseInterrupt
 
-.PortUseWait2:	lbz	r3,PortInUse(r0)
+.PortUseWait2:	lbz	r3,PortInUse(r28)
 		mr.	r3,r3
 		bne+	.PortUseWait2
 
@@ -2552,29 +2565,29 @@ WaitPortPPC:
 		mr.	r3,r3
 		beq+	.WaitInLine2
 		
-		lbz	r3,PortInUse(r0)
+		lbz	r3,PortInUse(r28)
 		mr.	r3,r3
 		beq-	.PortGood2
 
 		li	r4,Atomic
 		bl AtomicDone
 
-.PortUseWait3:	lbz	r3,PortInUse(r0)
+.PortUseWait3:	lbz	r3,PortInUse(r28)
 		mr.	r3,r3
 		bne+	.PortUseWait3
 		
 		b	.WaitInLine2
 
-.PortGood2:	stw	r31,CurrentPort(r0)
+.PortGood2:	stw	r31,CurrentPort(r28)
 		li	r0,-1
-		stb	r0,PortInUse(r0)
+		stb	r0,PortInUse(r28)
 
 		li	r4,Atomic
 		bl AtomicDone
 
 		bl CauseInterrupt
 
-.PortUseWait4:	lbz	r3,PortInUse(r0)
+.PortUseWait4:	lbz	r3,PortInUse(r28)
 		mr.	r3,r3
 		bne+	.PortUseWait4
 		
@@ -2635,7 +2648,6 @@ User:
 		ori	r0,r0,PSL_PR		#SET Bit 17 (PR) To User
 		mtmsr	r0
 		isync
-		sync
 
 .WrongKey:	epilog 'TOC'
 
@@ -2652,7 +2664,6 @@ DisableIntPPC:
 		xori	r28,r28,PSL_EE			#Disable()
 		mtmsr	r28
 		isync
-		sync
 		lwz	r28,0(r13)
 		addi	r13,r13,4
 		blr
@@ -2669,7 +2680,6 @@ EnableIntPPC:
 		ori	r28,r28,PSL_EE			#Enable()
 		mtmsr	r28
 		isync
-		sync
 		lwz	r28,0(r13)
 		addi	r13,r13,4
 		blr
@@ -2688,11 +2698,12 @@ CreateMsgFramePPC:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
+		stwu	r25,-4(r13)
 		stwu	r4,-4(r13)
 
-		lwz	r3,PowerPCBase(r0)
+		lwz	r25,PowerPCBase(r0)
 		li	r26,-1
-		stb	r26,FLAG_READY(r3)
+		stb	r26,FLAG_READY(r25)
 		isync
 
 		bl Super
@@ -2716,19 +2727,19 @@ CreateMsgFramePPC:
 		mr	r4,r26
 		bl User
 
-		lwz	r3,PowerPCBase(r0)
 		li	r26,0
-		stb	r26,FLAG_READY(r3)
+		stb	r26,FLAG_READY(r25)
 
 		mr	r3,r30
 
 		lwz	r4,0(r13)
-		lwz	r26,4(r13)
-		lwz	r27,8(r13)
-		lwz	r28,12(r13)
-		lwz	r29,16(r13)
-		lwz	r30,20(r13)
-		addi	r13,r13,24
+		lwz	r25,4(r13)
+		lwz	r26,8(r13)
+		lwz	r27,12(r13)
+		lwz	r28,16(r13)
+		lwz	r29,20(r13)
+		lwz	r30,24(r13)
+		addi	r13,r13,28
 
 		epilog 'TOC'
 		
@@ -2746,10 +2757,11 @@ SendMsgFramePPC:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
+		stwu	r25,-4(r13)
 
-		lwz	r3,PowerPCBase(r0)
+		lwz	r25,PowerPCBase(r0)
 		li	r26,-1
-		stb	r26,FLAG_READY(r3)
+		stb	r26,FLAG_READY(r25)
 		isync
 
 		mr	r30,r4
@@ -2773,16 +2785,16 @@ SendMsgFramePPC:
 		mr	r4,r26
 		bl User
 
-		lwz	r3,PowerPCBase(r0)
 		li	r26,0
-		stb	r26,FLAG_READY(r3)
+		stb	r26,FLAG_READY(r25)
 
-		lwz	r26,0(r13)
-		lwz	r27,4(r13)
-		lwz	r28,8(r13)
-		lwz	r29,12(r13)
-		lwz	r30,16(r13)
-		addi	r13,r13,20
+		lwz	r25,0(r13)
+		lwz	r26,4(r13)
+		lwz	r27,8(r13)
+		lwz	r28,12(r13)
+		lwz	r29,16(r13)
+		lwz	r30,20(r13)
+		addi	r13,r13,24
 
 		epilog	'TOC'
 		
@@ -2800,10 +2812,11 @@ FreeMsgFramePPC:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
+		stwu	r25,-4(r13)
 		
-		lwz	r3,PowerPCBase(r0)
+		lwz	r25,PowerPCBase(r0)
 		li	r26,-1
-		stb	r26,FLAG_READY(r3)
+		stb	r26,FLAG_READY(r25)
 		isync
 
 		mr	r30,r4
@@ -2827,16 +2840,16 @@ FreeMsgFramePPC:
 		mr	r4,r26
 		bl User
 
-		lwz	r3,PowerPCBase(r0)
 		li	r26,0
-		stb	r26,FLAG_READY(r3)
+		stb	r26,FLAG_READY(r25)
 
-		lwz	r26,0(r13)
-		lwz	r27,4(r13)
-		lwz	r28,8(r13)
-		lwz	r29,12(r13)
-		lwz	r30,16(r13)
-		addi	r13,r13,20
+		lwz	r25,0(r13)
+		lwz	r26,4(r13)
+		lwz	r27,8(r13)
+		lwz	r28,12(r13)
+		lwz	r29,16(r13)
+		lwz	r30,20(r13)
+		addi	r13,r13,24
 		
 		epilog	'TOC'
 
@@ -3995,8 +4008,9 @@ InsertOnPri:
 		lwz	r3,TASKPPC_PRIORITY(r5)
 		lwz	r6,TASKPPC_PRIOFFSET(r5)
 		add	r3,r3,r6
-		lwz	r7,LowActivityPrio(r0)
-		lwz	r6,LowActivityPrioOffset(r0)
+		lwz	r6,TASKPPC_POWERPCBASE(r5)
+		lwz	r7,LowActivityPrio(r6)
+		lwz	r6,LowActivityPrioOffset(r6)
 		add	r6,r6,r7
 		cmpw	r3,r6
 		blt-	.LowerPri
@@ -4665,11 +4679,11 @@ CreateTaskPPC:
 		mr	r5,r31				#Task
 		loadreg	r0,Quantum
 		stw	r0,TASKPPC_QUANTUM(r31)
-#		lwz	r7,TASKPPC_NICE(r31)		#Pending finding out what this means
-#		addi	r8,r7,20
-#		rlwinm	r8,r8,2,0,29
-#		lwz	r7,654(r23) 			#654(PowerPCBase)
-#		lwzx	r8,r7,r8
+#		lwz	r7,TASKPPC_NICE(r31)		#Get NICE value
+#		addi	r8,r7,20			#Add 20 (0-40)
+#		rlwinm	r8,r8,2,0,29			#multiply with 4 (0-160)
+#		lwz	r7,Table_NICE(r23)
+#		lwzx	r8,r7,r8			#Get value from table
 #		rlwinm	r8,r8,24,8,31
 #		lis	r7,2000
 #		ori	r7,r7,0
@@ -4679,7 +4693,7 @@ CreateTaskPPC:
 		bl InsertOnPri
 
 		li	r0,-1 
-		stb	r0,RescheduleFlag(r0)		#Reschedule flag 
+		stb	r0,RescheduleFlag(r23)		#Reschedule flag 
  		li	r4,Atomic
 
  		bl AtomicDone
@@ -4790,7 +4804,7 @@ SetDecInterrupt:
 		bl Super
 		
 		mr	r31,r3
-		
+
 		loadreg	r5,Quantum
 		mr	r6,r4
 		mulhw	r3,r5,r6
@@ -4800,13 +4814,12 @@ SetDecInterrupt:
 
 		mr.	r3,r3
 		bne-	.NotZ
-		li	r3,10
+		loadreg	r3,-1
 		
-.NotZ:		isync
-		mtdec	r3
+.NotZ:		mtdec	r3
 
 		mr	r4,r31
-		
+
 		bl User
 		
 		mtctr	r30
@@ -5104,7 +5117,7 @@ VacatePPC:
 		li	r31,FVacatePPC-FRun68K
 		bl	DebugStartFunction
 
-		mr	r31,r3
+		lwz	r31,PowerPCBase(r0)
 		mr	r30,r4
 		mr	r29,r5
 		
@@ -5177,7 +5190,7 @@ SnoopTask:
 		li	r31,FSnoopTask-FRun68K
 		bl	DebugStartFunction
 
-		mr	r29,r3
+		lwz	r29,PowerPCBase(r0)
 		li	r31,0
 		mr	r30,r4
 
@@ -5231,8 +5244,7 @@ SnoopTask:
 		
 		bl ObtainSemaphorePPC
 
-		lwz	r4,PowerPCBase(r0)
-		addi	r4,r4,LIST_SNOOP
+		addi	r4,r29,LIST_SNOOP
 		mr	r5,r31
 
 		bl AddHeadPPC
@@ -5521,8 +5533,6 @@ CauseInterrupt:
 		
 		bl SetDecInterrupt
 
-		isync
-
 		lwz	r31,0(r13)
 		addi	r13,r13,4
 
@@ -5750,7 +5760,8 @@ DeleteTaskPPC:
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r31)
 		li	r0,-1
-		stb	r0,RescheduleFlag(r0)		#Reschedule
+		lwz	r28,PowerPCBase(r0)
+		stb	r0,RescheduleFlag(r28)		#Reschedule
 		
 		bl CauseInterrupt
 
@@ -6685,12 +6696,6 @@ SetTaskPriPPC:
 		cmplwi	r0,TS_WAIT
 		bne-	.DonePriChange
 
-		lwz	r4,TASKPPC_TIMESTAMP2(r30)
-		mftbl	r5
-		sub	r4,r5,r4
-		lwz	r6,TASKPPC_ELAPSED2(r30)
-		add	r4,r4,r6
-		stw	r4,TASKPPC_ELAPSED2(r30)
 		mr	r4,r30
 
 		bl RemovePPC
@@ -6826,7 +6831,7 @@ SignalPPC:
 
 		mr	r31,r4
 		mr	r30,r5
-		mr	r29,r3
+		lwz	r29,PowerPCBase(r0)
 
 		lbz	r0,LN_TYPE(r4)
 		cmpwi	r0,NT_PPCTASK
@@ -6900,14 +6905,8 @@ SignalPPC:
 
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r30)
-		lwz	r7,TASKPPC_TIMESTAMP2(r30)
-		mftbl	r5
-		sub	r7,r5,r7
-		lwz	r6,TASKPPC_ELAPSED2(r30)
-		add	r7,r7,r6
-		stw	r7,TASKPPC_ELAPSED2(r30)
-		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_READYTASKS(r4)
+
+		la	r4,LIST_READYTASKS(r29)
 		mr	r5,r30
 		
 		bl InsertOnPri				#Prio recalculation
@@ -6916,13 +6915,12 @@ SignalPPC:
 
 		bl AtomicDone
 
-		lwz	r4,PowerPCBase(r0)
-		lwz	r4,LIST_READYTASKS(r4)
+		lwz	r4,LIST_READYTASKS(r29)
 		cmplw	r4,r30				#Check if we are top
 		bne-	.SigExit
 		
 		li	r0,-1
-		stb	r0,RescheduleFlag(r0)
+		stb	r0,RescheduleFlag(r29)
 
 		bl CauseInterrupt
 
@@ -6953,7 +6951,7 @@ GetMsgPPC:
 		li	r31,FGetMsgPPC-FRun68K
 		bl	DebugStartFunction
 
-		mr	r29,r3
+		lwz	r29,PowerPCBase(r0)
 		mr	r31,r4
 
 		addi	r4,r31,MP_PPC_SEM
@@ -6971,29 +6969,29 @@ GetMsgPPC:
 		mr.	r3,r3
 		beq+	.GetMsgAtom
 
-		lbz	r3,PortInUse(r0)
+		lbz	r3,PortInUse(r29)
 		mr.	r3,r3
 		beq-	.PortIsFree
 
 		li	r4,Atomic
 		bl AtomicDone
 
-.PortWait:	lbz	r3,PortInUse(r0)
+.PortWait:	lbz	r3,PortInUse(r29)
 		mr.	r3,r3
 		bne+	.PortWait
 
 		b	.GetMsgAtom
 
-.PortIsFree:	stw	r31,CurrentPort(r0)
+.PortIsFree:	stw	r31,CurrentPort(r29)
 		li	r0,-1
-		stb	r0,PortInUse(r0)
+		stb	r0,PortInUse(r29)
 
 		li	r4,Atomic
 		bl AtomicDone
 
 		bl CauseInterrupt
 
-.PortWait2:	lbz	r3,PortInUse(r0)
+.PortWait2:	lbz	r3,PortInUse(r29)
 		mr.	r3,r3
 		bne+	.PortWait2
 
@@ -7031,7 +7029,7 @@ ReplyMsgPPC:
 		li	r31,FReplyMsgPPC-FRun68K
 		bl	DebugStartFunction
 
-		mr	r29,r3
+		lwz	r29,PowerPCBase(r0)
 		mr	r30,r4
 
 		lwz	r31,MN_REPLYPORT(r30)
@@ -7080,7 +7078,7 @@ ReplyMsgPPC:
 		mr.	r3,r3
 		beq+	.ReplyAtom
 
-		lbz	r3,PortInUse(r0)
+		lbz	r3,PortInUse(r29)
 		mr.	r3,r3
 		beq-	.PortIzFree
 
@@ -7088,15 +7086,15 @@ ReplyMsgPPC:
 		
 		bl AtomicDone
 
-.WaitForPort:	lbz	r3,PortInUse(r0)
+.WaitForPort:	lbz	r3,PortInUse(r29)
 		mr.	r3,r3
 		bne+	.WaitForPort
 
 		b	.ReplyAtom
 
-.PortIzFree:	stw	r31,CurrentPort(r0)
+.PortIzFree:	stw	r31,CurrentPort(r29)
 		li	r0,-1
-		stb	r0,PortInUse(r0)
+		stb	r0,PortInUse(r29)
 
 		li	r4,Atomic
 		
@@ -7104,7 +7102,7 @@ ReplyMsgPPC:
 		
 		bl CauseInterrupt
 
-.WaitForPort2:	lbz	r3,PortInUse(r0)
+.WaitForPort2:	lbz	r3,PortInUse(r29)
 		mr.	r3,r3
 		bne+	.WaitForPort2
 
@@ -7156,7 +7154,7 @@ PutMsgPPC:
 		li	r31,FPutMsgPPC-FRun68K
 		bl	DebugStartFunction
 
-		mr	r29,r3
+		lwz	r29,PowerPCBase(r0)
 		mr	r31,r4
 		mr	r30,r5
 
@@ -7176,7 +7174,7 @@ PutMsgPPC:
 		mr.	r3,r3
 		beq+	.PutAtom
 
-		lbz	r3,PortInUse(r0)
+		lbz	r3,PortInUse(r29)
 		mr.	r3,r3
 		beq-	.CheckedPort
 
@@ -7184,15 +7182,15 @@ PutMsgPPC:
 		
 		bl AtomicDone
 
-.W8ForPort:	lbz	r3,PortInUse(r0)
+.W8ForPort:	lbz	r3,PortInUse(r29)
 		mr.	r3,r3
 		bne+	.W8ForPort
 
 		b	.PutAtom
 
-.CheckedPort:	stw	r31,CurrentPort(r0)
+.CheckedPort:	stw	r31,CurrentPort(r29)
 		li	r0,-1
-		stb	r0,PortInUse(r0)
+		stb	r0,PortInUse(r29)
 
 		li	r4,Atomic
 
@@ -7200,7 +7198,7 @@ PutMsgPPC:
 
 		bl CauseInterrupt
 
-.W8ForPort2:	lbz	r3,PortInUse(r0)
+.W8ForPort2:	lbz	r3,PortInUse(r29)
 		mr.	r3,r3
 		bne+	.W8ForPort2
 
@@ -7252,6 +7250,7 @@ SetScheduling:
 		li	r31,FSetScheduling-FRun68K
 		bl	DebugStartFunction
 
+		lwz	r30,PowerPCBase(r0)
 		mr	r31,r4
 
 		loadreg	r4,SCHED_REACTION
@@ -7272,7 +7271,7 @@ SetScheduling:
 
 		li	r4,20
 .InRange2:	mulli	r4,r4,1000
-		stw	r4,LowActivityPrio(r0)
+		stw	r4,LowActivityPrio(r30)
 
 .SchedNotFound:	lwz	r30,0(r13)
 		lwz	r31,4(r13)
@@ -7326,8 +7325,8 @@ GetHALInfo:
 		li	r31,FGetHALInfo-FRun68K
 		bl	DebugStartFunction
 
+		lwz	r30,PowerPCBase(r0)
 		mr	r31,r4
-		mr	r30,r3
 
 		loadreg	r4,HINFO_ALEXC_HIGH
 		mr	r5,r31
@@ -7745,7 +7744,7 @@ RemExcHandler:
 		mr.	r4,r4
 		beq-	.NoXLock
 
-		mr	r31,r3
+		lwz	r31,PowerPCBase(r0)
 		mr	r30,r4
 
 .RemExcAtom:	li	r4,Atomic
@@ -7894,7 +7893,7 @@ SetExcHandler:
 
 		li	r26,0
 
-		mr	r27,r3
+		lwz	r27,PowerPCBase(r0)
 		mr	r31,r4
 
 		li	r4,98
@@ -8420,7 +8419,7 @@ WaitTime:
 		bl	DebugStartFunction
 
 		mr	r30,r4
-		mr	r29,r3
+		lwz	r29,PowerPCBase(r0)
 		lwz	r26,RunningTask(r0)
 		
 		lwz	r4,WaitListSem(r0)
@@ -9187,7 +9186,7 @@ StartCode:	bl	.StartRunPPC
 
 .WasNoEMsg:	lwz	r4,RunningTask(r0)
 		lwz	r4,TC_SIGALLOC(r4)
-		loadreg	r28,0xfffff100
+		loadreg	r28,0xfffff110
 		and.	r4,r4,r28
 
 		bl WaitPPC

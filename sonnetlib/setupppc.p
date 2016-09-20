@@ -121,7 +121,7 @@ SetLen:		mr	r30,r28
 		bl	Epic				#Setup the EPIC controller
 		bl	End
 
-Start:		loadreg	r0,'REDY'			#Dummy entry at absolute 0x7400
+Start:		loadreg	r0,'REDY'			#Dummy entry at absolute 0x8400
 		stw	r0,Init(r0)
 .IdleLoop:	nop					#IdleTask
 		nop
@@ -147,7 +147,7 @@ End:		mflr	r4
 		
 		isync					#Wait for 68k to set up library
 
-		li	r3,IdleTask			#Start hardcoded at 0x7400
+		loadreg	r3,IdleTask			#Start hardcoded at 0x8400
 		lwz	r31,SonnetBase(r0)
 		or	r3,r3,r31
 
@@ -238,10 +238,16 @@ End:		mflr	r4
 		la	r4,LIST_WAITTIME(r3)
 		bl	.MakeList
 		
-				
+
 		li	r6,100
 		stw	r6,IdDefTasks(r3)
+		li	r6,6000
+		stw	r6,LowActivityPrio(r3)
+		li	r6,24
+		stb	r6,BusyCounter(r3)
 		li	r6,0
+		stw	r6,CurrentTBL(r3)
+		stw	r6,LowActivityPrioOffset(r3)
 		stw	r6,IdSysTasks(r3)
 		stb	r6,FLAG_WAIT(r3)
 		stb	r6,FLAG_READY(r3)
@@ -250,9 +256,9 @@ End:		mflr	r4
 		stw	r6,DataExcHigh(r3)
 		stw	r6,DataExcLow(r3)		#Should put code in place to clear
 							#lib_base instead of individual clearing
-		
-		li	r3,0x7000			#Put Semaphores at 0x7000
-		li	r6,0x7200			#Put Semaphores memory at 0x7200
+
+		loadreg	r3,0x8000			#Put Semaphores at 0x8000
+		addi	r6,r3,0x200			#Put Semaphores memory at 0x8200
 		lwz	r30,SonnetBase(r0)
 		or	r3,r3,r30
 		or	r6,r6,r30
@@ -772,8 +778,8 @@ mmuSetup:
 		
 		bl	.DoTBLs						
 		
-		li	r3,0x1000			#Exception code (16K cached)
-		li	r4,0x7000
+		li	r3,0x1000
+		addi	r4,r3,0x7000			#Exception code (28K cached)
 		mr	r5,r3
 		li	r6,r0
 		li	r7,0				#pp = 0 - Supervisor access only.
@@ -799,7 +805,7 @@ mmuSetup:
 		bl	.DoTBLs
 
 		
-		loadreg	r3,0x7000			#First free block (~1MB cached)
+		loadreg	r3,0x8000			#First free block (~1MB cached)
 		loadreg	r4,0x100000
 		mr	r5,r3
 		or	r3,r3,r27
@@ -1635,6 +1641,8 @@ EInt:		b	.FPUnav				#0
 
 		prolog	228,'TOC'
 
+		bl	.TaskStats
+
 		stwu	r3,-4(r13)
 		stwu	r4,-4(r13)
 		stwu 	r5,-4(r13)
@@ -1653,7 +1661,7 @@ EInt:		b	.FPUnav				#0
 		cmpwi	r5,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
 		beq	.ReturnToUser
 		
-.IntReturn:	lis	r3,EUMB
+		lis	r3,EUMB
 		li	r4,IMISR
 		lwbrx	r5,r4,r3
 		andi.	r9,r5,IMISR_IM0I
@@ -1806,7 +1814,7 @@ EInt:		b	.FPUnav				#0
 		lwz	r6,RunningTask(r0)
 		cmpw	r6,r3
 		li	r6,TS_READY
-		bne	.MakeReady		
+		bne	.MakeReady
 		li	r6,TS_RUN
 .MakeReady:	stb	r6,TC_STATE(r3)		
 		b	.PutMsgIt
@@ -1965,7 +1973,7 @@ EInt:		b	.FPUnav				#0
 		mr.	r5,r5
 		beq	.EndOfWaitList
 		lwz	r6,TC_SIGRECVD(r4)
-		mr.	r6,r6				####
+		mr.	r6,r6
 		beq	.NoSigs
 		rlwinm.	r0,r6,22,31,31
 		beq	.NoSigs
@@ -1988,7 +1996,7 @@ EInt:		b	.FPUnav				#0
 		mr	r5,r6
 		lwz	r4,PowerPCBase(r0)
 		la	r4,LIST_READYTASKS(r4)
-		
+
 		addi	r4,r4,4				#AddTailPPC
 		lwz	r3,4(r4)
 		stw	r5,4(r4)
@@ -2010,6 +2018,12 @@ EInt:		b	.FPUnav				#0
 		addi	r4,r4,1
 		stw	r4,IdDefTasks(r31)
 		stw	r4,TASKPPC_ID(r8)
+		stw	r31,TASKPPC_POWERPCBASE(r8)
+		
+#		li	r4,0
+#		stw	r4,TASKPPC_ELAPSED(r8)
+#		stw	r4,TASKPPC_ELAPSED2(r8)
+#		stw	r4,TASKPPC_TOTALELAPSED(r8)
 		li	r4,TS_RUN
 		stb	r4,TC_STATE(r8)
 		li	r4,NT_PPCTASK
@@ -2075,6 +2089,10 @@ EInt:		b	.FPUnav				#0
 		lwz	r3,NumAllTasks(r4)
 		addi	r3,r3,1
 		stw	r3,NumAllTasks(r4)
+		
+		li	r0,0
+		stb	r0,PortInUse(r4)
+		stb	r0,ExceptionMode(r0)
 
 		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
 		mtsrr1	r0		
@@ -2084,12 +2102,7 @@ EInt:		b	.FPUnav				#0
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
 		isync
-		mtspr	HID0,r0
-
-		li	r0,0
-		stb	r0,ExceptionMode(r0)
-		stb	r0,PortInUse(r0)
-		
+		mtspr	HID0,r0		
 		mr	r30,r9
 
 		loadreg	r0,Quantum
@@ -2142,10 +2155,15 @@ EInt:		b	.FPUnav				#0
 
 #********************************************************************************************
 		
-.ReturnToUser:		
+.ReturnToUser:				
 		lwz	r9,0xf0(r0)				#Debug counter to check
 		addi	r9,r9,1					#Whether exception is still
 		stw	r9,0xf0(r0)				#running
+		
+		lwz	r8,PowerPCBase(r0)
+		li	r0,0
+		stb	r0,ExceptionMode(r0)
+		stb	r0,PortInUse(r8)
 
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
@@ -2167,9 +2185,6 @@ EInt:		b	.FPUnav				#0
 		mfsprg0	r0
 		mtsrr0	r0
 
-		li	r0,0
-		stb	r0,ExceptionMode(r0)
-		stb	r0,PortInUse(r0)
 		
 		loadreg	r0,'USER'
 		stw	r0,0xf4(r0)
@@ -2185,7 +2200,173 @@ EInt:		b	.FPUnav				#0
 		mfsprg2	r0
 
 		rfi
+
+#********************************************************************************************
+
+.TaskStats:		
+		stwu	r2,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r4,-4(r13)
+		stwu	r5,-4(r13)
+		stwu	r6,-4(r13)
+		stwu	r7,-4(r13)
+		stwu	r8,-4(r13)
+		stwu	r9,-4(r13)
+		stwu	r10,-4(r13)
+		stwu	r11,-4(r13)
+		stwu	r12,-4(r13)
+		stwu	r14,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r31,-4(r13)		
+
+		loadreg	r3,'STAT'
+		stw	r3,0xf4(r0)
+
+		mftbl	r3
+		lwz	r2,PowerPCBase(r0)		
+		lwz	r5,CurrentTBL(r2)
+		stw	r3,CurrentTBL(r2)
+
+		mr.	r5,r5
+		beq	.ExitStats
+		sub	r5,r3,r5
+		mr	r14,r5
+		
+		li	r8,0
+		li	r9,0
+		la	r4,LIST_ALLTASKS(r2)
+		lwz	r4,MLH_HEAD(r4)
+
+		lwz	r7,LowActivityPrioOffset(r2)
+		neg.	r0,r7
+		lwz	r28,LowActivityPrio(r2)
+		sub.	r28,r0,r28
+		bge-	.SkipResetR28
+		li	r28,0
+
+.SkipResetR28:	mr	r10,r4
+.LoopLTasks:	lwz	r6,LN_SUCC(r4)
+		mr.	r6,r6
+		beq-	.TaskLReady
+		
+		mr	r5,r14
+		lwz	r4,TASKPTR_TASK(r4)
+		lwz	r7,TASKPPC_TOTALELAPSED(r4)
+		add	r7,r7,r5
+		stw	r7,TASKPPC_TOTALELAPSED(r4)
+				
+		lbz	r11,TC_STATE(r4)
+		cmpwi	r11,TS_RUN
+		beq-	.StatRunning
+		cmpwi	r11,TS_CHANGING
+		bne-	.StatRdyWait
+
+.StatRunning:	lwz	r7,TASKPPC_ELAPSED(r4)
+		add	r7,r7,r5
+		stw	r7,TASKPPC_ELAPSED(r4)
+		b	.CheckCount
+
+.StatRdyWait:	cmpwi	r11,TS_WAIT
+		bne-	.CheckCount
+
+		lwz	r0,TASKPPC_ELAPSED2(r4)
+		add	r11,r5,r0
+		stw	r11,TASKPPC_ELAPSED2(r4)
+		b	.CheckCount
 	
+.CheckCount:	lbz	r12,BusyCounter(r2)
+		mr.	r12,r12
+		bne	.NoCounting
+
+.DoStats:	lwz	r11,TASKPPC_ELAPSED2(r4)
+		lwz	r7,TASKPPC_ELAPSED(r4)
+		lwz	r5,TASKPPC_TOTALELAPSED(r4)
+		mr	r3,r7
+		add	r0,r11,r7
+		srawi	r31,r7,10
+		srawi	r0,r0,10		
+		mulli	r31,r31,10000
+		mr.	r0,r0
+		beq-	.NoDivZero1
+
+		divwu	r0,r31,r0
+.NoDivZero1:	mr	r29,r0
+		stw	r29,TASKPPC_ACTIVITY(r4)
+		addi	r29,r29,2000
+		lwz	r7,TASKPPC_NICE(r4)
+		addi	r31,r7,20
+		rlwinm	r31,r31,2,0,29
+		lwz	r7,Table_NICE(r2)
+#		lwzx	r31,r7,r31
+#		rlwinm	r31,r31,24,8,31
+		rlwinm	r7,r29,16,0,15
+#		divwu	r0,r7,r31
+#		stw	r0,TASKPPC_DESIRED(r4)
+		srawi	r0,r5,10
+		srawi	r11,r11,10
+		sub.	r11,r0,r11
+		bgt-	.NoResetR11
+
+		li	r11,0
+.NoResetR11:	mulli	r11,r11,10000
+		divwu	r11,r11,r0
+		stw	r11,TASKPPC_BUSY(r4)
+		add	r9,r9,r11
+		
+		srawi	r11,r5,10
+		srawi	r0,r3,10
+		
+		mulli	r0,r0,10000
+		li	r7,0
+		mr.	r11,r11
+		beq-	.NoDivZero2
+
+		divwu	r7,r0,r11
+.NoDivZero2:	cmpwi	r7,10000
+		blt-	.NoResetR7
+
+		li	r7,10000
+.NoResetR7:	stw	r7,TASKPPC_CPUUSAGE(r4)
+		add	r8,r8,r7
+			
+		li	r0,0
+		stw	r0,TASKPPC_TOTALELAPSED(r4)
+		stw	r0,TASKPPC_ELAPSED2(r4)
+		stw	r0,TASKPPC_ELAPSED(r4)
+		
+.NoCounting:	mr	r4,r6
+		b	.LoopLTasks
+
+.TaskLReady:	lbz	r11,BusyCounter(r2)
+		mr.	r11,r11
+		bne	.NoResetCtr
+		
+		stw	r8,CPULoad(r2)
+		stw	r9,SystemLoad(r2)
+		li	r11,25
+.NoResetCtr:	subi	r11,r11,1		
+		stb	r11,BusyCounter(r2)
+
+.ExitStats:	lwz	r31,0(r13)
+		lwzu	r29,4(r13)
+		lwzu	r28,4(r13)
+		lwzu	r14,4(r13)
+		lwzu	r12,4(r13)
+		lwzu	r11,4(r13)
+		lwzu	r10,4(r13)
+		lwzu	r9,4(r13)
+		lwzu	r8,4(r13)
+		lwzu	r7,4(r13)
+		lwzu	r6,4(r13)
+		lwzu	r5,4(r13)
+		lwzu	r4,4(r13)
+		lwzu	r3,4(r13)
+		lwzu	r2,4(r13)
+		addi	r13,r13,4
+
+		blr
+
 #********************************************************************************************
 
 .TaskException:	li	r9,0				#Will be starting point for TC_EXCEPTCODE
@@ -2231,7 +2412,7 @@ EInt:		b	.FPUnav				#0
 
 .DoReady:	li	r6,TS_RUN
 		stb	r6,TC_STATE(r9)
-		stw	r9,RunningTask(r0)		
+		stw	r9,RunningTask(r0)
 		b	.LoadContext
 
 .CheckWait:	li	r4,TS_REMOVED
@@ -2421,10 +2602,15 @@ EInt:		b	.FPUnav				#0
 		stfdu	f28,8(r6)
 		stfdu	f29,8(r6)
 		stfdu	f30,8(r6)
-		stfdu	f31,8(r6)
+		stfdu	f31,8(r6)				
 		blr
 			
 .LoadContext:	lwz	r9,TASKPPC_CONTEXTMEM(r9)
+		lwz	r8,PowerPCBase(r0)
+		li	r0,0
+		stb	r0,ExceptionMode(r0)
+		stb	r0,PortInUse(r8)
+
 		lwz	r0,0(r9)
 		mtsrr0	r0
 		lwzu	r0,4(r9)
@@ -2503,10 +2689,6 @@ EInt:		b	.FPUnav				#0
 		lfdu	f30,8(r9)
 		lfdu	f31,8(r9)
 		
-		li	r9,0
-		stb	r9,ExceptionMode(r0)
-		stb	r9,PortInUse(r0)
-		
 		loadreg	r9,'USER'
 		stw	r9,0xf4(r0)
 		
@@ -2546,6 +2728,11 @@ EInt:		b	.FPUnav				#0
 #********************************************************************************************		
 		
 .DoIdle:	loadreg	r0,IdleTask+(.IdleLoop-Start)	#Switch to idle task
+		lwz	r1,PowerPCBase(r0)
+		li	r9,0
+		stb	r9,ExceptionMode(r0)
+		stb	r9,PortInUse(r1)
+
 		lwz	r1,SonnetBase(r0)
 		or	r0,r1,r0
 		mtsrr0	r0
@@ -2576,10 +2763,6 @@ EInt:		b	.FPUnav				#0
 		loadreg	r0,'IDLE'
 		stw	r0,0xf4(r0)
 		
-		li	r0,0
-		stb	r0,ExceptionMode(r0)
-		stb	r0,PortInUse(r0)
-		
 		rfi
 
 #********************************************************************************************
@@ -2609,6 +2792,8 @@ EInt:		b	.FPUnav				#0
 		mtsprg3	r0
 		
 		prolog	228,'TOC'
+
+		bl	.TaskStats
 
 		stwu	r3,-4(r13)
 		stwu	r4,-4(r13)
@@ -3277,8 +3462,8 @@ EInt:		b	.FPUnav				#0
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
-		mtspr	HID0,r0
 		isync
+		mtspr	HID0,r0
 
 		mfsprg0	r0
 		
@@ -4424,14 +4609,14 @@ EInt:		b	.FPUnav				#0
 		
 		li	r0,0
 		stb	r0,ExceptionMode(r0)
-
-		loadreg	r0,'USER'
-		stw	r0,0xf4(r0)
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
 		isync
 		mtspr	HID0,r0
+
+		loadreg	r0,'USER'
+		stw	r0,0xf4(r0)
 		
 		mfsprg0	r0
 		
