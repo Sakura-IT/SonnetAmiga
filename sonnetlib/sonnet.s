@@ -43,8 +43,7 @@
 	XREF	SetNiceValue,AllocPrivateMem,FreePrivateMem,SetExceptPPC,ObtainSemaphoreSharedPPC
 	XREF	AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
 	XREF	AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
-	XREF	AddUniqueSemaphorePPC,IsExceptionMode,CreateMsgFramePPC,SendMsgFramePPC
-	XREF	FreeMsgFramePPC
+	XREF	AddUniqueSemaphorePPC,IsExceptionMode
 	
 	IFD	_IFUSION_
 	
@@ -1580,7 +1579,8 @@ RunPPC:		link a5,#-12
 		cmp.b #NT_PROCESS,LN_TYPE(a1)
 		beq.s IsProc
 
-		ILLEGAL						;Only DOS processes supported
+		moveq.l #PPERR_MISCERR,d7		;Only DOS processes supported
+		bra EndIt
 
 IsProc		move.l ThisTask(a6),d6
 		lea MirrorList(pc),a2
@@ -1602,6 +1602,9 @@ PPCRunning	tst.l MT_FLAGS(a2)
 DoneMirList	jsr _LVOCreateMsgPort(a6)
 		tst.l d0
 		bne.s GotMsgPort
+		
+		moveq.l #PPERR_MISCERR,d7
+		bra EndIt
 		
 GiveASyncErr	moveq.l #PPERR_ASYNCERR,d7
 		bra EndIt
@@ -1725,7 +1728,8 @@ SetSigAlloc	move.l d7,MN_ARG1(a0)			;Len
 		tst.l PP_STACKPTR(a1)			;Unsupported, but not yet encountered
 		beq.s CpMsg2
 
-		ILLEGAL
+		lea StackRunError(pc),a2
+		bra PrintError				;Does not unlink a5...
 
 CpMsg2		move.l (a3)+,(a2)+
 		dbf d0,CpMsg2
@@ -2039,9 +2043,10 @@ AllocXMsg:
 		movem.l d1-a6,-(a7)
 		cmp.l #192-MN_PPSTRUCT,d0
 		ble.s RightSize
-		
-		ILLEGAL						;Sizes above 172 unsupported
-		
+
+		lea AllocXError(pc),a2			;Sizes above 172 unsupported
+		bra PrintError
+
 RightSize	move.l d0,d3
 		move.l #MEMF_PUBLIC|MEMF_REVERSE|MEMF_CLEAR,d1
 		jsr _LVOAllocVec32(a6)
@@ -2496,9 +2501,6 @@ FUNCTABLE:
 	dc.l	AddUniquePortPPC
 	dc.l	AddUniqueSemaphorePPC
 	dc.l	IsExceptionMode
-	dc.l	CreateMsgFramePPC
-	dc.l	SendMsgFramePPC
-	dc.l	FreeMsgFramePPC
 
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0
@@ -2520,6 +2522,8 @@ PPCMMUError	dc.b	"Error during MMU setup of PPC",0
 GenMemError	dc.b	"General memory allocation error",0
 LSetupError	dc.b	"Error during library function setup",0
 SonnetMemError	dc.b	"No memory detected on the Sonnet card",0
+AllocXError	dc.b	"Cross message allocation error",0
+StackRunError	dc.b	"RunPPC Stack transfer unsupported",0
 
 ramlib		dc.b "ramlib",0		
 		

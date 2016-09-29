@@ -119,6 +119,3 @@
 .set _LVOAddUniquePortPPC    ,       -852
 .set _LVOAddUniqueSemaphorePPC       ,       -858
 .set _LVOIsExceptionMode     ,       -864
-.set _LVOCreateMsgFramePPC   ,       -870    #PRIVATE
-.set _LVOSendMsgFramePPC     ,       -876    #PRIVATE
-.set _LVOFreeMsgFramePPC     ,       -882    #PRIVATE

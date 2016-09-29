@@ -238,6 +238,8 @@ End:		mflr	r4
 		la	r4,LIST_WAITTIME(r3)
 		bl	.MakeList
 		
+		la	r4,LIST_MSGQUEUE(r3)
+		bl	.MakeList
 
 		li	r6,100
 		stw	r6,IdDefTasks(r3)
@@ -306,7 +308,7 @@ End:		mflr	r4
 
 		mtsrr0	r29
 		
-		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
+		loadreg	r0,MACHINESTATE_DEFAULT
 		mtsrr1	r0				#load up user MSR. Also clears PSL_IP
 		
 		lwz	r4,PowerPCBase(r0)
@@ -357,11 +359,13 @@ End:		mflr	r4
 		li	r4,MUCR_CQS_FIFO4K		#4K entries (16k x 4 FIFOs)
 		li	r5,MUCR
 		stwbrx	r4,r5,r14
+		sync
 
 		lwz	r6,SonnetBase(r0)
 		loadreg	r4,0x100000
 		li	r5,QBAR
 		stwbrx	r4,r5,r14
+		sync
 		
 		mr	r5,r4
 		subi	r4,r4,4
@@ -391,35 +395,41 @@ End:		mflr	r4
 		li	r5,IFHPR
 		li	r4,4096*4-4
 		stwbrx	r4,r5,r14
+		sync
 		
 		li	r5,IPTPR
 		loadreg	r4,4096*4
 		stwbrx	r4,r5,r14
+		sync
 		
 		li	r5,IPHPR
 		loadreg	r4,4096*4
 		stwbrx	r4,r5,r14
+		sync
 		
 		li	r5,OPTPR
 		loadreg	r4,4096*8
 		stwbrx	r4,r5,r14
+		sync
 		
 		li	r5,OPHPR
 		loadreg	r4,4096*8
 		stwbrx	r4,r5,r14
+		sync
 		
 		li	r5,OFTPR
 		loadreg	r4,4096*12
 		stwbrx	r4,r5,r14
+		sync
 		
 		li	r5,OFHPR
 		loadreg	r4,4096*16-4
 		stwbrx	r4,r5,r14
+		sync
 
 		li	r4,MUCR_CQS_FIFO4K|MUCR_CQE_ENABLE
 		li	r5,MUCR
-		stwbrx	r4,r5,r14
-		
+		stwbrx	r4,r5,r14		
 		sync
 
 		blr
@@ -560,23 +570,27 @@ Epic:		lis	r26,EUMB
 		loadreg	r27,EPIC_IIVPR3
 		add	r27,r26,r27
 		stwbrx	r28,0,r27			#Set MU interrupt, Pri = 5, Vector = 0x42
+		sync
 
 		loadreg	r27,EPIC_EICR
 		add	r27,r26,r27
 		lwz	r28,0(r27)
 		rlwinm	r28,r28,0,21,19			#Doc says Set SIE = 0
 		stw	r28,0(r27)
+		sync
 
 		loadreg	r27,EPIC_IIVPR3
 		add 	r27,r26,r27
 		lwz	r28,0(r27)
 		rlwinm	r28,r28,0,25,23			#Doc says Mask M bit now. Can maybe already at
 		stw	r28,0(r27)			#while setting the interrupt above?
+		sync
 
 		loadreg	r27,EPIC_PCTPR
 		add	r27,r26,r27
 		lis	r28,0
 		stw	r28,0(r27)			#Doc says Set Pri (Task) = 0
+		sync
 
 		loadreg	r27,EPIC_FRR
 		add	r27,r26,r27
@@ -1613,12 +1627,11 @@ EInt:		b	.FPUnav				#0
 		b	.MachCheck			#20
 		b	.SysCall			#24
 		b	.PerfMon			#28
-
-		mtsprg2	r0				#2c
+		b	.SysMan				#2c
+		b	.TherMan			#30
 		
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
-		
+		mtsprg2	r0				#34
+				
 		mfsrr1	r0
 		mtsprg1	r0
 		mfsrr0	r0
@@ -1628,6 +1641,9 @@ EInt:		b	.FPUnav				#0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
 		isync					#Also reenable FPU
+
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1				
 		lwz	r0,SonnetBase(r0)		#Store user stack pointer
@@ -1650,6 +1666,7 @@ EInt:		b	.FPUnav				#0
 		stwu	r7,-4(r13)
 		stwu	r8,-4(r13)
 		stwu	r9,-4(r13)
+		stwu	r10,-4(r13)
 
 		loadreg	r3,'EXEX'
 		stw	r3,0xf4(r0)
@@ -1670,7 +1687,7 @@ EInt:		b	.FPUnav				#0
 		mr	r9,r5
 		li	r5,IMISR_IM0I|IMISR_IM1I
 		stwbrx	r5,r4,r3			#Clear IM0/IM1 bit to clear interrupt
-		eieio		
+		sync		
 		mr	r5,r9
 	
 .CheckQueue:	andi.	r9,r5,IMISR_IPQI
@@ -1678,7 +1695,7 @@ EInt:		b	.FPUnav				#0
 		
 		li	r5,IMISR_IPQI			#Clear IPQI bit to clear interrupt
 		stwbrx	r5,r4,r3		
-		eieio
+		sync
 
 		li	r4,IPTPR			#Get message from Inbound FIFO
 		lwbrx	r5,r4,r3
@@ -1688,8 +1705,52 @@ EInt:		b	.FPUnav				#0
 		loadreg r4,0x7fff
 		and	r9,r9,r4			#Keep it 4000-7FFE		
 		sync
-
+		
+		lwz	r6,PowerPCBase(r0)
+		la	r4,LIST_MSGQUEUE(r6)
 		lwz	r5,0(r5)
+
+		addi	r4,r4,4				#PutMsg r5 to queue
+		lwz	r3,4(r4)			#AddTailPPC
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
+
+		lis	r3,EUMB				#Check if header (IPHPR) is equal to
+		li	r4,IPHPR			#tail (IPTPR). If so, queue is empty
+		lwbrx	r5,r4,r3
+		loadreg	r4,0xffff
+		and	r5,r5,r4
+		cmpw	r5,r9
+
+		beq	.QEmpty
+		
+		mr	r5,r9
+		b	.QNotEmpty
+		
+.QEmpty:	li	r4,IPTPR
+		stwbrx	r9,r4,r3
+		sync
+		
+.EndQueue:	clearreg r5
+		lis	r3,EUMBEPICPROC
+		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
+				
+#**********************************************************
+
+.NxtInQ:	lwz	r6,PowerPCBase(r0)
+		la	r4,LIST_MSGQUEUE(r6)
+		
+		lwz	r5,0(r4)			#RemHeadPPC
+		lwz	r3,0(r5)
+		mr.	r3,r3
+		beq-	.ExitQueue
+		stw	r3,0(r4)
+		stw	r4,4(r3)
+		mr.	r3,r5
+		beq	.ExitQueue
+
 		loadreg	r4,'TPPC'
 		lwz	r6,MN_IDENTIFIER(r5)
 		cmpw	r4,r6				#A RunPPC request
@@ -1771,6 +1832,7 @@ EInt:		b	.FPUnav				#0
 		loadreg	r7,0x3fff
 		and	r8,r8,r7			#Keep it 0000-3FFE
 		stwbrx	r8,r4,r3
+		sync
 
 		b	.NxtInQ		
 		
@@ -1881,32 +1943,12 @@ EInt:		b	.FPUnav				#0
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
+		
+		b	.NxtInQ
 
 #**********************************************************
-		
-.NxtInQ:	lis	r3,EUMB				#Check if header (IPHPR) is equal to
-		li	r4,IPHPR			#tail (IPTPR). If so, queue is empty
-		lwbrx	r5,r4,r3
-		loadreg	r4,0xffff
-		and	r5,r5,r4
-		cmpw	r5,r9
 
-		beq	.QEmpty
-		
-		mr	r5,r9
-		b	.QNotEmpty
-
-#**********************************************************
-		
-.QEmpty:	li	r4,IPTPR
-		stwbrx	r9,r4,r3
-		sync
-		
-.EndQueue:	clearreg r5
-		lis	r3,EUMBEPICPROC
-		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
-		
-.RDecInt:	lwz	r9,PowerPCBase(r0)
+.ExitQueue:	lwz	r9,PowerPCBase(r0)
 		lbz	r9,FLAG_READY(r9)
 		mr.	r9,r9
 		bne	.ReturnToUser
@@ -2094,7 +2136,7 @@ EInt:		b	.FPUnav				#0
 		stb	r0,PortInUse(r4)
 		stb	r0,ExceptionMode(r0)
 
-		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
+		loadreg	r0,MACHINESTATE_DEFAULT
 		mtsrr1	r0		
 		mfsprg0	r0
 		mtsrr0	r0
@@ -2165,7 +2207,8 @@ EInt:		b	.FPUnav				#0
 		stb	r0,ExceptionMode(r0)
 		stb	r0,PortInUse(r8)
 
-		lwz	r9,0(r13)
+		lwz	r10,0(r13)
+		lwzu	r9,4(r13)
 		lwzu	r8,4(r13)
 		lwzu	r7,4(r13)
 		lwzu	r6,4(r13)
@@ -2533,6 +2576,8 @@ EInt:		b	.FPUnav				#0
 		lwz	r0,0(r3)
 		stwu	r0,4(r6)			#r1
 		stwu	r2,4(r6)
+		lwz	r0,28(r13)
+		stwu	r0,4(r6)
 		lwz	r0,24(r13)
 		stwu	r0,4(r6)
 		lwz	r0,20(r13)
@@ -2547,7 +2592,6 @@ EInt:		b	.FPUnav				#0
 		stwu	r0,4(r6)
 		lwz	r0,0(r13)
 		stwu	r0,4(r6)
-		stwu	r10,4(r6)
 		stwu	r11,4(r6)
 		stwu	r12,4(r6)
 		lwz	r3,-4(r3)
@@ -2749,7 +2793,7 @@ EInt:		b	.FPUnav				#0
 		subi	r13,r1,4
 		stwu	r1,-284(r1)
 		
-		loadreg	r0,PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE
+		loadreg	r0,MACHINESTATE_DEFAULT
 		mtsrr1	r0
 
 		mfspr	r0,HID0
@@ -2769,9 +2813,6 @@ EInt:		b	.FPUnav				#0
 		
 .DecInt:	mtsprg2	r0
 
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
-
 		mfsrr1	r0
 		mtsprg1	r0
 		mfsrr0	r0
@@ -2780,6 +2821,9 @@ EInt:		b	.FPUnav				#0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
 		isync					#Also reenable FPU
+
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1				#Store user stack pointer
 		lwz	r0,SonnetBase(r0)
@@ -2802,6 +2846,7 @@ EInt:		b	.FPUnav				#0
 		stwu	r7,-4(r13)
 		stwu	r8,-4(r13)
 		stwu	r9,-4(r13)
+		stwu	r10,-4(r13)
 			
 		loadreg r0,'DECI'
 		stw	r0,0xf4(r0)
@@ -2950,19 +2995,19 @@ EInt:		b	.FPUnav				#0
 		
 		b	.NoExcHandlers
 		
-.NoRemExc:	b	.RDecInt
+.NoRemExc:	b	.NxtInQ
 		
 #********************************************************************************************
 
 .BreakPoint:	mtsprg0	r0				#Breakpoint Exception
-		
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
 
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
 		mtmsr	r0
 		isync
+
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
@@ -3002,13 +3047,13 @@ EInt:		b	.FPUnav				#0
 
 .MachCheck:	mtsprg0	r0				#Machine Check Exception
 		
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
-
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
 		mtmsr	r0				
 		isync
+
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
@@ -3049,15 +3094,115 @@ EInt:		b	.FPUnav				#0
 
 #********************************************************************************************
 
-.SysCall:	mtsprg0	r0				#System Call Exception
+.SysMan:	mtsprg0	r0				#System Management Exception
 		
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
+		sync
+		mtmsr	r0
+		sync
+		isync
+
 		li	r0,-1
 		stb	r0,ExceptionMode(r0)
+		loadreg	r0,'SYSM'
+		stw	r0,0xf4(r0)
+
+		mtsprg3	r1
+		lwz	r0,SonnetBase(r0)
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		or	r1,r1,r0
+		mfsprg3	r0
+		stwu	r0,-4(r1)			#Store user stack
+		
+		mfsprg0	r0
+
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-1080(r1)
+		stwu	r26,-4(r13)			#Make place on stack (36) for Exc Type
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r2,-4(r13)
+		stwu	r0,-4(r13)		
+		mfcr	r0
+		stwu	r0,-4(r13)
+
+		lwz	r31,PowerPCBase(r0)
+		la	r31,LIST_EXCMCHECK(r31)
+		li	r0,EXCF_MCHECK
+		stw	r0,36(r13)			#NOT VERY NICE!!
+
+		li	r0,.ESM-.EMonitor
+		mtsprg1	r0
+
+		b	.NoHandler
+		
+#********************************************************************************************
+
+.TherMan:	mtsprg0	r0				#Thermal Management Exception
+		
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
+		sync
+		mtmsr	r0
+		sync
+		isync
+
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
+		loadreg	r0,'THRM'
+		stw	r0,0xf4(r0)
+
+		mtsprg3	r1
+		lwz	r0,SonnetBase(r0)
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		or	r1,r1,r0
+		mfsprg3	r0
+		stwu	r0,-4(r1)			#Store user stack
+		
+		mfsprg0	r0
+
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-1080(r1)
+		stwu	r26,-4(r13)			#Make place on stack (36) for Exc Type
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r2,-4(r13)
+		stwu	r0,-4(r13)		
+		mfcr	r0
+		stwu	r0,-4(r13)
+
+		lwz	r31,PowerPCBase(r0)
+		la	r31,LIST_EXCMCHECK(r31)
+		li	r0,EXCF_MCHECK
+		stw	r0,36(r13)			#NOT VERY NICE!!
+
+		li	r0,.ETM-.EMonitor
+		mtsprg1	r0
+
+		b	.NoHandler
+
+#********************************************************************************************
+
+.SysCall:	mtsprg0	r0				#System Call Exception
 
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
 		mtmsr	r0
 		isync
+
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
@@ -3099,14 +3244,14 @@ EInt:		b	.FPUnav				#0
 #********************************************************************************************
 
 .Trace:		mtsprg0	r0				#Trace Exception
-		
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
 
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
 		mtmsr	r0					
 		isync
+
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
@@ -3469,11 +3614,10 @@ EInt:		b	.FPUnav				#0
 		
 		rfi
 		
-.NoHandler:	mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		xori	r0,r0,HID0_DCE
-		sync	
-		mtspr	HID0,r0
+.NoHandler:	lwz	r27,36(r13)
+		li	r0,EXCF_SYSTEMCALL
+		cmpw	r0,r27
+		beq	.DoSysCalls
 		
 		lwz	r0,0(r13)
 		mtcr	r0
@@ -3494,17 +3638,101 @@ EInt:		b	.FPUnav				#0
 
 		b	.CrashReport
 		
+.DoSysCalls:	mfsprg0	r0
+		cmpwi	r0,SYSCALL_DISABLE
+		beq	.DoDisable
+		cmpwi	r0,SYSCALL_ENABLE
+		beq	.DoEnable
+		cmpwi	r0,SYSCALL_CREATEMSGFRAME
+		beq	.CreateMsg
+		cmpwi	r0,SYSCALL_SENDMSGFRAME
+		beq	.SendMsg
+		cmpwi	r0,SYSCALL_FREEMSGFRAME
+		beq	.FreeMsg
+		cmpwi	r0,SYSCALL_CAUSEINTERRUPT
+		beq	.CauseInterrupt
+		b	.LastTrHandler
+		
+.DoDisable:	mfsrr1	r31
+		ori	r31,r31,PSL_EE
+		xori	r31,r31,PSL_EE
+		mtsrr1	r31
+		b	.LastTrHandler
+		
+.DoEnable:	mfsrr1	r31
+		ori	r31,r31,PSL_EE
+		mtsrr1	r31
+		b	.LastTrHandler
+
+.CreateMsg:	lis	r3,EUMB
+		li	r27,OFTPR
+		lwbrx	r30,r27,r3			
+		addi	r28,r30,4
+		loadreg	r29,0xc000
+		or	r28,r28,r29
+		loadreg r29,0xffff			#fffeffff?
+		and	r28,r28,r29			#Keep it C000-FFFE		
+		stwbrx	r28,r27,r3
+		sync
+		lwz	r30,0(r30)
+		stw	r30,12(r13)
+		b	.LastTrHandler
+		
+.SendMsg:	lis	r3,EUMB
+		li	r27,OPHPR
+		lwbrx	r28,r27,r3		
+		stw	r4,0(r28)		
+		addi	r29,r28,4
+		loadreg	r4,0xbfff			#ffffbfff?
+		and	r29,r29,r4			#Keep it 8000-BFFE
+		stwbrx	r29,r27,r3			#triggers Interrupt
+		sync
+		b	.LastTrHandler
+		
+.FreeMsg:	lis	r3,EUMB				#Free the message
+		li	r27,IFHPR
+		lwbrx	r29,r27,r3		
+		stw	r4,0(r29)		
+		addi	r28,r29,4
+		loadreg	r29,0x3fff			#ffff3fff?
+		and	r28,r28,r29			#Keep it 0000-3FFE
+		stwbrx	r28,r27,r3
+		sync
+		b	.LastTrHandler
+		
+.CauseInterrupt:
+		lwz	r0,0(r13)
+		mtcr	r0
+		lwz	r0,4(r13)
+		mtsprg0	r0
+		lwz	r2,8(r13)
+		lwz	r3,12(r13)
+		lwz	r27,16(r13)
+		lwz	r28,20(r13)
+		lwz	r29,24(r13)
+		lwz	r30,28(r13)
+		lwz	r31,32(r13)
+		addi	r13,r13,40			#Skipping one spot (was for Exc Type)
+
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r1,0(r1)
+		
+		mfsprg0	r0
+		
+		b	.DecInt		
+
 #********************************************************************************************
 
 .FPUnav:	mtsprg0	r0				#FPU Unavailable Exception
-		
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
 
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
 		mtmsr	r0					
 		isync
+
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
@@ -3791,14 +4019,14 @@ EInt:		b	.FPUnav				#0
 #********************************************************************************************
 
 .ISI:		mtsprg0	r0				#Instruction Storage Exception
-		
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
 
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
 		mtmsr	r0					
 		isync
+
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
@@ -3840,14 +4068,14 @@ EInt:		b	.FPUnav				#0
 #********************************************************************************************
 
 .PerfMon:	mtsprg0	r0				#Performance Monitor Exception
-		
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
 
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
 		mtmsr	r0					
 		isync
+
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
@@ -3967,7 +4195,7 @@ EInt:		b	.FPUnav				#0
 		rlwinm	r6,r31,0,25,5
 		loadreg	r8,0x7c00002e			#check for stbx/sthx/stwx/lbzx/lhzx/lwzx
 		cmpw	r6,r8
-		bne	.NotSupported
+		bne	.HaltDSI
 		nop
 		
 		li	r29,1
@@ -4022,7 +4250,7 @@ EInt:		b	.FPUnav				#0
 		beq	.GoLoadx			#lhzx
 		cmpwi	r0,5
 		beq	.GoLoadx			#lhax
-		b	.NotSupported			#Not Supported
+		b	.HaltDSI			#Not Supported
 		
 .NoStxx:	rlwinm.	r0,r31,3,31,31			#Normal store
 		bne	.StoreHalf
@@ -4072,7 +4300,7 @@ EInt:		b	.FPUnav				#0
 		beq	.FixedValue
 		rlwinm	r10,r10,24,24,31
 		cmpwi	r9,-30720			#lbz/lbzu
-		bne	.NotSupported			#Not Supported
+		bne	.HaltDSI			#Not Supported
 
 .FixedValue:	stwx	r10,r30,r6			#Store gotten value in correct register
 		
@@ -4126,12 +4354,6 @@ EInt:		b	.FPUnav				#0
 		mfsprg0	r0
 		rfi
 
-.NotSupported:	mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		xori	r0,r0,HID0_DCE
-		sync	
-		mtspr	HID0,r0
-		
 .HaltDSI:	loadreg	r7,'DSI!'
 		stw	r7,0xf4(r0)
 				
@@ -4193,6 +4415,7 @@ EInt:		b	.FPUnav				#0
 		loadreg r20,0xffff
 		and	r23,r23,r20			#Keep it C000-FFFE		
 		stwbrx	r23,r24,r28
+		sync
 		lwz	r25,0(r25)
 
 		stw	r9,MN_IDENTIFIER(r25)
@@ -4216,6 +4439,7 @@ EInt:		b	.FPUnav				#0
 		loadreg	r20,0xbfff
 		and	r23,r23,r20			#Keep it 8000-BFFE
 		stwbrx	r23,r24,r28			#triggers Interrupt
+		sync
 
 		mr.	r7,r7
 		bne	.NoWaitSE
@@ -4230,15 +4454,15 @@ EInt:		b	.FPUnav				#0
 
 #********************************************************************************************
 
-.PrInt:		mtsprg0	r0				#Program Exception
-		
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)		
-		
+.PrInt:		mtsprg0	r0				#Program Exception		
+
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable MMU & FPU
 		mtmsr	r0				
 		isync
+
+		li	r0,-1
+		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
@@ -4656,6 +4880,8 @@ EInt:		b	.FPUnav				#0
 .EISI:		.string	"Instruction Storage"
 .EFP:		.string	"FPU Unavailable"
 .ETrace:	.string "Trace"
+.ESM:		.string "System Management"
+.ETM:		.string "Thermal Management"
 
 		.align	2
 				
@@ -4782,6 +5008,7 @@ EInt:		b	.FPUnav				#0
 		loadreg r20,0xffff
 		and	r23,r23,r20			#Keep it C000-FFFE		
 		stwbrx	r23,r24,r28
+		sync
 		lwz	r25,0(r25)
 
 		loadreg	r9,'CRSH'
@@ -4805,6 +5032,7 @@ EInt:		b	.FPUnav				#0
 		loadreg	r20,0xbfff
 		and	r23,r23,r20			#Keep it 8000-BFFE
 		stwbrx	r23,r24,r28			#triggers Interrupt
+		sync
 
 .RealHalt:	b	.RealHalt
 		
@@ -4812,9 +5040,13 @@ EInt:		b	.FPUnav				#0
 #********************************************************************************************
 	
 EIntEnd:
-		mflr	r4				#Setup a small jumptable for exceptions			
-		loadreg r5,0x48002b2c
+		mflr	r4				#Setup a small jumptable for exceptions
+		loadreg r5,0x48002b34
 		stw	r5,0x500(r0)			#External Interrupt
+		loadreg	r5,0x48001930			
+		stw	r5,0x1700(r0)			#Thermal Management
+		loadreg	r5,0x48001c2c
+		stw	r5,0x1400(r0)			#System Management
 		loadreg	r5,0x48002128
 		stw	r5,0xf00(r0)			#Performance Monitor
 		loadreg	r5,0x48002424

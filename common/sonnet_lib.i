@@ -119,9 +119,6 @@ _LVOPutPublicMsgPPC	=	-846
 _LVOAddUniquePortPPC	=	-852
 _LVOAddUniqueSemaphorePPC	=	-858
 _LVOIsExceptionMode	=	-864
-_LVOCreateMsgFramePPC	=	-870	;PRIVATE
-_LVOSendMsgFramePPC	=	-876	;PRIVATE
-_LVOFreeMsgFramePPC	=	-882	;PRIVATE
 
 		IFND    _POWERMODE
 

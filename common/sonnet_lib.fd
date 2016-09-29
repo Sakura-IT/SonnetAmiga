@@ -122,8 +122,5 @@ PutPublicMsgPPC(portname,message)()
 AddUniquePortPPC(port)()
 AddUniqueSemaphorePPC(SemaphorePPC)()
 IsExceptionMode()()
-CreateMsgFramePPC()
-SendMsgFramePPC()
-FreeMsgFramePPC()
 ##end
 
