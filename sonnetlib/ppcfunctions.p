@@ -1321,9 +1321,10 @@ FlushDCache:
 		
 		mfctr	r28		
 		
-		lwz	r30,PowerPCBase(r0)
+		lwz	r3,PowerPCBase(r0)
+		mr	r30,r3
 		li	r29,-1
-		stb	r29,FLAG_READY(r30)			
+		stb	r29,FLAG_READY(r3)			
 		
 		bl	Super
 		
@@ -1629,10 +1630,7 @@ AllocSignalPPC:
 		lwz	r3,0(r13)
 		addi	r13,r13,4
 		
-.EndSig:	li	r31,FAllocSignalPPC-FRun68K
-		bl	DebugEndFunction
-	
-		lwz	r31,0(r13)
+.EndSig:	lwz	r31,0(r13)
 		addi	r13,r13,4		
 		epilog 'TOC'	
 
@@ -1735,7 +1733,7 @@ LockTaskList:
 
 		lwz	r31,PowerPCBase(r0)
 		lwz	r3,LIST_ALLTASKS(r31)
-
+		
 		lwz	r31,0(r13)
 		addi	r13,r13,4
 		
@@ -2526,8 +2524,7 @@ WaitPortPPC:
 		li	r4,Atomic
 		bl AtomicDone
 
-		li	r0,SYSCALL_CAUSEINTERRUPT
-		sc
+		bl CauseInterrupt
 
 .PortUseWait2:	lbz	r3,PortInUse(r28)
 		mr.	r3,r3
@@ -2586,8 +2583,7 @@ WaitPortPPC:
 		li	r4,Atomic
 		bl AtomicDone
 
-		li	r0,SYSCALL_CAUSEINTERRUPT
-		sc
+		bl CauseInterrupt
 
 .PortUseWait4:	lbz	r3,PortInUse(r28)
 		mr.	r3,r3
@@ -2650,6 +2646,7 @@ User:
 		ori	r0,r0,PSL_PR		#SET Bit 17 (PR) To User
 		mtmsr	r0
 		isync
+		sync
 
 .WrongKey:	epilog 'TOC'
 
@@ -2685,7 +2682,7 @@ PutXMsgPPC:
 		cmplwi	r29,156				#FIFO msg length - 32 -4 (for MN_MCPORT)
 		bgt	.ErrorX		
 			
-		li 	r0,SYSCALL_CREATEMSGFRAME
+		li	r0,SYSCALL_CREATEMSGFRAME
 		sc
 		
 		mr	r30,r3
@@ -2722,7 +2719,7 @@ PutXMsgPPC:
 		stw	r31,MN_PPC(r30)
 		mr	r4,r30
 		
-		li 	r0,SYSCALL_SENDMSGFRAME
+		li	r0,SYSCALL_SENDMSGFRAME
 		sc
 
 		lwz	r22,0(r13)
@@ -2817,7 +2814,7 @@ WaitFor68K:
 		lwz	r29,MN_PPSTRUCT+5*4(r30)
 		mr	r4,r30
 		
-		li 	r0,SYSCALL_FREEMSGFRAME
+		li	r0,SYSCALL_FREEMSGFRAME
 		sc
 
 		mr	r4,r28
@@ -2861,9 +2858,9 @@ Run68K:
 		mr	r31,r4		
 		mfctr	r25
 
-		li 	r0,SYSCALL_CREATEMSGFRAME
+		li	r0,SYSCALL_CREATEMSGFRAME
 		sc
-
+		
 		mr	r30,r3			
 		subi	r5,r30,4		
 		li	r6,48
@@ -2890,7 +2887,9 @@ Run68K:
 		stw	r4,MN_ARG0(r30)
 		lwz	r4,TC_SIGALLOC(r5)
 		stw	r4,MN_ARG1(r30)
-
+#		lwz	r4,TC_SIGRECVD(r5)
+#		stw	r4,MN_ARG2(r30)
+		
 		lwz	r4,PP_FLAGS(r30)
 		cmpwi	r4,0
 		beq	.FromRunPPC
@@ -2927,7 +2926,7 @@ Run68K:
 
 .NotAllocMem:	mr	r4,r30
 		
-		li 	r0,SYSCALL_SENDMSGFRAME
+		li	r0,SYSCALL_SENDMSGFRAME
 		sc
 
 		mr	r4,r31
@@ -2966,19 +2965,19 @@ Signal68K:
 		
 		mr	r31,r4
 		mr	r30,r5
-		
-		li 	r0,SYSCALL_CREATEMSGFRAME
+
+		li	r0,SYSCALL_CREATEMSGFRAME
 		sc
-		
+
 		mr	r4,r3
 		loadreg	r5,'SIG!'
 		stw	r5,MN_IDENTIFIER(r4)
 		stw	r31,MN_PPSTRUCT(r4)
 		stw	r30,MN_PPSTRUCT+4(r4)
-		
-		li 	r0,SYSCALL_SENDMSGFRAME
+
+		li	r0,SYSCALL_SENDMSGFRAME
 		sc
-		
+
 		lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
@@ -3793,31 +3792,25 @@ CopyStr:
 #********************************************************************************************
 
 InsertOnPri:	
-		mflr	r0
-		stw	r0,8(r1)
-		mfcr	r0
-		stw	r0,4(r1)
-		stw	r13,-4(r1)
-		subi	r13,r1,4
-		stwu	r1,-60(r1)
+		prolog	228,'TOC'
 
+		stwu	r8,-4(r13)
 		stwu	r7,-4(r13)
 		stwu	r6,-4(r13)
 		stwu	r5,-4(r13)
 		stwu	r4,-4(r13)
 		stwu	r3,-4(r13)
 
-		lwz	r3,PowerPCBase(r0)
+		lwz	r8,PowerPCBase(r0)
 		li	r6,-1
-		stb	r6,FLAG_READY(r3)
+		stb	r6,FLAG_READY(r8)
 		isync
 
 		lwz	r3,TASKPPC_PRIORITY(r5)
 		lwz	r6,TASKPPC_PRIOFFSET(r5)
 		add	r3,r3,r6
-		lwz	r6,TASKPPC_POWERPCBASE(r5)
-		lwz	r7,LowActivityPrio(r6)
-		lwz	r6,LowActivityPrioOffset(r6)
+		lwz	r7,LowActivityPrio(r8)
+		lwz	r6,LowActivityPrioOffset(r8)
 		add	r6,r6,r7
 		cmpw	r3,r6
 		blt-	.LowerPri
@@ -3850,25 +3843,18 @@ InsertOnPri:
 		stw	r3,4(r5)
 		stw	r5,0(r3)
 
-		lwz	r3,PowerPCBase(r0)
 		li	r6,0
-		stb	r6,FLAG_READY(r3)
+		stb	r6,FLAG_READY(r8)
 
 		lwz	r3,0(r13)
 		lwz	r4,4(r13)
 		lwz	r5,8(r13)
 		lwz	r6,12(r13)
 		lwz	r7,16(r13)
-		addi	r13,r13,20
+		lwz	r8,20(r13)
+		addi	r13,r13,24
 
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r0,8(r1)
-		mtlr	r0
-		lwz	r0,4(r1)
-		mtcr	r0
-
-		blr
+		epilog	'TOC'
 
 #********************************************************************************************
 #
@@ -4419,7 +4405,7 @@ CreateTaskPPC:
 		beq-	.Error13			#Error NoMem 
  
 		mr	r5,r3 
-		stw	r31,TASKPTR_TASK(r5)		#Store Taskpointer 
+		stw	r31,14(r5)			#Store Taskpointer 
 		stw	r5,TASKPPC_TASKPTR(r31)
 		lwz	r3,LN_NAME(r31)			#Copy Name pointer 
 		stw	r3,LN_NAME(r5) 
@@ -4482,15 +4468,16 @@ CreateTaskPPC:
 .SkipSystem:	stw	r5,TASKPPC_ID(r31)
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r31)
-		la	r4,LIST_READYTASKS(r23)
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_READYTASKS(r4)
 		mr	r5,r31				#Task
 		loadreg	r0,Quantum
 		stw	r0,TASKPPC_QUANTUM(r31)
-#		lwz	r7,TASKPPC_NICE(r31)		#Get NICE value
-#		addi	r8,r7,20			#Add 20 (0-40)
-#		rlwinm	r8,r8,2,0,29			#multiply with 4 (0-160)
-#		lwz	r7,Table_NICE(r23)
-#		lwzx	r8,r7,r8			#Get value from table
+#		lwz	r7,TASKPPC_NICE(r31)		#Pending finding out what this means
+#		addi	r8,r7,20
+#		rlwinm	r8,r8,2,0,29
+#		lwz	r7,654(r23) 			#654(PowerPCBase)
+#		lwzx	r8,r7,r8
 #		rlwinm	r8,r8,24,8,31
 #		lis	r7,2000
 #		ori	r7,r7,0
@@ -4505,8 +4492,7 @@ CreateTaskPPC:
 
  		bl AtomicDone
 
-		li	r0,SYSCALL_CAUSEINTERRUPT
-		sc
+		bl CauseInterrupt
 
 		mr	r3,r31
 		b	.SkipToEnd			#All good, go to exit
@@ -4856,7 +4842,7 @@ VacatePPC:
 		li	r31,FVacatePPC-FRun68K
 		bl	DebugStartFunction
 
-		lwz	r31,PowerPCBase(r0)
+		mr	r31,r3
 		mr	r30,r4
 		mr	r29,r5
 		
@@ -4929,7 +4915,7 @@ SnoopTask:
 		li	r31,FSnoopTask-FRun68K
 		bl	DebugStartFunction
 
-		lwz	r29,PowerPCBase(r0)
+		mr	r29,r3
 		li	r31,0
 		mr	r30,r4
 
@@ -4983,7 +4969,8 @@ SnoopTask:
 		
 		bl ObtainSemaphorePPC
 
-		addi	r4,r29,LIST_SNOOP
+		lwz	r4,PowerPCBase(r0)
+		addi	r4,r4,LIST_SNOOP
 		mr	r5,r31
 
 		bl AddHeadPPC
@@ -5271,7 +5258,7 @@ CauseInterrupt:
 		stwu	r31,-4(r13)
 
 		li	r0,SYSCALL_CAUSEINTERRUPT
-		sc	
+		sc
 
 		lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -5309,8 +5296,7 @@ CheckExcSignal:
 		
 		stw	r7,TaskException(r0)
 
-		li	r0,SYSCALL_CAUSEINTERRUPT
-		sc
+		bl CauseInterrupt
 
 .IntWait2:	lwz	r0,TaskException(r0)
 		mr.	r0,r0
@@ -5472,10 +5458,10 @@ DeleteTaskPPC:
 
 		bl RemovePPC		
 
-.NoTaskPtr:	lwz	r4,PowerPCBase(r0)		#Tasks -1
-		lwz	r3,NumAllTasks(r4)
+.NoTaskPtr:	lwz	r27,PowerPCBase(r0)		#Tasks -1
+		lwz	r3,NumAllTasks(r27)
 		subi	r3,r3,1
-		stw	r3,NumAllTasks(r4)
+		stw	r3,NumAllTasks(r27)
 		dcbst	r0,r4
 
 		lwz	r4,TaskListSem(r0)
@@ -5487,7 +5473,7 @@ DeleteTaskPPC:
 		mr.	r26,r26
 		beq	.NoMirror
 
-		li 	r0,SYSCALL_CREATEMSGFRAME
+		li	r0,SYSCALL_CREATEMSGFRAME
 		sc
 		
 		mr	r4,r3
@@ -5495,19 +5481,17 @@ DeleteTaskPPC:
 		loadreg	r26,'END!'
 		stw	r26,MN_IDENTIFIER(r4)
 		
-		li 	r0,SYSCALL_SENDMSGFRAME
-		sc					#Send kill signal to mirror 68K task
+		li	r0,SYSCALL_SENDMSGFRAME		#Send kill signal to mirror 68K task
+		sc
 
 .NoMirror:	mr.	r29,r29				#This task?
 		beq-	.NotOwnTask2			#no? Skip next
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r31)
 		li	r0,-1
-		lwz	r28,PowerPCBase(r0)
-		stb	r0,RescheduleFlag(r28)		#Reschedule
+		stb	r0,RescheduleFlag(r27)		#Reschedule
 		
-		li	r0,SYSCALL_CAUSEINTERRUPT
-		sc
+		bl CauseInterrupt
 
 .EndTask:	b	.EndTask			#Halt this Task
 
@@ -6366,8 +6350,7 @@ WaitPPC:
 		
 		bl AtomicDone
 		
-		li	r0,SYSCALL_CAUSEINTERRUPT
-		sc
+		bl CauseInterrupt
 
 .WaitForRun:	lbz	r0,TC_STATE(r31)
 		cmplwi	r0,TS_RUN
@@ -6462,8 +6445,7 @@ SetTaskPriPPC:
 		
 		bl AtomicDone
 
-		li	r0,SYSCALL_CAUSEINTERRUPT
-		sc
+		bl CauseInterrupt
 
 		b	.ExitPri
 
@@ -6507,7 +6489,7 @@ Run68KLowLevel:
 		mr	r25,r9
 		mfctr	r22
 
-		li 	r0,SYSCALL_CREATEMSGFRAME
+		li	r0,SYSCALL_CREATEMSGFRAME
 		sc
 
 		mr	r30,r3
@@ -6536,7 +6518,7 @@ Run68KLowLevel:
 		stw	r5,MN_PPC(r30)				
 		mr	r4,r30
 
-		li 	r0,SYSCALL_SENDMSGFRAME
+		li	r0,SYSCALL_SENDMSGFRAME
 		sc
 
 		subi	r4,r30,MN_PPSTRUCT
@@ -6579,7 +6561,7 @@ SignalPPC:
 
 		mr	r31,r4
 		mr	r30,r5
-		lwz	r29,PowerPCBase(r0)
+		mr	r29,r3
 
 		lbz	r0,LN_TYPE(r4)
 		cmpwi	r0,NT_PPCTASK
@@ -6654,7 +6636,6 @@ SignalPPC:
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r30)
 
-		la	r4,LIST_READYTASKS(r29)
 		mr	r5,r30
 		
 		bl InsertOnPri				#Prio recalculation
@@ -6663,15 +6644,15 @@ SignalPPC:
 
 		bl AtomicDone
 
-		lwz	r4,LIST_READYTASKS(r29)
+		lwz	r28,PowerPCBase(r0)
+		lwz	r4,LIST_READYTASKS(r28)
 		cmplw	r4,r30				#Check if we are top
 		bne-	.SigExit
 		
 		li	r0,-1
-		stb	r0,RescheduleFlag(r29)
+		stb	r0,RescheduleFlag(r28)
 
-		li	r0,SYSCALL_CAUSEINTERRUPT
-		sc
+		bl CauseInterrupt
 
 .SigExit:	li	r31,FSignalPPC-FRun68K
 		bl	DebugEndFunction
@@ -6738,8 +6719,7 @@ GetMsgPPC:
 		li	r4,Atomic
 		bl AtomicDone
 
-		li	r0,SYSCALL_CAUSEINTERRUPT
-		sc
+		bl CauseInterrupt
 
 .PortWait2:	lbz	r3,PortInUse(r29)
 		mr.	r3,r3
@@ -6850,8 +6830,7 @@ ReplyMsgPPC:
 		
 		bl AtomicDone
 		
-		li	r0,SYSCALL_CAUSEINTERRUPT
-		sc
+		bl CauseInterrupt
 
 .WaitForPort2:	lbz	r3,PortInUse(r29)
 		mr.	r3,r3
@@ -6947,8 +6926,7 @@ PutMsgPPC:
 
 		bl AtomicDone
 
-		li	r0,SYSCALL_CAUSEINTERRUPT
-		sc
+		bl CauseInterrupt
 
 .W8ForPort2:	lbz	r3,PortInUse(r29)
 		mr.	r3,r3
@@ -7077,8 +7055,8 @@ GetHALInfo:
 		li	r31,FGetHALInfo-FRun68K
 		bl	DebugStartFunction
 
-		lwz	r30,PowerPCBase(r0)
 		mr	r31,r4
+		mr	r30,r3
 
 		loadreg	r4,HINFO_ALEXC_HIGH
 		mr	r5,r31
@@ -7496,7 +7474,7 @@ RemExcHandler:
 		mr.	r4,r4
 		beq-	.NoXLock
 
-		lwz	r31,PowerPCBase(r0)
+		mr	r31,r3
 		mr	r30,r4
 
 .RemExcAtom:	li	r4,Atomic
@@ -7516,8 +7494,7 @@ RemExcHandler:
 
 		bl AtomicDone
 
-		li	r0,SYSCALL_CAUSEINTERRUPT
-		sc
+		bl CauseInterrupt
 
 		lwz	r3,EXCDATA_LASTEXC(r30)
 .WaitActive:	lwz	r4,EXCDATA_FLAGS(r3)
@@ -7646,7 +7623,7 @@ SetExcHandler:
 
 		li	r26,0
 
-		lwz	r27,PowerPCBase(r0)
+		mr	r27,r3
 		mr	r31,r4
 
 		li	r4,98
@@ -7954,8 +7931,7 @@ SetExcHandler:
 		
 		bl AtomicDone
 
-		li	r0,SYSCALL_CAUSEINTERRUPT
-		sc
+		bl CauseInterrupt
 
 		mr.	r26,r26
 		beq-	.NoExcDefined
@@ -8173,7 +8149,7 @@ WaitTime:
 		bl	DebugStartFunction
 
 		mr	r30,r4
-		lwz	r29,PowerPCBase(r0)
+		mr	r29,r3
 		lwz	r26,RunningTask(r0)
 		
 		lwz	r4,WaitListSem(r0)
@@ -8318,7 +8294,7 @@ WaitTime:
 		subi	r13,r1,4
 		stwu	r1,-44(r1)
 	
-		loadreg	r5,SonnetBusClock
+		loadreg	r5,SonnetBusClock*4
 		
 		mr	r6,r4
 		mulhw	r3,r5,r6
@@ -8828,7 +8804,7 @@ DebugStartFunction:
 		lwz	r29,PP_OFFSET-MN_PPSTRUCT(r4)
 		lwz	r30,PP_CODE-MN_PPSTRUCT(r4)
 		
-.NoRun:		li 	r0,SYSCALL_CREATEMSGFRAME
+.NoRun:		li	r0,SYSCALL_CREATEMSGFRAME
 		sc
 
 		mr	r28,r3
@@ -8858,7 +8834,7 @@ DebugStartFunction:
 		stw	r5,MN_PPC(r28)
 		mr	r4,r28
 
-		li 	r0,SYSCALL_SENDMSGFRAME
+		li	r0,SYSCALL_SENDMSGFRAME
 		sc
 
 		lwz	r30,0(r13)
@@ -8895,9 +8871,9 @@ DebugEndFunction:
 
 		mr	r29,r3
 
-		li 	r0,SYSCALL_CREATEMSGFRAME
+		li	r0,SYSCALL_CREATEMSGFRAME
 		sc
-		
+
 		mr	r28,r3
 
 		bl	.GetTxtOffSet2
@@ -8921,7 +8897,7 @@ DebugEndFunction:
 
 		mr	r4,r28
 					
-		li 	r0,SYSCALL_SENDMSGFRAME
+		li	r0,SYSCALL_SENDMSGFRAME
 		sc
 
 		lwz	r30,0(r13)
@@ -8944,9 +8920,11 @@ StartCode:	bl	.StartRunPPC
 
 .WasNoEMsg:	lwz	r4,RunningTask(r0)
 		lwz	r4,TC_SIGALLOC(r4)
-		loadreg	r28,0xfffff110
+		loadreg	r28,0xfffff100
 		and.	r4,r4,r28
-
+		
+		mr	r4,r28
+		
 		bl WaitPPC
 
 .debugxxx:	mr	r5,r3
@@ -9148,7 +9126,7 @@ ExitCode:	lwz	r17,RunningTask(r0)
 
 .NotLinear2:	mr	r12,r3
 
-		li 	r0,SYSCALL_CREATEMSGFRAME
+		li	r0,SYSCALL_CREATEMSGFRAME
 		sc
 
 		mr	r9,r3
@@ -9171,6 +9149,8 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		lwz	r7,RunningTask(r0)
 		lwz	r8,TC_SIGALLOC(r7)
 		stw	r8,MN_ARG1(r9)
+#		lwz	r8,TC_SIGRECVD(r7)
+#		stw	r8,MN_ARG2(r9)		
 		lwz	r7,TASKPPC_STARTMSG(r7)						
 		lwz	r7,MN_REPLYPORT(r7)		
 		stw	r7,MN_REPLYPORT(r9)
@@ -9206,12 +9186,12 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		lwz	r4,RunningTask(r0)			#Free original 68K -> PPC
 		lwz	r4,TASKPPC_STARTMSG(r4)			#message
 
-		li 	r0,SYSCALL_FREEMSGFRAME
+		li	r0,SYSCALL_FREEMSGFRAME
 		sc
-
+		
 		mr	r4,r9
 		
-		li 	r0,SYSCALL_SENDMSGFRAME
+		li	r0,SYSCALL_SENDMSGFRAME
 		sc
 		
 		lfd	f31,0(r1)
@@ -9291,7 +9271,7 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		stb	r7,TC_STATE(r9)
 		mr	r4,r30
 
-		li 	r0,SYSCALL_FREEMSGFRAME
+		li	r0,SYSCALL_FREEMSGFRAME
 		sc
 
 		lwz	r4,RunningTask(r0)
