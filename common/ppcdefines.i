@@ -1,10 +1,10 @@
 #Sonnet Memory Map
 #0x00000000	Zero Page				0x003000	12288
 #0x00003000	Exceptions/Scheduler			0x004000	16384
-#0x00008000	Semaphores				0x000200	512
-#0x00008200	Semaphore memory			0x000200	512
-#0x00008400	Idle Task				0x000c00	3072
-#0x00009000	System Stack				0x008000	32768
+#0x00007000	Semaphores				0x000200	512
+#0x00007200	Semaphore memory			0x000200	512
+#0x00007400	Idle Task				0x000c00	3072
+#0x00008000	System Stack				0x008000	32768
 #0x00010000	Free memory				0x0e0000	917504
 #0x00100000	Message FIFOs				0x010000	65536	Must be 0x100000 aligned
 #0x00110000	Message Frames 2x4096xPP_SIZE+48	0x180000
@@ -31,13 +31,17 @@
 .set L2STATE,52
 .set CPUSDR1,56					#Pointer
 .set TaskException,60				#Pointer
+.set DState,64
+.set DLockState,65
 .set ExceptionMode,66
+.set RescheduleFlag,67				#626
 .set SnoopSem,68				#Pointer
+.set CurrentPort,72				#610
 .set L2Size,76
 .set MemSem,88
 .set PowerPCBase,92
 .set Break,96
-.set AtomicUser,100
+.set PortInUse,108				#628	; See CurrentPort
 .set DebugLevel,109				#18737
 .set RTGType,112
 .set RTGBase,116
@@ -49,6 +53,7 @@
 .set ViolationAddress,140			#Pointer
 .set MemSize,144
 .set RunPPCStart,148
+.set KrytenTask,152
 
 #LibBase:
 .set LIST_WAITINGTASKS,128
@@ -70,27 +75,23 @@
 .set LIST_EXCIACCESS,384
 .set LIST_EXCDACCESS,400
 .set LIST_EXCMCHECK,416
-.set LIST_WAITTIME,432
-.set LIST_PORTS,448
-.set LIST_NEWTASKS,464
-.set LIST_READYTASKS,480
-.set LIST_REMOVEDTASKS,496
-.set LIST_MSGQUEUE,512
+.set LIST_EXCSYSMAN,432
+.set LIST_EXCTHERMAN,448
+.set LIST_WAITTIME,464
+.set LIST_PORTS,480
+.set LIST_NEWTASKS,496
+.set LIST_READYTASKS,512
+.set LIST_REMOVEDTASKS,528
+.set LIST_MSGQUEUE,544
 
 .set AlignmentExcHigh,600
 .set AlignmentExcLow,604
-.set CurrentPort,610
-.set DataExcHigh,616
-.set DataExcLow,620
-.set DState,624
-.set DLockState,625
-.set RescheduleFlag,626
+.set DataExcHigh,608
+.set DataExcLow,612
 .set FLAG_WAIT,627
-.set PortInUse,628				#See CurrentPort
+.set FLAG_READY,628
 .set BusyCounter,629
-.set FLAG_READY,630
-
-.set NumAllTasks,632
+.set NumAllTasks,630
 
 .set StartTBL,638
 .set CurrentTBL,642
@@ -206,7 +207,7 @@
 .set _LVOAllocVec,		-684
 .set _LVOFreeVec,		-690
 
-.set SysStack,			0x10000			#Length max $7000
+.set SysStack,			0x10000			#Length max $8000
 .set IdleTask,			0x8400
 
 .set MEMF_PUBLIC,		0x00000001
@@ -282,6 +283,8 @@
 .set EXCF_TRACE,		0x00002000
 .set EXCF_PERFMON,		0x00008000
 .set EXCF_IABR,			0x00080000
+.set EXCF_SYSMAN,		0x00100000
+.set EXCF_THERMAN,		0x00800000
 
 .set EXC_MCHECK,2            				#machine check exception
 .set EXC_DACCESS,3           				#data access exception
@@ -295,6 +298,8 @@
 .set EXC_TRACE,13            				#trace exception
 .set EXC_PERFMON,15          				#performance monitor exception
 .set EXC_IABR,19 					#IA breakpoint exception
+.set EXC_SYSMAN,20					#system management exception
+.set EXC_THERMAN,23					#thermal management exception
 
 .set FPF_EN_OVERFLOW,0        				#enable overflow exception
 .set FPF_EN_UNDERFLOW,1       				#enable underflow exception
@@ -663,13 +668,13 @@
 .set TS_CHANGING,7
 .set TS_ATOMIC,8
 
+.set TASKPTR_TASK,14
+
 .set TASKPPC_SYSTEM,0
 .set TASKPPC_BAT,1
 .set TASKPPC_EMULATOR,2
 .set TASKPPC_CHOWN,3
 .set TASKPPC_ATOMIC,5
-
-.set TASKPTR_TASK,14
 
 .set TASKPPC_STACKSIZE,92
 .set TASKPPC_STACKMEM,96
@@ -689,7 +694,6 @@
 .set TASKPPC_ELAPSED,164
 .set TASKPPC_ELAPSED2,168
 .set TASKPPC_TOTALELAPSED,172
-.set TASKPPC_QUANTUM,176
 .set TASKPPC_PRIORITY,180
 .set TASKPPC_PRIOFFSET,184
 .set TASKPPC_POWERPCBASE,188
@@ -699,6 +703,9 @@
 .set TASKPPC_ACTIVITY,204
 .set TASKPPC_ID,208
 .set TASKPPC_NICE,212
+.set TASKPPC_QUANTUM,176
+.set TASKPPC_DESIRED,192
+.set TASKPPC_ID,208
 .set TASKPPC_MSGPORT,216
 .set TASKPPC_TASKPOOLS,220
 .set TASKPPC_POOLMEM,238

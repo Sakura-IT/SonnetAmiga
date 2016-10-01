@@ -1,5 +1,5 @@
 **
-**      $VER: sonnet_lib.i 1.1 (28.08.16)
+**      $VER: sonnet_lib.i 1.0 (15.05.15)
 **
 **      Library offsets for sonnet.library V1
 **
@@ -20,7 +20,6 @@ _LVOGetPPCState         =       -90
 _LVOSetCache68K         =       -96
 _LVOCreatePPCTask       =       -102
 _LVOCausePPCInterrupt   =       -108
-_LVOChangeStack68K	=	-114	;PRIVATE!
 
 ****  PPC Library offsets
 
@@ -119,6 +118,9 @@ _LVOPutPublicMsgPPC	=	-846
 _LVOAddUniquePortPPC	=	-852
 _LVOAddUniqueSemaphorePPC	=	-858
 _LVOIsExceptionMode	=	-864
+_LVOCreateMsgFramePPC	=	-870	;PRIVATE
+_LVOSendMsgFramePPC	=	-876	;PRIVATE
+_LVOFreeMsgFramePPC	=	-882	;PRIVATE
 
 		IFND    _POWERMODE
 

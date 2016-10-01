@@ -43,7 +43,8 @@
 	XREF	SetNiceValue,AllocPrivateMem,FreePrivateMem,SetExceptPPC,ObtainSemaphoreSharedPPC
 	XREF	AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
 	XREF	AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
-	XREF	AddUniqueSemaphorePPC,IsExceptionMode
+	XREF	AddUniqueSemaphorePPC,IsExceptionMode,CreateMsgFramePPC,SendMsgFramePPC
+	XREF	FreeMsgFramePPC,Kryten
 	
 	IFD	_IFUSION_
 	
@@ -564,12 +565,21 @@ VeryStrange	move.l #_LVOAddTask,a0			;Set system patches
 
 		jsr _LVOEnable(a6)
 		
+		move.l _PowerPCBase(pc),a6
+		move.l _LVOFreeMsgFramePPC-4(a6),a1
+		lea KrytenTags(pc),a0
+
+		move.l a1,4(a0)
+		addq.l #4,a1
+		move.l a1,12(a0)
+		bsr CreatePPCTask
+		
 		bra Clean
 
 ;********************************************************************************************
 
-PrintError	move.l LExecBase(pc),a6
-		lea IntuitionLib(pc),a1
+PrintError	move.l LExecBase(pc),a6			;Put up a requester and give out
+		lea IntuitionLib(pc),a1			;an error message
 		moveq.l #33,d0
 		jsr _LVOOpenLibrary(a6)
 		tst.l d0
@@ -806,8 +816,8 @@ PshMsg		cpushl dc,(a2)				;040+
 		
 ;********************************************************************************************
 
-MsgMir68	move.l a1,-(a7)
-		move.l MN_ARG0(a1),a0
+MsgMir68	move.l a1,-(a7)				;Sets up a mirror task for an
+		move.l MN_ARG0(a1),a0			;original PPC task 
 		moveq.l #-1,d1
 GetPPCName	addq.l #1,d1
 		tst.b (a0)+
@@ -821,7 +831,7 @@ GetPPCName	addq.l #1,d1
 		move.l MN_ARG0(a1),a0
 CopyPPCName	move.b (a0)+,(a2)+
 		dbf d2,CopyPPCName
-		move.l #"_68K",(a2)+
+		move.l #"_68K",(a2)+			;add _68K to PPC mirror task name
 		clr.b (a2)
 		move.l d1,d2
 		
@@ -836,17 +846,20 @@ CopyPPCName	move.b (a0)+,(a2)+
 		move.l 4.w,a6
 		tst.l d0
 		beq.s MsgMir68
-
-		move.l d0,a0		
-		move.l MN_ARG1(a1),TC_SIGALLOC(a0)		
+		move.l d0,a0
+		
+		jsr _LVODisable(a6)
+		move.l MN_ARG1(a1),TC_SIGALLOC(a0)
+		jsr _LVOEnable(a6)
+		
 		lea pr_MsgPort(a0),a0
 		jsr _LVOPutMsg(a6)
 		bra GetLoop
 
 ;********************************************************************************************
 
-PrintDebug2	lea DebugString2(pc),a0
-		bra.s DebugEnd
+PrintDebug2	lea DebugString2(pc),a0			;Print debug information send
+		bra.s DebugEnd				;from PPC tasks
 		
 PrintDebug	lea DebugString(pc),a0
 DebugEnd	move.l a1,a3
@@ -862,35 +875,37 @@ DebugEnd	move.l a1,a3
 ;********************************************************************************************
 
 MirrorTask	move.l 4.w,a6				;Mirror task for PPC task
-		move.l ThisTask(a6),a0
+		move.l ThisTask(a6),a0			;set up by MsgMir68
 		
 		or.b #TF_PPC,TC_FLAGS(a0)
 		lea pr_MsgPort(a0),a0
 		move.l a0,d6
 		jsr _LVOWaitPort(a6)
 
-		jsr _LVOCreateMsgPort(a6)
+Error		jsr _LVOCreateMsgPort(a6)
 		tst.l d0
-		bne GotTaskMsgPort
-			
-		lea GenMemError(pc),a2
-		bra PrintError				;Lazy - jumps to Clean....Will crash.
-		
-GotTaskMsgPort	move.l d0,-(a7)
+		beq.s Error
+		move.l d0,-(a7)
 		
 CleanUp		move.l d6,a0
 		jsr _LVOGetMsg(a6)
 		tst.l d0
-		beq.s GtLoop2
+		beq.s GoWaitPort
 		
 		move.l d0,a1
 		move.l (a7),a0
 		jsr _LVOPutMsg(a6)
 		bra.s CleanUp
 
-GoWaitPort	move.l ThisTask(a6),a1
-		move.l TC_SIGALLOC(a1),d0
-		and.l #$fffff010,d0
+GoWaitPort	move.l (a7),a0
+		move.l ThisTask(a6),a1
+		move.l TC_SIGALLOC(a1),d0		
+		and.l #$fffff000,d0
+
+		move.b MP_SIGBIT(a0),d1
+		moveq.l #0,d2
+		bset d1,d2
+		or.l d2,d0		
 		jsr _LVOWait(a6)
 		
 		move.l (a7),a0		
@@ -902,19 +917,9 @@ GoWaitPort	move.l ThisTask(a6),a1
 		and.l d2,d1
 		beq.s GtLoop2
 
-		move.l ThisTask(a6),a1
-		move.l LN_NAME(a1),a1
-		cmp.l #"Time",8(a1)			;ScummVMWOS patch pending fix
-		bne.s NoTimer
-
-		nop
-;		bset #28,d0
-;		bset #29,d0
-
-NoTimer		bsr CrossSignals
+		bsr CrossSignals
 		
 GtLoop2		move.l (a7),a0
-
 		jsr _LVOGetMsg(a6)
 		move.l d0,d7
 		beq.s GoWaitPort
@@ -933,27 +938,31 @@ GtLoop2		move.l (a7),a0
 		
 DoRunk86	move.l (a7),MN_MIRROR(a0)	
 		bsr Runk86
-		bra.s GtLoop2	
-
+		bra.s GtLoop2
+		
 ;********************************************************************************************
 
 		cnop 0,4
 
-PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,4,NP_StackSize,$20000,0,0
+PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,4,NP_StackSize,$20000,TAG_END
 PrcName		dc.b "MasterControl",0
 
 		cnop 0,4
 		
-Prc2Tags	dc.l NP_Entry,MirrorTask,NP_Name,Prc2Name,NP_Priority,3,NP_StackSize,$20000,0,0
+Prc2Tags	dc.l NP_Entry,MirrorTask,NP_Name,Prc2Name,NP_Priority,3,NP_StackSize,$20000,TAG_END
 Prc2Name	dc.b "Joshua",0
 
 		cnop 0,4
-				
+
+KrytenTags	dc.l TASKATTR_CODE,0,TASKATTR_NAME,0,TASKATTR_SYSTEM,-1,TAG_END
+
+		cnop 0,4
+
 ;********************************************************************************************
 ;********************************************************************************************
 
 
-Crashed		movem.l d0-a6,-(a7)
+Crashed		movem.l d0-a6,-(a7)			;Prints message when PPC has crashed
 		move.l a1,a0
 		bsr FreeMsgFrame
 		move.l DosBase(pc),a6
@@ -976,8 +985,8 @@ VeryBad		movem.l (a7)+,d0-a6
 
 ;********************************************************************************************
 
-SonInt:		movem.l d0-a6,-(a7)
-		move.l 4.w,a6
+SonInt:		movem.l d0-a6,-(a7)			;68K interrupt which distributes
+		move.l 4.w,a6				;messages send by the PPC
 		move.l EUMBAddr(pc),a2
 		move.l OMISR(a2),d3
 		move.l #$20000000,d4			;OMISR[OPQI]
@@ -1073,11 +1082,12 @@ MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
 		beq CommandMaster
 		cmp.l #"END!",d0
 		beq DoPutMsg
-
+		
 		move.l d1,a2
 		move.l MP_SIGTASK(a2),a2
-		move.l MN_ARG1(a1),d0
-		move.l d0,TC_SIGALLOC(a2)
+		move.l MN_ARG1(a1),TC_SIGALLOC(a2)
+		move.l MN_ARG2(a1),d0
+		or.l d0,TC_SIGRECVD(a2)				
 		bra DoPutMsg
 
 ;********************************************************************************************
@@ -1091,14 +1101,13 @@ MsgFPPC		move.l MN_ARG1(a1),d0
 		
 ;********************************************************************************************		
 
-MsgXMSG		
-		move.l MN_MIRROR(a1),a0
+MsgXMSG		move.l MN_MIRROR(a1),a0			;Cross message from PPC to 68k
 		lea 32(a1),a1
 		bra DoPutMsg
 		
 ;********************************************************************************************		
 
-MsgSignal68k	move.l MN_PPSTRUCT+4(a1),d0
+MsgSignal68k	move.l MN_PPSTRUCT+4(a1),d0		;Signal from a PPC task to 68K task
 		move.l a1,d7
 		move.l MN_PPSTRUCT(a1),a1
 		jsr _LVOSignal(a6)
@@ -1212,6 +1221,7 @@ G3		move.l #CPUF_G3,d0
 G4		move.l #CPUF_G4,d0
 ExCPU		movem.l (a7)+,d1-a6
 		rts
+
 ;********************************************************************************************
 ;
 ;	MessageFrame = CreateMsgFrame(void) // a0
@@ -1371,9 +1381,6 @@ NoRamLib1	move.l d3,60(a7)
 		move.l d4,d2
 		lea WhiteList(pc),a2
 		or.b #TF_PPC,d3
-		cmp.l #"data",(a1)
-		beq.s  SetFlag
-
 NextBWList	move.b (a2)+,d1
 NextWhite	move.b (a2)+,d2
 		move.l a2,a3
@@ -1492,60 +1499,6 @@ NoFast		move.l AllocMemAddress(pc),-(a7)
 
 ClrBit		bclr #13,d1
 		bra.s NoBit
-		
-;********************************************************************************************
-;
-;	Status = ChangeStack68K(NewStackSize) // d0=d1
-;
-;********************************************************************************************
-
-ChangeStack68K:
-		movem.l d1-a6,-(a7)
-
-		move.l d1,d7
-		move.l LExecBase(pc),a6
-		sub.l a1,a1
-		jsr _LVOFindTask(a6)
-		move.l d0,a0
-		moveq.l #0,d0
-		move.l LN_NAME(a0),a3
-		cmp.l #"raml",(a3)
-		beq CSExit
-		move.l TC_SPUPPER(a0),d6
-		move.l d6,d5
-		move.l TC_SPLOWER(a0),d4
-		move.l d6,d3
-		sub.l d4,d5
-		cmp.l #$100000,d5
-		bhi BigEnuf
-		move.l #$100000,d5
-BigEnuf		move.l d5,d0
-		move.l #MEMF_PUBLIC|MEMF_PPC,d1
-		jsr _LVOAllocVec(a6)
-		tst.l d0
-		beq.s CSExit
-
-		lea StackSwpStruct(pc),a0
-		move.l d0,stk_Lower(a0)
-		move.l a7,d2
-		sub.l d2,d3
-		add.l d5,d0
-		move.l d0,d2
-		sub.l d3,d2
-		move.l d2,stk_Pointer(a0)
-		move.l d0,stk_Upper(a0)
-		move.l d0,a3
-		move.l d6,a5
-
-		lsr.l #2,d3
-StackCP		move.l -(a5),-(a3)
-		dbf d3,StackCP
-
-		jsr _LVOStackSwap(a6)
-		moveq.l #-1,d0
-
-CSExit		movem.l (a7)+,d1-a6
-		rts
 
 ;*********************************************************************************************
 ;
@@ -1603,10 +1556,7 @@ DoneMirList	jsr _LVOCreateMsgPort(a6)
 		tst.l d0
 		bne.s GotMsgPort
 		
-		moveq.l #PPERR_MISCERR,d7
-		bra EndIt
-		
-GiveASyncErr	moveq.l #PPERR_ASYNCERR,d7
+GiveASyncErr	moveq.l #PPERR_MISCERR,d7
 		bra EndIt
 
 GotMsgPort	move.l d0,Port(a5)
@@ -1709,16 +1659,17 @@ ClrMsg		clr.l (a2)+
 		move.l d6,MN_ARG0(a0)			;Mem
 		move.l d5,MN_PPC(a0)
 		move.l ThisTask(a6),a2
+		
 		move.l TC_SIGALLOC(a2),d0
 		tst.l d5
 		bne OldPPCTask
-
+		
 		move.l d0,MN_STARTALLOC(a0)
 		bra SetSigAlloc
 		
 OldPPCTask	move.l d0,d7
-SetSigAlloc	move.l d7,MN_ARG1(a0)			;Len
-		move.l a2,MN_ARG2(a0)
+SetSigAlloc	move.l d7,MN_ARG1(a0)
+		move.l a2,MN_ARG2(a0)		
 
 		lea MN_PPSTRUCT(a0),a2
 		moveq.l #PP_SIZE/4-1,d0
@@ -1729,7 +1680,7 @@ SetSigAlloc	move.l d7,MN_ARG1(a0)			;Len
 		beq.s CpMsg2
 
 		lea StackRunError(pc),a2
-		bra PrintError				;Does not unlink a5...
+		bra PrintError
 
 CpMsg2		move.l (a3)+,(a2)+
 		dbf d0,CpMsg2
@@ -1738,7 +1689,7 @@ CpMsg2		move.l (a3)+,(a2)+
 		
 		move.l PP_FLAGS(a1),d1			;Asynchronous RunPPC Call
 		btst.l #PPB_ASYNC,d1
-		beq GtLoop
+		beq Stacker
 		
 		move.l MirrorNode(a5),a3
 		move.l d1,MT_FLAGS(a3)
@@ -1779,8 +1730,14 @@ DidAsync	moveq.l #0,d0
 		move.l d0,MT_FLAGS(a2)
 
 Stacker		move.l ThisTask(a6),a1
-		move.l TC_SIGALLOC(a1),d0
-		and.l #$fffff010,d0
+		move.l TC_SIGALLOC(a1),d0		
+		and.l #$fffff000,d0
+
+		move.l Port(a5),a0
+		move.b MP_SIGBIT(a0),d1
+		moveq.l #0,d2
+		bset d1,d2
+		or.l d2,d0		
 		jsr _LVOWait(a6)
 
 		move.l Port(a5),a0		
@@ -1834,7 +1791,6 @@ EndIt		move.l d7,d0
 
 Runk862		move.l MirrorNode(a5),a1
 		move.l MN_PPC(a0),MT_MIRROR(a1)
-		
 Runk86		btst #AFB_FPU40,AttnFlags+1(a6)
 		beq.s NoFPU
 		fmove.d fp0,-(a7)
@@ -1951,7 +1907,6 @@ ClearMsg	clr.l (a2)+
 		dbf d1,ClearMsg
 
 		move.l #"LLPP",MN_IDENTIFIER(a0)
-		and.l #$fffff000,d0
 		move.l d0,MN_ARG0(a0)
 		move.l ThisTask(a6),a3
 		move.l a3,MN_ARG1(a0)
@@ -2220,11 +2175,16 @@ CpXMsg		move.l (a1)+,(a2)+
 
 ;********************************************************************************************
 ;
-;	void CausePPCInterrupt(void) // -> TO BE IMPLEMENTED
+;	void CausePPCInterrupt(void) //
 ;
 ;********************************************************************************************
 
 CausePPCInterrupt:
+		movem.l d1-a6,-(a7)
+
+		RUNPOWERPC	_PowerPCBase,CauseInterrupt
+
+		movem.l (a7)+,d1-a6
 		rts
 
 ;********************************************************************************************
@@ -2253,7 +2213,6 @@ OpenLibAddress	ds.l	1
 AllocMemAddress	ds.l	1
 MirrorList	ds.l	3
 RemSysTask	ds.l	1
-StackSwpStruct	ds.l	3
 MyInterrupt	ds.b	IS_SIZE
 
 	cnop	0,4
@@ -2373,8 +2332,8 @@ FUNCTABLE:
 	dc.l	SetCache68K
 	dc.l	CreatePPCTask
 	dc.l	CausePPCInterrupt
-	dc.l	ChangeStack68K
 
+	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved
 	dc.l	Reserved
@@ -2501,10 +2460,14 @@ FUNCTABLE:
 	dc.l	AddUniquePortPPC
 	dc.l	AddUniqueSemaphorePPC
 	dc.l	IsExceptionMode
+	dc.l	CreateMsgFramePPC
+	dc.l	SendMsgFramePPC
+	dc.l	FreeMsgFramePPC
+	dc.l	Kryten
 
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0
-IDString	dc.b	"$VER: sonnet.library 17.3 (22-Aug-16)",0
+IDString	dc.b	"$VER: sonnet.library 17.3 (03-Oct-16)",0
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: fake warp.library 5.0 (01-Apr-16)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
@@ -2565,14 +2528,14 @@ CrashMessage	dc.b	"Task name: '%s'  Task address: %08lx  Exception: %s",10
 		dc.b	"R24-R27: %08lx %08lx %08lx %08lx   DBAT2: %08lx %08lx",10
 		dc.b	"R28-R31: %08lx %08lx %08lx %08lx   DBAT3: %08lx %08lx",10,10,0
 
-;		dc.b	"F0-F3:    %s   %s   %s   %s",10		;Unused at the moment
-;		dc.b	"F4-F7:    %s   %s   %s   %s",10
-;		dc.b	"F8-F11:   %s   %s   %s   %s",10
-;		dc.b	"F12-F15:  %s   %s   %s   %s",10
-;		dc.b	"F16-F19:  %s   %s   %s   %s",10
-;		dc.b	"F20-F23:  %s   %s   %s   %s",10
-;		dc.b	"F24-F27:  %s   %s   %s   %s",10
-;		dc.b	"F28-F31:  %s   %s   %s   %s",10,0
+		dc.b	"F0-F3:    %s   %s   %s   %s",10		;Unused at the moment
+		dc.b	"F4-F7:    %s   %s   %s   %s",10
+		dc.b	"F8-F11:   %s   %s   %s   %s",10
+		dc.b	"F12-F15:  %s   %s   %s   %s",10
+		dc.b	"F16-F19:  %s   %s   %s   %s",10
+		dc.b	"F20-F23:  %s   %s   %s   %s",10
+		dc.b	"F24-F27:  %s   %s   %s   %s",10
+		dc.b	"F28-F31:  %s   %s   %s   %s",10,0
 				
 RContinue	dc.b	"Continue",0
 

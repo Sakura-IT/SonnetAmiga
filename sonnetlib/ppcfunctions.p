@@ -33,9 +33,9 @@
 .global SetNiceValue,AllocPrivateMem,FreePrivateMem,SetExceptPPC,ObtainSemaphoreSharedPPC
 .global AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
 .global AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
-.global AddUniqueSemaphorePPC,IsExceptionMode
+.global AddUniqueSemaphorePPC,IsExceptionMode,CreateMsgFramePPC,SendMsgFramePPC,FreeMsgFramePPC
 
-.global	WarpIllegal
+.global	WarpIllegal,Kryten
 
 .section "LibBody","acrx"
 
@@ -53,13 +53,11 @@ SetCache:
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
-		stwu	r27,-4(r13)
 		
 		li	r31,FSetCache-FRun68K
 		bl	DebugStartFunction
 		
 		mfctr	r28
-		lwz	r27,PowerPCBase(r0)
 
 		cmplwi	r4,CACHE_DCACHEFLUSH
 		beq-	.DCACHEFLUSH
@@ -180,7 +178,7 @@ SetCache:
 		mr.	r6,r6
 		beq-	.DoneCache
 
-		lbz	r29,DLockState(r27)
+		lbz	r29,DLockState(r0)
 		mr.	r29,r29
 		bne	.DoneCache
 
@@ -218,11 +216,11 @@ SetCache:
 		bl User
 		
 		li	r0,-1
-		stb	r0,DLockState(r27)
+		stb	r0,DLockState(r0)
 
 		b	.DoneCache
 				
-.DCACHEOFF:	lbz	r29,DState(r27)			#ExceptionMode should be Neg?
+.DCACHEOFF:	lbz	r29,DState(r0)			#ExceptionMode should be Neg?
 		mr.	r29,r29
 		bne	.DoneCache
 		
@@ -240,7 +238,7 @@ SetCache:
 		mr	r4,r3
 		
 		li	r0,-1
-		stb	r0,DState(r27)
+		stb	r0,DState(r0)
 		
 		bl User
 
@@ -260,7 +258,7 @@ SetCache:
 		b	.DoneCache
 
 .DCACHEUNLOCK:	li	r0,0
-		stb	r0,DLockState(r27)
+		stb	r0,DLockState(r0)
 		
 		bl Super
 
@@ -278,7 +276,7 @@ SetCache:
 		b	.DoneCache
 
 .DCACHEON:	li	r0,0
-		stb	r0,DState(r27)		
+		stb	r0,DState(r0)		
 		
 		bl Super
 
@@ -378,10 +376,10 @@ SetCache:
 		mr.	r6,r6
 		beq-	.DCACHEFLUSHALL
 		
-		lbz	r29,DState(r27)
+		lbz	r29,DState(r0)
 		mr.	r29,r29
 		bne	.DoneCache
-		lbz	r29,DLockState(r27)
+		lbz	r29,DLockState(r0)
 		mr.	r29,r29
 		bne	.DoneCache
 
@@ -405,10 +403,10 @@ SetCache:
 		b	.DoneCache
 
 .DCACHEFLUSHALL:
-		lbz	r29,DState(r27)
+		lbz	r29,DState(r0)
 		mr.	r29,r29
 		bne	.DoneCache
-		lbz	r29,DLockState(r27)
+		lbz	r29,DLockState(r0)
 		mr.	r29,r29
 		bne	.DoneCache
 
@@ -416,12 +414,11 @@ SetCache:
 
 .DoneCache:	mtctr	r28
 
-		lwz	r27,0(r13)
-		lwz	r28,4(r13)
-		lwz	r29,8(r13)
-		lwz	r30,12(r13)
-		lwz	r31,16(r13)
-		addi	r13,r13,20
+		lwz	r28,0(r13)
+		lwz	r29,4(r13)
+		lwz	r30,8(r13)
+		lwz	r31,12(r13)
+		addi	r13,r13,16
 		
 		epilog 'TOC'
 
@@ -966,10 +963,10 @@ GetInfo:
 		
 		li	r31,FGetInfo-FRun68K
 		bl	DebugStartFunction
-		
-		lwz	r30,PowerPCBase(r0)
 
 		bl Super
+
+		lwz	r30,PowerPCBase(r0)
 
 		mr	r4,r3
 
@@ -1224,7 +1221,7 @@ NextTagItemPPC:
 		blt-	.IgnoreTag
 		beq-	.ChainTag
 
-		lwz	r5,4(r3)		#Skip tags
+		lwz	r5,4(r3)			#Skip tags
 		rlwinm	r5,r5,3,0,28
 		addi	r5,r5,8
 		add	r3,r3,r5
@@ -1733,7 +1730,7 @@ LockTaskList:
 
 		lwz	r31,PowerPCBase(r0)
 		lwz	r3,LIST_ALLTASKS(r31)
-		
+
 		lwz	r31,0(r13)
 		addi	r13,r13,4
 		
@@ -1853,8 +1850,8 @@ ObtainSemaphorePPC:
 		stwu	r4,-4(r13)
 		stwu	r3,-4(r13)
 		
-#		li	r31,FObtainSemaphorePPC-FRun68K
-#		bl	DebugStartFunction
+		li	r31,FObtainSemaphorePPC-FRun68K
+		bl	DebugStartFunction
 
 		mr	r30,r4
 
@@ -1917,11 +1914,7 @@ ObtainSemaphorePPC:
 		addi	r5,r5,1
 		sth	r5,SS_NESTCOUNT(r30)
 		
-.DoneWait:	
-#		li	r31,FObtainSemaphorePPC-FRun68K
-#		bl	DebugEndFunction
-
-		lwz	r3,0(r13)
+.DoneWait:	lwz	r3,0(r13)
 		lwz	r4,4(r13)
 		lwz	r5,8(r13)
 		lwz	r6,12(r13)
@@ -2040,8 +2033,8 @@ ReleaseSemaphorePPC:
 		stwu	r4,-4(r13)
 		stwu	r3,-4(r13)
 
-#		li	r31,FReleaseSemaphorePPC-FRun68K
-#		bl	DebugStartFunction
+		li	r31,FReleaseSemaphorePPC-FRun68K
+		bl	DebugStartFunction
 
 		mr	r31,r4
 
@@ -2197,11 +2190,6 @@ ReleaseSemaphorePPC:
 		sth	r0,SSPPC_LOCK(r31)
 
 .Released:	lwz	r3,0(r13)
-
-#		li	r31,FReleaseSemaphorePPC-FRun68K
-#		bl	DebugEndFunction
-
-		lwz	r3,0(r13)
 		lwz	r4,4(r13)
 		lwz	r5,8(r13)
 		lwz	r6,12(r13)
@@ -2487,7 +2475,7 @@ WaitPortPPC:
 		li	r31,FWaitPortPPC-FRun68K
 		bl	DebugStartFunction
 		
-		lwz	r28,PowerPCBase(r0)
+		mr	r28,r3
 		mr	r31,r4
 
 		addi	r4,r31,MP_PPC_SEM
@@ -2505,28 +2493,28 @@ WaitPortPPC:
 		mr.	r3,r3
 		beq+	.WaitInLine
 		
-		lbz	r3,PortInUse(r28)
+		lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		beq-	.PortGood
 
 		li	r4,Atomic
 		bl AtomicDone
 
-.PortUseWait:	lbz	r3,PortInUse(r28)
+.PortUseWait:	lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		bne+	.PortUseWait
 		b	.WaitInLine
 		
-.PortGood:	stw	r31,CurrentPort(r28)
+.PortGood:	stw	r31,CurrentPort(r0)
 		li	r0,-1
-		stb	r0,PortInUse(r28)
+		stb	r0,PortInUse(r0)
 
 		li	r4,Atomic
 		bl AtomicDone
 
 		bl CauseInterrupt
 
-.PortUseWait2:	lbz	r3,PortInUse(r28)
+.PortUseWait2:	lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		bne+	.PortUseWait2
 
@@ -2563,29 +2551,29 @@ WaitPortPPC:
 		mr.	r3,r3
 		beq+	.WaitInLine2
 		
-		lbz	r3,PortInUse(r28)
+		lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		beq-	.PortGood2
 
 		li	r4,Atomic
 		bl AtomicDone
 
-.PortUseWait3:	lbz	r3,PortInUse(r28)
+.PortUseWait3:	lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		bne+	.PortUseWait3
 		
 		b	.WaitInLine2
 
-.PortGood2:	stw	r31,CurrentPort(r28)
+.PortGood2:	stw	r31,CurrentPort(r0)
 		li	r0,-1
-		stb	r0,PortInUse(r28)
+		stb	r0,PortInUse(r0)
 
 		li	r4,Atomic
 		bl AtomicDone
 
 		bl CauseInterrupt
 
-.PortUseWait4:	lbz	r3,PortInUse(r28)
+.PortUseWait4:	lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		bne+	.PortUseWait4
 		
@@ -2650,6 +2638,93 @@ User:
 
 .WrongKey:	epilog 'TOC'
 
+
+#********************************************************************************************
+#
+#	Support: MsgFrame = CreateMsgFramePPC(void) // r3
+#
+#********************************************************************************************
+
+CreateMsgFramePPC:
+		prolog 228,'TOC'
+		
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
+		stwu	r4,-4(r13)
+
+		li	r0,SYSCALL_CREATEMSGFRAME
+		
+		sc
+
+		lwz	r4,0(r13)
+		lwz	r26,4(r13)
+		lwz	r27,8(r13)
+		lwz	r28,12(r13)
+		lwz	r29,16(r13)
+		lwz	r30,20(r13)
+		addi	r13,r13,24
+
+		epilog 'TOC'
+		
+#********************************************************************************************
+#
+#	Support: void SendMsgFramePPC(MsgFrame) // r4
+#
+#********************************************************************************************
+
+SendMsgFramePPC:
+		prolog 228,'TOC'
+		
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
+
+		li	r0,SYSCALL_SENDMSGFRAME
+		
+		sc
+
+		lwz	r26,0(r13)
+		lwz	r27,4(r13)
+		lwz	r28,8(r13)
+		lwz	r29,12(r13)
+		lwz	r30,16(r13)
+		addi	r13,r13,20
+
+		epilog	'TOC'
+		
+#********************************************************************************************
+#
+#	Support: void FreeMsgFramePPC(MsgFrame) // r4
+#
+#********************************************************************************************
+
+FreeMsgFramePPC:
+		prolog 228,'TOC'
+		
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
+		
+		li	r0,SYSCALL_FREEMSGFRAME
+		
+		sc
+
+		lwz	r26,0(r13)
+		lwz	r27,4(r13)
+		lwz	r28,8(r13)
+		lwz	r29,12(r13)
+		lwz	r30,16(r13)
+		addi	r13,r13,20
+		
+		epilog	'TOC'
+
 #********************************************************************************************
 #
 #	void PutXMsgPPC(MsgPort, message) // r4,r5
@@ -2682,8 +2757,7 @@ PutXMsgPPC:
 		cmplwi	r29,156				#FIFO msg length - 32 -4 (for MN_MCPORT)
 		bgt	.ErrorX		
 			
-		li	r0,SYSCALL_CREATEMSGFRAME
-		sc
+		bl CreateMsgFramePPC
 		
 		mr	r30,r3
 		mfctr	r28
@@ -2719,8 +2793,7 @@ PutXMsgPPC:
 		stw	r31,MN_PPC(r30)
 		mr	r4,r30
 		
-		li	r0,SYSCALL_SENDMSGFRAME
-		sc
+		bl SendMsgFramePPC
 
 		lwz	r22,0(r13)
 		lwz	r23,4(r13)
@@ -2814,8 +2887,7 @@ WaitFor68K:
 		lwz	r29,MN_PPSTRUCT+5*4(r30)
 		mr	r4,r30
 		
-		li	r0,SYSCALL_FREEMSGFRAME
-		sc
+		bl FreeMsgFramePPC
 
 		mr	r4,r28
 		mr	r5,r29
@@ -2858,8 +2930,7 @@ Run68K:
 		mr	r31,r4		
 		mfctr	r25
 
-		li	r0,SYSCALL_CREATEMSGFRAME
-		sc
+		bl CreateMsgFramePPC
 		
 		mr	r30,r3			
 		subi	r5,r30,4		
@@ -2887,8 +2958,8 @@ Run68K:
 		stw	r4,MN_ARG0(r30)
 		lwz	r4,TC_SIGALLOC(r5)
 		stw	r4,MN_ARG1(r30)
-#		lwz	r4,TC_SIGRECVD(r5)
-#		stw	r4,MN_ARG2(r30)
+		lwz	r4,TC_SIGRECVD(r5)
+		stw	r4,MN_ARG2(r30)
 		
 		lwz	r4,PP_FLAGS(r30)
 		cmpwi	r4,0
@@ -2926,8 +2997,7 @@ Run68K:
 
 .NotAllocMem:	mr	r4,r30
 		
-		li	r0,SYSCALL_SENDMSGFRAME
-		sc
+		bl SendMsgFramePPC
 
 		mr	r4,r31
 
@@ -2965,19 +3035,17 @@ Signal68K:
 		
 		mr	r31,r4
 		mr	r30,r5
-
-		li	r0,SYSCALL_CREATEMSGFRAME
-		sc
-
+		
+		bl CreateMsgFramePPC
+		
 		mr	r4,r3
 		loadreg	r5,'SIG!'
 		stw	r5,MN_IDENTIFIER(r4)
 		stw	r31,MN_PPSTRUCT(r4)
 		stw	r30,MN_PPSTRUCT+4(r4)
-
-		li	r0,SYSCALL_SENDMSGFRAME
-		sc
-
+		
+		bl SendMsgFramePPC
+		
 		lwz	r30,0(r13)
 		lwz	r31,4(r13)
 		addi	r13,r13,8
@@ -3686,7 +3754,7 @@ FindTaskByID:
 		mr.	r4,r4
 		beq-	.EndSearch
 
-		lwz	r3,14(r3)			#Link from mini list to big list
+		lwz	r3,TASKPTR_TASK(r3)			#Link from mini list to big list
 		lwz	r5,TASKPPC_ID(r3)
 		cmpw	r5,r31
 		bne-	.IncorrectID
@@ -3853,7 +3921,7 @@ InsertOnPri:
 		lwz	r7,16(r13)
 		lwz	r8,20(r13)
 		addi	r13,r13,24
-
+		
 		epilog	'TOC'
 
 #********************************************************************************************
@@ -4405,7 +4473,7 @@ CreateTaskPPC:
 		beq-	.Error13			#Error NoMem 
  
 		mr	r5,r3 
-		stw	r31,14(r5)			#Store Taskpointer 
+		stw	r31,TASKPTR_TASK(r5)		#Store Taskpointer 
 		stw	r5,TASKPPC_TASKPTR(r31)
 		lwz	r3,LN_NAME(r31)			#Copy Name pointer 
 		stw	r3,LN_NAME(r5) 
@@ -4473,10 +4541,10 @@ CreateTaskPPC:
 		mr	r5,r31				#Task
 		loadreg	r0,Quantum
 		stw	r0,TASKPPC_QUANTUM(r31)
-#		lwz	r7,TASKPPC_NICE(r31)		#Pending finding out what this means
+#		lwz	r7,TASKPPC_NICE(r31)		
 #		addi	r8,r7,20
 #		rlwinm	r8,r8,2,0,29
-#		lwz	r7,654(r23) 			#654(PowerPCBase)
+#		lwz	r7,Table_NICE(r23)		#Getting DESIRED from a table
 #		lwzx	r8,r7,r8
 #		rlwinm	r8,r8,24,8,31
 #		lis	r7,2000
@@ -4487,7 +4555,7 @@ CreateTaskPPC:
 		bl InsertOnPri
 
 		li	r0,-1 
-		stb	r0,RescheduleFlag(r23)		#Reschedule flag 
+		stb	r0,RescheduleFlag(r0)		#Reschedule flag 
  		li	r4,Atomic
 
  		bl AtomicDone
@@ -4717,7 +4785,7 @@ FindTaskPPC:
 		mr.	r3,r3
 		beq-	.NameNotFound
 
-		lwz	r3,14(r3)			#Pointer to PPCTask in AllTasks list
+		lwz	r3,TASKPTR_TASK(r3)		#Pointer to PPCTask in AllTasks list
 .NameNotFound:	mr	r31,r3
 
 		lwz	r4,TaskListSem(r0)
@@ -5247,7 +5315,7 @@ AttemptSemaphoreSharedPPC:
 
 #********************************************************************************************
 #
-#	Support: void CauseInterrupt(void) // Interrupt using the Decrementer Exception
+#	Support: void CauseInterrupt(void) // causing the system call interrupt
 #
 #********************************************************************************************
 	
@@ -5258,6 +5326,7 @@ CauseInterrupt:
 		stwu	r31,-4(r13)
 
 		li	r0,SYSCALL_CAUSEINTERRUPT
+
 		sc
 
 		lwz	r31,0(r13)
@@ -5458,10 +5527,10 @@ DeleteTaskPPC:
 
 		bl RemovePPC		
 
-.NoTaskPtr:	lwz	r27,PowerPCBase(r0)		#Tasks -1
-		lwz	r3,NumAllTasks(r27)
+.NoTaskPtr:	lwz	r4,PowerPCBase(r0)		#Tasks -1
+		lwz	r3,NumAllTasks(r4)
 		subi	r3,r3,1
-		stw	r3,NumAllTasks(r27)
+		stw	r3,NumAllTasks(r4)
 		dcbst	r0,r4
 
 		lwz	r4,TaskListSem(r0)
@@ -5473,23 +5542,21 @@ DeleteTaskPPC:
 		mr.	r26,r26
 		beq	.NoMirror
 
-		li	r0,SYSCALL_CREATEMSGFRAME
-		sc
+		bl CreateMsgFramePPC
 		
 		mr	r4,r3
 		stw	r26,MN_MIRROR(r4)
 		loadreg	r26,'END!'
 		stw	r26,MN_IDENTIFIER(r4)
 		
-		li	r0,SYSCALL_SENDMSGFRAME		#Send kill signal to mirror 68K task
-		sc
+		bl SendMsgFramePPC			#Send kill signal to mirror 68K task
 
 .NoMirror:	mr.	r29,r29				#This task?
 		beq-	.NotOwnTask2			#no? Skip next
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r31)
 		li	r0,-1
-		stb	r0,RescheduleFlag(r27)		#Reschedule
+		stb	r0,RescheduleFlag(r0)		#Reschedule
 		
 		bl CauseInterrupt
 
@@ -6489,8 +6556,7 @@ Run68KLowLevel:
 		mr	r25,r9
 		mfctr	r22
 
-		li	r0,SYSCALL_CREATEMSGFRAME
-		sc
+		bl CreateMsgFramePPC
 
 		mr	r30,r3
 		subi	r5,r30,4				
@@ -6518,8 +6584,7 @@ Run68KLowLevel:
 		stw	r5,MN_PPC(r30)				
 		mr	r4,r30
 
-		li	r0,SYSCALL_SENDMSGFRAME
-		sc
+		bl SendMsgFramePPC
 
 		subi	r4,r30,MN_PPSTRUCT
 
@@ -6635,7 +6700,9 @@ SignalPPC:
 
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r30)
-
+		
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_READYTASKS(r4)
 		mr	r5,r30
 		
 		bl InsertOnPri				#Prio recalculation
@@ -6644,13 +6711,13 @@ SignalPPC:
 
 		bl AtomicDone
 
-		lwz	r28,PowerPCBase(r0)
-		lwz	r4,LIST_READYTASKS(r28)
+		lwz	r4,PowerPCBase(r0)
+		lwz	r4,LIST_READYTASKS(r4)
 		cmplw	r4,r30				#Check if we are top
 		bne-	.SigExit
 		
 		li	r0,-1
-		stb	r0,RescheduleFlag(r28)
+		stb	r0,RescheduleFlag(r0)
 
 		bl CauseInterrupt
 
@@ -6681,7 +6748,7 @@ GetMsgPPC:
 		li	r31,FGetMsgPPC-FRun68K
 		bl	DebugStartFunction
 
-		lwz	r29,PowerPCBase(r0)
+		mr	r29,r3
 		mr	r31,r4
 
 		addi	r4,r31,MP_PPC_SEM
@@ -6699,29 +6766,29 @@ GetMsgPPC:
 		mr.	r3,r3
 		beq+	.GetMsgAtom
 
-		lbz	r3,PortInUse(r29)
+		lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		beq-	.PortIsFree
 
 		li	r4,Atomic
 		bl AtomicDone
 
-.PortWait:	lbz	r3,PortInUse(r29)
+.PortWait:	lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		bne+	.PortWait
 
 		b	.GetMsgAtom
 
-.PortIsFree:	stw	r31,CurrentPort(r29)
+.PortIsFree:	stw	r31,CurrentPort(r0)
 		li	r0,-1
-		stb	r0,PortInUse(r29)
+		stb	r0,PortInUse(r0)
 
 		li	r4,Atomic
 		bl AtomicDone
 
 		bl CauseInterrupt
 
-.PortWait2:	lbz	r3,PortInUse(r29)
+.PortWait2:	lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		bne+	.PortWait2
 
@@ -6759,7 +6826,7 @@ ReplyMsgPPC:
 		li	r31,FReplyMsgPPC-FRun68K
 		bl	DebugStartFunction
 
-		lwz	r29,PowerPCBase(r0)
+		mr	r29,r3
 		mr	r30,r4
 
 		lwz	r31,MN_REPLYPORT(r30)
@@ -6808,7 +6875,7 @@ ReplyMsgPPC:
 		mr.	r3,r3
 		beq+	.ReplyAtom
 
-		lbz	r3,PortInUse(r29)
+		lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		beq-	.PortIzFree
 
@@ -6816,15 +6883,15 @@ ReplyMsgPPC:
 		
 		bl AtomicDone
 
-.WaitForPort:	lbz	r3,PortInUse(r29)
+.WaitForPort:	lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		bne+	.WaitForPort
 
 		b	.ReplyAtom
 
-.PortIzFree:	stw	r31,CurrentPort(r29)
+.PortIzFree:	stw	r31,CurrentPort(r0)
 		li	r0,-1
-		stb	r0,PortInUse(r29)
+		stb	r0,PortInUse(r0)
 
 		li	r4,Atomic
 		
@@ -6832,7 +6899,7 @@ ReplyMsgPPC:
 		
 		bl CauseInterrupt
 
-.WaitForPort2:	lbz	r3,PortInUse(r29)
+.WaitForPort2:	lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		bne+	.WaitForPort2
 
@@ -6884,7 +6951,7 @@ PutMsgPPC:
 		li	r31,FPutMsgPPC-FRun68K
 		bl	DebugStartFunction
 
-		lwz	r29,PowerPCBase(r0)
+		mr	r29,r3
 		mr	r31,r4
 		mr	r30,r5
 
@@ -6904,7 +6971,7 @@ PutMsgPPC:
 		mr.	r3,r3
 		beq+	.PutAtom
 
-		lbz	r3,PortInUse(r29)
+		lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		beq-	.CheckedPort
 
@@ -6912,15 +6979,15 @@ PutMsgPPC:
 		
 		bl AtomicDone
 
-.W8ForPort:	lbz	r3,PortInUse(r29)
+.W8ForPort:	lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		bne+	.W8ForPort
 
 		b	.PutAtom
 
-.CheckedPort:	stw	r31,CurrentPort(r29)
+.CheckedPort:	stw	r31,CurrentPort(r0)
 		li	r0,-1
-		stb	r0,PortInUse(r29)
+		stb	r0,PortInUse(r0)
 
 		li	r4,Atomic
 
@@ -6928,7 +6995,7 @@ PutMsgPPC:
 
 		bl CauseInterrupt
 
-.W8ForPort2:	lbz	r3,PortInUse(r29)
+.W8ForPort2:	lbz	r3,PortInUse(r0)
 		mr.	r3,r3
 		bne+	.W8ForPort2
 
@@ -6980,8 +7047,8 @@ SetScheduling:
 		li	r31,FSetScheduling-FRun68K
 		bl	DebugStartFunction
 
-		lwz	r30,PowerPCBase(r0)
 		mr	r31,r4
+		lwz	r30,PowerPCBase(r0)
 
 		loadreg	r4,SCHED_REACTION
 		mr	r5,r31
@@ -8293,8 +8360,8 @@ WaitTime:
 		stw	r13,-4(r1)
 		subi	r13,r1,4
 		stwu	r1,-44(r1)
-	
-		loadreg	r5,SonnetBusClock*4
+		
+		loadreg	r5,SonnetBusClock
 		
 		mr	r6,r4
 		mulhw	r3,r5,r6
@@ -8804,8 +8871,7 @@ DebugStartFunction:
 		lwz	r29,PP_OFFSET-MN_PPSTRUCT(r4)
 		lwz	r30,PP_CODE-MN_PPSTRUCT(r4)
 		
-.NoRun:		li	r0,SYSCALL_CREATEMSGFRAME
-		sc
+.NoRun:		bl CreateMsgFramePPC
 
 		mr	r28,r3
 		mr	r4,r30
@@ -8834,8 +8900,7 @@ DebugStartFunction:
 		stw	r5,MN_PPC(r28)
 		mr	r4,r28
 
-		li	r0,SYSCALL_SENDMSGFRAME
-		sc
+		bl SendMsgFramePPC
 
 		lwz	r30,0(r13)
 		lwz	r29,4(r13)
@@ -8871,9 +8936,8 @@ DebugEndFunction:
 
 		mr	r29,r3
 
-		li	r0,SYSCALL_CREATEMSGFRAME
-		sc
-
+		bl CreateMsgFramePPC
+		
 		mr	r28,r3
 
 		bl	.GetTxtOffSet2
@@ -8897,8 +8961,7 @@ DebugEndFunction:
 
 		mr	r4,r28
 					
-		li	r0,SYSCALL_SENDMSGFRAME
-		sc
+		bl SendMsgFramePPC
 
 		lwz	r30,0(r13)
 		lwz	r29,4(r13)
@@ -8919,31 +8982,9 @@ DebugEndFunction:
 StartCode:	bl	.StartRunPPC
 
 .WasNoEMsg:	lwz	r4,RunningTask(r0)
-		lwz	r4,TC_SIGALLOC(r4)
-		loadreg	r28,0xfffff100
-		and.	r4,r4,r28
+		lwz	r4,TASKPPC_MSGPORT(r4)		
 		
-		mr	r4,r28
-		
-		bl WaitPPC
-
-.debugxxx:	mr	r5,r3
-		lwz	r4,RunningTask(r0)
-		lwz	r28,TASKPPC_MSGPORT(r4)
-		lbz	r29,MP_SIGBIT(r31)
-		loadreg	r28,0xfffffffe
-		rlwnm	r28,r28,r29,0,31
-		and.	r29,r5,r28
-		beq	.NextEMsg
-		
-		loadreg r28,0xfffff000
-		and.	r5,r5,r28
-		beq	.NextEMsg
-
-		lwz	r4,TASKPPC_MIRRORPORT(r4)
-		lwz	r4,MP_SIGTASK(r4)
-		
-		bl Signal68K		
+		bl WaitPortPPC
 		
 .NextEMsg:	lwz	r4,RunningTask(r0)
 		lwz	r4,TASKPPC_MSGPORT(r4)
@@ -8951,6 +8992,7 @@ StartCode:	bl	.StartRunPPC
 		bl GetMsgPPC
 
 		mr.	r30,r3
+
 		beq	.WasNoEMsg
 		
 		lwz	r29,MN_IDENTIFIER(r30)
@@ -8961,9 +9003,8 @@ StartCode:	bl	.StartRunPPC
 		cmpw	r4,r29
 		bne	.NextEMsg
 
-		bl	.StartRunPPC
-		b	.NextEMsg
-
+		b	StartCode
+		
 #********************************************************************************************
 
 .StartRunPPC:		
@@ -9126,8 +9167,7 @@ ExitCode:	lwz	r17,RunningTask(r0)
 
 .NotLinear2:	mr	r12,r3
 
-		li	r0,SYSCALL_CREATEMSGFRAME
-		sc
+		bl CreateMsgFramePPC
 
 		mr	r9,r3
 		mr	r3,r12
@@ -9148,9 +9188,7 @@ ExitCode:	lwz	r17,RunningTask(r0)
 
 		lwz	r7,RunningTask(r0)
 		lwz	r8,TC_SIGALLOC(r7)
-		stw	r8,MN_ARG1(r9)
-#		lwz	r8,TC_SIGRECVD(r7)
-#		stw	r8,MN_ARG2(r9)		
+		stw	r8,MN_ARG1(r9)		
 		lwz	r7,TASKPPC_STARTMSG(r7)						
 		lwz	r7,MN_REPLYPORT(r7)		
 		stw	r7,MN_REPLYPORT(r9)
@@ -9186,13 +9224,11 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		lwz	r4,RunningTask(r0)			#Free original 68K -> PPC
 		lwz	r4,TASKPPC_STARTMSG(r4)			#message
 
-		li	r0,SYSCALL_FREEMSGFRAME
-		sc
+		bl FreeMsgFramePPC
 		
 		mr	r4,r9
 		
-		li	r0,SYSCALL_SENDMSGFRAME
-		sc
+		bl SendMsgFramePPC
 		
 		lfd	f31,0(r1)
 		lfdu	f30,8(r1)
@@ -9271,8 +9307,7 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		stb	r7,TC_STATE(r9)
 		mr	r4,r30
 
-		li	r0,SYSCALL_FREEMSGFRAME
-		sc
+		bl FreeMsgFramePPC
 
 		lwz	r4,RunningTask(r0)
 		lwz	r4,TASKPPC_TASKPTR(r4)
@@ -9308,6 +9343,73 @@ Pause:		nop
 WarpIllegal:	.long	0
 		b	WarpIllegal		
 		
+#********************************************************************************************
+
+Kryten:		b	.StartKryten
+
+		.byte	"Kryten",0,0
+
+.StartKryten:	prolog	228,'TOC'
+
+		lwz	r30,RunningTask(r0)
+		stw	r30,KrytenTask(r0)
+
+.PortLoop:	lwz	r4,TASKPPC_MSGPORT(r30)
+
+		bl WaitPortPPC
+
+		mr.	r5,r3
+		beq	.PortLoop
+
+.MsgLoop:	lwz	r4,TASKPPC_MSGPORT(r30)
+
+		bl GetMsgPPC
+
+		mr.	r5,r3
+		beq	.PortLoop
+
+		lwz	r6,MN_IDENTIFIER(r5)		
+		loadreg	r4,'LLPP'			#Cross-signaling
+		cmpw	r4,r6
+		mr	r29,r5
+		beq	.CrossSig
+		
+		b	.SkipNxt
+		
+#*************************************************	
+
+.CrossSig:	bl LockTaskList
+				
+		mr	r4,r3
+.NextTask:	lwz	r7,0(r4)
+		mr.	r7,r7
+		beq	.RelFrame
+		
+		lwz	r3,MN_ARG1(r29)			#68K mirror
+		lwz	r31,TASKPTR_TASK(r4)
+		lwz	r8,TASKPPC_MIRROR68K(r31)
+		cmpw	r8,r3
+		beq	.GotTask
+		mr	r4,r7
+		b	.NextTask
+
+.GotTask:	bl UnLockTaskList
+		
+		mr	r4,r31
+		lwz	r5,MN_ARG0(r29)			#Signals
+
+		bl SignalPPC
+
+		b	.SkipNxt
+	
+.RelFrame:	bl UnLockTaskList
+		
+.SkipNxt:	mr	r4,r29
+
+		bl FreeMsgFramePPC
+
+		b	.MsgLoop
+
 #********************************************************************************************
 
 FRun68K:		.byte	"Run68K",0
