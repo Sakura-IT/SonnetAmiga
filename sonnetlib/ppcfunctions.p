@@ -1562,8 +1562,7 @@ FreeSignalPPC:
 		andc	r3,r3,r6
 		stw	r3,TC_SIGALLOC(r5)
 
-.NoSigDef:	
-		epilog 'TOC'
+.NoSigDef:	epilog 'TOC'
 
 #********************************************************************************************
 #
@@ -2213,8 +2212,12 @@ ReleaseSemaphorePPC:
 
 .Error68k:	li	r4,Atomic
 		bl AtomicDone
-.DeadEnd:	nop					#Not Yet Implemented
-		b 	.DeadEnd
+
+		loadreg	r0,'DBUG'
+		
+		illegal					#Not Yet Implemented
+
+.DeadEnd:	b 	.DeadEnd
 
 #********************************************************************************************
 #
@@ -2809,9 +2812,11 @@ PutXMsgPPC:
 		
 		epilog 'TOC'
 
-.ErrorX:	loadreg	r5,'XMSG'
-		stw	r5,0xf8(r0)
-		b	.ErrorX
+.ErrorX:	loadreg	r0,'XMSG'
+
+		illegal
+
+.HErrorX:	b	.HErrorX
 
 #********************************************************************************************
 #
@@ -2962,10 +2967,18 @@ Run68K:
 		stw	r4,MN_ARG2(r30)
 		
 		lwz	r4,PP_FLAGS(r30)
-		cmpwi	r4,0
+		mr.	r4,r4
+		bne	.GivErr
+		lwz	r4,PP_STACKPTR(r30)
+		mr.	r4,r4
+		beq	.FromRunPPC
+		lwz	r4,PP_STACKSIZE(r30)
+		mr.	r4,r4
 		beq	.FromRunPPC
 		
-		.long	0				#ILLEGAL (DEBUG)
+.GivErr:	loadreg	r0,'DBUG'
+
+		illegal					#DEBUG
 		
 .FromRunPPC:	lwz	r4,MCPort(r0)
 		stw	r4,MN_MCPORT(r30)
@@ -6250,9 +6263,11 @@ DeallocatePPC:
 		
 #********************************************************************************************
 
-.GuruTime:	loadreg	r31,'MEM!'
-		stw	r31,0xf8(r0)
-		b	.GuruTime		#STUB
+.GuruTime:	loadreg	r0,'MEM!'
+		
+		illegal
+
+.GTHalt:	b	.GTHalt			#STUB
 
 #********************************************************************************************
 #
@@ -9122,14 +9137,35 @@ StartCode:	bl	.StartRunPPC
 		mr	r10,r0
 		mr 	r11,r0
 		mr	r12,r0
-		mr	r14,r0
-		mr	r15,r0
-		mr	r18,r0
-		mr	r19,r0
 		mr	r20,r0
 		mr	r21,r0
 		
-		lwz	r16,PP_FLAGS(r17)
+		lwz	r16,PP_STACKPTR(r17)
+		mr.	r16,r16
+		beq 	.NoStack
+		lwz	r15,PP_STACKSIZE(r17)
+		mr.	r15,r15
+		beq	.NoStack
+
+		mtctr	r15
+		mr	r14,r1
+		sub	r1,r1,r15
+		mr	r19,r1
+		lwz	r16,MN_STACKFRAME(r17)
+		la	r16,MN_PPSTRUCT(r16)
+		subi	r19,r19,1
+		subi	r16,r16,1
+
+.CpPPCStck:	lbzu	r18,1(r16)
+		stbu	r18,1(r19)
+		bdnz	.CpPPCStck
+		
+		subi	r1,r1,24
+		stw	r14,0(r1)
+		b	.DoneStack
+
+.NoStack:	stwu	r1,-4(r1)
+.DoneStack:	lwz	r16,PP_FLAGS(r17)
 		rlwinm.	r16,r16,(32-PPB_LINEAR),31,31
 		beq	.NotLinear
 
@@ -9143,9 +9179,13 @@ StartCode:	bl	.StartRunPPC
 .NotLinear:	loadreg	r0,'WARP'
 		
 		lwz	r16,PP_FLAGS(r17)
-		li	r17,0
+		li	r19,0
+		mr	r18,r19
+		mr	r17,r19
+		mr	r15,r19
+		mr	r14,r19
 		rlwinm.	r16,r16,(32-PPB_THROW),31,31
-		mr	r16,r17
+		mr	r16,r19
 		beq	.NoThrow
 
 		trap						#For PP_THROW
@@ -9216,6 +9256,7 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		stfd	f7,PP_FREGS+6*8(r9)
 		stfd	f8,PP_FREGS+7*8(r9)
 		lwz	r8,MCPort(r0)
+		lwz	r7,MN_STACKFRAME(r9)			#StackFrame
 		stw	r8,MN_MCPORT(r9)
 
 		lwz	r4,RunningTask(r0)
@@ -9226,10 +9267,23 @@ ExitCode:	lwz	r17,RunningTask(r0)
 
 		bl FreeMsgFramePPC
 		
-		mr	r4,r9
+		lwz	r4,PP_STACKPTR(r9)
+		mr.	r4,r4
+		beq	.NoStck
+		
+		lwz	r4,PP_STACKSIZE(r9)
+		mr.	r4,r4
+		beq	.NoStck
+		
+		mr	r4,r7
+		
+		bl FreeMsgFramePPC				#Free up StackFrame
+		
+.NoStck:	mr	r4,r9
 		
 		bl SendMsgFramePPC
 		
+		lwz	r1,0(r1)
 		lfd	f31,0(r1)
 		lfdu	f30,8(r1)
 		lfdu	f29,8(r1)
@@ -9340,7 +9394,8 @@ Pause:		nop
 		b	Pause
 		
 		
-WarpIllegal:	.long	0
+WarpIllegal:	illegal
+
 		b	WarpIllegal		
 		
 #********************************************************************************************

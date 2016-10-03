@@ -1,3 +1,7 @@
+.macro	illegal
+		.long	0
+.endm
+
 .macro clearreg register
 		lis \register, 0
 		mr \register,\register

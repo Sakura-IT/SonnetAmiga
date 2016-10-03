@@ -1,9 +1,9 @@
 #Sonnet Memory Map
 #0x00000000	Zero Page				0x003000	12288
 #0x00003000	Exceptions/Scheduler			0x004000	16384
-#0x00007000	Semaphores				0x000200	512
-#0x00007200	Semaphore memory			0x000200	512
-#0x00007400	Idle Task				0x000c00	3072
+#0x00008000	Semaphores				0x000200	512
+#0x00008200	Semaphore memory			0x000200	512
+#0x00008400	Idle Task				0x000c00	3072
 #0x00008000	System Stack				0x008000	32768
 #0x00010000	Free memory				0x0e0000	917504
 #0x00100000	Message FIFOs				0x010000	65536	Must be 0x100000 aligned
@@ -207,7 +207,7 @@
 .set _LVOAllocVec,		-684
 .set _LVOFreeVec,		-690
 
-.set SysStack,			0x10000			#Length max $8000
+.set SysStack,			0x10000			#Length max $7000
 .set IdleTask,			0x8400
 
 .set MEMF_PUBLIC,		0x00000001
@@ -774,6 +774,7 @@
 .set MN_ARG1,180
 .set MN_ARG0,184
 .set MN_MCPORT,188
+.set MN_STACKFRAME,188			# depends on MN type
 
 .set MH_ATTRIBUTES,14			# characteristics of this region
 .set MH_FIRST,16			# first free region

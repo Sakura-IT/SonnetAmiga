@@ -138,7 +138,7 @@ FoundMed	move.l LExecBase(pc),a6
 		tst.l d0
 		bne.s Clean
 
-		moveq.l #9,d0
+		moveq.l #11,d0
 		lea pcilib(pc),a1
 		jsr _LVOOpenLibrary(a6)
 		move.l d0,PCIBase-Buffer(a4)
@@ -1670,17 +1670,48 @@ ClrMsg		clr.l (a2)+
 OldPPCTask	move.l d0,d7
 SetSigAlloc	move.l d7,MN_ARG1(a0)
 		move.l a2,MN_ARG2(a0)		
-
-		lea MN_PPSTRUCT(a0),a2
-		moveq.l #PP_SIZE/4-1,d0
 		move.l PStruct(a5),a1
 
 		move.l a1,a3
 		tst.l PP_STACKPTR(a1)			;Unsupported, but not yet encountered
-		beq.s CpMsg2
+		beq.s SetupCp
 
-		lea StackRunError(pc),a2
+		move.l PP_STACKSIZE(a1),d1
+		beq.s SetupCp
+
+		move.l d1,d2
+		and.l #3,d2
+		bne AlignmentErr
+
+		cmp.l #164,d1				;Max size for stack to be transferred
+		ble SupSize
+		
+		move.l PP_FLAGS(a1),d2			;Passing stack through a message frame
+		btst #PPB_ASYNC,d2			;Docs say don't do it while async
+		beq SupSize
+
+AlignmentErr	lea StackRunError(pc),a2
 		bra PrintError
+
+SupSize		move.l a0,-(a7)
+		bsr CreateMsgFrame
+		move.l (a7),a2
+		move.l a0,MN_STACKFRAME(a2)
+		move.l #"STCK",MN_IDENTIFIER(a0)
+		lea MN_PPSTRUCT(a0),a2
+		move.l PP_STACKPTR(a1),a4
+		subq.l #1,d1
+CpStack		move.b (a4)+,(a2)+
+		dbf d1,CpStack
+		
+		move.l d5,MN_PPC(a0)
+		
+		bsr SendMsgFrame			;Send stack ahead of normal frame
+		
+		move.l (a7)+,a0
+
+SetupCp		lea MN_PPSTRUCT(a0),a2
+		moveq.l #PP_SIZE/4-1,d0
 
 CpMsg2		move.l (a3)+,(a2)+
 		dbf d0,CpMsg2
@@ -2475,7 +2506,7 @@ DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
 LDOSError	dc.b	"Could not open dos.library V37+",0
 LExpError	dc.b	"Could not open expansion.library V37+",0
-LPCIError	dc.b	"Could not open pci.library V9+",0
+LPCIError	dc.b	"Could not open pci.library V11+",0
 MedError	dc.b	"Could not find a supported Mediator board",0
 MemMedError	dc.b	"No system VGA memory detected (pcidma)",0
 SonnetError	dc.b	"No Sonnet card detected",0
@@ -2486,7 +2517,7 @@ GenMemError	dc.b	"General memory allocation error",0
 LSetupError	dc.b	"Error during library function setup",0
 SonnetMemError	dc.b	"No memory detected on the Sonnet card",0
 AllocXError	dc.b	"Cross message allocation error",0
-StackRunError	dc.b	"RunPPC Stack transfer unsupported",0
+StackRunError	dc.b	"RunPPC Stack transfer error (size/async)",0
 
 ramlib		dc.b "ramlib",0		
 		

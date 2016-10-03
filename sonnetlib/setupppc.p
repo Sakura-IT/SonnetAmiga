@@ -1767,6 +1767,10 @@ EInt:		b	.FPUnav				#0
 		loadreg	r4,'DNLL'			#Reply from Run68KLowLevel
 		cmpw	r4,r6
 		beq	.Done68
+		
+		loadreg	r4,'STCK'
+		cmpw	r4,r6
+		beq	.RemNode			#Leave it to be released by PPC task
 
 		b	.RelFrame
 		
@@ -1830,7 +1834,18 @@ EInt:		b	.FPUnav				#0
 		stwbrx	r8,r4,r3
 
 .Oopsie:	mr	r5,r9
-		b	.NxtInQ		
+		b	.NxtInQ
+		
+#**********************************************************
+
+.RemNode:	mr	r4,r5
+		lwz	r3,0(r4)			#RemovePPC
+		lwz	r4,4(r4)
+		stw	r4,4(r3)
+		stw	r3,0(r4)
+		
+		mr	r5,r9
+		b	.NxtInQ
 		
 #**********************************************************		
 		

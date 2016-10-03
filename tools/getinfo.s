@@ -150,6 +150,22 @@ Done		move.l 52(a2),d2
 		move.l d2,32(a1)
 		move.l 60(a2),d2
 		move.l d2,36(a1)
+
+		move.l 92(a2),d2
+		move.l d2,d3
+		divu.l #100,d3
+		move.l d3,48(a1)
+		mulu.l #100,d3
+		sub.l d3,d2
+		move.l d2,52(a1)
+		
+		move.l 100(a2),d2
+		move.l d2,d3
+		divu.l #100,d3
+		move.l d3,56(a1)
+		mulu.l #100,d3
+		sub.l d3,d2
+		move.l d2,60(a1)
 		
 		move.l 84(a2),d2
 		move.l #1024,d3
@@ -224,8 +240,8 @@ PowerPCLib	dc.b	"sonnet.library",0
 	
 Tags		dc.l	PPCINFO_CPU,0,PPCINFO_PVR,0,PPCINFO_CPUCLOCK,0,PPCINFO_BUSCLOCK,0
 		dc.l	PPCINFO_ICACHE,0,PPCINFO_DCACHE,0,PPCINFO_PAGETABLE,0,PPCINFO_TABLESIZE,0
-		dc.l	PPCINFO_L2CACHE,0,PPCINFO_L2STATE,0,PPCINFO_L2SIZE,0
-		dc.l	0,0
+		dc.l	PPCINFO_L2CACHE,0,PPCINFO_L2STATE,0,PPCINFO_L2SIZE,0,PPCINFO_CPULOAD,0
+		dc.l	PPCINFO_SYSTEMLOAD,0,TAG_END
 	
 ;************************************************************************************************
 
