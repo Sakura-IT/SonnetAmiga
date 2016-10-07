@@ -5337,12 +5337,16 @@ CauseInterrupt:
 		prolog 228,'TOC'
 
 		stwu	r31,-4(r13)
+		
+		lbz	r31,ExceptionMode(r0)
+		mr.	r31,r31
+		bne	.AlreadyInExc
 
 		li	r0,SYSCALL_CAUSEINTERRUPT
 
 		sc
 
-		lwz	r31,0(r13)
+.AlreadyInExc:	lwz	r31,0(r13)
 		addi	r13,r13,4
 
 		epilog 'TOC'
