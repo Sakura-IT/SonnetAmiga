@@ -58,6 +58,7 @@ SetCache:
 		bl	DebugStartFunction
 		
 		mfctr	r28
+		lwz	r30,PowerPCBase(r0)
 
 		cmplwi	r4,CACHE_DCACHEFLUSH
 		beq-	.DCACHEFLUSH
@@ -178,7 +179,7 @@ SetCache:
 		mr.	r6,r6
 		beq-	.DoneCache
 
-		lbz	r29,DLockState(r0)
+		lbz	r29,DLockState(r30)
 		mr.	r29,r29
 		bne	.DoneCache
 
@@ -216,11 +217,11 @@ SetCache:
 		bl User
 		
 		li	r0,-1
-		stb	r0,DLockState(r0)
+		stb	r0,DLockState(r30)
 
 		b	.DoneCache
 				
-.DCACHEOFF:	lbz	r29,DState(r0)			#ExceptionMode should be Neg?
+.DCACHEOFF:	lbz	r29,DState(r30)			#ExceptionMode should be Neg?
 		mr.	r29,r29
 		bne	.DoneCache
 		
@@ -238,7 +239,7 @@ SetCache:
 		mr	r4,r3
 		
 		li	r0,-1
-		stb	r0,DState(r0)
+		stb	r0,DState(r30)
 		
 		bl User
 
@@ -258,7 +259,7 @@ SetCache:
 		b	.DoneCache
 
 .DCACHEUNLOCK:	li	r0,0
-		stb	r0,DLockState(r0)
+		stb	r0,DLockState(r30)
 		
 		bl Super
 
@@ -276,7 +277,7 @@ SetCache:
 		b	.DoneCache
 
 .DCACHEON:	li	r0,0
-		stb	r0,DState(r0)		
+		stb	r0,DState(r30)		
 		
 		bl Super
 
@@ -376,10 +377,10 @@ SetCache:
 		mr.	r6,r6
 		beq-	.DCACHEFLUSHALL
 		
-		lbz	r29,DState(r0)
+		lbz	r29,DState(r30)
 		mr.	r29,r29
 		bne	.DoneCache
-		lbz	r29,DLockState(r0)
+		lbz	r29,DLockState(r30)
 		mr.	r29,r29
 		bne	.DoneCache
 
@@ -403,10 +404,10 @@ SetCache:
 		b	.DoneCache
 
 .DCACHEFLUSHALL:
-		lbz	r29,DState(r0)
+		lbz	r29,DState(r30)
 		mr.	r29,r29
 		bne	.DoneCache
-		lbz	r29,DLockState(r0)
+		lbz	r29,DLockState(r30)
 		mr.	r29,r29
 		bne	.DoneCache
 
@@ -5338,9 +5339,9 @@ CauseInterrupt:
 
 		stwu	r31,-4(r13)
 		
-		lbz	r31,ExceptionMode(r0)
-		mr.	r31,r31
-		bne	.AlreadyInExc
+#		lbz	r0,ExceptionMode(r0)
+#		mr.	r0,r0
+#		bne	.AlreadyInExc
 
 		li	r0,SYSCALL_CAUSEINTERRUPT
 
@@ -5481,7 +5482,8 @@ DeleteTaskPPC:
 		
 .ExitKludge:	li	r31,FDeleteTaskPPC-FRun68K
 		bl	DebugStartFunction
-
+		
+		lwz	r30,PowerPCBase(r0)
 		lwz	r5,RunningTask(r0)		#ThisTask
 		li	r29,0
 		cmpw	r4,r5				#To be deleted?
@@ -5496,8 +5498,7 @@ DeleteTaskPPC:
 		
 		bl ObtainSemaphorePPC
 
-		lwz	r28,PowerPCBase(r0)
-		addi	r28,r28,LIST_SNOOP
+		lwz	r28,LIST_SNOOP(r30)
 .Loop100:	lwz	r27,0(r28)
 		mr.	r27,r27
 		beq-	.EmptySnoopLst
@@ -5544,10 +5545,10 @@ DeleteTaskPPC:
 
 		bl RemovePPC		
 
-.NoTaskPtr:	lwz	r4,PowerPCBase(r0)		#Tasks -1
-		lwz	r3,NumAllTasks(r4)
+.NoTaskPtr:	la	r4,NumAllTasks(r30)		#Tasks -1
+		lwz	r3,0(r4)
 		subi	r3,r3,1
-		stw	r3,NumAllTasks(r4)
+		stw	r3,0(r4)
 		dcbst	r0,r4
 
 		lwz	r4,TaskListSem(r0)
@@ -5591,8 +5592,7 @@ DeleteTaskPPC:
 		bl RemovePPC
 
 		mr	r5,r31		
-		lwz	r3,PowerPCBase(r0)
-		la	r4,LIST_REMOVEDTASKS(r3)	#Deleted task list at base
+		la	r4,LIST_REMOVEDTASKS(r30)	#Deleted task list at base
 		
 		bl AddTailPPC				#In WarpOS a seperate task takes care of all freemems (TC_MEMENTRY)
 
@@ -6664,14 +6664,9 @@ SignalPPC:
 		
 		b	.SigExit
 
-.PPCTask:	mr	r4,r31
-		mr	r5,r30
-		mr	r3,r29
-		
-		mr	r31,r3
-		mr	r30,r4
-		mr	r3,r30
-		mr	r4,r5
+.PPCTask:	mr	r3,r31
+		mr	r4,r30
+		mr	r30,r31
 		
 		bl CheckExcSignal
 
@@ -6734,6 +6729,10 @@ SignalPPC:
 		lwz	r4,LIST_READYTASKS(r4)
 		cmplw	r4,r30				#Check if we are top
 		bne-	.SigExit
+		
+		lbz	r4,ExceptionMode(r0)
+		mr.	r4,r4
+		bne	.SigExit
 		
 		li	r0,-1
 		stb	r0,RescheduleFlag(r0)
@@ -8235,7 +8234,7 @@ WaitTime:
 		bl	DebugStartFunction
 
 		mr	r30,r4
-		mr	r29,r3
+		lwz	r29,PowerPCBase(r0)
 		lwz	r26,RunningTask(r0)
 		
 		lwz	r4,WaitListSem(r0)
