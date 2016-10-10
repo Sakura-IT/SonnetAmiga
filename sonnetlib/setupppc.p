@@ -1680,7 +1680,7 @@ EInt:		b	.FPUnav				#0
 		mr	r9,r5
 		li	r5,IMISR_IM0I|IMISR_IM1I
 		stwbrx	r5,r4,r3			#Clear IM0/IM1 bit to clear interrupt
-		eieio		
+		sync		
 		mr	r5,r9
 	
 .CheckQueue:	andi.	r9,r5,IMISR_IPQI
@@ -1688,18 +1688,18 @@ EInt:		b	.FPUnav				#0
 		
 		li	r5,IMISR_IPQI			#Clear IPQI bit to clear interrupt
 		stwbrx	r5,r4,r3		
-		eieio
+		sync
 
 		li	r4,IPTPR			#Get message from Inbound FIFO
 		lwbrx	r5,r4,r3
 .QNotEmpty:	addi	r9,r5,4				#Increase FIFO pointer
 		loadreg	r4,0x4000
 		or	r9,r9,r4
-		loadreg r4,0x7fff
+		loadreg r4,0xffff7fff
 		and	r9,r9,r4			#Keep it 4000-7FFE		
 		sync
 		lwz	r5,0(r5)
-		
+
 		lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_MSGQUEUE(r3)
 		addi	r4,r4,4				#PutMsg r5 to queue
@@ -1712,8 +1712,6 @@ EInt:		b	.FPUnav				#0
 		lis	r3,EUMB				#Check if header (IPHPR) is equal to
 		li	r4,IPHPR			#tail (IPTPR). If so, queue is empty
 		lwbrx	r5,r4,r3
-		loadreg	r4,0xffff
-		and	r5,r5,r4
 		cmpw	r5,r9
 
 		beq	.QEmpty
@@ -2789,6 +2787,10 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r9
 		isync
 
+		lwz	r9,0xf0(r0)				#Debug counter to check
+		addi	r9,r9,1					#Whether exception is still
+		stw	r9,0xf0(r0)
+
 		loadreg	r9,Quantum
 		mtdec	r9
 		
@@ -3776,7 +3778,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfsprg0	r0
 		
-		b	.DecInt		
+		b	.DecInt
 		
 #********************************************************************************************
 
@@ -4240,6 +4242,10 @@ EInt:		b	.FPUnav				#0
 		stw	r6,DataExcHigh(r7)
 
 		mfsrr0	r31
+		
+		cmpwi	r31,0x4000			#Called from other exception
+		blt	.NotSupported			#NOT GOOD!
+		
 		lwz	r31,0(r31)			#get offending instruction in r31
 		
 		li	r29,0
@@ -4411,13 +4417,7 @@ EInt:		b	.FPUnav				#0
 		mfsprg0	r0
 		rfi
 
-.NotSupported:	mfspr	r0,HID0
-		ori	r0,r0,HID0_DCE
-		xori	r0,r0,HID0_DCE
-		sync	
-		mtspr	HID0,r0
-		isync
-		
+.NotSupported:	nop
 .HaltDSI:	loadreg	r7,'DSI!'
 		stw	r7,0xf4(r0)
 				
@@ -4481,7 +4481,7 @@ EInt:		b	.FPUnav				#0
 		stwbrx	r23,r24,r28
 		lwz	r25,0(r25)
 
-		stw	r9,MN_IDENTIFIER(r25)
+.Loading:	stw	r9,MN_IDENTIFIER(r25)
 		stw	r2,MN_IDENTIFIER+4(r25)		#AmigaValue
 		stw	r3,MN_IDENTIFIER+8(r25)		#AmigaAddress
 		

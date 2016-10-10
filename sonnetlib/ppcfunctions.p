@@ -498,6 +498,9 @@ InsertPPC:
 		lwz	r3,PowerPCBase(r0)
 		li	r0,-1
 		stb	r0,FLAG_READY(r3)
+		sync
+		isync
+
 		mr.	r6,r6
 		beq-	.NoPred
 		lwz	r3,0(r6)
@@ -533,6 +536,9 @@ InsertPPC:
 AddHeadPPC:	lwz	r3,PowerPCBase(r0)
 		li	r0,-1
 		stb	r0,FLAG_READY(r3)
+		sync
+		isync
+
 		lwz	r3,0(r4)
 		stw	r5,0(r4)
 		stw	r3,0(r5)
@@ -552,6 +558,9 @@ AddHeadPPC:	lwz	r3,PowerPCBase(r0)
 AddTailPPC:	lwz	r3,PowerPCBase(r0)
 		li	r0,-1
 		stb	r0,FLAG_READY(r3)
+		sync
+		isync
+		
 		addi	r4,r4,4
 		lwz	r3,4(r4)
 		stw	r5,4(r4)
@@ -573,7 +582,9 @@ RemovePPC:
 		lwz	r3,PowerPCBase(r0)
 		li	r0,-1
 		stb	r0,FLAG_READY(r3)
+		sync
 		isync
+
 		lwz	r3,0(r4)
 		lwz	r4,4(r4)
 		stw	r4,4(r3)
@@ -593,6 +604,9 @@ RemHeadPPC:
 		lwz	r3,PowerPCBase(r0)
 		li	r0,-1
 		stb	r0,FLAG_READY(r3)
+		sync
+		isync
+		
 		lwz	r5,0(r4)
 		lwz	r3,0(r5)
 		mr.	r3,r3
@@ -614,6 +628,9 @@ RemHeadPPC:
 RemTailPPC:	lwz	r3,PowerPCBase(r0)
 		li	r0,-1
 		stb	r0,FLAG_READY(r3)
+		sync
+		isync
+
 		lwz	r3,8(r4)
 		lwz	r5,4(r3)
 		mr.	r5,r5
@@ -636,6 +653,9 @@ EnqueuePPC:
 		lwz	r3,PowerPCBase(r0)
 		li	r0,-1
 		stb	r0,FLAG_READY(r3)
+		sync
+		isync
+
 		lbz	r3,LN_PRI(r5)
 		extsb	r3,r3
 		lwz	r6,0(r4)
@@ -2663,6 +2683,13 @@ CreateMsgFramePPC:
 		
 		sc
 
+		rlwinm	r26,r3,16,16,31
+		cmpwi	r26,0x7011
+		blt	.CMFError
+		cmpwi	r26,0x7029
+		bgt	.CMFError
+		
+
 		lwz	r4,0(r13)
 		lwz	r26,4(r13)
 		lwz	r27,8(r13)
@@ -2672,6 +2699,9 @@ CreateMsgFramePPC:
 		addi	r13,r13,24
 
 		epilog 'TOC'
+		
+.CMFError:	illegal
+		b	$		
 		
 #********************************************************************************************
 #
@@ -2687,6 +2717,12 @@ SendMsgFramePPC:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
+
+		rlwinm	r26,r4,16,16,31
+		cmpwi	r26,0x7011
+		blt	.CMFError
+		cmpwi	r26,0x7029
+		bgt	.CMFError
 
 		li	r0,SYSCALL_SENDMSGFRAME
 		
@@ -2715,6 +2751,12 @@ FreeMsgFramePPC:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
+		
+		rlwinm	r26,r4,16,16,31
+		cmpwi	r26,0x7011
+		blt	.CMFError
+		cmpwi	r26,0x7029
+		bgt	.CMFError
 		
 		li	r0,SYSCALL_FREEMSGFRAME
 		
@@ -5339,13 +5381,15 @@ CauseInterrupt:
 
 		stwu	r31,-4(r13)
 		
-#		lbz	r0,ExceptionMode(r0)
-#		mr.	r0,r0
-#		bne	.AlreadyInExc
+		lbz	r0,ExceptionMode(r0)
+		mr.	r0,r0
+		bne	.AlreadyInExc
 
 		li	r0,SYSCALL_CAUSEINTERRUPT
 
 		sc
+		sync
+		isync
 
 .AlreadyInExc:	lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -6730,9 +6774,9 @@ SignalPPC:
 		cmplw	r4,r30				#Check if we are top
 		bne-	.SigExit
 		
-		lbz	r4,ExceptionMode(r0)
-		mr.	r4,r4
-		bne	.SigExit
+#		lbz	r4,ExceptionMode(r0)
+#		mr.	r4,r4
+#		bne	.SigExit
 		
 		li	r0,-1
 		stb	r0,RescheduleFlag(r0)
@@ -9359,39 +9403,23 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		
 #********************************************************************************************		
 
-.KillRunPPC:	li	r7,TS_ATOMIC
-		lwz	r9,RunningTask(r0)
-		stb	r7,TC_STATE(r9)
+.KillRunPPC:	lwz	r31,RunningTask(r0)
 		mr	r4,r30
 
 		bl FreeMsgFramePPC
 
-		lwz	r4,RunningTask(r0)
-		lwz	r4,TASKPPC_TASKPTR(r4)
-
-		bl RemovePPC
-
-		lwz	r4,RunningTask(r0)		
-
-		bl FreeVec68K
-
 		lwz	r4,PowerPCBase(r0)			#Tasks -1
-		lwz	r3,NumAllTasks(r4)
+		la	r4,NumAllTasks(r4)
+		lwz	r3,0(r4)
 		subi	r3,r3,1
-		stw	r3,NumAllTasks(r4)
-
-		loadreg	r1,SysStack-0x20			#System stack in unused mem
-		lwz	r13,SonnetBase(r0)
-		or	r1,r1,r13
-		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		stw	r3,0(r4)
+		dcbst	r0,r4
 
 		li	r7,TS_REMOVED
-		stb	r7,TC_STATE(r9)
+		stb	r7,TC_STATE(r31)
 
-		li	r0,0
-		stw	r0,RunningTask(r0)
-
+		bl CauseInterrupt
+		
 Pause:		nop
 		nop
 		b	Pause
