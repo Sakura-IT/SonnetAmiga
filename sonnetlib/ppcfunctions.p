@@ -2683,13 +2683,6 @@ CreateMsgFramePPC:
 		
 		sc
 
-		rlwinm	r26,r3,16,16,31
-		cmpwi	r26,0x7011
-		blt	.CMFError
-		cmpwi	r26,0x7029
-		bgt	.CMFError
-		
-
 		lwz	r4,0(r13)
 		lwz	r26,4(r13)
 		lwz	r27,8(r13)
@@ -2699,10 +2692,7 @@ CreateMsgFramePPC:
 		addi	r13,r13,24
 
 		epilog 'TOC'
-		
-.CMFError:	illegal
-		b	$		
-		
+				
 #********************************************************************************************
 #
 #	Support: void SendMsgFramePPC(MsgFrame) // r4
@@ -2717,12 +2707,6 @@ SendMsgFramePPC:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
-
-		rlwinm	r26,r4,16,16,31
-		cmpwi	r26,0x7011
-		blt	.CMFError
-		cmpwi	r26,0x7029
-		bgt	.CMFError
 
 		li	r0,SYSCALL_SENDMSGFRAME
 		
@@ -2751,12 +2735,6 @@ FreeMsgFramePPC:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
-		
-		rlwinm	r26,r4,16,16,31
-		cmpwi	r26,0x7011
-		blt	.CMFError
-		cmpwi	r26,0x7029
-		bgt	.CMFError
 		
 		li	r0,SYSCALL_FREEMSGFRAME
 		
