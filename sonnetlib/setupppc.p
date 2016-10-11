@@ -1690,8 +1690,14 @@ EInt:		b	.FPUnav				#0
 		stwbrx	r5,r4,r3		
 		sync
 
+		li	r4,IPHPR			
+		lwbrx	r9,r4,r3
 		li	r4,IPTPR			#Get message from Inbound FIFO
-		lwbrx	r5,r4,r3
+		lwbrx	r5,r4,r3		
+		cmpw	r5,r9				#Check if interrupt was triggered
+
+		beq	.QEmpty				#during previous interrupt
+
 .QNotEmpty:	addi	r9,r5,4				#Increase FIFO pointer
 		loadreg	r4,0x4000
 		or	r9,r9,r4
@@ -4243,7 +4249,7 @@ EInt:		b	.FPUnav				#0
 
 		mfsrr0	r31
 		
-		cmpwi	r31,0x4000			#Called from other exception
+		cmpwi	r31,0x7f00			#Called from other exception
 		blt	.NotSupported			#NOT GOOD!
 		
 		lwz	r31,0(r31)			#get offending instruction in r31
