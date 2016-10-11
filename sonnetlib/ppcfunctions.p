@@ -1666,11 +1666,10 @@ AtomicTest:
 		bne-	.AtomicOn
 		li	r3,-1
 		b	.AtomicOff
-		
+
 .AtomicOn:	li	r3,0
 .AtomicOff:	isync
 		blr
-
 
 #********************************************************************************************
 #
@@ -1678,7 +1677,7 @@ AtomicTest:
 #
 #********************************************************************************************
 
-AtomicDone:		
+AtomicDone:	
 		sync
 		li	r0,0
 		stw	r0,0(r4)
@@ -6451,12 +6450,12 @@ WaitPPC:
 		mr.	r5,r5
 		bne-	.GotSignals
 
-		li	r0,TS_CHANGING
-		stb	r0,TC_STATE(r31)
-
 		li	r4,Atomic
 		
 		bl AtomicDone
+
+		li	r0,TS_CHANGING
+		stb	r0,TC_STATE(r31)
 		
 		bl CauseInterrupt
 
