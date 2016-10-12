@@ -9020,18 +9020,36 @@ DebugEndFunction:
 
 StartCode:	bl	.StartRunPPC
 
-.WasNoEMsg:	lwz	r4,RunningTask(r0)
-		lwz	r4,TASKPPC_MSGPORT(r4)		
+.WasNoEMsg:	lwz	r31,RunningTask(r0)
+		lwz	r4,TC_SIGALLOC(r31)
+		loadreg	r28,0xfffff100
+		and.	r4,r4,r28
+
+		bl WaitPPC
+
+		mr	r5,r3
+		lwz	r4,RunningTask(r0)
+		lwz	r28,TASKPPC_MSGPORT(r31)
+		lbz	r29,MP_SIGBIT(r28)
+		loadreg	r28,0xfffffffe
+		rlwinm	r28,r28,r29,0,31
+		and.	r29,r5,r28
+		beq	.NextEMsg
 		
-		bl WaitPortPPC
+		loadreg r28,0xfffff000
+		and.	r5,r5,r28
+		beq	.NextEMsg
+
+		lwz	r4,TASKPPC_MIRRORPORT(r31)
+		lwz	r4,MP_SIGTASK(r4)
 		
-.NextEMsg:	lwz	r4,RunningTask(r0)
-		lwz	r4,TASKPPC_MSGPORT(r4)
+		bl Signal68K		
+		
+.NextEMsg:	lwz	r4,TASKPPC_MSGPORT(r31)
 
 		bl GetMsgPPC
 
 		mr.	r30,r3
-
 		beq	.WasNoEMsg
 		
 		lwz	r29,MN_IDENTIFIER(r30)
@@ -9042,7 +9060,8 @@ StartCode:	bl	.StartRunPPC
 		cmpw	r4,r29
 		bne	.NextEMsg
 
-		b	StartCode
+		bl	.StartRunPPC
+		b	.NextEMsg
 		
 #********************************************************************************************
 
