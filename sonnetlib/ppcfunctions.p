@@ -9028,11 +9028,10 @@ StartCode:	bl	.StartRunPPC
 		bl WaitPPC
 
 		mr	r5,r3
-		lwz	r4,RunningTask(r0)
 		lwz	r28,TASKPPC_MSGPORT(r31)
 		lbz	r29,MP_SIGBIT(r28)
 		loadreg	r28,0xfffffffe
-		rlwinm	r28,r28,r29,0,31
+		rlwnm	r28,r28,r29,0,31
 		and.	r29,r5,r28
 		beq	.NextEMsg
 		

@@ -1782,7 +1782,6 @@ EInt:		b	.FPUnav				#0
 
 .XSignal:	lwz	r3,KrytenTask(r0)
 		lwz	r4,TASKPPC_MSGPORT(r3)
-
 		addi	r6,r4,MP_PPC_SEM
 		lha	r8,SS_QUEUECOUNT(r6)
 		extsh.	r0,r8
@@ -2081,7 +2080,15 @@ EInt:		b	.FPUnav				#0
 		cmpw	r9,r6
 		beq	.GotOneWait
 
-		mr	r4,r5		
+		lwz	r6,TC_SIGWAIT(r4)
+		lwz	r7,TC_SIGRECVD(r4)
+		and.	r0,r7,r6
+		beq	.NoSigsRecvd
+
+		stb	r9,TC_STATE(r4)
+		b	.GotOneWait
+
+.NoSigsRecvd:	mr	r4,r5		
 		b	.NextOnList
 
 .GotOneWait:	mr	r6,r4
@@ -2475,23 +2482,7 @@ EInt:		b	.FPUnav				#0
 		bne	.CheckWait
 
 		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_READYTASKS(r4)
-		
-		lwz	r5,0(r4)			#RemHeadPPC
-		lwz	r3,0(r5)
-		mr.	r3,r3
-		beq-	.NoNode3
-		stw	r3,0(r4)
-		stw	r4,4(r3)
-		mr	r3,r5
-		
-.NoNode3:	mr.	r9,r3
-		
-		bne	.DoReady
-		
-		lwz	r4,PowerPCBase(r0)
 		la	r4,LIST_NEWTASKS(r4)
-		mr	r6,r4
 
 		lwz	r5,0(r4)			#RemHeadPPC
 		lwz	r3,0(r5)
@@ -2500,11 +2491,25 @@ EInt:		b	.FPUnav				#0
 		stw	r3,0(r4)
 		stw	r4,4(r3)
 		mr	r3,r5
-	
-.NoNode6:	mr.	r9,r3
-		beq	.DoIdle
+.NoNode6:	mr.	r9,r3		
 		
-		b	.Dispatch
+		bne	.Dispatch
+
+		lwz	r4,PowerPCBase(r0)
+		la	r4,LIST_READYTASKS(r4)
+		
+		lwz	r5,0(r4)			#RemHeadPPC
+		lwz	r3,0(r5)
+		mr.	r3,r3
+		beq-	.NoNode3
+		stw	r3,0(r4)
+		stw	r4,4(r3)
+		mr	r3,r5		
+.NoNode3:	mr.	r9,r3
+		
+		bne	.DoReady
+		
+		b	.DoIdle
 
 .DoReady:	li	r6,TS_RUN
 		stb	r6,TC_STATE(r9)
