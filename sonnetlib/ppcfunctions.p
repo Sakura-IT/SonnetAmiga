@@ -6841,6 +6841,10 @@ GetMsgPPC:
 		bl ReleaseSemaphorePPC
 
 		mr	r3,r5
+		
+		li	r31,FGetMsgPPC-FRun68K
+		bl	DebugEndFunction
+		
 		lwz	r29,0(r13)
 		lwz	r30,4(r13)
 		lwz	r31,8(r13)
@@ -6882,19 +6886,27 @@ ReplyMsgPPC:
 		addi	r4,r31,MP_PPC_INTMSG
 
 		cmpwi	r28,NT_XMSG68K
-		bne-	.DoSem
-		lhz	r6,MN_LENGTH(r30)
-		mr	r5,r30
-		li	r4,CACHE_DCACHEFLUSH
+		bne-	.DoSem						#HERERE
 
-		bl SetCache
+		bl CreateMsgFramePPC
 
-		mr	r6,r31						#a0
-		mr	r7,r30						#a1
-		lwz	r4,SysBase(r0)
-		li	r5,_LVOPutMsg
-			
-		bl 	Run68KLowLevel
+		subi	r6,r3,4
+		subi	r5,r30,MN_PPSTRUCT+4
+		li	r4,48
+		mtctr	r4
+.CpNewX:	lwzu	r7,4(r5)
+		stwu	r7,4(r6)
+		bdnz	.CpNewX
+
+		loadreg	r5,'RX68'
+		stw	r5,MN_IDENTIFIER(r3)	
+		mr	r4,r3
+
+		bl SendMsgFramePPC
+
+		subi	r4,r30,MN_PPSTRUCT
+
+		bl FreeMsgFramePPC
 
 		b	.ExitReply
 

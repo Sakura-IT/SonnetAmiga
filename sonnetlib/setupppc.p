@@ -1917,6 +1917,7 @@ EInt:		b	.FPUnav				#0
 		lwz	r3,MP_SIGTASK(r4)
 		mr.	r3,r3
 		beq	.RelFrame
+		mr	r7,r3
 
 		mr	r6,r4
 		mr	r4,r5
@@ -1925,6 +1926,7 @@ EInt:		b	.FPUnav				#0
 		stw	r4,4(r3)
 		stw	r3,0(r4)
 
+		mr	r3,r7
 		mr	r4,r6
 		la	r5,MN_PPSTRUCT(r5)		#PutMsg it to correct PPC task
 		b	.PutMsgIt			#Go to signalling code

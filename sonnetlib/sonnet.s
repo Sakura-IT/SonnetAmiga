@@ -1013,6 +1013,8 @@ NxtMsg		bsr GetMsgFrame
 		beq MsgXMSG
 		cmp.l #"SIG!",d0
 		beq MsgSignal68k
+		cmp.l #"RX68",d0
+		beq MsgRetX
 		cmp.l #"GETV",d0
 		beq.s LoadD
 		and.l #$ffffff00,d0
@@ -1104,6 +1106,21 @@ MsgFPPC		move.l MN_ARG1(a1),d0
 MsgXMSG		move.l MN_MIRROR(a1),a0			;Cross message from PPC to 68k
 		lea 32(a1),a1
 		bra DoPutMsg
+		
+;********************************************************************************************
+
+MsgRetX		move.l MN_MIRROR(a1),a0			;Reply on cross message to PPC
+		move.l a1,d7
+		lea MN_PPSTRUCT(a1),a2
+		moveq.l #39,d1				;Messagesize (192) - MN_PPSTRUCT (32) /4
+CopyXBk		move.l (a2)+,(a0)+
+		dbf d1,CopyXBk
+		move.l MN_PPSTRUCT+MN_REPLYPORT(a1),a0
+		move.l MN_MIRROR(a1),a1
+		jsr _LVOPutMsg(a6)
+		move.l d7,a0
+		bsr FreeMsgFrame
+		bra NxtMsg
 		
 ;********************************************************************************************		
 
@@ -2013,10 +2030,11 @@ MemErr		move.l (a7)+,a6
 FreeVec32:
 		move.l a6,-(a7)
 		move.l a1,d0
+		beq NoMemAddr
 		move.l -4(a1),a1
 		move.l 4.w,a6
 		jsr _LVOFreeVec(a6)
-		move.l (a7)+,a6
+NoMemAddr	move.l (a7)+,a6
 		rts
 
 ;********************************************************************************************
@@ -2033,7 +2051,9 @@ AllocXMsg:
 		lea AllocXError(pc),a2			;Sizes above 172 unsupported
 		bra PrintError
 
-RightSize	move.l d0,d3
+RightSize	move.l #160,d0
+		move.l d0,d3
+		move.l a0,d2
 		move.l #MEMF_PUBLIC|MEMF_REVERSE|MEMF_CLEAR,d1
 		jsr _LVOAllocVec32(a6)
 		tst.l d0
@@ -2194,6 +2214,7 @@ ClrXMsg		clr.l (a2)+
 		move.l #"XPPC",MN_IDENTIFIER(a0)
 		move.b #NT_MESSAGE,LN_TYPE(a0)
 		move.l d7,MN_PPC(a0)
+		move.l a1,MN_MIRROR(a0)
 
 		lea MN_PPSTRUCT(a0),a2
 		moveq.l #PP_SIZE/4-1,d0
