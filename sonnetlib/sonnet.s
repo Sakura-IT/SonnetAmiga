@@ -574,6 +574,11 @@ VeryStrange	move.l #_LVOAddTask,a0			;Set system patches
 		move.l a1,12(a0)
 		bsr CreatePPCTask
 		
+		move.l LExecBase(pc),a6
+		moveq.l #0,d0
+		lea ppclib(pc),a1
+		jsr _LVOOpenLibrary(a6)
+		
 		bra Clean
 
 ;********************************************************************************************
@@ -664,17 +669,12 @@ NoFun		movem.l (a7)+,d1-a6
 ;********************************************************************************************
 
 IntuitionLib	dc.b "intuition.library",0
-		cnop	0,2
 DosLib		dc.b "dos.library",0
-		cnop 	0,2
 ExpLib		dc.b "expansion.library",0
-		cnop	0,2
 pcilib		dc.b "pci.library",0
-		cnop	0,2
+ppclib		dc.b "ppc.library",0
 MemName		dc.b "Sonnet memory",0
-		cnop	0,2
 PCIMem		dc.b "pcidma memory",0
-		cnop	0,2
 IntName		dc.b "Gort",0
 		cnop	0,4
 

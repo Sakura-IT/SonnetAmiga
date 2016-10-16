@@ -31,10 +31,7 @@
 .set L2STATE,52
 .set CPUSDR1,56					#Pointer
 .set TaskException,60				#Pointer
-.set DState,64
-.set DLockState,65
 .set ExceptionMode,66
-.set RescheduleFlag,67				#626
 .set SnoopSem,68				#Pointer
 .set CurrentPort,72				#610
 .set L2Size,76
@@ -88,6 +85,10 @@
 .set AlignmentExcLow,604
 .set DataExcHigh,608
 .set DataExcLow,612
+
+.set DState,624
+.set DLockState,625
+.set RescheduleFlag,626
 .set FLAG_WAIT,627
 .set FLAG_READY,628
 .set BusyCounter,629

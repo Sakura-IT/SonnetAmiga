@@ -1339,10 +1339,9 @@ FlushDCache:
 		
 		mfctr	r28		
 		
-		lwz	r3,PowerPCBase(r0)
-		mr	r30,r3
+		lwz	r30,PowerPCBase(r0)
 		li	r29,-1
-		stb	r29,FLAG_READY(r3)			
+		stb	r29,FLAG_READY(r30)			
 		
 		bl	Super
 		
@@ -2453,15 +2452,14 @@ FindPortPPC:
 		li	r31,FFindPortPPC-FRun68K
 		bl	DebugStartFunction
 		
-		mr	r31,r3
+		lwz	r31,PowerPCBase(r0)
 		mr	r5,r4
 
 		lwz	r4,PortListSem(r0)
 
 		bl ObtainSemaphorePPC
 
-		lwz	r4,PowerPCBase(r0)
-		addi	r4,r4,LIST_PORTS
+		la	r4,LIST_PORTS(r31)
 
 		bl FindNamePPC
 
@@ -4515,16 +4513,14 @@ CreateTaskPPC:
  
  		bl ObtainSemaphorePPC
 	 
-	 	lwz	r4,PowerPCBase(r0)
-	 	addi	r4,r4,LIST_ALLTASKS
+	 	la	r4,LIST_ALLTASKS(r23)
 
 	 	bl AddTailPPC				#Insert dummy task in list
 
-		lwz	r4,PowerPCBase(r0)
-		lwz	r3,NumAllTasks(r4)
+		la	r4,NumAllTasks(r23)
+		lwz	r3,0(r4)
 		addi	r3,r3,1				#Set number of tasks
-		stw	r3,NumAllTasks(r4)
- 
+		stw	r3,0(r4) 
 		dcbst	r0,r4				#Cache
 
  		lwz	r4,TaskListSem(r0)
@@ -4569,8 +4565,7 @@ CreateTaskPPC:
 .SkipSystem:	stw	r5,TASKPPC_ID(r31)
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r31)
-		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_READYTASKS(r4)
+		la	r4,LIST_READYTASKS(r23)
 		mr	r5,r31				#Task
 		loadreg	r0,Quantum
 		stw	r0,TASKPPC_QUANTUM(r31)
@@ -4588,7 +4583,7 @@ CreateTaskPPC:
 		bl InsertOnPri
 
 		li	r0,-1 
-		stb	r0,RescheduleFlag(r0)		#Reschedule flag 
+		stb	r0,RescheduleFlag(r23)		#Reschedule flag 
  		li	r4,Atomic
 
  		bl AtomicDone
@@ -5595,7 +5590,7 @@ DeleteTaskPPC:
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r31)
 		li	r0,-1
-		stb	r0,RescheduleFlag(r0)		#Reschedule
+		stb	r0,RescheduleFlag(r30)		#Reschedule
 		
 		bl CauseInterrupt
 
@@ -6538,13 +6533,10 @@ SetTaskPriPPC:
 		mr	r5,r30
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r30)
-
-		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_READYTASKS(r4)		#Insert in Readytasks list on Pri
+		la	r4,LIST_READYTASKS(r30)		#Insert in Readytasks list on Pri
 		bl	InsertOnPri
 
-		lwz	r4,PowerPCBase(r0)
-		lwz	r4,LIST_READYTASKS(r4)		#Check if we are top
+		lwz	r4,LIST_READYTASKS(r30)		#Check if we are top
 		cmplw	r4,r30
 		bne-	.DonePriChange
 
@@ -6666,7 +6658,7 @@ SignalPPC:
 
 		mr	r31,r4
 		mr	r30,r5
-		mr	r29,r3
+		lwz	r29,PowerPCBase(r0)
 
 		lbz	r0,LN_TYPE(r4)
 		cmpwi	r0,NT_PPCTASK
@@ -6735,9 +6727,8 @@ SignalPPC:
 
 		li	r0,TS_READY
 		stb	r0,TC_STATE(r30)
-		
-		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_READYTASKS(r4)
+
+		la	r4,LIST_READYTASKS(r29)
 		mr	r5,r30
 		
 		bl InsertOnPri				#Prio recalculation
@@ -6746,17 +6737,12 @@ SignalPPC:
 
 		bl AtomicDone
 
-		lwz	r4,PowerPCBase(r0)
-		lwz	r4,LIST_READYTASKS(r4)
+		lwz	r4,LIST_READYTASKS(r29)
 		cmplw	r4,r30				#Check if we are top
 		bne-	.SigExit
 		
-#		lbz	r4,ExceptionMode(r0)
-#		mr.	r4,r4
-#		bne	.SigExit
-		
 		li	r0,-1
-		stb	r0,RescheduleFlag(r0)
+		stb	r0,RescheduleFlag(r29)
 
 		bl CauseInterrupt
 
