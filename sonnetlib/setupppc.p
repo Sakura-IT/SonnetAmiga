@@ -2188,10 +2188,14 @@ EInt:		b	.FPUnav				#0
 		stw	r3,4(r5)
 		stw	r5,0(r3)
 
-		lwz	r4,PowerPCBase(r0)		#Tasks +1
-		lwz	r3,NumAllTasks(r4)
+		lwz	r30,PowerPCBase(r0)		#Tasks +1
+		li	r0,0
+		la	r4,NumAllTasks(r30)
+		lwz	r3,0(r4)
 		addi	r3,r3,1
-		stw	r3,NumAllTasks(r4)
+		stw	r3,0(r4)
+		stb	r0,PortInUse(r30)
+		dcbst	r0,r4
 
 		loadreg	r0,MACHINESTATE_DEFAULT
 		mtsrr1	r0		
@@ -2206,8 +2210,7 @@ EInt:		b	.FPUnav				#0
 
 		li	r0,0
 		stb	r0,ExceptionMode(r0)
-		stb	r0,PortInUse(r0)
-		
+
 		mr	r30,r9
 
 		loadreg	r0,Quantum
@@ -2264,6 +2267,9 @@ EInt:		b	.FPUnav				#0
 		lwz	r9,0xf0(r0)				#Debug counter to check
 		addi	r9,r9,1					#Whether exception is still
 		stw	r9,0xf0(r0)				#running
+		li	r0,0
+		lwz	r9,PowerPCBase(r0)
+		stb	r0,PortInUse(r9)
 
 		lwz	r9,0(r13)
 		lwzu	r8,4(r13)
@@ -2287,8 +2293,7 @@ EInt:		b	.FPUnav				#0
 
 		li	r0,0
 		stb	r0,ExceptionMode(r0)
-		stb	r0,PortInUse(r0)
-		
+
 		loadreg	r0,'USER'
 		stw	r0,0xf4(r0)
 		
@@ -2709,6 +2714,9 @@ EInt:		b	.FPUnav				#0
 		blr
 			
 .LoadContext:	lwz	r9,TASKPPC_CONTEXTMEM(r9)
+		li	r0,0
+		lwz	r3,PowerPCBase(r0)
+		stb	r0,PortInUse(r3)
 		lwz	r0,0(r9)
 		mtsrr0	r0
 		lwzu	r0,4(r9)
@@ -2789,7 +2797,6 @@ EInt:		b	.FPUnav				#0
 		
 		li	r9,0
 		stb	r9,ExceptionMode(r0)
-		stb	r9,PortInUse(r0)
 		
 		loadreg	r9,'USER'
 		stw	r9,0xf4(r0)
@@ -2845,7 +2852,10 @@ EInt:		b	.FPUnav				#0
 
 		lwz	r9,0xf0(r0)				#Debug counter to check
 		addi	r9,r9,1					#Whether exception is still
+		li	r0,0
 		stw	r9,0xf0(r0)
+		lwz	r9,PowerPCBase(r0)
+		stb	r0,PortInUse(r9)
 
 		stw	r13,-4(r1)
 		subi	r13,r1,4
@@ -2868,7 +2878,6 @@ EInt:		b	.FPUnav				#0
 		
 		li	r0,0
 		stb	r0,ExceptionMode(r0)
-		stb	r0,PortInUse(r0)
 		
 		rfi
 
@@ -3685,12 +3694,7 @@ EInt:		b	.FPUnav				#0
 		
 		rfi
 		
-.NoHandler:	lwz	r27,36(r13)
-		li	r0,EXCF_SYSTEMCALL
-		cmpw	r0,r27
-		beq	.DoSysCalls
-
-.NoCall:	lwz	r0,0(r13)
+.NoHandler:	lwz	r0,0(r13)
 		mtcr	r0
 		lwz	r0,4(r13)
 		mtsprg0	r0
@@ -3708,90 +3712,6 @@ EInt:		b	.FPUnav				#0
 		lwz	r1,0(r1)
 
 		b	.CrashReport
-
-.DoSysCalls:	mfsprg0	r0
-		cmpwi	r0,SYSCALL_DISABLE
-		beq	.DoDisable
-		cmpwi	r0,SYSCALL_ENABLE
-		beq	.DoEnable
-		cmpwi	r0,SYSCALL_CREATEMSGFRAME
-		beq	.CreateMsg
-		cmpwi	r0,SYSCALL_SENDMSGFRAME
-		beq	.SendMsg
-		cmpwi	r0,SYSCALL_FREEMSGFRAME
-		beq	.FreeMsg
-		cmpwi	r0,SYSCALL_CAUSEINTERRUPT
-		beq	.CauseInterrupt
-		b	.NoCall
-		
-.DoDisable:	mfsrr1	r31
-		ori	r31,r31,PSL_EE
-		xori	r31,r31,PSL_EE
-		mtsrr1	r31
-		b	.LastTrHandler
-		
-.DoEnable:	mfsrr1	r31
-		ori	r31,r31,PSL_EE
-		mtsrr1	r31
-		b	.LastTrHandler
-
-.CreateMsg:	lis	r3,EUMB
-		li	r27,OFTPR
-		lwbrx	r30,r27,r3			
-		addi	r28,r30,4
-		loadreg	r29,0xc000
-		or	r28,r28,r29
-		loadreg r29,0xffff			#fffeffff?
-		and	r28,r28,r29			#Keep it C000-FFFE		
-		stwbrx	r28,r27,r3
-		sync
-		lwz	r30,0(r30)
-		stw	r30,12(r13)
-		b	.LastTrHandler
-		
-.SendMsg:	lis	r3,EUMB
-		li	r27,OPHPR
-		lwbrx	r28,r27,r3		
-		stw	r4,0(r28)		
-		addi	r29,r28,4
-		loadreg	r4,0xbfff			#ffffbfff?
-		and	r29,r29,r4			#Keep it 8000-BFFE
-		stwbrx	r29,r27,r3			#triggers Interrupt
-		sync
-		b	.LastTrHandler
-		
-.FreeMsg:	lis	r3,EUMB				#Free the message
-		li	r27,IFHPR
-		lwbrx	r29,r27,r3		
-		stw	r4,0(r29)		
-		addi	r28,r29,4
-		loadreg	r29,0x3fff			#ffff3fff?
-		and	r28,r28,r29			#Keep it 0000-3FFE
-		stwbrx	r28,r27,r3
-		sync
-		b	.LastTrHandler
-		
-.CauseInterrupt:
-		lwz	r0,0(r13)
-		mtcr	r0
-		lwz	r0,4(r13)
-		mtsprg0	r0
-		lwz	r2,8(r13)
-		lwz	r3,12(r13)
-		lwz	r27,16(r13)
-		lwz	r28,20(r13)
-		lwz	r29,24(r13)
-		lwz	r30,28(r13)
-		lwz	r31,32(r13)
-		addi	r13,r13,40			#Skipping one spot (was for Exc Type)
-
-		lwz	r1,0(r1)
-		lwz	r13,-4(r1)
-		lwz	r1,0(r1)
-		
-		mfsprg0	r0
-		
-		b	.DecInt
 		
 #********************************************************************************************
 

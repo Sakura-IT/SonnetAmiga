@@ -33,12 +33,10 @@
 .set TaskException,60				#Pointer
 .set ExceptionMode,66
 .set SnoopSem,68				#Pointer
-.set CurrentPort,72				#610
 .set L2Size,76
 .set MemSem,88
 .set PowerPCBase,92
 .set Break,96
-.set PortInUse,108				#628	; See CurrentPort
 .set DebugLevel,109				#18737
 .set RTGType,112
 .set RTGBase,116
@@ -81,16 +79,18 @@
 .set LIST_REMOVEDTASKS,528
 .set LIST_MSGQUEUE,544
 
-.set AlignmentExcHigh,600
-.set AlignmentExcLow,604
-.set DataExcHigh,608
-.set DataExcLow,612
-
+.set AlignmentExcHigh,594
+.set AlignmentExcLow,598
+.set DataExcHigh,602
+.set DataExcLow,606
+.set CurrentPort,610
+.set FLAG_READY,622
+.set DoDFlushAll,623
 .set DState,624
 .set DLockState,625
 .set RescheduleFlag,626
 .set FLAG_WAIT,627
-.set FLAG_READY,628
+.set PortInUse,628
 .set BusyCounter,629
 .set NumAllTasks,630
 
@@ -103,13 +103,6 @@
 .set IdSysTasks,662
 .set IdDefTasks,666
 .set LowActivityPrioOffset,670
-
-.set SYSCALL_DISABLE,1
-.set SYSCALL_ENABLE,2
-.set SYSCALL_CREATEMSGFRAME,3
-.set SYSCALL_SENDMSGFRAME,4
-.set SYSCALL_FREEMSGFRAME,5
-.set SYSCALL_CAUSEINTERRUPT,6
 
 .set EXCDATA_TYPE,8				#Always NT_INTERRUPT
 .set EXCDATA_PRI,9				#This
@@ -379,6 +372,7 @@
 .set CACHE_L2CACHEOFF,13
 .set CACHE_L2WTON,14
 .set CACHE_L2WTOFF,15
+.set CACHE_TOGGLEDFLUSH,16
 
 .set IMIMR,0x104		#Inbound Message Interrupt Mask Register
 .set IMISR,0x100		#Inbound Message Interrupt Status Register
