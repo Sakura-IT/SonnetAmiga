@@ -2011,10 +2011,10 @@ EInt:		b	.FPUnav				#0
 
 #**********************************************************
 
-.EndMsgQueue:	lwz	r9,PowerPCBase(r0)
-		lbz	r9,FLAG_READY(r9)
-		mr.	r9,r9
-		bne	.ReturnToUser
+.EndMsgQueue:	lwz	r9,Atomic(r0)
+		cmpwi	r9,-1
+		beq	.ReturnToUser
+
 		lwz	r9,RunningTask(r0)
 		mr.	r9,r9
 		beq	.NoAtomicTask
@@ -2922,6 +2922,10 @@ EInt:		b	.FPUnav				#0
 			
 		loadreg r0,'DECI'
 		stw	r0,0xf4(r0)
+		
+		lwz	r9,Atomic(r0)
+		cmpwi	r9,-1
+		beq	.ReturnToUser
 
 .ListLoop:	lwz	r9,PowerPCBase(r0)
 		la	r4,LIST_READYEXC(r9)
@@ -3869,16 +3873,20 @@ EInt:		b	.FPUnav				#0
 
 		rlwinm	r6,r5,14,24,28			#get floating point register offset
 		rlwinm	r7,r5,18,25,29			#get destination register offset
-		mr.	r7,r7
+		mr.	r10,r7
 		beq	.ItsR0
-		lwzx	r7,r30,r7			#get address from destination register
+		lwzx	r10,r30,r7			#get address from destination register
 .ItsR0:		rlwinm	r8,r5,0,16,31			#get displacement
 
 		rlwinm	r0,r5,6,26,31		
 		cmpwi	r0,0x34				#test for stfs
 		beq	.stfs
+		cmpwi	r0,0x35
+		beq	.stfsu
 		cmpwi	r0,0x30
 		beq	.lfs
+		cmpwi	r0,0x31
+		beq	.lfsu
 		cmpwi	r0,0x1f
 		beq	.stfsx
 		cmpwi	r0,0x32
@@ -3888,29 +3896,35 @@ EInt:		b	.FPUnav				#0
 		b	.HaltAlign
 
 .stfd:		lwzx	r9,r31,r6
-		stwx	r9,r7,r8
+		stwx	r9,r10,r8
 		addi	r6,r6,4
 		addi	r8,r8,4
 		lwzx	r9,r31,r6
-		stwx	r9,r7,r8
+		stwx	r9,r10,r8
 		b	.AligExit
+
+.stfsu:		add	r9,r10,r8
+		stwx	r9,r30,r7
 
 .stfs:		lfdx	f1,r31,r6			#get value from fp register
 		stfs	f1,AlignStore(r0)		#store it on correct aligned spot
 		lwz	r6,AlignStore(r0)		#Get the correct 32 bit value
-		stwx	r6,r7,r8			#Store correct value
+		stwx	r6,r10,r8			#Store correct value
 		b	.AligExit
 
-.lfd:		lwzx	r9,r7,r8
+.lfd:		lwzx	r9,r10,r8
 		stw	r9,AlignStore(r0)
 		addi	r8,r8,4
-		lwzx	r9,r7,r8
+		lwzx	r9,r10,r8
 		stw	r9,AlignStore2(r0)
 		lfd	f1,AlignStore(r0)
 		stfdx	f1,r31,r6
 		b	.AligExit
 
-.lfs:		lwzx	r9,r7,r8			#Get 32 bit value
+.lfsu:		add	r5,r10,r8			#Add displacement
+		stwx	r5,r30,r7	
+
+.lfs:		lwzx	r9,r10,r8			#Get 32 bit value
 		stw	r9,AlignStore(r0)		#Store it on aligned spot
 		lfs	f1,AlignStore(r0)		#Get it and convert it to 64 bit
 		stfdx	f1,r31,r6			#Store the 64 bit value
@@ -4005,7 +4019,85 @@ EInt:		b	.FPUnav				#0
 	
 #***********************************************	
 		
-.HaltAlign:	b	.HaltAlign
+.HaltAlign:	
+		lfdu	f0,0(r1)
+		lfdu	f1,8(r1)
+		lfdu	f2,8(r1)
+		lfdu	f3,8(r1)
+		lfdu	f4,8(r1)
+		lfdu	f5,8(r1)
+		lfdu	f6,8(r1)
+		lfdu	f7,8(r1)
+		lfdu	f8,8(r1)
+		lfdu	f9,8(r1)
+		lfdu	f10,8(r1)
+		lfdu	f11,8(r1)
+		lfdu	f12,8(r1)
+		lfdu	f13,8(r1)
+		lfdu	f14,8(r1)
+		lfdu	f15,8(r1)
+		lfdu	f16,8(r1)
+		lfdu	f17,8(r1)
+		lfdu	f18,8(r1)
+		lfdu	f19,8(r1)
+		lfdu	f20,8(r1)
+		lfdu	f21,8(r1)
+		lfdu	f22,8(r1)
+		lfdu	f23,8(r1)
+		lfdu	f24,8(r1)
+		lfdu	f25,8(r1)
+		lfdu	f26,8(r1)
+		lfdu	f27,8(r1)
+		lfdu	f28,8(r1)
+		lfdu	f29,8(r1)
+		lfdu	f30,8(r1)
+		lfdu	f31,8(r1)
+		
+		lwzu	r31,8(r1)			#Load registers with correct values
+		mtsprg0	r31
+		lwzu	r31,4(r1)
+		mtsprg1	r31
+		lwzu	r2,4(r1)
+		lwzu	r3,4(r1)
+		lwzu	r4,4(r1)
+		lwzu	r5,4(r1)
+		lwzu	r6,4(r1)
+		lwzu	r7,4(r1)
+		lwzu	r8,4(r1)
+		lwzu	r9,4(r1)
+		lwzu	r10,4(r1)
+		lwzu	r11,4(r1)
+		lwzu	r12,4(r1)
+		lwzu	r13,4(r1)
+		lwzu	r14,4(r1)
+		lwzu	r15,4(r1)
+		lwzu	r16,4(r1)
+		lwzu	r17,4(r1)
+		lwzu	r18,4(r1)
+		lwzu	r19,4(r1)
+		lwzu	r20,4(r1)
+		lwzu	r21,4(r1)
+		lwzu	r22,4(r1)
+		lwzu	r23,4(r1)
+		lwzu	r24,4(r1)
+		lwzu	r25,4(r1)
+		lwzu	r26,4(r1)
+		lwzu	r27,4(r1)
+		lwzu	r28,4(r1)
+		lwzu	r29,4(r1)
+		lwzu	r30,4(r1)
+		lwzu	r31,4(r1)
+		lwzu	r0,8(r1)
+		mtcr	r0
+
+		mfsprg1	r1
+
+		li	r0,.EAlign-.EMonitor
+		mtsprg1	r0
+		
+		mfsprg0	r0
+		
+		b	.CrashReport
 
 #********************************************************************************************
 
@@ -4874,6 +4966,7 @@ EInt:		b	.FPUnav				#0
 .EProgram:	.string	"Program"
 .EDSI:		.string	"Data Storage"
 .EISI:		.string	"Instruction Storage"
+.EAlign:	.string "FPU Alignment"
 .EFP:		.string	"FPU Unavailable"
 .ETrace:	.string "Trace"
 .ESM:		.string "System Management"

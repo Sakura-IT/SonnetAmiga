@@ -84,7 +84,7 @@
 .set DataExcHigh,602
 .set DataExcLow,606
 .set CurrentPort,610
-.set FLAG_READY,622
+
 .set DoDFlushAll,623
 .set DState,624
 .set DLockState,625

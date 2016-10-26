@@ -505,14 +505,7 @@ ConfirmInterrupt:
 #
 #********************************************************************************************
 
-InsertPPC:	
-		lwz	r3,PowerPCBase(r0)
-		li	r0,-1
-		stb	r0,FLAG_READY(r3)
-		sync
-		isync
-
-		mr.	r6,r6
+InsertPPC:	mr.	r6,r6
 		beq-	.NoPred
 		lwz	r3,0(r6)
 		mr.	r3,r3
@@ -533,10 +526,7 @@ InsertPPC:
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-.E1:		lwz	r3,PowerPCBase(r0)
-		li	r0,0
-		stb	r0,FLAG_READY(r3)
-		blr	
+.E1:		blr	
 
 #********************************************************************************************
 #
@@ -544,20 +534,11 @@ InsertPPC:
 #
 #********************************************************************************************
 
-AddHeadPPC:	lwz	r3,PowerPCBase(r0)
-		li	r0,-1
-		stb	r0,FLAG_READY(r3)
-		sync
-		isync
-
-		lwz	r3,0(r4)
+AddHeadPPC:	lwz	r3,0(r4)
 		stw	r5,0(r4)
 		stw	r3,0(r5)
 		stw	r4,4(r5)
 		stw	r5,4(r3)
-		lwz	r3,PowerPCBase(r0)
-		li	r0,0
-		stb	r0,FLAG_READY(r3)
 		blr	
 
 #********************************************************************************************
@@ -566,21 +547,12 @@ AddHeadPPC:	lwz	r3,PowerPCBase(r0)
 #
 #********************************************************************************************
 
-AddTailPPC:	lwz	r3,PowerPCBase(r0)
-		li	r0,-1
-		stb	r0,FLAG_READY(r3)
-		sync
-		isync
-		
-		addi	r4,r4,4
+AddTailPPC:	addi	r4,r4,4
 		lwz	r3,4(r4)
 		stw	r5,4(r4)
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
-		lwz	r3,PowerPCBase(r0)
-		li	r0,0
-		stb	r0,FLAG_READY(r3)
 		blr	
 
 #********************************************************************************************
@@ -589,20 +561,10 @@ AddTailPPC:	lwz	r3,PowerPCBase(r0)
 #
 #********************************************************************************************
 
-RemovePPC:
-		lwz	r3,PowerPCBase(r0)
-		li	r0,-1
-		stb	r0,FLAG_READY(r3)
-		sync
-		isync
-
-		lwz	r3,0(r4)
+RemovePPC:	lwz	r3,0(r4)
 		lwz	r4,4(r4)
 		stw	r4,4(r3)
 		stw	r3,0(r4)
-		lwz	r3,PowerPCBase(r0)
-		li	r0,0
-		stb	r0,FLAG_READY(r3)
 		blr	
 
 #********************************************************************************************
@@ -611,24 +573,14 @@ RemovePPC:
 #
 #********************************************************************************************
 
-RemHeadPPC:	
-		lwz	r3,PowerPCBase(r0)
-		li	r0,-1
-		stb	r0,FLAG_READY(r3)
-		sync
-		isync
-		
-		lwz	r5,0(r4)
+RemHeadPPC:	lwz	r5,0(r4)
 		lwz	r3,0(r5)
 		mr.	r3,r3
 		beq-	.HeadListEmpty
 		stw	r3,0(r4)
 		stw	r4,4(r3)
 		mr	r3,r5
-.HeadListEmpty:	lwz	r5,PowerPCBase(r0)
-		li	r0,0
-		stb	r0,FLAG_READY(r5)
-		blr	
+.HeadListEmpty:	blr	
 
 #********************************************************************************************
 #
@@ -636,23 +588,14 @@ RemHeadPPC:
 #
 #********************************************************************************************
 
-RemTailPPC:	lwz	r3,PowerPCBase(r0)
-		li	r0,-1
-		stb	r0,FLAG_READY(r3)
-		sync
-		isync
-
-		lwz	r3,8(r4)
+RemTailPPC:	lwz	r3,8(r4)
 		lwz	r5,4(r3)
 		mr.	r5,r5
 		beq-	.TailListEmpty
 		stw	r5,8(r4)
 		addi	r4,r4,4
 		stw	r4,0(r5)
-.TailListEmpty:	lwz	r5,PowerPCBase(r0)
-		li	r0,0
-		stb	r0,FLAG_READY(r5)
-		blr	
+.TailListEmpty:	blr	
 
 #********************************************************************************************
 #
@@ -660,14 +603,7 @@ RemTailPPC:	lwz	r3,PowerPCBase(r0)
 #
 #********************************************************************************************
 
-EnqueuePPC:	
-		lwz	r3,PowerPCBase(r0)
-		li	r0,-1
-		stb	r0,FLAG_READY(r3)
-		sync
-		isync
-
-		lbz	r3,LN_PRI(r5)
+EnqueuePPC:	lbz	r3,LN_PRI(r5)
 		extsb	r3,r3
 		lwz	r6,0(r4)
 .Loop1:		mr	r4,r6
@@ -683,9 +619,6 @@ EnqueuePPC:
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
-		lwz	r3,PowerPCBase(r0)
-		li	r0,0
-		stb	r0,FLAG_READY(r3)
 		blr	
 
 #********************************************************************************************
@@ -941,7 +874,8 @@ FreeVecPPC:	prolog 228,'TOC'
 		addi	r13,r13,4
 
 		epilog	'TOC'
-		
+
+
 #********************************************************************************************
 #
 #	Support: MemBlock = AllocVec68K(Length)	// r3=r4 (r5 and r6 are ignored for now)
@@ -1373,9 +1307,11 @@ FlushDCache:
 		
 		mfctr	r28		
 		
-		lwz	r30,PowerPCBase(r0)
-		li	r29,-1
-		stb	r29,FLAG_READY(r30)			
+.WLFlush:	li	r4,Atomic
+		bl 	AtomicTest
+		
+		mr.	r3,r3
+		beq+	.WLFlush
 		
 		bl	Super
 		
@@ -1417,10 +1353,10 @@ FlushDCache:
 		mr	r4,r3
 		bl	User
 
-		li	r29,0
-		stb	r29,FLAG_READY(r30)
-
 		mtctr	r28
+		
+		li	r4,Atomic
+		bl	AtomicDone
 		
 		lwz	r26,0(r13)
 		lwz	r27,4(r13)
@@ -2744,11 +2680,6 @@ CreateMsgFramePPC:
 		stwu	r26,-4(r13)
 		stwu	r4,-4(r13)
 
-		lwz	r3,PowerPCBase(r0)
-		li	r26,-1
-		stb	r26,FLAG_READY(r3)
-		isync
-
 		bl Super
 		mr	r26,r3
 
@@ -2769,10 +2700,6 @@ CreateMsgFramePPC:
 
 		mr	r4,r26
 		bl User
-
-		lwz	r3,PowerPCBase(r0)
-		li	r26,0
-		stb	r26,FLAG_READY(r3)
 
 		mr	r3,r30
 
@@ -2801,11 +2728,6 @@ SendMsgFramePPC:
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
 
-		lwz	r3,PowerPCBase(r0)
-		li	r26,-1
-		stb	r26,FLAG_READY(r3)
-		isync
-
 		mr	r30,r4
 
 		bl Super
@@ -2826,10 +2748,6 @@ SendMsgFramePPC:
 
 		mr	r4,r26
 		bl User
-
-		lwz	r3,PowerPCBase(r0)
-		li	r26,0
-		stb	r26,FLAG_READY(r3)
 
 		lwz	r26,0(r13)
 		lwz	r27,4(r13)
@@ -2854,11 +2772,6 @@ FreeMsgFramePPC:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
-		
-		lwz	r3,PowerPCBase(r0)
-		li	r26,-1
-		stb	r26,FLAG_READY(r3)
-		isync
 
 		mr	r30,r4
 		
@@ -2880,10 +2793,6 @@ FreeMsgFramePPC:
 
 		mr	r4,r26
 		bl User
-
-		lwz	r3,PowerPCBase(r0)
-		li	r26,0
-		stb	r26,FLAG_READY(r3)
 
 		lwz	r26,0(r13)
 		lwz	r27,4(r13)
@@ -4049,10 +3958,6 @@ InsertOnPri:
 		stwu	r3,-4(r13)
 
 		lwz	r8,PowerPCBase(r0)
-		li	r6,-1
-		stb	r6,FLAG_READY(r8)
-		isync
-
 		lwz	r3,TASKPPC_PRIORITY(r5)
 		lwz	r6,TASKPPC_PRIOFFSET(r5)
 		add	r3,r3,r6
@@ -4089,9 +3994,6 @@ InsertOnPri:
 		stw	r4,0(r5)
 		stw	r3,4(r5)
 		stw	r5,0(r3)
-
-		li	r6,0
-		stb	r6,FLAG_READY(r8)
 
 		lwz	r3,0(r13)
 		lwz	r4,4(r13)
