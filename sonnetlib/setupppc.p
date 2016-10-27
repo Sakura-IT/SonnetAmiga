@@ -3930,9 +3930,9 @@ EInt:		b	.FPUnav				#0
 		stfdx	f1,r31,r6			#Store the 64 bit value
 		b	.AligExit
 		
-.lstfsx:	rlwinm	r8,r5,23,25,29
-		lwzx	r8,r30,r8			#get index register
-		rlwinm.	r0,r5,23,31,31			#get index register value
+.lstfsx:	rlwinm	r8,r5,23,25,29			#get index register
+		lwzx	r8,r30,r8			#get index register value
+		rlwinm.	r0,r5,24,31,31
 		bne	.stfs
 		b	.lfs
 				
