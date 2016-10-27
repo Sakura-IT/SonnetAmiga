@@ -3888,7 +3888,7 @@ EInt:		b	.FPUnav				#0
 		cmpwi	r0,0x31
 		beq	.lfsu
 		cmpwi	r0,0x1f
-		beq	.stfsx
+		beq	.lstfsx
 		cmpwi	r0,0x32
 		beq	.lfd
 		cmpwi	r0,0x36
@@ -3930,9 +3930,11 @@ EInt:		b	.FPUnav				#0
 		stfdx	f1,r31,r6			#Store the 64 bit value
 		b	.AligExit
 		
-.stfsx:		rlwinm	r8,r5,23,25,29			#get index register
-		lwzx	r8,r30,r8			#get index register value
-		b	.stfs
+.lstfsx:	rlwinm	r8,r5,23,25,29
+		lwzx	r8,r30,r8			#get index register
+		rlwinm.	r0,r5,23,31,31			#get index register value
+		bne	.stfs
+		b	.lfs
 				
 #***********************************************
 						
