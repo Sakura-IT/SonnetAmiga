@@ -43,8 +43,6 @@
 .set TaskExitCode,120
 .set WaitListSem,124				#18150
 .set CPUInfo,128
-.set AlignStore,132
-.set AlignStore2,136
 .set ViolationAddress,140			#Pointer
 .set MemSize,144
 .set RunPPCStart,148
@@ -215,7 +213,7 @@
 
 .set SonnetBusClock,66666666			#66.6 MHz
 .set DecTimerFreq,(SonnetBusClock/4)		#Dec goes at 1/4 of Bus clock
-.set SwitchFreq,50				#
+.set SwitchFreq,10				#
 .set Quantum,(DecTimerFreq/SwitchFreq)		#
 .set QuickQuantum,50
 
@@ -677,10 +675,10 @@
 .set TASKPPC_TASKPTR,104
 .set TASKPPC_FLAGS,108
 .set TASKPPC_LINK,112
-.set TASKLINK_TASK,120
 
-.set TASKLINK_SIG,12
-.set TASKLINK_USED,16
+.set TASKLINK_TASK,120
+.set TASKLINK_SIG,124
+.set TASKLINK_USED,128
 
 .set TASKPPC_BATSTORAGE,130
 .set TASKPPC_PAD,154

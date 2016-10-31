@@ -1551,6 +1551,9 @@ FreeSignalPPC:
 		slw	r6,r6,r4
 		andc	r3,r3,r6
 		stw	r3,TC_SIGALLOC(r5)
+		lwz	r3,TASKLINK_SIG(r5)
+		andc	r3,r3,r6
+		stw	r3,TASKLINK_SIG(r5)
 
 .NoSigDef:	epilog 'TOC'
 
@@ -1596,6 +1599,9 @@ AllocSignalPPC:
 .GetSig:	or	r3,r3,r6
 		stw	r3,TC_SIGALLOC(r5)
 		stwu	r4,-4(r13)
+		lwz	r3,TASKLINK_SIG(r5)
+		or	r3,r3,r6
+		stw	r3,TASKLINK_SIG(r5)
 		
 .WaitingLine:	li	r4,Atomic
 		bl AtomicTest
@@ -1637,6 +1643,7 @@ AtomicTest:
 		b	.AtomicOff
 
 .AtomicOn:	li	r3,0
+
 .AtomicOff:	isync
 		blr
 
@@ -2914,18 +2921,31 @@ WaitFor68K:
 
 		mr	r31,r4
 
-.WasNoMsg:	lwz	r4,RunningTask(r0)
-		lwz	r4,TASKPPC_MSGPORT(r4)		
+.WasNoMsg:	lwz	r27,RunningTask(r0)
+		lwz	r4,TC_SIGALLOC(r27)
+		loadreg	r28,0xfffff100
+		and.	r4,r4,r28
 
-		bl WaitPortPPC		
+		bl WaitPPC
 
-.WasNoDone:	lwz	r4,RunningTask(r0)
-		lwz	r4,TASKPPC_MSGPORT(r4)
+		mr	r5,r3
+		lwz	r28,TASKPPC_MSGPORT(r27)
+		lbz	r29,MP_SIGBIT(r28)
+		loadreg	r28,0xfffffffe
+		rlwnm	r28,r28,r29,0,31
+		and.	r29,r5,r28
+		beq	.NextMsg
+
+		lwz	r4,TASKPPC_MIRRORPORT(r27)
+		lwz	r4,MP_SIGTASK(r4)
+		
+		bl Signal68K		
+		
+.NextMsg:	lwz	r4,TASKPPC_MSGPORT(r27)
 
 		bl GetMsgPPC
 
 		mr.	r30,r3
-
 		beq	.WasNoMsg
 		
 		lwz	r29,MN_IDENTIFIER(r30)
@@ -2940,7 +2960,7 @@ WaitFor68K:
 		beq	.RunPPC
 		loadreg	r4,'DONE'
 		cmpw	r4,r29
-		bne	.WasNoDone
+		bne	.NextMsg
 		
 .WasDone:	lwz	r4,RunningTask(r0)
 		lwz	r26,TASKPPC_MIRRORPORT(r4)
@@ -2986,7 +3006,7 @@ WaitFor68K:
 
 .RunPPC:	bl	.StartRunPPC
 		
-		b	.WasNoDone
+		b	.NextMsg
 
 #********************************************************************************************
 #
@@ -4064,6 +4084,8 @@ CreateTaskPPC:
  
 		mr	r31,r3 
 		stw	r31,TASKLINK_TASK(r31)
+		li	r0,0xfff
+		stw	r0,TASKLINK_SIG(r31)
 		addi	r3,r31,TC_MEMENTRY
 		stw	r3,LH_TAILPRED(r3)
 		li	r0,0 
@@ -9083,7 +9105,7 @@ StartCode:	bl	.StartRunPPC
 		and.	r29,r5,r28
 		beq	.NextEMsg
 		
-		loadreg r28,0xfffff000
+		loadreg	r28,0xfffff000
 		and.	r5,r5,r28
 		beq	.NextEMsg
 

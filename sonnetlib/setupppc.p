@@ -2133,6 +2133,9 @@ EInt:		b	.FPUnav				#0
 		stb	r4,LN_TYPE(r8)
 		la	r4,TASKPPC_CTMEM(r8)
 		stw	r4,TASKPPC_CONTEXTMEM(r8)
+		stw	r8,TASKLINK_TASK(r8)
+		li	r31,0xfff
+		stw	r31,TASKLINK_SIG(r8)
 		lwz	r31,MN_ARG2(r9)
 		stw	r31,TASKPPC_MIRROR68K(r8)
 		lwz	r31,MN_MIRROR(r9)
@@ -3788,6 +3791,8 @@ EInt:		b	.FPUnav				#0
 		stwu	r0,-4(r1)
 		li	r0,0
 		stwu	r0,-4(r1)			#For when rA = 0
+		stwu	r0,-4(r1)			#Align2 (33x4)
+		stwu	r0,-4(r1)			#Align1	(32x4)
 
 		stwu	r31,-4(r1)
 		stwu	r30,-4(r1)
@@ -3907,17 +3912,17 @@ EInt:		b	.FPUnav				#0
 		stwx	r9,r30,r7
 
 .stfs:		lfdx	f1,r31,r6			#get value from fp register
-		stfs	f1,AlignStore(r0)		#store it on correct aligned spot
-		lwz	r6,AlignStore(r0)		#Get the correct 32 bit value
+		stfs	f1,32*4(r30)			#store it on correct aligned spot
+		lwz	r6,32*4(r30)			#Get the correct 32 bit value
 		stwx	r6,r10,r8			#Store correct value
 		b	.AligExit
 
 .lfd:		lwzx	r9,r10,r8
-		stw	r9,AlignStore(r0)
+		stw	r9,32*4(r30)
 		addi	r8,r8,4
 		lwzx	r9,r10,r8
-		stw	r9,AlignStore2(r0)
-		lfd	f1,AlignStore(r0)
+		stw	r9,33*4(r30)
+		lfd	f1,32*4(r30)
 		stfdx	f1,r31,r6
 		b	.AligExit
 
@@ -3925,8 +3930,8 @@ EInt:		b	.FPUnav				#0
 		stwx	r5,r30,r7	
 
 .lfs:		lwzx	r9,r10,r8			#Get 32 bit value
-		stw	r9,AlignStore(r0)		#Store it on aligned spot
-		lfs	f1,AlignStore(r0)		#Get it and convert it to 64 bit
+		stw	r9,32*4(r30)			#Store it on aligned spot
+		lfs	f1,32*4(r30)			#Get it and convert it to 64 bit
 		stfdx	f1,r31,r6			#Store the 64 bit value
 		b	.AligExit
 		
@@ -4008,12 +4013,13 @@ EInt:		b	.FPUnav				#0
 		lwzu	r29,4(r1)
 		lwzu	r30,4(r1)
 		lwzu	r31,4(r1)
-		lwzu	r0,8(r1)
+		lwzu	r0,16(r1)
 		mtcr	r0
 		
 		mfsrr0	r1
 		addi	r1,r1,4				#Exit beyond offending instruction
 		mtsrr0	r1
+		
 		mfsprg1	r1
 		mfsprg0	r0
 
@@ -4089,7 +4095,7 @@ EInt:		b	.FPUnav				#0
 		lwzu	r29,4(r1)
 		lwzu	r30,4(r1)
 		lwzu	r31,4(r1)
-		lwzu	r0,8(r1)
+		lwzu	r0,16(r1)
 		mtcr	r0
 
 		mfsprg1	r1
