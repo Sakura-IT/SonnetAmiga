@@ -43,6 +43,7 @@
 .set TaskExitCode,120
 .set WaitListSem,124				#18150
 .set CPUInfo,128
+.set AtomicFrame,132
 .set ViolationAddress,140			#Pointer
 .set MemSize,144
 .set RunPPCStart,148

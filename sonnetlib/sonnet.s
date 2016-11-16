@@ -899,13 +899,10 @@ CleanUp		move.l d6,a0
 
 GoWaitPort	move.l (a7),a0
 		move.l ThisTask(a6),a1
+		
 		move.l TC_SIGALLOC(a1),d0		
 		and.l #$fffff000,d0
-
-		move.b MP_SIGBIT(a0),d1
-		moveq.l #0,d2
-		bset d1,d2
-		or.l d2,d0		
+		
 		jsr _LVOWait(a6)
 		
 		move.l (a7),a0		
@@ -936,7 +933,10 @@ GtLoop2		move.l (a7),a0
 		move.l (a7)+,d0
 		rts					;End task
 		
-DoRunk86	move.l (a7),MN_MIRROR(a0)	
+DoRunk86	move.l (a7),MN_MIRROR(a0)
+
+		move.l a0,$70000144
+
 		bsr Runk86
 		bra.s GtLoop2
 		
@@ -1084,7 +1084,7 @@ MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
 		beq CommandMaster
 		cmp.l #"END!",d0
 		beq DoPutMsg
-		
+
 		move.l d1,a2
 		move.l MP_SIGTASK(a2),a2
 		move.l MN_ARG1(a1),TC_SIGALLOC(a2)
@@ -1690,7 +1690,7 @@ SetSigAlloc	move.l d7,MN_ARG1(a0)
 		move.l PStruct(a5),a1
 
 		move.l a1,a3
-		tst.l PP_STACKPTR(a1)			;Unsupported, but not yet encountered
+		tst.l PP_STACKPTR(a1)
 		beq.s SetupCp
 
 		move.l PP_STACKSIZE(a1),d1
@@ -1725,7 +1725,7 @@ CpStack		move.b (a4)+,(a2)+
 		
 		bsr SendMsgFrame			;Send stack ahead of normal frame
 		
-		move.l (a7)+,a0
+		move.l (a7)+,a0				;(Do we actually need to send this frame??)
 
 SetupCp		lea MN_PPSTRUCT(a0),a2
 		moveq.l #PP_SIZE/4-1,d0
@@ -1778,14 +1778,10 @@ DidAsync	moveq.l #0,d0
 		move.l d0,MT_FLAGS(a2)
 
 Stacker		move.l ThisTask(a6),a1
+
 		move.l TC_SIGALLOC(a1),d0		
 		and.l #$fffff000,d0
-
-		move.l Port(a5),a0
-		move.b MP_SIGBIT(a0),d1
-		moveq.l #0,d2
-		bset d1,d2
-		or.l d2,d0		
+		
 		jsr _LVOWait(a6)
 
 		move.l Port(a5),a0		
@@ -1965,7 +1961,7 @@ ClearMsg	clr.l (a2)+
 
 ;********************************************************************************************
 ;
-;	PPCState = GetPCState(void) // d0
+;	PPCState = GetPCState(void) // d0		THIS NEEDS AN OVERHAUL!!
 ;
 ;********************************************************************************************
 
@@ -2519,7 +2515,7 @@ FUNCTABLE:
 
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0
-IDString	dc.b	"$VER: sonnet.library 17.3 (03-Oct-16)",0
+IDString	dc.b	"$VER: sonnet.library 17.3 (11-Nov-16)",0
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: fake warp.library 5.0 (01-Apr-16)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0

@@ -137,7 +137,6 @@ End:		mflr	r4
 		mtdec	r28				#Decrementer.
 
 		lwz	r28,0(r14)
-		stw	r14,Atomic(r0)
 		stw	r28,4(r29)			#Signal 68k that PPC is initialized
 
 		loadreg r6,'INIT'
@@ -364,14 +363,14 @@ End:		mflr	r4
 		stwbrx	r4,r5,r14
 
 		lwz	r6,SonnetBase(r0)
-		loadreg	r4,0x100000
+		lis	r4,0x10
 		li	r5,QBAR
 		stwbrx	r4,r5,r14
 		
 		mr	r5,r4
 		subi	r4,r4,4
 		
-		loadreg	r14,0x10000
+		lis	r14,0x1
 		or	r5,r5,r6
 		add	r5,r5,r14
 		
@@ -391,10 +390,11 @@ End:		mflr	r4
 		lis	r14,EUMB
 		
 		li	r5,IFTPR
-		li	r4,4096*0
+		li	r4,4096*0+4
+		stwbrx	r4,r5,r14
 		
 		li	r5,IFHPR
-		li	r4,4096*4-4
+		li	r4,4096*0
 		stwbrx	r4,r5,r14
 		
 		li	r5,IPTPR
@@ -414,11 +414,11 @@ End:		mflr	r4
 		stwbrx	r4,r5,r14
 		
 		li	r5,OFTPR
-		loadreg	r4,4096*12
+		loadreg	r4,4096*12+4
 		stwbrx	r4,r5,r14
 		
 		li	r5,OFHPR
-		loadreg	r4,4096*16-4
+		loadreg	r4,4096*12
 		stwbrx	r4,r5,r14
 
 		li	r4,MUCR_CQS_FIFO4K|MUCR_CQE_ENABLE
@@ -450,7 +450,7 @@ Reset:		mflr	r15
 		mtspr	HID0,r3
 		sync
 		
-		loadreg	r3,PSL_FP					#Set MPU/MSR to a known state. Turn on FP
+		loadreg	r3,PSL_FP			#Set MPU/MSR to a known state. Turn on FP
 		or	r3,r1,r3
 		mtmsr 	r3
 		isync
@@ -643,8 +643,7 @@ Wait2:		mfl2cr	r3
 		lis	r4,0
 
 		lwz	r6,MemSize(r0)			#Address to start writing
-		loadreg	r5,0x400000			#Substract 4 MB
-		sub	r6,r6,r5
+		subis	r6,r6,0x40			#Substract 4 MB
 		lwz	r5,SonnetBase(r0)
 		or	r6,r6,r5
 		lis	r5,L2_SIZE_1M_U			#Size of memory to write to
@@ -700,7 +699,7 @@ Wait2:		mfl2cr	r3
 mmuSetup:	
 		mflr	r30
 
-		loadreg	r6,0x8000000			#Amount of memory to virtualize (128MB)
+		lis	r6,0x800				#Amount of memory to virtualize (128MB)
 
 		bl	.SetupPT
 		
@@ -712,8 +711,8 @@ mmuSetup:
 		
 		bl	.DoTBLs
 
-		loadreg	r3,0xfff00000			#Fake ROM (64k)
-		loadreg	r4,0xfff10000
+		lis	r3,0xfff0			#Fake ROM (64k)
+		lis	r4,0xfff1
 		mr	r5,r3
 		loadreg	r6,PTE_CACHE_INHIBITED
 		li	r7,2
@@ -777,7 +776,7 @@ mmuSetup:
 		bl	.DoTBLs		
 		
 .NoATI:		li	r3,0				#Zeropage (4K no cache)
-		li	r4,0x1000
+		li	r4,0x1000			#no cache for shared stuff with 68k
 		mr	r5,r3
 		loadreg	r6,PTE_CACHE_INHIBITED
 		li	r7,2				#pp = 2 - Read/Write Access
@@ -792,17 +791,17 @@ mmuSetup:
 							#Otherwise DSI/ISI (e.g. CHIP access)
 		bl	.DoTBLs
 		
-		loadreg	r3,0x100000			#Message FIFOs (64k no cache)
-		loadreg	r4,0x110000
+		lis	r3,0x10				#Message FIFOs (64k no cache)
+		lis	r4,0x11
 		mr	r5,r3
 		li	r6,PTE_CACHE_INHIBITED
 		li	r7,0				#pp = 0 - Supervisor access only.
 							#Otherwise DSI/ISI (e.g. CHIP access)
 		bl	.DoTBLs
 		
-		loadreg	r3,0x110000			#Message (1.5MB no cache)
-		loadreg	r4,0x290000
-		mr	r5,r3
+		lis	r3,0x11				#Message (1.5MB no cache)
+		lis	r4,0x29				#MOVE THIS TO 0x200000?
+		mr	r5,r3				#MOVE TBLS HERE?
 		or	r3,r3,r27
 		or	r4,r4,r27
 		li	r6,PTE_CACHE_INHIBITED
@@ -812,16 +811,16 @@ mmuSetup:
 
 		
 		loadreg	r3,0x8000			#First free block (~1MB cached)
-		loadreg	r4,0x100000
-		mr	r5,r3
-		or	r3,r3,r27
+		lis	r4,0x10				#SHOULD PROBABLY MAKE THIS SUPERVISOR ACCESS
+		mr	r5,r3				#ONLY TOO TO EMULATE CHIP ACCESS!!
+		or	r3,r3,r27			#(TO 0x200000?)
 		or	r4,r4,r27
 		li	r6,0
 		li	r7,2
 		
 		bl	.DoTBLs
 		
-		loadreg	r3,0x290000			#Sonnet memory (Rest cached)
+		lis	r3,0x29				#Sonnet memory (Rest cached)
 		lwz	r4,MemSize(r0)
 		mr	r5,r3
 		or	r3,r3,r27
@@ -894,7 +893,7 @@ mmuSetup:
 		
 #********************************************************************************************		
 		
-.DoTBLs:	mr	r17,r3
+.DoTBLs:	mr	r17,r3				#SHOULD IMPLEMENT TURBO MODE (THROUGH BATS)
 		mr	r18,r4
 		mr	r19,r5
 		mr	r20,r6
@@ -1669,7 +1668,7 @@ EInt:		b	.FPUnav				#0
 
 		rlwinm	r5,r5,8,0,31
 		cmpwi	r5,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
-		beq	.ReturnToUser
+		beq	.SlowReturn
 		
 .IntReturn:	lis	r3,EUMB
 		li	r4,IMISR
@@ -1680,8 +1679,8 @@ EInt:		b	.FPUnav				#0
 		mr	r9,r5
 		li	r5,IMISR_IM0I|IMISR_IM1I
 		stwbrx	r5,r4,r3			#Clear IM0/IM1 bit to clear interrupt
-		sync		
-		mr	r5,r9
+		sync					#These are no longer used in current version
+		mr	r5,r9				#as we are using FIFO now and not these registers
 	
 .CheckQueue:	andi.	r9,r5,IMISR_IPQI
 		beq	.EndQueue
@@ -1699,7 +1698,7 @@ EInt:		b	.FPUnav				#0
 		beq	.QEmpty				#during previous interrupt
 
 .QNotEmpty:	addi	r9,r5,4				#Increase FIFO pointer
-		loadreg	r4,0x4000
+		li	r4,0x4000
 		or	r9,r9,r4
 		loadreg r4,0xffff7fff
 		and	r9,r9,r4			#Keep it 4000-7FFE		
@@ -1780,12 +1779,13 @@ EInt:		b	.FPUnav				#0
 		
 #**********************************************************
 
-.XSignal:	lwz	r3,KrytenTask(r0)
-		lwz	r4,TASKPPC_MSGPORT(r3)
-		addi	r6,r4,MP_PPC_SEM
-		lha	r8,SS_QUEUECOUNT(r6)
+.XSignal:	lwz	r3,KrytenTask(r0)		##SOMETIMES LLPP ENDS UP AT NORMAL
+		lwz	r4,TASKPPC_MSGPORT(r3)		##TASK. THIS IS A BUG!!
+		addi	r6,r4,MP_PPC_SEM		##PROBABLY OVERWRITTEN OTHER TYPE???
+		lha	r8,SS_QUEUECOUNT(r6)		##LIST CORRUPTION?
+		addi	r8,r8,1
 		extsh.	r0,r8
-		beq	.Oopsie
+		bne	.Oopsie
 
 		lwz	r6,RunningTask(r0)
 		cmpw	r6,r3
@@ -1832,7 +1832,7 @@ EInt:		b	.FPUnav				#0
 		lwbrx	r6,r4,r3		
 		stw	r5,0(r6)		
 		addi	r8,r6,4
-		loadreg	r7,0x3fff
+		li	r7,0x3fff
 		and	r8,r8,r7			#Keep it 0000-3FFE
 		stwbrx	r8,r4,r3
 
@@ -1855,8 +1855,9 @@ EInt:		b	.FPUnav				#0
 .ReturnXMsg:	lwz	r4,MN_REPLYPORT(r5)		#Handles the reply from an XMSG
 		addi	r6,r4,MP_PPC_SEM
 		lha	r8,SS_QUEUECOUNT(r6)
+		addi	r8,r8,1
 		extsh.	r0,r8
-		beq	.Oopsie
+		bne	.Oopsie
 
 		addi	r7,r5,32			#(or a cross message from PPC to 68K)
 		stw	r4,MN_REPLYPORT(r7)
@@ -1887,7 +1888,7 @@ EInt:		b	.FPUnav				#0
 		lwbrx	r6,r4,r3		
 		stw	r5,0(r6)		
 		addi	r8,r6,4
-		loadreg	r6,0x3fff			#ffff3fff?
+		li	r6,0x3fff			#ffff3fff?
 		and	r8,r8,r6			#Keep it 0000-3FFE
 		stwbrx	r8,r4,r3
 		sync
@@ -1911,8 +1912,9 @@ EInt:		b	.FPUnav				#0
 .XMsgPPC:	lwz	r4,MN_PPC(r5)			#Handles a cross message from 68K to PPC)
 		addi	r6,r4,MP_PPC_SEM
 		lha	r8,SS_QUEUECOUNT(r6)
+		addi	r8,r8,1
 		extsh.	r0,r8
-		beq	.Oopsie
+		bne	.Oopsie
 
 		lwz	r3,MP_SIGTASK(r4)
 		mr.	r3,r3
@@ -1937,8 +1939,9 @@ EInt:		b	.FPUnav				#0
 		lwz	r6,TASKPPC_MSGPORT(r4)
 		addi	r6,r6,MP_PPC_SEM
 		lha	r8,SS_QUEUECOUNT(r6)
+		addi	r8,r8,1
 		extsh.	r0,r8
-		beq	.Oopsie
+		bne	.Oopsie
 
 		mr	r6,r4
 		mr	r4,r5
@@ -2013,14 +2016,17 @@ EInt:		b	.FPUnav				#0
 
 .EndMsgQueue:	lwz	r9,Atomic(r0)
 		cmpwi	r9,-1
-		beq	.ReturnToUser
+		beq	.QuickReturn
+		lwz	r9,AtomicFrame(r0)
+		cmpwi	r9,-1
+		beq	.QuickReturn
 
 		lwz	r9,RunningTask(r0)
 		mr.	r9,r9
 		beq	.NoAtomicTask
 		lbz	r9,TC_STATE(r9)
 		cmpwi	r9,TS_ATOMIC
-		beq	.ReturnToUser
+		beq	.SlowReturn			##Needs fix
 
 .NoAtomicTask:	lwz	r9,TaskException(r0)
 		mr.	r9,r9
@@ -2266,8 +2272,14 @@ EInt:		b	.FPUnav				#0
 
 #********************************************************************************************
 		
-.ReturnToUser:		
-		lwz	r9,0xf0(r0)				#Debug counter to check
+.QuickReturn:	li	r0,0x1000
+		mtdec	r0
+		b	.ExitToUser
+		
+.SlowReturn:	loadreg	r0,Quantum
+		mtdec	r0
+		
+.ExitToUser:	lwz	r9,0xf0(r0)				#Debug counter to check
 		addi	r9,r9,1					#Whether exception is still
 		stw	r9,0xf0(r0)				#running
 		li	r0,0
@@ -2306,9 +2318,6 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r0
 		isync
 
-		loadreg	r0,Quantum
-		mtdec	r0
-		
 		mfsprg2	r0
 
 		rfi
@@ -2484,7 +2493,7 @@ EInt:		b	.FPUnav				#0
 
 .TaskException:	li	r9,0				#Will be starting point for TC_EXCEPTCODE
 		stw	r9,TaskException(r0)
-		b	.ReturnToUser
+		b	.SlowReturn
 		
 #********************************************************************************************
 
@@ -2586,7 +2595,7 @@ EInt:		b	.FPUnav				#0
 .NoNode2:	mr.	r9,r3	
 		bne	.SwitchOld
 		
-		b	.ReturnToUser
+		b	.SlowReturn
 	
 .SwitchOld:	lwz	r4,PowerPCBase(r0)
 		la	r4,LIST_READYTASKS(r4)		#Old = Context, New = PPStruct
@@ -2928,7 +2937,10 @@ EInt:		b	.FPUnav				#0
 		
 		lwz	r9,Atomic(r0)
 		cmpwi	r9,-1
-		beq	.ReturnToUser
+		beq	.QuickReturn
+		lwz	r9,AtomicFrame(r0)
+		cmpwi	r9,-1
+		beq	.QuickReturn
 
 .ListLoop:	lwz	r9,PowerPCBase(r0)
 		la	r4,LIST_READYEXC(r9)
@@ -4450,8 +4462,7 @@ EInt:		b	.FPUnav				#0
 		mfsprg0	r0
 		rfi
 
-.NotSupported:	nop
-.HaltDSI:	loadreg	r7,'DSI!'
+.NotSupported:	loadreg	r7,'DSI!'
 		stw	r7,0xf4(r0)
 				
 		lwz	r31,0(r1)			#Load registers with correct values

@@ -781,8 +781,8 @@ AllocVecPPC:	prolog 228,'TOC'
 		
 		loadreg	r4,MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE
 		or	r4,r4,r30
-		loadreg	r5,0x80000					#512kb
-		loadreg	r6,0x10000					#64kb
+		lis	r5,0x8						#512kb
+		lis	r6,0x1						#64kb
 		
 		bl	CreatePoolPPC
 		
@@ -791,7 +791,7 @@ AllocVecPPC:	prolog 228,'TOC'
 		
 		b	.GotPool
 		
-.AListNotEmpty:	loadreg	r4,0x10000
+.AListNotEmpty:	lis	r4,0x1
 		lwz	r5,POOL_TRESHSIZE(r27)
 		cmpw	r4,r5
 		beq	.GotPool
@@ -1319,7 +1319,7 @@ FlushDCache:
 		lis	r29,0xf00
 		mtdec	r29
 		
-		loadreg	r29,0x400			#L1 Cache size/Cache line size
+		li	r29,0x400			#L1 Cache size/Cache line size
 		lwz	r27,L2Size(r0)
 		li	r4,5
 		srw	r27,r27,r4
@@ -1329,7 +1329,7 @@ FlushDCache:
 		mtctr	r29
 		
 		lwz	r29,MemSize(r0)
-		loadreg	r4,0x400000
+		li	r4,0x40
 		sub	r29,r29,r4
 		lwz	r4,SonnetBase(r0)		
 		add	r4,r4,r29
@@ -2687,9 +2687,14 @@ CreateMsgFramePPC:
 		stwu	r26,-4(r13)
 		stwu	r4,-4(r13)
 
+.WaitCreate:	li	r4,AtomicFrame
+		bl AtomicTest
+
+		mr.	r3,r3
+		beq+	.WaitCreate
+		
 		bl Super
 		mr	r26,r3
-
 		bl DisableIntPPC
 
 		lis	r3,EUMB
@@ -2704,9 +2709,11 @@ CreateMsgFramePPC:
 		lwz	r30,0(r30)			
 
 		bl EnableIntPPC
-
 		mr	r4,r26
 		bl User
+
+		li	r4,AtomicFrame
+		bl AtomicDone
 
 		mr	r3,r30
 
@@ -2736,11 +2743,17 @@ SendMsgFramePPC:
 		stwu	r26,-4(r13)
 
 		mr	r30,r4
+		
+.WaitSend:	li	r4,AtomicFrame
+		bl AtomicTest
+
+		mr.	r3,r3
+		beq+	.WaitSend
 
 		bl Super
 		mr	r26,r3
+		bl DisableIntPPC
 
-		bl DisableIntPPC		
 
 		lis	r3,EUMB
 		li	r27,OPHPR
@@ -2750,11 +2763,13 @@ SendMsgFramePPC:
 		loadreg	r4,0xbfff			#ffffbfff?
 		and	r29,r29,r4			#Keep it 8000-BFFE
 		stwbrx	r29,r27,r3			#triggers Interrupt
-
+		
 		bl EnableIntPPC
-
 		mr	r4,r26
 		bl User
+
+		li	r4,AtomicFrame
+		bl AtomicDone
 
 		lwz	r26,0(r13)
 		lwz	r27,4(r13)
@@ -2781,10 +2796,15 @@ FreeMsgFramePPC:
 		stwu	r26,-4(r13)
 
 		mr	r30,r4
-		
+
+.WaitFree:	li	r4,AtomicFrame
+		bl AtomicTest
+
+		mr.	r3,r3
+		beq+	.WaitFree
+
 		bl Super
 		mr	r26,r3
-
 		bl DisableIntPPC
 
 		lis	r3,EUMB				#Free the message
@@ -2792,14 +2812,16 @@ FreeMsgFramePPC:
 		lwbrx	r29,r27,r3		
 		stw	r30,0(r29)		
 		addi	r28,r29,4
-		loadreg	r29,0x3fff			#ffff3fff?
+		li	r29,0x3fff			#ffff3fff?
 		and	r28,r28,r29			#Keep it 0000-3FFE
 		stwbrx	r28,r27,r3
 
 		bl EnableIntPPC
-
 		mr	r4,r26
 		bl User
+
+		li	r4,AtomicFrame
+		bl AtomicDone
 
 		lwz	r26,0(r13)
 		lwz	r27,4(r13)
@@ -2929,11 +2951,8 @@ WaitFor68K:
 		bl WaitPPC
 
 		mr	r5,r3
-		lwz	r28,TASKPPC_MSGPORT(r27)
-		lbz	r29,MP_SIGBIT(r28)
-		loadreg	r28,0xfffffffe
-		rlwnm	r28,r28,r29,0,31
-		and.	r29,r5,r28
+		li	r28,SIGF_DOS				#Standard msg port wait bit
+		andc.	r5,r5,r28
 		beq	.NextMsg
 
 		lwz	r4,TASKPPC_MIRRORPORT(r27)
@@ -3104,7 +3123,7 @@ Run68K:
 		stw	r4,PP_REGS+4(r30)			
 
 .NotAllocMem:	mr	r4,r30
-		
+
 		bl SendMsgFramePPC
 
 		mr	r4,r31
@@ -3140,6 +3159,9 @@ Signal68K:
 		
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
+		
+		li	r31,FSignal68K-FRun68K
+		bl	DebugStartFunction
 		
 		mr	r31,r4
 		mr	r30,r5
@@ -6944,7 +6966,7 @@ ReplyMsgPPC:
 		addi	r4,r31,MP_PPC_INTMSG
 
 		cmpwi	r28,NT_XMSG68K
-		bne-	.DoSem						#HERERE
+		bne-	.DoSem
 
 		bl CreateMsgFramePPC
 
@@ -7803,7 +7825,7 @@ SetExcHandler:
 		mr	r31,r4
 
 		li	r4,98
-		loadreg	r5,0x10001
+		loadreg	r5,0x10001			#NEEDS PROPER ATTRIBUTES
 		li	r6,0
 		li	r7,0
 		
@@ -9002,7 +9024,12 @@ DebugStartFunction:
 		stw	r30,MN_PPSTRUCT+8(r28)
 		stw	r29,MN_PPSTRUCT+12(r28)
 		stw	r6,MN_PPSTRUCT+16(r28)
+		
+		mr	r4,r7					##
+		mftbl	r7					##		
 		stw	r7,MN_PPSTRUCT+20(r28)
+		mr	r7,r4					##
+		
 		lwz	r4,MCPort(r0)
 		stw	r4,MN_MCPORT(r28)
 		lwz	r5,RunningTask(r0)
@@ -9098,15 +9125,8 @@ StartCode:	bl	.StartRunPPC
 		bl WaitPPC
 
 		mr	r5,r3
-		lwz	r28,TASKPPC_MSGPORT(r31)
-		lbz	r29,MP_SIGBIT(r28)
-		loadreg	r28,0xfffffffe
-		rlwnm	r28,r28,r29,0,31
-		and.	r29,r5,r28
-		beq	.NextEMsg
-		
-		loadreg	r28,0xfffff000
-		and.	r5,r5,r28
+		li	r28,SIGF_DOS				#Standard msg port wait bit
+		andc.	r5,r5,r28
 		beq	.NextEMsg
 
 		lwz	r4,TASKPPC_MIRRORPORT(r31)
