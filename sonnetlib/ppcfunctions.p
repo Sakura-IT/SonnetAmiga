@@ -1329,7 +1329,7 @@ FlushDCache:
 		mtctr	r29
 		
 		lwz	r29,MemSize(r0)
-		li	r4,0x40
+		lis	r4,0x40
 		sub	r29,r29,r4
 		lwz	r4,SonnetBase(r0)		
 		add	r4,r4,r29

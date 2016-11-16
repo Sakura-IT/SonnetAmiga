@@ -935,8 +935,6 @@ GtLoop2		move.l (a7),a0
 		
 DoRunk86	move.l (a7),MN_MIRROR(a0)
 
-		move.l a0,$70000144
-
 		bsr Runk86
 		bra.s GtLoop2
 		
