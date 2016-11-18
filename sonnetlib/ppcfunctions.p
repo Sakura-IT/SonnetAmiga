@@ -1632,12 +1632,14 @@ AllocSignalPPC:
 #
 #********************************************************************************************
 
-AtomicTest:		
-		lwarx	r0,0,r4
+AtomicTest:	lwzx	r0,r0,r4
+		cmpwi	r0,0
+		bne-	.AtomicOn
+		lwarx	r0,r0,r4
 		cmpwi	r0,0
 		bne-	.AtomicOn
 		li	r0,-1
-		stwcx.	r0,0,r4
+		stwcx.	r0,r0,r4
 		bne-	.AtomicOn
 		li	r3,-1
 		b	.AtomicOff

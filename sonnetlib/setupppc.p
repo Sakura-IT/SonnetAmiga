@@ -1794,11 +1794,8 @@ EInt:		b	.FPUnav				#0
 
 		li	r7,TS_READY
 .IsXRunning:	stb	r7,TC_STATE(r3)
-
-		lbz	r6,MP_SIGBIT(r4)
-		li	r8,1
-		slw	r8,r8,r6		
 		addi	r6,r4,MP_MSGLIST
+		li	r8,SIGF_DOS
 		lwz	r0,TC_SIGRECVD(r3)
 		or	r0,r0,r8
 		stw	r0,TC_SIGRECVD(r3)
@@ -2014,13 +2011,15 @@ EInt:		b	.FPUnav				#0
 
 #**********************************************************
 
-.EndMsgQueue:	lwz	r9,Atomic(r0)
-		cmpwi	r9,-1
-		beq	.QuickReturn
+.EndMsgQueue:	li	r9,Atomic
+		lwarx	r0,r0,r9
+		cmpwi	r0,0
+		bne-	.QuickReturn
+
 		lwz	r9,AtomicFrame(r0)
 		cmpwi	r9,-1
 		beq	.QuickReturn
-
+		
 		lwz	r9,RunningTask(r0)
 		mr.	r9,r9
 		beq	.NoAtomicTask
