@@ -2689,11 +2689,11 @@ CreateMsgFramePPC:
 		stwu	r26,-4(r13)
 		stwu	r4,-4(r13)
 
-.WaitCreate:	li	r4,AtomicFrame
-		bl AtomicTest
-
-		mr.	r3,r3
-		beq+	.WaitCreate
+#.WaitCreate:	li	r4,AtomicFrame
+#		bl AtomicTest
+#
+#		mr.	r3,r3
+#		beq+	.WaitCreate
 		
 		bl Super
 		mr	r26,r3
@@ -2705,17 +2705,18 @@ CreateMsgFramePPC:
 		addi	r28,r30,4
 		loadreg	r29,0xc000
 		or	r28,r28,r29
-		loadreg r29,0xffff			#fffeffff?
+		loadreg r29,0xffff
 		and	r28,r28,r29			#Keep it C000-FFFE		
 		stwbrx	r28,r27,r3
+		sync
 		lwz	r30,0(r30)			
 
 		bl EnableIntPPC
 		mr	r4,r26
 		bl User
 
-		li	r4,AtomicFrame
-		bl AtomicDone
+#		li	r4,AtomicFrame
+#		bl AtomicDone
 
 		mr	r3,r30
 
@@ -2746,32 +2747,32 @@ SendMsgFramePPC:
 
 		mr	r30,r4
 		
-.WaitSend:	li	r4,AtomicFrame
-		bl AtomicTest
-
-		mr.	r3,r3
-		beq+	.WaitSend
+#.WaitSend:	li	r4,AtomicFrame
+#		bl AtomicTest
+#
+#		mr.	r3,r3
+#		beq+	.WaitSend
 
 		bl Super
 		mr	r26,r3
 		bl DisableIntPPC
-
 
 		lis	r3,EUMB
 		li	r27,OPHPR
 		lwbrx	r28,r27,r3		
 		stw	r30,0(r28)		
 		addi	r29,r28,4
-		loadreg	r4,0xbfff			#ffffbfff?
+		loadreg	r4,0xbfff
 		and	r29,r29,r4			#Keep it 8000-BFFE
 		stwbrx	r29,r27,r3			#triggers Interrupt
+		sync
 		
 		bl EnableIntPPC
 		mr	r4,r26
 		bl User
 
-		li	r4,AtomicFrame
-		bl AtomicDone
+#		li	r4,AtomicFrame
+#		bl AtomicDone
 
 		lwz	r26,0(r13)
 		lwz	r27,4(r13)
@@ -2799,11 +2800,11 @@ FreeMsgFramePPC:
 
 		mr	r30,r4
 
-.WaitFree:	li	r4,AtomicFrame
-		bl AtomicTest
-
-		mr.	r3,r3
-		beq+	.WaitFree
+#.WaitFree:	li	r4,AtomicFrame
+#		bl AtomicTest
+#
+#		mr.	r3,r3
+#		beq+	.WaitFree
 
 		bl Super
 		mr	r26,r3
@@ -2814,16 +2815,17 @@ FreeMsgFramePPC:
 		lwbrx	r29,r27,r3		
 		stw	r30,0(r29)		
 		addi	r28,r29,4
-		li	r29,0x3fff			#ffff3fff?
+		li	r29,0x3fff
 		and	r28,r28,r29			#Keep it 0000-3FFE
 		stwbrx	r28,r27,r3
+		sync
 
 		bl EnableIntPPC
 		mr	r4,r26
 		bl User
 
-		li	r4,AtomicFrame
-		bl AtomicDone
+#		li	r4,AtomicFrame
+#		bl AtomicDone
 
 		lwz	r26,0(r13)
 		lwz	r27,4(r13)
@@ -2981,7 +2983,10 @@ WaitFor68K:
 		beq	.RunPPC
 		loadreg	r4,'DONE'
 		cmpw	r4,r29
-		bne	.NextMsg
+		beq	.WasDone
+		
+		illegal					##FIFO list corruption?
+		b	.NextMsg			##Needs error message
 		
 .WasDone:	lwz	r4,RunningTask(r0)
 		lwz	r26,TASKPPC_MIRRORPORT(r4)
@@ -3082,6 +3087,11 @@ Run68K:
 		lwz	r4,TC_SIGRECVD(r5)
 		stw	r4,MN_ARG2(r30)
 		
+		
+		lwz	r4,PP_CODE(r30)
+		mr.	r4,r4
+		li	r4,PPERR_MISCERR
+		beq	.GiveResult
 		lwz	r4,PP_FLAGS(r30)
 		mr.	r4,r4
 		bne	.GivErr
@@ -3094,7 +3104,7 @@ Run68K:
 		
 .GivErr:	loadreg	r0,'DBUG'
 
-		illegal					#DEBUG
+		illegal					#DEBUG Not yet implemented (Stack transfer)
 		
 .FromRunPPC:	lwz	r4,MCPort(r0)
 		stw	r4,MN_MCPORT(r30)
@@ -3138,7 +3148,8 @@ Run68K:
 		bl	DebugEndFunction
 		
 		mtctr	r25
-		li	r3,0
+		li	r4,PPERR_SUCCESS
+.GiveResult:	mr	r3,r4
 		
 		lwz	r23,0(r13)
 		lwzu	r24,4(r13)
@@ -9027,10 +9038,10 @@ DebugStartFunction:
 		stw	r29,MN_PPSTRUCT+12(r28)
 		stw	r6,MN_PPSTRUCT+16(r28)
 		
-		mr	r4,r7					##
-		mftbl	r7					##		
+		mr	r4,r7					##Used for timing speed
+		mftbl	r7					##of functions
 		stw	r7,MN_PPSTRUCT+20(r28)
-		mr	r7,r4					##
+		mr	r7,r4					##Restore r7
 		
 		lwz	r4,MCPort(r0)
 		stw	r4,MN_MCPORT(r28)
@@ -9511,10 +9522,10 @@ Pause:		nop
 		nop
 		b	Pause
 		
-		
-WarpIllegal:	illegal
+#********************************************************************************************		
 
-		b	WarpIllegal		
+WarpIllegal:	illegal					#Fake warp.library functions
+		b	WarpIllegal			#intended to debug iFusion
 		
 #********************************************************************************************
 

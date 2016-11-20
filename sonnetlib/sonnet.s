@@ -134,7 +134,7 @@ FoundMed	move.l LExecBase(pc),a6
 
 		lea MemList(a6),a0
 		lea MemName(pc),a1
-		jsr _LVOFindName(a6)
+		jsr _LVOFindName(a6)			;Check for sonnet memory
 		tst.l d0
 		bne.s Clean
 
@@ -144,7 +144,7 @@ FoundMed	move.l LExecBase(pc),a6
 		move.l d0,PCIBase-Buffer(a4)
 
 		lea MemList(a6),a0
-		lea PCIMem(pc),a1
+		lea PCIMem(pc),a1			;Check for PCI DMA (GFX) memory
 		jsr _LVOFindName(a6)
 		tst.l d0
 		bne.s FndMem
@@ -183,7 +183,7 @@ FndMem		move.l d0,d7
 		lea MemList(a6),a0
 		move.l d7,a1
 		jsr _LVOAddTail(a6)			;Move gfx memory to back to prevent
-		jsr _LVOEnable(a6)			;mem list corruption
+		jsr _LVOEnable(a6)			;mem list corruption if LE
 
 		move.l PCIBase(pc),d0
 		bne.s GotPCI
@@ -195,7 +195,7 @@ GotPCI		move.l d0,a6
 		move.w #VENDOR_MOTOROLA,d0
 		move.w #DEVICE_MPC107,d1
 		moveq.l #0,d2
-		jsr _LVOPCIFindCard(a6)
+		jsr _LVOPCIFindCard(a6)			;Check for Sonnet card
 		move.l d0,d6
 		bne.s GotSonnetCard
 	
@@ -206,7 +206,7 @@ GotSonnetCard	move.w #VENDOR_3DFX,d0
 		move.w d0,d5
 		move.w #DEVICE_VOODOO45,d1
 		moveq.l #0,d2
-		jsr _LVOPCIFindCard(a6)
+		jsr _LVOPCIFindCard(a6)			;Check for Voodoo4/5
 		tst.l d0		
 		beq.s Nxt3DFX
 		move.l d0,a2
@@ -216,7 +216,7 @@ GotSonnetCard	move.w #VENDOR_3DFX,d0
 	
 Nxt3DFX		move.w #VENDOR_3DFX,d0
 		move.w d0,d5
-		move.w #DEVICE_VOODOO3,d1
+		move.w #DEVICE_VOODOO3,d1		;Check for Voodoo3
 		moveq.l #0,d2
 		jsr _LVOPCIFindCard(a6)
 		tst.l d0		
@@ -225,11 +225,11 @@ Nxt3DFX		move.w #VENDOR_3DFX,d0
 		move.l PCI_SPACE0(a2),d4
 		bra.s FoundGfx
 			
-Not3DFX		move.w #VENDOR_ATI,d0			;Need more pciinfo
+Not3DFX		move.w #VENDOR_ATI,d0
 		move.w d0,d5
 		move.w #DEVICE_RV280PRO,d1
 		moveq.l #0,d2
-		jsr _LVOPCIFindCard(a6)
+		jsr _LVOPCIFindCard(a6)			;Check for ATI 92xx
 		tst.l d0
 		beq.s NxtATI
 		move.l d0,a2
@@ -238,7 +238,7 @@ Not3DFX		move.w #VENDOR_ATI,d0			;Need more pciinfo
 				
 NxtATI		move.w #VENDOR_ATI,d0
 		move.w d0,d5
-		move.w #DEVICE_RV280MOB,d1
+		move.w #DEVICE_RV280MOB,d1		;Check for ATI 92xx (more possibilities?)
 		moveq.l #0,d2
 		jsr _LVOPCIFindCard(a6)
 		tst.l d0
@@ -267,10 +267,10 @@ FoundGfx	move.l LExecBase(pc),a6
 
 GotVGAMem	move.l d0,ROMMem-Buffer(a4)
 		add.l #$10000,d0
-		and.w #0,d0
+		and.w #0,d0				;Align ROM on $10000
 		move.l d0,a5
 		move.l a5,a1
-		lea $100(a5),a5
+		lea $100(a5),a5				;Pointer to system reset exception
 
 		move.l PCI_SPACE1(a2),a3		;PCSRBAR Sonnet
 		move.l a3,EUMBAddr-Buffer(a4)
@@ -278,18 +278,18 @@ GotVGAMem	move.l d0,ROMMem-Buffer(a4)
 		rol.w #8,d0
 		swap d0
 		rol.w #8,d0
-		move.l d0,OTWR(a3)
+		move.l d0,OTWR(a3)			;Make ROM visible and place it at
 		move.l #$0000F0FF,OMBAR(a3)		;Processor outbound mem at $FFF00000
 
 		move.l a2,d4
-EndDrty		move.l #$48002f00,(a5)
+EndDrty		move.l #$48002f00,(a5)			;PPC branch to code outside exception space (0x3000)
 		lea $2f00(a5),a5
 		lea PPCCode(pc),a2
 		move.l #PPCLen,d6
 		lsr.l #2,d6
 		subq.l #1,d6
 
-loop2		move.l (a2)+,(a5)+
+loop2		move.l (a2)+,(a5)+			;Copy code to 0x3000
 		dbf d6,loop2
 
 		move.l #$abcdabcd,$3004(a1)		;Code Word
@@ -307,14 +307,14 @@ loop2		move.l (a2)+,(a5)+
 		bset #26,d5				;Set Bus Master bit
 		move.l d5,COMMAND(a5)
 
-NoCmm		move.l #WP_TRIG01,WP_CONTROL(a3)	;Negate HRESET
-
+NoCmm		move.l #WP_TRIG01,WP_CONTROL(a3)	;Negate HRESET. Now code gets executed
+							;at 0xfff00100 which jumps to 0xfff03000
 Wait		move.l $3004(a1),d5
-		cmp.l #"Boon",d5
+		cmp.l #"Boon",d5			;This is returned when PPC is set up
 		beq.s PPCReady
-		cmp.l #"Err2",d5
+		cmp.l #"Err2",d5			;When no memory found on the Sonnet
 		beq.s NoSonRam
-		cmp.l #"Err1",d5
+		cmp.l #"Err1",d5			;When the MMU was not set up correctly
 		bne.s Wait
 		
 		lea PPCMMUError(pc),a2
@@ -333,9 +333,9 @@ PPCReady	move.l #StackSize,d7			;Set stack
 
 		moveq.l #16,d0
 		move.l #MEMF_PUBLIC|MEMF_CLEAR|MEMF_REVERSE,d1
-		jsr _LVOAllocVec(a6)
+		jsr _LVOAllocVec(a6)			;Reserve space for sonnet mem name
 		tst.l d0
-		bne.s GotMemName
+		bne.s GotMemName			
 		
 		lea GenMemError(pc),a2
 		bra PrintError
@@ -347,7 +347,7 @@ GotMemName	move.l d0,a0
 		move.l 8(a1),8(a0)
 		move.l 12(a1),12(a0)
 
-		move.l a0,a1
+		move.l a0,a1				;Set up sonnet memory on 68k side:
 		move.l d5,a0
 		move.w #$0a01,LN_TYPE(a0)		;TYPE and PRI
 		move.l a1,LN_NAME(a0)
@@ -377,13 +377,13 @@ GotMemName	move.l d0,a0
 		move.l d5,PCI_SPACE0(a2)
 		moveq.l #0,d6
 		sub.l d7,d6
-		move.l d6,PCI_SPACELEN0(a2)
-NoPCILb		jsr _LVOEnqueue(a6)
+		move.l d6,PCI_SPACELEN0(a2)		;Correct MemSpace0 in the PCI database
+NoPCILb		jsr _LVOEnqueue(a6)			;Add the memory node
 
 		move.l #FunctionsLen,d0
 		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE|MEMF_CLEAR,d1
-		bsr AllocVec32
-		tst.l d0
+		bsr AllocVec32				;Reserve space for the function table
+		tst.l d0				;to be copied to PPC memory
 		bne GotFuncMem
 	
 		lea GenMemError(pc),a2
@@ -396,7 +396,7 @@ GotFuncMem	move.l d0,PPCCodeMem-Buffer(a4)
 		lsr.l #2,d1
 		subq.l #1,d1
 MoveSon		move.l (a0)+,(a1)+
-		dbf d1,MoveSon
+		dbf d1,MoveSon				;Do the copy to PPC/Sonnet memory
 
 		bsr MakeLibrary
 		tst.l d0
@@ -428,8 +428,8 @@ GotLibMade	move.l SonnetBase(pc),a1
 
 		move.l SonnetBase(pc),a1
 		add.l #$100000,a1
-		move.l #$190000,d0
-		jsr _LVOAllocAbs(a6)
+		move.l #$190000,d0			;Reserve space for the msg FIFOs
+		jsr _LVOAllocAbs(a6)			;and the inter CPU messages themselves
 
 		lea MyInterrupt(pc),a1
 		lea SonInt(pc),a2
@@ -453,14 +453,14 @@ GotLibMade	move.l SonnetBase(pc),a1
 		lea PrcTags(pc),a1
 		move.l a1,d1
 		move.l DosBase(pc),a6
-		jsr _LVOCreateNewProc(a6)
-
+		jsr _LVOCreateNewProc(a6)		;Start up Master Control
+							;It will start phase 2 of PPC setup
 		move.l LExecBase(pc),a6
 		jsr _LVOEnable(a6)
 
 PPCInit		move.l SonnetBase(pc),a1
 		move.l Init(a1),d0
-		cmp.l #"REDY",d0
+		cmp.l #"REDY",d0			;Phase 2 of PPC setup completed?
 		bne.s PPCInit
 
 		move.l GfxMem(pc),d0			;Amiga PCI Memory
@@ -472,7 +472,7 @@ PPCInit		move.l SonnetBase(pc),a1
 		rol.w #8,d0
 		move.l d0,OTWR(a3)
 		add.b #$40,d0				;Translated to PPC PCI Memory
-		move.l d0,OMBAR(a3)
+		move.l d0,OMBAR(a3)			;Is probably 0x60000000-0x80000000
 		
 		jsr _LVODisable(a6)
 
@@ -485,7 +485,7 @@ PPCInit		move.l SonnetBase(pc),a1
 		move.l TC_SPUPPER(a3),d0
 		move.l TC_SPLOWER(a3),d1
 		sub.l d1,d0
-		move.l #$4000,d6
+		move.l #$4000,d6			;make RamLib stack 16kb
 		cmp.l d6,d0
 		bge.s VeryStrange
 		
@@ -507,7 +507,7 @@ PPCInit		move.l SonnetBase(pc),a1
 		move.l a1,-(a7)
 		move.l d1,d0
 		
-		jsr _LVOCopyMem(a6)
+		jsr _LVOCopyMem(a6)			;Copy stack to new spot
 		
 		move.l (a7)+,TC_SPREG(a3)
 		move.l (a7)+,d0
@@ -527,11 +527,11 @@ VeryStrange	move.l #_LVOAddTask,a0			;Set system patches
 		lea StartCode(pc),a3
 		move.l a3,d0
 		move.l a6,a1
-		jsr _LVOSetFunction(a6)
+		jsr _LVOSetFunction(a6)			;AddTask to track PPC mirror tasks
 		lea AddTaskAddress(pc),a3
 		move.l d0,(a3)
 		
-		move.l #_LVORemTask,a0
+		move.l #_LVORemTask,a0			;Counterpart to AddTask
 		lea ExitCode(pc),a3
 		move.l a3,d0
 		move.l a6,a1
@@ -543,7 +543,7 @@ VeryStrange	move.l #_LVOAddTask,a0			;Set system patches
 		lea OpenCode(pc),a3
 		move.l a3,d0
 		move.l a6,a1
-		jsr _LVOSetFunction(a6)
+		jsr _LVOSetFunction(a6)			;To force certain lib bases to MEMF_PPC
 		lea OpenLibAddress(pc),a3
 		move.l d0,(a3)
 		
@@ -551,7 +551,7 @@ VeryStrange	move.l #_LVOAddTask,a0			;Set system patches
 		lea NewAlloc(pc),a3
 		move.l a3,d0
 		move.l a6,a1
-		jsr _LVOSetFunction(a6)
+		jsr _LVOSetFunction(a6)			;To force memory allocations to MEMF_PPC
 		lea AllocMemAddress(pc),a3
 		move.l d0,(a3)
 
@@ -572,12 +572,12 @@ VeryStrange	move.l #_LVOAddTask,a0			;Set system patches
 		move.l a1,4(a0)
 		addq.l #4,a1
 		move.l a1,12(a0)
-		bsr CreatePPCTask
+		bsr CreatePPCTask			;Master Control equivalent for PPC
 		
 		move.l LExecBase(pc),a6
 		moveq.l #0,d0
 		lea ppclib(pc),a1
-		jsr _LVOOpenLibrary(a6)
+		jsr _LVOOpenLibrary(a6)			;Open ppc.library for LoadSeg() patch
 		
 		bra Clean
 
@@ -608,7 +608,7 @@ PrintError	move.l LExecBase(pc),a6			;Put up a requester and give out
 ;********************************************************************************************
 
 MakeLibrary
-		movem.l d1-a6,-(a7)
+		movem.l d1-a6,-(a7)			;Sets up library base and function table
 		sub.l a0,a1
 		move.l a1,d6
 		lea FUNCTABLE(pc),a0
@@ -689,12 +689,12 @@ MasterControl:
 		tst.l d0
 		beq.s MasterControl
 		move.l d0,MCPort(a4)
-		move.l d6,Init(a4)
-		move.l d0,d6
-		jsr _LVOCacheClearU(a6)
+		move.l d6,Init(a4)			;Start phase 2 of PPC setup
+		move.l d0,d6				;which moves it from fff00000 to 00000000
+		jsr _LVOCacheClearU(a6)			;and sets up all the exception handlers
 
 NextMsg		move.l d6,a0
-		jsr _LVOWaitPort(a6)
+		jsr _LVOWaitPort(a6)			;we wait for messages from our 68k interrupt
 		
 GetLoop		move.l d6,a0
 		jsr _LVOGetMsg(a6)
@@ -712,17 +712,17 @@ GetLoop		move.l d6,a0
 		beq.s MsgRXMSG
 		
 NoXReply	move.l MN_IDENTIFIER(a1),d0
-		cmp.l #"T68K",d0
+		cmp.l #"T68K",d0			;Message to 68K
 		beq MsgMir68
-		cmp.l #"LL68",d0
+		cmp.l #"LL68",d0			;Low level message to 68K
 		beq.s MsgLL68
-		cmp.l #"FREE",d0
+		cmp.l #"FREE",d0			;Async FreeMem/FreeVec() call. Not implemented in ppcfunctions.p
 		beq MsgFree
-		cmp.l #"DBG!",d0
+		cmp.l #"DBG!",d0			;Print debug info
 		beq PrintDebug
-		cmp.l #"DBG2",d0
+		cmp.l #"DBG2",d0			;Print debug info
 		beq PrintDebug2
-		cmp.l #"CRSH",d0
+		cmp.l #"CRSH",d0			;Print WarpOS like crash window
 		beq Crashed
 		bra.s GetLoop
 
@@ -733,19 +733,19 @@ MsgRXMSG	lea -32(a1),a1
 		move.l MN_REPLYPORT(a1),d0
 		beq.s FreeRXMsg
 
-		bsr CreateMsgFrame
+		bsr CreateMsgFrame			;To set up reply to XMSG =(RXMSG)
 
 		move.l a1,a3
 		move.l a0,d7
 		moveq.l #192/4-1,d0
 CopyRXMsg	move.l (a3)+,(a0)+
-		dbf d0,CopyRXMsg
+		dbf d0,CopyRXMsg			;Copy response (normale msg) to RXMSG
 
 		move.l d7,a0
-		bsr SendMsgFrame
+		bsr SendMsgFrame			;Send response from XMSG back to PPC
 
 FreeRXMsg	move.l a1,a0
-		bsr FreeMsgFrame
+		bsr FreeMsgFrame			;Free original XMSG
 
 		bra GetLoop
 
@@ -755,7 +755,7 @@ MsgLL68		move.l MN_PPSTRUCT+0*4(a1),a6
 		move.l MN_PPSTRUCT+1*4(a1),a0
 		add.l a6,a0
 		move.l a1,-(a7)
-		pea RtnLL(pc)
+		pea RtnLL(pc)				;Execute 68K code
 		move.l a0,-(a7)	
 		move.l MN_PPSTRUCT+2*4(a1),a0
 		move.l MN_PPSTRUCT+4*4(a1),d0
@@ -766,7 +766,7 @@ MsgLL68		move.l MN_PPSTRUCT+0*4(a1),a6
 RtnLL		move.l 4.w,a6
 		move.l (a7)+,a1
 		move.l a1,d5
-		bsr CreateMsgFrame
+		bsr CreateMsgFrame			;Get message for reply
 		
 		move.l a0,d7
 		move.l d0,MN_PPSTRUCT+6*4(a0)
@@ -777,14 +777,14 @@ RtnLL		move.l 4.w,a6
 		move.l MN_PPSTRUCT+1*4(a1),MN_PPSTRUCT+1*4(a0)
 
 		move.l d7,a1
-		lea PushMsg(pc),a5
+		lea PushMsg(pc),a5			;Push to 68K data cache (needed?)
 		jsr _LVOSupervisor(a6)
 
 		move.l d7,a0
-		bsr SendMsgFrame
+		bsr SendMsgFrame			;Send it to PPC
 
 		move.l d5,a0
-		bsr FreeMsgFrame
+		bsr FreeMsgFrame			;Free original LL68 message
 
 		bra GetLoop
 
@@ -807,7 +807,7 @@ RtnFree		move.l 4.w,a6
 		
 ;********************************************************************************************
 
-PushMsg		moveq.l #11,d4
+PushMsg		moveq.l #11,d4				;Flush message from data cache
 		move.l a1,a2
 PshMsg		cpushl dc,(a2)				;040+
 		lea L1_CACHE_LINE_SIZE_040(a2),a2	;Cache_Line 040/060 = 16 bytes
@@ -839,7 +839,7 @@ CopyPPCName	move.b (a0)+,(a2)+
 		lea Prc2Tags(pc),a1
 		move.l a7,12(a1)
 		move.l a1,d1
-		jsr _LVOCreateNewProc(a6)
+		jsr _LVOCreateNewProc(a6)		;start the process
 		
 		add.l d2,a7
 		move.l (a7)+,a1
@@ -849,7 +849,7 @@ CopyPPCName	move.b (a0)+,(a2)+
 		move.l d0,a0
 		
 		jsr _LVODisable(a6)
-		move.l MN_ARG1(a1),TC_SIGALLOC(a0)
+		move.l MN_ARG1(a1),TC_SIGALLOC(a0)	;set up the allocated signals
 		jsr _LVOEnable(a6)
 		
 		lea pr_MsgPort(a0),a0
@@ -882,13 +882,13 @@ MirrorTask	move.l 4.w,a6				;Mirror task for PPC task
 		move.l a0,d6
 		jsr _LVOWaitPort(a6)
 
-Error		jsr _LVOCreateMsgPort(a6)
-		tst.l d0
+Error		jsr _LVOCreateMsgPort(a6)		;Make a seperate msgport to prevent
+		tst.l d0				;DOS packet gurus
 		beq.s Error
 		move.l d0,-(a7)
 		
 CleanUp		move.l d6,a0
-		jsr _LVOGetMsg(a6)
+		jsr _LVOGetMsg(a6)			;Make sure the original msgport is empty
 		tst.l d0
 		beq.s GoWaitPort
 		
@@ -901,7 +901,7 @@ GoWaitPort	move.l (a7),a0
 		move.l ThisTask(a6),a1
 		
 		move.l TC_SIGALLOC(a1),d0		
-		and.l #$fffff000,d0
+		and.l #$fffff000,d0			;Do not act on system signals except the CTRL ones
 		
 		jsr _LVOWait(a6)
 		
@@ -914,8 +914,8 @@ GoWaitPort	move.l (a7),a0
 		and.l d2,d1
 		beq.s GtLoop2
 
-		bsr CrossSignals
-		
+		bsr CrossSignals			;If other signals are detected than the
+							;the one for the msgport, send it to ppc.
 GtLoop2		move.l (a7),a0
 		jsr _LVOGetMsg(a6)
 		move.l d0,d7
@@ -923,9 +923,9 @@ GtLoop2		move.l (a7),a0
 
 		move.l d7,a0
 		move.l MN_IDENTIFIER(a0),d0
-		cmp.l #"T68K",d0
+		cmp.l #"T68K",d0			;Mother PPC task has send a Run68K request
 		beq.s DoRunk86
-		cmp.l #"END!",d0
+		cmp.l #"END!",d0			;Mother PPC task is shutting down
 		bne.s GtLoop2
 
 		bsr FreeMsgFrame
@@ -1156,7 +1156,7 @@ WarpClose:
 ;********************************************************************************************
 
 Open:
-		move.l a6,d0
+		move.l a6,d0				;Standard LibOpen() routine
 		tst.l d0
 		beq.s NoA6
 		move.l 4.w,a6
@@ -1220,8 +1220,8 @@ Reserved:
 ;********************************************************************************************
 
 GetCPU:
-		movem.l d1-a6,-(a7)
-		move.l SonnetBase(pc),a1
+		movem.l d1-a6,-(a7)			;As we only have G3 and G4 on a sonnet
+		move.l SonnetBase(pc),a1		;only those are returned (no 603/604 etc)
 		move.l CPUInfo(a1),d0
 		and.w #$0,d0
 		swap d0
@@ -1243,7 +1243,7 @@ ExCPU		movem.l (a7)+,d1-a6
 ;
 ;********************************************************************************************
 
-CreateMsgFrame:
+CreateMsgFrame:						;Fetch a free 192 bytes long message
 		move.l a2,-(a7)
 		move.l EUMBAddr(pc),a2
 		move.l IFQPR(a2),a0
@@ -1257,7 +1257,7 @@ CreateMsgFrame:
 ;********************************************************************************************
 
 SendMsgFrame:
-		move.l a2,-(a7)
+		move.l a2,-(a7)				;Send the message to the PPC
 		move.l EUMBAddr(pc),a2
 		move.l a0,IFQPR(a2)
 		move.l (a7)+,a2
@@ -1270,8 +1270,8 @@ SendMsgFrame:
 ;********************************************************************************************
 		
 FreeMsgFrame:
-		move.l a2,-(a7)
-		move.l EUMBAddr(pc),a2
+		move.l a2,-(a7)				;Return a PPC message to the free
+		move.l EUMBAddr(pc),a2			;messages pool
 		move.l a0,OFQPR(a2)
 		move.l (a7)+,a2
 		rts
@@ -1283,8 +1283,8 @@ FreeMsgFrame:
 ;********************************************************************************************
 
 GetMsgFrame:
-		move.l a2,-(a7)
-		move.l EUMBAddr(pc),a2
+		move.l a2,-(a7)				;Get next message send from the PPC
+		move.l EUMBAddr(pc),a2			;if available
 		move.l OFQPR(a2),a1
 		move.l (a7)+,a2
 		rts
@@ -1300,7 +1300,7 @@ GetMsgFrame:
 ;
 ;********************************************************************************************
 
-ExitCode	movem.l d0-a6,-(a7)
+ExitCode	movem.l d0-a6,-(a7)			;called when an 68K task is removed
 		bsr.s CommonCode
 		movem.l (a7)+,d0-a6
 		move.l RemTaskAddress(pc),-(a7)
@@ -1333,7 +1333,7 @@ NextMList	tst.l LN_SUCC(a2)
 KillPPC		bsr CreateMsgFrame
 		move.l #"END!",MN_IDENTIFIER(a0)
 		move.l MT_MIRROR(a2),MN_PPC(a0)
-		bsr SendMsgFrame
+		bsr SendMsgFrame			;kill off the PPC mirror task
 
 		jsr _LVODisable(a6)
 
@@ -1343,10 +1343,10 @@ KillPPC		bsr CreateMsgFrame
 		jsr _LVOEnable(a6)
 
 		move.l MT_PORT(a2),a0
-		jsr _LVODeleteMsgPort(a6)
+		jsr _LVODeleteMsgPort(a6)		;Free the 68K task msg port
 
 		move.l a2,a1
-		jsr _LVOFreeVec(a6)
+		jsr _LVOFreeVec(a6)			;Free the original task structure
 
 DoneMList	rts
 		
@@ -1356,8 +1356,8 @@ DoneMList	rts
 ;
 ;********************************************************************************************
 
-StartCode	movem.l d0/a1,-(a7)
-		cmp.b #NT_PROCESS,LN_TYPE(a1)
+StartCode	movem.l d0/a1,-(a7)			;Change exit code of 68K task to point
+		cmp.b #NT_PROCESS,LN_TYPE(a1)		;to our own exit code
 		bne.s ExitTrue
 		move.l a3,d0
 		beq.s DoPatch		
@@ -1379,9 +1379,9 @@ ExitTrue	movem.l (a7)+,d0/a1
 ;
 ;********************************************************************************************
 
-OpenCode	lea -8(a7),a7
-		movem.l d0-a6,-(a7)
-		move.l a1,d3		
+OpenCode	lea -8(a7),a7				;check a list of libraries
+		movem.l d0-a6,-(a7)			;to see where to put the lib base
+		move.l a1,d3				;either in normal or MEMF_PPC memory
 		lea ramlib(pc),a1
 		jsr _LVOFindTask(a6)
 		move.l d3,a1
@@ -1550,7 +1550,7 @@ RunPPC:		link a5,#-12
 		moveq.l #PPERR_MISCERR,d7		;Only DOS processes supported
 		bra EndIt
 
-IsProc		move.l ThisTask(a6),d6
+IsProc		move.l ThisTask(a6),d6			;See if we already have a PPC mirrortask
 		lea MirrorList(pc),a2
 		move.l MLH_HEAD(a2),a2
 NextMirList	tst.l LN_SUCC(a2)
@@ -1943,7 +1943,7 @@ NoFPU2		rts
 
 CrossSignals	bsr CreateMsgFrame
 
-		moveq.l #47,d1				;MsgLen/4-1
+debugxx		moveq.l #47,d1				;MsgLen/4-1
 		move.l a0,a2
 ClearMsg	clr.l (a2)+
 		dbf d1,ClearMsg

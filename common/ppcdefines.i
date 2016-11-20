@@ -43,7 +43,6 @@
 .set TaskExitCode,120
 .set WaitListSem,124				#18150
 .set CPUInfo,128
-.set AtomicFrame,132
 .set ViolationAddress,140			#Pointer
 .set MemSize,144
 .set RunPPCStart,148
@@ -214,7 +213,7 @@
 
 .set SonnetBusClock,66666666			#66.6 MHz
 .set DecTimerFreq,(SonnetBusClock/4)		#Dec goes at 1/4 of Bus clock
-.set SwitchFreq,10				#
+.set SwitchFreq,50				#
 .set Quantum,(DecTimerFreq/SwitchFreq)		#
 .set QuickQuantum,50
 
@@ -786,6 +785,9 @@
 .set MC_NEXT,0
 .set MC_BYTES,4
 
+.set PPERR_SUCCESS,0
+.set PPERR_ASYNCERR,1
+.set PPERR_MISCERR,3
 .set PP_CODE,MN_PPSTRUCT
 .set PP_OFFSET,PP_CODE+4
 .set PP_FLAGS,PP_CODE+8

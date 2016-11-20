@@ -49,7 +49,7 @@ PPCCode:	b	.SkipCom			#0x3000	System initialization
 		stw	r0,4(r29)
 		b	.ErrorRam
 
-.GotRam:	lhz	r3,20(r29)
+.GotRam:	lhz	r3,20(r29)			#RTGType
 		cmpwi	r3,0x1002			#Check for ATI Gfx Card
 		beq	.MaxRam
 		cmpwi	r3,0x121b			#Check for VooDoo4/5
@@ -62,7 +62,7 @@ PPCCode:	b	.SkipCom			#0x3000	System initialization
 		mr	r8,r4	
 
 .NoMaxRam:	lis	r27,0x8000			#Upper boundary PCI Memory Mediator
-		lwz	r26,16(r29)			#Get gfx mem
+		lwz	r26,16(r29)			#Get gfx mem (RTGBase)
 		cmplw	r26,r27
 		blt	.ZorroX				#Is Zorro3
 		lis	r27,0x9000			#Zorro2 plus 256MB ATI
@@ -108,9 +108,9 @@ SetLen:		mr	r30,r28
 .Clear0:	stwu	r0,4(r3)
 		bdnz+	.Clear0				#Clear first part of zero page
 
-		lwz	r3,16(r29)
+		lwz	r3,16(r29)			#RTGBase
 		stw	r3,RTGBase(r0)
-		lhz	r3,20(r29)
+		lhz	r3,20(r29)			#RTGType
 		sth	r3,RTGType(r0)		
 		stw	r8,MemSize(r0)		
 
@@ -173,7 +173,7 @@ End:		mflr	r4
 .ClearBase:	stwu	r6,4(r4)
 		bdnz	.ClearBase
 		
-		la	r4,LIST_READYTASKS(r3)
+		la	r4,LIST_READYTASKS(r3)		#Set up various used lists
 		bl	.MakeList
 		
 		la	r4,LIST_WAITINGTASKS(r3)
@@ -259,7 +259,7 @@ End:		mflr	r4
 		li	r6,24
 		stb	r6,BusyCounter(r3)
 		li	r6,6000
-		stw	r6,LowActivityPrio(r3)
+		stw	r6,LowActivityPrio(r3)		#Not used
 
 		loadreg	r3,0x8000			#Put Semaphores at 0x8000
 		addi	r6,r3,0x200			#Put Semaphores memory at 0x8200
@@ -331,7 +331,7 @@ End:		mflr	r4
 		
 #********************************************************************************************		
 
-.MakeList:	stw	r4,8(r4)
+.MakeList:	stw	r4,8(r4)			#NewList()
 		lis	r0,0
 		nop	
 		stwu	r0,4(r4)
@@ -339,7 +339,7 @@ End:		mflr	r4
 
 		blr
 
-.InitSem:	mr	r31,r4
+.InitSem:	mr	r31,r4				#InitSemaphore()
 		addi	r5,r31,SS_WAITQUEUE
 		stw	r5,8(r5)
 		li	r0,0
@@ -361,11 +361,13 @@ End:		mflr	r4
 		li	r4,MUCR_CQS_FIFO4K		#4K entries (16k x 4 FIFOs)
 		li	r5,MUCR
 		stwbrx	r4,r5,r14
+		sync
 
 		lwz	r6,SonnetBase(r0)
 		lis	r4,0x10
 		li	r5,QBAR
 		stwbrx	r4,r5,r14
+		sync
 		
 		mr	r5,r4
 		subi	r4,r4,4
@@ -392,39 +394,46 @@ End:		mflr	r4
 		li	r5,IFTPR
 		li	r4,4096*0+4
 		stwbrx	r4,r5,r14
+		sync
 		
 		li	r5,IFHPR
 		li	r4,4096*0
 		stwbrx	r4,r5,r14
+		sync
 		
 		li	r5,IPTPR
 		loadreg	r4,4096*4
 		stwbrx	r4,r5,r14
+		sync
 		
 		li	r5,IPHPR
 		loadreg	r4,4096*4
 		stwbrx	r4,r5,r14
+		sync
 		
 		li	r5,OPTPR
 		loadreg	r4,4096*8
 		stwbrx	r4,r5,r14
+		sync
 		
 		li	r5,OPHPR
 		loadreg	r4,4096*8
 		stwbrx	r4,r5,r14
+		sync
 		
 		li	r5,OFTPR
 		loadreg	r4,4096*12+4
 		stwbrx	r4,r5,r14
+		sync
 		
 		li	r5,OFHPR
 		loadreg	r4,4096*12
 		stwbrx	r4,r5,r14
+		sync
 
 		li	r4,MUCR_CQS_FIFO4K|MUCR_CQE_ENABLE
 		li	r5,MUCR
-		stwbrx	r4,r5,r14
-		
+		stwbrx	r4,r5,r14		
 		sync
 
 		blr
@@ -565,6 +574,7 @@ Epic:		lis	r26,EUMB
 		loadreg	r27,EPIC_IIVPR3
 		add	r27,r26,r27
 		stwbrx	r28,0,r27			#Set MU interrupt, Pri = 5, Vector = 0x42
+		sync
 
 		loadreg	r27,EPIC_EICR
 		add	r27,r26,r27
@@ -1734,8 +1744,12 @@ EInt:		b	.FPUnav				#0
 
 #**********************************************************
 
+.StartQ:	li	r9,Atomic
+		lwarx	r0,r0,r9
+		cmpwi	r0,0
+		bne-	.QuickReturn
 
-.StartQ:	lwz	r3,PowerPCBase(r0)
+		lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_MSGQUEUE(r3)
 		lwz	r5,0(r4)
 .NxtInQ:	lwz	r9,0(r5)			#get next message
@@ -1832,6 +1846,7 @@ EInt:		b	.FPUnav				#0
 		li	r7,0x3fff
 		and	r8,r8,r7			#Keep it 0000-3FFE
 		stwbrx	r8,r4,r3
+		sync
 
 .Oopsie:	mr	r5,r9
 		b	.NxtInQ
@@ -1885,7 +1900,7 @@ EInt:		b	.FPUnav				#0
 		lwbrx	r6,r4,r3		
 		stw	r5,0(r6)		
 		addi	r8,r6,4
-		li	r6,0x3fff			#ffff3fff?
+		li	r6,0x3fff
 		and	r8,r8,r6			#Keep it 0000-3FFE
 		stwbrx	r8,r4,r3
 		sync
@@ -1970,7 +1985,7 @@ EInt:		b	.FPUnav				#0
 		loadreg	r6,'DONE'
 		cmpw	r6,r0
 		bne	.NoSigUpdate
-		
+
 		lwz	r8,MN_ARG1(r5)
 		stw	r8,TC_SIGALLOC(r3)
 				
@@ -2010,22 +2025,13 @@ EInt:		b	.FPUnav				#0
 		b	.NxtInQ
 
 #**********************************************************
-
-.EndMsgQueue:	li	r9,Atomic
-		lwarx	r0,r0,r9
-		cmpwi	r0,0
-		bne-	.QuickReturn
-
-		lwz	r9,AtomicFrame(r0)
-		cmpwi	r9,-1
-		beq	.QuickReturn
 		
-		lwz	r9,RunningTask(r0)
+.EndMsgQueue:	lwz	r9,RunningTask(r0)
 		mr.	r9,r9
 		beq	.NoAtomicTask
 		lbz	r9,TC_STATE(r9)
 		cmpwi	r9,TS_ATOMIC
-		beq	.SlowReturn			##Needs fix
+		beq	.SlowReturn			##Needs fix/implementation
 
 .NoAtomicTask:	lwz	r9,TaskException(r0)
 		mr.	r9,r9
@@ -2422,7 +2428,7 @@ EInt:		b	.FPUnav				#0
 #		rlwinm	r31,r31,24,8,31
 		rlwinm	r7,r29,16,0,15
 #		divwu	r0,r7,r31
-#		stw	r0,TASKPPC_DESIRED(r4)
+#		stw	r0,TASKPPC_DESIRED(r4)			#Needs implementation
 		srawi	r0,r5,10
 		srawi	r11,r11,10
 		sub.	r11,r0,r11
@@ -2491,7 +2497,7 @@ EInt:		b	.FPUnav				#0
 
 
 .TaskException:	li	r9,0				#Will be starting point for TC_EXCEPTCODE
-		stw	r9,TaskException(r0)
+		stw	r9,TaskException(r0)		#Needs implementation
 		b	.SlowReturn
 		
 #********************************************************************************************
@@ -2818,8 +2824,8 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r9
 		isync
 
-		lwz	r9,0xf0(r0)				#Debug counter to check
-		addi	r9,r9,1					#Whether exception is still
+		lwz	r9,0xf0(r0)			#Debug counter to check
+		addi	r9,r9,1				#Whether exception is still running
 		stw	r9,0xf0(r0)
 
 		loadreg	r9,Quantum
@@ -2861,8 +2867,8 @@ EInt:		b	.FPUnav				#0
 		lwz	r0,SonnetBase(r0)
 		or	r1,r1,r0
 
-		lwz	r9,0xf0(r0)				#Debug counter to check
-		addi	r9,r9,1					#Whether exception is still
+		lwz	r9,0xf0(r0)			#Debug counter to check
+		addi	r9,r9,1				#Whether exception is still running
 		li	r0,0
 		stw	r9,0xf0(r0)
 		lwz	r9,PowerPCBase(r0)
@@ -2933,13 +2939,6 @@ EInt:		b	.FPUnav				#0
 			
 		loadreg r0,'DECI'
 		stw	r0,0xf4(r0)
-		
-		lwz	r9,Atomic(r0)
-		cmpwi	r9,-1
-		beq	.QuickReturn
-		lwz	r9,AtomicFrame(r0)
-		cmpwi	r9,-1
-		beq	.QuickReturn
 
 .ListLoop:	lwz	r9,PowerPCBase(r0)
 		la	r4,LIST_READYEXC(r9)
@@ -3425,8 +3424,8 @@ EInt:		b	.FPUnav				#0
 		mr	r3,r13
 		mtsprg2	r1				
 		
-		lwz	r0,4+XCO_SIZE(r13)
-		lwz	r27,16+XCO_SIZE(r13)
+		lwz	r0,4+XCO_SIZE(r13)		#Small context needs testing
+		lwz	r27,16+XCO_SIZE(r13)		#(is used in iFusion)
 		lwz	r28,20+XCO_SIZE(r13)
 		lwz	r29,24+XCO_SIZE(r13)
 		lwz	r30,28+XCO_SIZE(r13)
@@ -4522,6 +4521,7 @@ EInt:		b	.FPUnav				#0
 		loadreg r20,0xffff
 		and	r23,r23,r20			#Keep it C000-FFFE		
 		stwbrx	r23,r24,r28
+		sync
 		lwz	r25,0(r25)
 
 .Loading:	stw	r9,MN_IDENTIFIER(r25)
@@ -4545,6 +4545,7 @@ EInt:		b	.FPUnav				#0
 		loadreg	r20,0xbfff
 		and	r23,r23,r20			#Keep it 8000-BFFE
 		stwbrx	r23,r24,r28			#triggers Interrupt
+		sync
 
 		mr.	r7,r7
 		bne	.NoWaitSE
@@ -5115,6 +5116,7 @@ EInt:		b	.FPUnav				#0
 		loadreg r20,0xffff
 		and	r23,r23,r20			#Keep it C000-FFFE		
 		stwbrx	r23,r24,r28
+		sync
 		lwz	r25,0(r25)
 
 		loadreg	r9,'CRSH'
@@ -5138,6 +5140,7 @@ EInt:		b	.FPUnav				#0
 		loadreg	r20,0xbfff
 		and	r23,r23,r20			#Keep it 8000-BFFE
 		stwbrx	r23,r24,r28			#triggers Interrupt
+		sync
 		
 .RealHalt:	b	.RealHalt
 		
