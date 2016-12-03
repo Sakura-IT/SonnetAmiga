@@ -629,6 +629,8 @@ Caches:		mfspr	r4,HID0				#Invalidatem then enable L1 caches
 #		blr					#REMOVE ME FOR L2 CACHE		
 
 		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS|L2CR_DO
+#		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS|L2CR_DO|L2CR_L2WT
+
 		mtl2cr	r4				# Set up on chip L2 cache controller.
 		sync
 		
@@ -694,6 +696,7 @@ Wait2:		mfl2cr	r3
 .L2SizeDone:	li	r4,8
 		slw	r30,r30,r4
 		stw	r30,L2Size(r0)
+		stw	r30,L2SizeBU(r0)
 		
 		mfl2cr	r4		
 		xoris	r4,r4,L2CR_SIZE_1MB|L2CR_TS_OFF
@@ -1871,24 +1874,20 @@ EInt:		b	.FPUnav				#0
 		extsh.	r0,r8
 		bne	.Oopsie
 
-		addi	r7,r5,32			#(or a cross message from PPC to 68K)
-		stw	r4,MN_REPLYPORT(r7)
-		lwz	r8,MN_PPC(r5)		
-		li	r4,NT_REPLYMSG
-		stb	r4,LN_TYPE(r7)
-		lhz	r4,MN_LENGTH(r7)
-		mfctr	r3
-		mtctr	r4
-		
-		subi	r8,r8,1
-		subi	r7,r7,1
-.CopyXBack:	lbzu	r6,1(r7)
-		stbu	r6,1(r8)
-		bdnz	.CopyXBack
-		mtctr	r3
+		lhz	r6,MN_ARG1(r5)
+		lwz	r7,MN_ARG2(r5)
+		rlwinm	r8,r6,27,5,31			#Determine number of cachelines
+		mfctr	r6
+		mtctr	r8
 				
-		lwz	r7,MN_PPC(r5)
-
+.InvRXMsg:	dcbi	r0,r7				#invalidate the cachelines
+		addi	r7,r7,L1_CACHE_LINE_SIZE
+		bdnz+	.InvRXMsg
+	
+		mtctr	r6
+			
+		lwz	r7,MN_ARG2(r5)
+		
 		mr	r4,r5
 		lwz	r3,0(r4)			#RemovePPC
 		lwz	r4,4(r4)
@@ -1905,12 +1904,12 @@ EInt:		b	.FPUnav				#0
 		stwbrx	r8,r4,r3
 		sync
 		
+		lwz	r4,MN_REPLYPORT(r7)
 		mr	r5,r7
-		lwz	r4,MN_REPLYPORT(r5)
 		lwz	r3,MP_SIGTASK(r4)
 		mr.	r3,r3
 		beq	.Oopsie
-		
+
 		lwz	r6,RunningTask(r0)
 		cmpw	r6,r3
 		li	r6,TS_READY
@@ -1931,18 +1930,43 @@ EInt:		b	.FPUnav				#0
 		lwz	r3,MP_SIGTASK(r4)
 		mr.	r3,r3
 		beq	.RelFrame
-		mr	r7,r3
 
-		mr	r6,r4
+		mtlr	r4
 		mr	r4,r5
 		lwz	r3,0(r4)			#RemovePPC
 		lwz	r4,4(r4)
 		stw	r4,4(r3)
 		stw	r3,0(r4)
 
-		mr	r3,r7
-		mr	r4,r6
-		la	r5,MN_PPSTRUCT(r5)		#PutMsg it to correct PPC task
+		lhz	r6,MN_ARG1(r5)			#Length of message
+		lwz	r7,MN_ARG2(r5)			#Address of message
+
+		rlwinm	r8,r6,27,5,31			#Determine number of cachelines
+		mfctr	r6
+		mtctr	r8
+
+.InvXMsg:	dcbi	r0,r7				#invalidate the cachelines
+		addi	r7,r7,L1_CACHE_LINE_SIZE
+		bdnz+	.InvXMsg
+
+		mtctr	r6
+
+		lwz	r7,MN_ARG2(r5)
+
+		lis	r3,EUMB				#Free the message
+		li	r4,IFHPR
+		lwbrx	r6,r4,r3		
+		stw	r5,0(r6)		
+		addi	r8,r6,4
+		li	r6,0x3fff
+		and	r8,r8,r6			#Keep it 0000-3FFE
+		stwbrx	r8,r4,r3
+		sync
+
+		mr	r5,r7
+		mflr	r4
+		lwz	r3,MP_SIGTASK(r4)
+
 		b	.PutMsgIt			#Go to signalling code
 
 #**********************************************************
@@ -3903,7 +3927,7 @@ EInt:		b	.FPUnav				#0
 		cmpwi	r0,0x31
 		beq	.lfsu
 		cmpwi	r0,0x1f
-		beq	.lstfsx
+#		beq	.lstfsx
 		cmpwi	r0,0x32
 		beq	.lfd
 		cmpwi	r0,0x36

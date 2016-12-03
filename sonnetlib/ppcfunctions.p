@@ -99,6 +99,7 @@ SetCache:
 		mfl2cr	r4
 		oris	r4,r4,L2CR_L2WT@h
 		mtl2cr	r4
+		sync
 		
 		mr	r4,r3
 		
@@ -112,6 +113,7 @@ SetCache:
 		oris	r4,r4,L2CR_L2WT@h
 		xoris	r4,r4,L2CR_L2WT@h
 		mtl2cr	r4
+		sync
 		
 		mr	r4,r3
 		
@@ -125,7 +127,10 @@ SetCache:
 		mfl2cr	r4
 		oris	r4,r4,L2CR_L2E@h
 		mtl2cr	r4
-
+		sync
+		
+		lwz	r4,L2SizeBU(r0)
+		stw	r4,L2Size(r0)
 		mr	r4,r3
 
 		bl	User
@@ -141,7 +146,10 @@ SetCache:
 		oris	r4,r4,L2CR_L2E@h
 		xoris	r4,r4,L2CR_L2E@h
 		mtl2cr	r4
+		sync
 		
+		li	r4,0
+		stw	r4,L2Size(r0)		
 		mr	r4,r3
 		
 		bl User
@@ -412,9 +420,6 @@ SetCache:
 		b	.DoneCache
 
 .DCACHEFLUSHALL:
-		lbz	r29,DoDFlushAll(r30)
-		mr.	r29,r29
-		bne	.DoneCache
 		lbz	r29,DState(r30)
 		mr.	r29,r29
 		bne	.DoneCache
@@ -941,7 +946,7 @@ FreeVec68K:	prolog 228,'TOC'
 #
 #	void  GetInfo(PPCInfoTagList)	// r4
 #
-#********************************************************************************************		
+#********************************************************************************************
 
 GetInfo:	
 		prolog 228,'TOC'
@@ -1125,7 +1130,7 @@ GetInfo:
 		b	.StoreTag
 		
 .INFO_L2SIZE:	lwz	r7,L2Size(r0)
-		b	.StoreTag		
+		b	.StoreTag
 
 #********************************************************************************************
 #
@@ -1321,7 +1326,8 @@ FlushDCache:
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
 		
-		mfctr	r28		
+		mfctr	r28
+		lwz	r30,PowerPCBase(r0)
 		
 .WLFlush:	li	r4,Atomic
 		bl 	AtomicTest
@@ -1331,13 +1337,21 @@ FlushDCache:
 		
 		bl	Super
 		
+		bl DisableIntPPC
+		
 		mfdec	r26
 		lis	r29,0xf00
 		mtdec	r29
 		
 		li	r29,0x400			#L1 Cache size/Cache line size
 		lwz	r27,L2Size(r0)
-		li	r4,5
+		
+		lbz	r4,DoDFlushAll(r30)
+		mr.	r4,r4
+		beq	.CompleteFlush
+		li	r27,0		
+		
+.CompleteFlush:	li	r4,5
 		srw	r27,r27,r4
 		add	r29,r29,r27			#Add with the L2 Cache size/Cache line size
 		mr	r27,r29
@@ -1345,26 +1359,27 @@ FlushDCache:
 		mtctr	r29
 		
 		lwz	r29,MemSize(r0)
-		lis	r4,0x40
-		sub	r29,r29,r4
+		subis	r29,r29,0x40
 		lwz	r4,SonnetBase(r0)		
 		add	r4,r4,r29
 		mr	r31,r4
 	
-.Fl1:		lwz	r29,0(r4)
+.FillCache:	lwz	r29,0(r4)
 		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz+	.Fl1
+		bdnz+	.FillCache
 	
 		mr	r4,r31
 		mtctr	r27
 		
-.Fl2:		dcbf	r0,r4
+.FlushCache:	dcbf	r0,r4
 		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz+	.Fl2
+		bdnz+	.FlushCache
 		
 		sync
 		
 		mtdec	r26
+
+		bl EnableIntPPC
 
 		mr	r4,r3
 		bl	User
@@ -1399,9 +1414,12 @@ AllocXMsgPPC:
 		li	r31,FAllocXMsgPPC-FRun68K
 		bl	DebugStartFunction
 
-		addi	r31,r4,MN_SIZE
+		addi	r31,r4,MN_SIZE+31
+		loadreg	r30,-32
+		and	r4,r31,r30
 		mr	r30,r5
-		mr	r4,r31
+		mr	r31,r4
+		
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,32
 
@@ -2704,12 +2722,6 @@ CreateMsgFramePPC:
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
 		stwu	r4,-4(r13)
-
-#.WaitCreate:	li	r4,AtomicFrame
-#		bl AtomicTest
-#
-#		mr.	r3,r3
-#		beq+	.WaitCreate
 		
 		bl Super
 		mr	r26,r3
@@ -2730,9 +2742,6 @@ CreateMsgFramePPC:
 		bl EnableIntPPC
 		mr	r4,r26
 		bl User
-
-#		li	r4,AtomicFrame
-#		bl AtomicDone
 
 		mr	r3,r30
 
@@ -2762,12 +2771,6 @@ SendMsgFramePPC:
 		stwu	r26,-4(r13)
 
 		mr	r30,r4
-		
-#.WaitSend:	li	r4,AtomicFrame
-#		bl AtomicTest
-#
-#		mr.	r3,r3
-#		beq+	.WaitSend
 
 		bl Super
 		mr	r26,r3
@@ -2786,9 +2789,6 @@ SendMsgFramePPC:
 		bl EnableIntPPC
 		mr	r4,r26
 		bl User
-
-#		li	r4,AtomicFrame
-#		bl AtomicDone
 
 		lwz	r26,0(r13)
 		lwz	r27,4(r13)
@@ -2816,12 +2816,6 @@ FreeMsgFramePPC:
 
 		mr	r30,r4
 
-#.WaitFree:	li	r4,AtomicFrame
-#		bl AtomicTest
-#
-#		mr.	r3,r3
-#		beq+	.WaitFree
-
 		bl Super
 		mr	r26,r3
 		bl DisableIntPPC
@@ -2839,9 +2833,6 @@ FreeMsgFramePPC:
 		bl EnableIntPPC
 		mr	r4,r26
 		bl User
-
-#		li	r4,AtomicFrame
-#		bl AtomicDone
 
 		lwz	r26,0(r13)
 		lwz	r27,4(r13)
@@ -2866,11 +2857,6 @@ PutXMsgPPC:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
-		stwu	r26,-4(r13)
-		stwu	r25,-4(r13)
-		stwu	r24,-4(r13)
-		stwu	r23,-4(r13)
-		stwu	r22,-4(r13)
 
 		li	r31,FPutXMsgPPC-FRun68K
 		bl	DebugStartFunction
@@ -2879,68 +2865,39 @@ PutXMsgPPC:
 		stb	r31,LN_TYPE(r5)	
 		
 		mr	r31,r5
-		mr	r22,r4
+		mr	r28,r4
 		lhz	r29,MN_LENGTH(r31)
-		cmplwi	r29,156				#FIFO msg length - 32 -4 (for MN_MCPORT)
-		bgt	.ErrorX		
+		
+		li	r4,CACHE_DCACHEFLUSH
+		mr	r6,r29
+		
+		bl SetCache
 			
 		bl CreateMsgFramePPC
 		
 		mr	r30,r3
-		mfctr	r28
-		subi	r25,r30,4
-		li	r26,48				#FIFO msg length / 4
-		li	r27,0
-		mtctr	r26
-.ClrMsg:	stwu	r27,4(r25)
-		bdnz	.ClrMsg
 
-		addi	r25,r30,28
-		subi	r27,r31,4
-		li	r26,39				#FIFO msg length -32 -4 /4
-		mtctr	r26
-.FillXMsg:	lwzu	r29,4(r27)
-		stwu	r29,4(r25)
-		bdnz	.FillXMsg
-
-		mtctr	r28
-
-		li	r25,192
-		sth	r25,MN_LENGTH(r30)
-		li	r25,NT_MESSAGE
-		stb	r25,LN_TYPE(r30)
-		loadreg	r25,'XMSG'
-		stw	r25,MN_IDENTIFIER(r30)
-		lwz	r25,MN_REPLYPORT+32(r30)
-		stw	r25,MN_REPLYPORT(r30)
-		lwz	r25,MCPort(r0)
-		stw	r25,MN_MCPORT(r30)
-		stw	r25,MN_REPLYPORT+32(r30)
-		stw	r22,MN_MIRROR(r30)
-		stw	r31,MN_PPC(r30)
+		lwz	r27,MCPort(r0)
+		stw	r27,MN_MCPORT(r30)
+		sth	r29,MN_ARG1(r30)
+		stw	r31,MN_ARG2(r30)
+		loadreg	r27,'XMSG'
+		stw	r27,MN_IDENTIFIER(r30)
+		li	r27,NT_MESSAGE
+		stb	r27,LN_TYPE(r30)
+		stw	r28,MN_PPC(r30)
 		mr	r4,r30
 		
 		bl SendMsgFramePPC
 
-		lwz	r22,0(r13)
-		lwz	r23,4(r13)
-		lwz	r24,8(r13)
-		lwz	r25,12(r13)
-		lwz	r26,16(r13)
-		lwz	r27,20(r13)
-		lwz	r28,24(r13)
-		lwz	r29,28(r13)
-		lwz	r30,32(r13)
-		lwz	r31,36(r13)
-		addi	r13,r13,40
+		lwz	r27,0(r13)
+		lwz	r28,4(r13)
+		lwz	r29,8(r13)
+		lwz	r30,12(r13)
+		lwz	r31,16(r13)
+		addi	r13,r13,20
 		
 		epilog 'TOC'
-
-.ErrorX:	loadreg	r0,'XMSG'
-
-		illegal
-
-.HErrorX:	b	.HErrorX
 
 #********************************************************************************************
 #
@@ -6998,24 +6955,24 @@ ReplyMsgPPC:
 		bne-	.DoSem
 
 		bl CreateMsgFramePPC
-
-		subi	r6,r3,4
-		subi	r5,r30,MN_PPSTRUCT+4
-		li	r4,48
-		mtctr	r4
-.CpNewX:	lwzu	r7,4(r5)
-		stwu	r7,4(r6)
-		bdnz	.CpNewX
-
+		
+		stw	r30,MN_ARG2(r3)
+		lhz	r6,MN_LENGTH(r30)
+		sth	r6,MN_ARG1(r3)		
+		rlwinm	r6,r6,27,5,31				#determine number of cachelines
 		loadreg	r5,'RX68'
 		stw	r5,MN_IDENTIFIER(r3)	
 		mr	r4,r3
+		mfctr	r5
+		mtctr	r6
+
+.FlushMsg:	dcbf	r0,r30
+		addi	r30,r30,L1_CACHE_LINE_SIZE
+		bdnz+	.FlushMsg
+
+		mtctr	r5
 
 		bl SendMsgFramePPC
-
-		subi	r4,r30,MN_PPSTRUCT
-
-		bl FreeMsgFramePPC
 
 		b	.ExitReply
 

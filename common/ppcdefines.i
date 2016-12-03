@@ -34,6 +34,7 @@
 .set ExceptionMode,66
 .set SnoopSem,68				#Pointer
 .set L2Size,76
+.set L2SizeBU,80
 .set MemSem,88
 .set PowerPCBase,92
 .set Break,96

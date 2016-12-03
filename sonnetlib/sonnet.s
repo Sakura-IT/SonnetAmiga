@@ -707,9 +707,8 @@ GetLoop		move.l d6,a0
 		cmp.b #NT_REPLYMSG,d0
 		bne.s NoXReply
 	
-		move.l -32+MN_IDENTIFIER(a1),d0
-		cmp.l #"XMSG",d0
-		beq.s MsgRXMSG
+		move.l LN_NAME(a1),d0
+		bne.s MsgRXMSG
 		
 NoXReply	move.l MN_IDENTIFIER(a1),d0
 		cmp.l #"T68K",d0			;Message to 68K
@@ -726,27 +725,30 @@ NoXReply	move.l MN_IDENTIFIER(a1),d0
 		beq Crashed
 		bra.s GetLoop
 
+
+		move.l a1,a0
+		moveq.l #0,d1
+		move.w MN_LENGTH(a2),d1
+		moveq.l #CACHE_DCACHEFLUSH,d0
+		bsr SetCache68K
+
 ;********************************************************************************************		
 
-MsgRXMSG	lea -32(a1),a1
-		move.b #NT_REPLYMSG,LN_TYPE(a1)
-		move.l MN_REPLYPORT(a1),d0
-		beq.s FreeRXMsg
+MsgRXMSG	move.l a1,a2
+		move.l a1,a0
+		moveq.l #0,d1
+		move.w MN_LENGTH(a2),d1
+		moveq.l #CACHE_DCACHEFLUSH,d0
+		bsr SetCache68K
 
 		bsr CreateMsgFrame			;To set up reply to XMSG =(RXMSG)
+		move.l #"XMSG",MN_IDENTIFIER(a0)
+		move.l a2,MN_ARG2(a0)
+		move.w MN_LENGTH(a2),MN_ARG1(a0)
+		move.l LN_NAME(a2),MN_REPLYPORT(a0)
+		move.l LN_NAME(a2),MN_REPLYPORT(a2)
 
-		move.l a1,a3
-		move.l a0,d7
-		moveq.l #192/4-1,d0
-CopyRXMsg	move.l (a3)+,(a0)+
-		dbf d0,CopyRXMsg			;Copy response (normale msg) to RXMSG
-
-		move.l d7,a0
 		bsr SendMsgFrame			;Send response from XMSG back to PPC
-
-FreeRXMsg	move.l a1,a0
-		bsr FreeMsgFrame			;Free original XMSG
-
 		bra GetLoop
 
 ;********************************************************************************************
@@ -1101,25 +1103,40 @@ MsgFPPC		move.l MN_ARG1(a1),d0
 		
 ;********************************************************************************************		
 
-MsgXMSG		move.l MN_MIRROR(a1),a0			;Cross message from PPC to 68k
-		lea 32(a1),a1
+MsgXMSG		move.l a1,a2				;Cross message from PPC to 68k
+		move.l MN_ARG2(a2),a0
+		moveq.l #0,d1
+		move.w MN_ARG1(a2),d1
+		moveq.l #CACHE_DCACHEINV,d0
+		bsr SetCache68K
+
+		move.l MN_PPC(a2),d7			
+		move.l a2,a0
+		move.l MN_ARG2(a2),a1
+		move.l MN_REPLYPORT(a1),LN_NAME(a1)
+		move.l MN_MCPORT(a2),MN_REPLYPORT(a1)	;Set MasterControl as replyport
+		bsr FreeMsgFrame
+		
+		move.l d7,a0
 		bra DoPutMsg
 		
 ;********************************************************************************************
 
-MsgRetX		move.l MN_MIRROR(a1),a0			;Reply on cross message to PPC
-		move.l a1,d7
-		lea MN_PPSTRUCT(a1),a2
-		moveq.l #39,d1				;Messagesize (192) - MN_PPSTRUCT (32) /4
-CopyXBk		move.l (a2)+,(a0)+
-		dbf d1,CopyXBk
-		move.l MN_PPSTRUCT+MN_REPLYPORT(a1),a0
-		move.l MN_MIRROR(a1),a1
-		jsr _LVOPutMsg(a6)
-		move.l d7,a0
+MsgRetX		move.l a1,a2
+		move.l MN_ARG2(a2),a0			;Reply on cross message to PPC
+		moveq.l #0,d1
+		move.w MN_ARG1(a2),d1		
+		moveq.l #CACHE_DCACHEINV,d0
+		bsr SetCache68K
+
+		move.l MN_ARG2(a2),a1
+		move.l a2,a0
+		move.l MN_REPLYPORT(a1),d7
 		bsr FreeMsgFrame
-		bra NxtMsg
 		
+		move.l d7,a0
+		bra DoPutMsg
+
 ;********************************************************************************************		
 
 MsgSignal68k	move.l MN_PPSTRUCT+4(a1),d0		;Signal from a PPC task to 68K task
@@ -1504,7 +1521,7 @@ IsHell		lsl.l #2,d7
 		beq.s DoBit					;If yes, then redirect to PPC memory
 		bra.s NoBit	
 
-DoBit		bset #13,d1					;Set attribute $2000
+DoBit		bset #13,d1					;Set attribute MEMF_PPC
 		bset #18,d1					;MEMF_REVERSE
 NoBit		move.l (a7)+,a2
 		move.l (a7)+,a3
@@ -2002,7 +2019,7 @@ CreatePPCTask:	movem.l d1-a6,-(a7)
 AllocVec32:
 		move.l a6,-(a7)
 		add.l #$38,d0
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		and.l #MEMF_CLEAR,d1
 		or.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE,d1		;attributes are FIXED to Sonnet mem
 		jsr _LVOAllocVec(a6)
@@ -2037,18 +2054,13 @@ NoMemAddr	move.l (a7)+,a6
 ;
 ;********************************************************************************************
 
-AllocXMsg:
+AllocXMsg:			
 		movem.l d1-a6,-(a7)
-		cmp.l #192-MN_PPSTRUCT,d0
-		ble.s RightSize
-
-		lea AllocXError(pc),a2			;Sizes above 172 unsupported
-		bra PrintError
-
-RightSize	move.l #160,d0
+		add.l #MN_SIZE+31,d0
+		and.l #-32,d0
 		move.l d0,d3
 		move.l a0,d2
-		move.l #MEMF_PUBLIC|MEMF_REVERSE|MEMF_CLEAR,d1
+		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_CLEAR,d1
 		jsr _LVOAllocVec32(a6)
 		tst.l d0
 		beq.s NoRoom
@@ -2080,6 +2092,7 @@ SetCache68K:
 		move.l d0,d2
 		move.l a0,a2
 		move.l d1,d3
+		move.l LExecBase(pc),a6
 		cmp.l #CACHE_DCACHEOFF,d2
 		beq.s DCOff
 		cmp.l #CACHE_DCACHEON,d2
@@ -2092,31 +2105,28 @@ SetCache68K:
 		beq.s DCFlush
 		cmp.l #CACHE_ICACHEINV,d2
 		beq.s ICInv
-		cmp.l #CACHE_DCACHEINV,d2
-		beq.s DCFlush
-		bra.s CacheIt
+		cmp.l #CACHE_DCACHEINV,d2		;only works if flushed before 
+		beq.s DCFlush				;as this is not a real invalidate
+		bra.s CacheIt				;but a flush/invalidate
 
 DCOff		moveq.l #0,d0
 		move.l #CACRF_EnableD,d1
-		move.l 4.w,a6
 		jsr _LVOCacheControl(a6)
 		bra.s CacheIt
 
 DCOn		move.l #CACRF_EnableD,d0
 		move.l d0,d1
-		move.l 4.w,a6
 		jsr _LVOCacheControl(a6)
 		bra.s CacheIt
 
 ICOff		moveq.l #0,d0
 		moveq.l #CACRF_EnableI,d1
-		move.l 4.w,a6
 		jsr _LVOCacheControl(a6)
 		bra.s CacheIt
 
 ICOn		moveq.l #CACRF_EnableI,d0
 		move.l d0,d1
-		move.l 4.w,a6
+		jsr _LVOCacheControl(a6)
 		bra.s CacheIt
 
 DCFlush		tst.l a2
@@ -2126,7 +2136,6 @@ DCFlush		tst.l a2
 		move.l a2,a0
 		move.l d3,d0
 		move.l #CACRF_ClearD,d1
-		move.l 4.w,a6
 		jsr _LVOCacheClearE(a6)
 		bra.s CacheIt
 
@@ -2137,12 +2146,10 @@ ICInv		tst.l a2
 		move.l a2,a0
 		move.l d3,d0
 		moveq.l #CACRF_ClearI,d1
-		move.l 4.w,a6
 		jsr _LVOCacheClearE(a6)
-		bra.s CacheIt
+		bra.s CacheIt		
 
-NoStrtA		move.l 4.w,a6
-		jsr _LVOCacheClearU(a6)
+NoStrtA		jsr _LVOCacheClearU(a6)
 
 CacheIt		movem.l (a7)+,d2-d4/a2/a6
 		rts
@@ -2193,8 +2200,7 @@ PutChProc:
 ;
 ;********************************************************************************************
 
-PutXMsg:
-		movem.l d0-a6,-(a7)
+PutXMsg:	movem.l d0-a6,-(a7)
 		move.l a0,d7
 		move.b #NT_XMSG68K,LN_TYPE(a1)
 		bsr CreateMsgFrame		
@@ -2204,17 +2210,22 @@ PutXMsg:
 ClrXMsg		clr.l (a2)+
 		dbf d0,ClrXMsg
 
+		move.l a0,a2
 		move.w #192,MN_LENGTH(a0)
 		move.l #"XPPC",MN_IDENTIFIER(a0)
 		move.b #NT_MESSAGE,LN_TYPE(a0)
 		move.l d7,MN_PPC(a0)
-		move.l a1,MN_MIRROR(a0)
+		move.l a1,MN_ARG2(a0)
+		move.w MN_LENGTH(a1),MN_ARG1(a0)	;length for PPC to invalidate cache
 
-		lea MN_PPSTRUCT(a0),a2
-		moveq.l #PP_SIZE/4-1,d0
-CpXMsg		move.l (a1)+,(a2)+
-		dbf d0,CpXMsg
+		moveq.l #0,d1
+		move.w MN_LENGTH(a1),d1
+		move.l a1,a0
+		move.l #CACHE_DCACHEFLUSH,d0
 
+		bsr SetCache68K
+
+		move.l a2,a0
 		bsr SendMsgFrame
 		movem.l (a7)+,d0-a6
 		rts
@@ -2531,7 +2542,6 @@ PPCMMUError	dc.b	"Error during MMU setup of PPC",0
 GenMemError	dc.b	"General memory allocation error",0
 LSetupError	dc.b	"Error during library function setup",0
 SonnetMemError	dc.b	"No memory detected on the Sonnet card",0
-AllocXError	dc.b	"Cross message allocation error",0
 StackRunError	dc.b	"RunPPC Stack transfer error (size/async)",0
 
 ramlib		dc.b "ramlib",0		
