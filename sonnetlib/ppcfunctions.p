@@ -948,7 +948,10 @@ GetInfo:
 
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
+		mfctr	r31
+		stwu	r31,-4(r13)
 		stwu	r4,-4(r13)
+		
 		
 		li	r31,FGetInfo-FRun68K
 		bl	DebugStartFunction
@@ -986,6 +989,8 @@ GetInfo:
 .NoTags:	li	r31,FGetInfo-FRun68K
 		bl	DebugEndFunction
 
+		lwzu	r31,4(r13)
+		mtctr	r31
 		lwzu	r30,4(r13)
 		lwzu	r31,4(r13)
 		addi	r13,r13,4
@@ -1089,15 +1094,26 @@ GetInfo:
 		
 .INFO_CPUCLOCK:	lwz	r7,CPUHID1(r0)
 		rlwinm	r7,r7,4,28,31
-		cmpwi	r7,1
-		beq	.MHz500
-		cmpwi	r7,13
-		beq	.MHz400
+		bl	.END_CFG
+		
+		.long	0,0						#For the Modders
+.PLL_CFG:	.long	0b1101,400000000,0b0001,500000000
+		.long	0b0101,433333333,0b0010,466666666
+		.long	0b1100,533333333
+.END_CFG:
+
+		mflr	r6
+		li	r8,(.END_CFG-.PLL_CFG)/8
+		mtctr	r8
+		
+.NextPLL:	lwzu	r8,8(r6)
+		cmpw	r7,r8
+		beq	.GotMHz
+		bdnz	.NextPLL
 		li	r7,0
-		b 	.StoreTag
-.MHz500:	loadreg	r7,500000000
 		b	.StoreTag
-.MHz400:	loadreg r7,400000000
+		
+.GotMHz:	lwz	r7,4(r6)
 		b	.StoreTag		
 
 .INFO_L2CACHE:	lwz	r7,L2STATE(r0)
