@@ -92,7 +92,7 @@ LIBINIT:
 		moveq.l #37,d0
 		jsr _LVOOpenLibrary(a6)
 		tst.l d0
-		bne.s GotDOS				;Open dos.library
+		bne GotDOS				;Open dos.library
 		
 		lea LDOSError(pc),a2
 		bra PrintError
@@ -985,7 +985,7 @@ VeryBad		movem.l (a7)+,d0-a6
 
 ;********************************************************************************************
 
-SonInt:		movem.l d0-a6,-(a7)			;68K interrupt which distributes
+SonInt:		movem.l d1-a6,-(a7)			;68K interrupt which distributes
 		move.l 4.w,a6				;messages send by the PPC
 		move.l EUMBAddr(pc),a2
 		move.l OMISR(a2),d3
@@ -993,12 +993,12 @@ SonInt:		movem.l d0-a6,-(a7)			;68K interrupt which distributes
 		and.l d4,d3
 		beq DidNotInt
 
-NxtMsg		bsr GetMsgFrame
+		bsr GetMsgFrame
 		move.l a1,d3
 		cmp.l #-1,d3
-		beq.s DidInt
+		beq DidNotInt
 
-		moveq.l #11,d4
+IntMsgLoop	moveq.l #11,d4
 ;		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
 		move.l d3,a1
 		
@@ -1016,7 +1016,7 @@ NxtMsg		bsr GetMsgFrame
 		cmp.l #"RX68",d0
 		beq MsgRetX
 		cmp.l #"GETV",d0
-		beq.s LoadD
+		beq LoadD
 		and.l #$ffffff00,d0
 		cmp.l #$50555400,d0
 		beq.s StoreD		
@@ -1024,10 +1024,15 @@ NxtMsg		bsr GetMsgFrame
 CommandMaster	move.l d3,a1
 		move.l MN_MCPORT(a1),a0
 DoPutMsg	jsr _LVOPutMsg(a6)
-		bra.s NxtMsg
 
-DidInt		moveq.l #0,d7
-		movem.l (a7)+,d0-a6
+NxtMsg		bsr GetMsgFrame
+		move.l a1,d3
+		cmp.l #-1,d3
+		beq.s DidInt
+		bra.s IntMsgLoop
+
+DidInt		movem.l (a7)+,d1-a6
+		moveq.l #-1,d0				;Clear Z flag if server handled interrupt
 		rts
 
 InvMsg		cinvl dc,(a1)				;040+
@@ -1037,8 +1042,8 @@ InvMsg		cinvl dc,(a1)				;040+
 
 IntData		dc.l 0
 
-DidNotInt	moveq.l #-1,d7
-		movem.l (a7)+,d0-a6
+DidNotInt	movem.l (a7)+,d1-a6
+		moveq.l #0,d0				;Set Z flag if we did not handle interrupt
 		rts
 
 ;********************************************************************************************
