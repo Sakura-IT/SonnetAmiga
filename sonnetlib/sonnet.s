@@ -44,7 +44,7 @@
 	XREF	AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
 	XREF	AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
 	XREF	AddUniqueSemaphorePPC,IsExceptionMode,CreateMsgFramePPC,SendMsgFramePPC
-	XREF	FreeMsgFramePPC,Kryten
+	XREF	FreeMsgFramePPC
 	
 	IFD	_IFUSION_
 	
@@ -565,15 +565,6 @@ VeryStrange	move.l #_LVOAddTask,a0			;Set system patches
 
 		jsr _LVOEnable(a6)
 		
-		move.l _PowerPCBase(pc),a6
-		move.l _LVOFreeMsgFramePPC-4(a6),a1
-		lea KrytenTags(pc),a0
-
-		move.l a1,4(a0)
-		addq.l #4,a1
-		move.l a1,12(a0)
-		bsr CreatePPCTask			;Master Control equivalent for PPC
-		
 		move.l LExecBase(pc),a6
 		moveq.l #0,d0
 		lea ppclib(pc),a1
@@ -694,21 +685,28 @@ MasterControl:
 		jsr _LVOCacheClearU(a6)			;and sets up all the exception handlers
 
 NextMsg		move.l d6,a0
+
 		jsr _LVOWaitPort(a6)			;we wait for messages from our 68k interrupt
 		
 GetLoop		move.l d6,a0
 		jsr _LVOGetMsg(a6)
 
 		move.l d0,d7
-		beq.s NextMsg
+		bne.s CheckMsg
+		
+		move.l d6,a0
+		clr.l MP_MSGLIST+MLH_TAIL(a0)				;SoftCinema bug/quirk?
+		bra.s NextMsg
 							
-		move.l d0,a1	
+CheckMsg	move.l d0,a1	
 		move.b LN_TYPE(a1),d0
 		cmp.b #NT_REPLYMSG,d0
 		bne.s NoXReply
 	
 		move.l LN_NAME(a1),d0
 		bne.s MsgRXMSG
+		
+		ILLEGAL
 		
 NoXReply	move.l MN_IDENTIFIER(a1),d0
 		cmp.l #"T68K",d0			;Message to 68K
@@ -951,10 +949,6 @@ PrcName		dc.b "MasterControl",0
 		
 Prc2Tags	dc.l NP_Entry,MirrorTask,NP_Name,Prc2Name,NP_Priority,3,NP_StackSize,$20000,TAG_END
 Prc2Name	dc.b "Joshua",0
-
-		cnop 0,4
-
-KrytenTags	dc.l TASKATTR_CODE,0,TASKATTR_NAME,0,TASKATTR_SYSTEM,-1,TAG_END
 
 		cnop 0,4
 
@@ -2525,7 +2519,6 @@ FUNCTABLE:
 	dc.l	CreateMsgFramePPC
 	dc.l	SendMsgFramePPC
 	dc.l	FreeMsgFramePPC
-	dc.l	Kryten
 
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0

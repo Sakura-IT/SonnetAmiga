@@ -321,6 +321,10 @@ End:		mflr	r4
 		stw	r6,TaskExitCode(r0)
 		addi	r6,r4,TaskStart
 		stw	r6,RunPPCStart(r0)
+		addi	r6,r4,ListStart
+		stw	r6,AdListStart(r0)
+		addi	r6,r4,ListEnd
+		stw	r6,AdListEnd(r0)		
 
 		bl	Caches				#Setup the L1 and L2 cache
 
@@ -851,6 +855,19 @@ mmuSetup:
 		addi	r7,r7,0x1000
 		bdnz+	.tlblp
 		tlbsync
+
+		
+#		loadreg	r0,IBAT3L_VAL
+#		mtspr	ibat3l,r0
+#		loadreg	r0,IBAT3U_VAL
+#		mtspr	ibat3u,r0
+#		loadreg r0,DBAT3L_VAL
+#		mtspr	dbat3l,r0
+#		loadreg	r0,DBAT3U_VAL
+#		mtspr	dbat3u,r0
+#		sync
+#		isync
+
 
 		loadreg	r0,PSL_IR|PSL_DR|PSL_FP		#Turn on MMU
 		sync
@@ -1672,9 +1689,12 @@ EInt:		b	.FPUnav				#0
 		stwu	r7,-4(r13)
 		stwu	r8,-4(r13)
 		stwu	r9,-4(r13)
+		stwu	r10,-4(r13)
 
 		loadreg	r3,'EXEX'
 		stw	r3,0xf4(r0)
+		
+		lwz	r10,PowerPCBase(r0)
 
 		lis	r3,EUMBEPICPROC
 		lwz	r5,EPIC_IACK(r3)		#Read IACKR to acknowledge interrupt
@@ -1716,10 +1736,18 @@ EInt:		b	.FPUnav				#0
 		loadreg r4,0xffff7fff
 		and	r9,r9,r4			#Keep it 4000-7FFE		
 		sync
+		
+		lwz	r3,0x150(r0)
+		cmpw	r3,r5
+		bne	.NotError		
+		loadreg	r0,'UHOH'
+		stw	r0,0x154(r0)
+.Hat:		b	.Hat
+.NotError:	stw	r5,0x150(r0)
+		
 		lwz	r5,0(r5)
 
-		lwz	r3,PowerPCBase(r0)
-		la	r4,LIST_MSGQUEUE(r3)
+		la	r4,LIST_MSGQUEUE(r10)
 		addi	r4,r4,4				#PutMsg r5 to queue
 		lwz	r3,4(r4)			#AddTailPPC
 		stw	r5,4(r4)
@@ -1747,13 +1775,18 @@ EInt:		b	.FPUnav				#0
 
 #**********************************************************
 
-.StartQ:	li	r9,Atomic
-		lwarx	r0,r0,r9
-		cmpwi	r0,0
-		bne-	.QuickReturn
+.StartQ:	lwz	r10,PowerPCBase(r0)
 
-		lwz	r3,PowerPCBase(r0)
-		la	r4,LIST_MSGQUEUE(r3)
+		mfsrr0	r9
+		lwz	r4,AdListStart(r0)
+		cmpw	r9,r4
+		blt	.SkipListChk
+		
+		lwz	r4,AdListEnd(r0)
+		cmpw	r9,r4
+		blt	.QuickReturn
+
+.SkipListChk:	la	r4,LIST_MSGQUEUE(r10)
 		lwz	r5,0(r4)
 .NxtInQ:	lwz	r9,0(r5)			#get next message
 		mr.	r9,r9
@@ -1763,10 +1796,6 @@ EInt:		b	.FPUnav				#0
 		lwz	r6,MN_IDENTIFIER(r5)
 		cmpw	r4,r6				#A RunPPC request
 		beq	.MsgTPPC
-		
-		loadreg	r4,'LLPP'			#Cross-signaling
-		cmpw	r4,r6
-		beq	.XSignal
 	
 		loadreg	r4,'XMSG'			#Reply (7) from XMSG from 68K
 		cmpw	r4,r6
@@ -1792,46 +1821,60 @@ EInt:		b	.FPUnav				#0
 		cmpw	r4,r6
 		beq	.RemNode			#Leave it to be released by PPC task
 
+		loadreg	r4,'LLPP'			#Cross-signaling
+		cmpw	r4,r6
+		beq	.XSignal
+
 		b	.RelFrame
 		
 #**********************************************************
 
-.XSignal:	lwz	r3,KrytenTask(r0)		##SOMETIMES LLPP ENDS UP AT NORMAL
-		lwz	r4,TASKPPC_MSGPORT(r3)		##TASK. THIS IS A BUG!!
-		addi	r6,r4,MP_PPC_SEM		##PROBABLY OVERWRITTEN OTHER TYPE???
-		lha	r8,SS_QUEUECOUNT(r6)		##LIST CORRUPTION?
-		addi	r8,r8,1
-		extsh.	r0,r8
-		bne	.Oopsie
+.XSignal:	li	r4,Atomic
+		lwarx	r0,r0,r4
+		cmpwi	r0,0
+		bne-	.Oopsie
+		isync
 
-		lwz	r6,RunningTask(r0)
-		cmpw	r6,r3
-		li	r7,TS_RUN
-		beq	.IsXRunning
-
-		li	r7,TS_READY
-.IsXRunning:	stb	r7,TC_STATE(r3)
-		addi	r6,r4,MP_MSGLIST
-		li	r8,SIGF_DOS
-		lwz	r0,TC_SIGRECVD(r3)
-		or	r0,r0,r8
-		stw	r0,TC_SIGRECVD(r3)
-		mr	r4,r5
-
-		lwz	r3,0(r4)			#RemovePPC
-		lwz	r4,4(r4)
-		stw	r4,4(r3)
-		stw	r3,0(r4)
-
-		addi	r4,r6,4				#PutMsg r5 to Kryten
-		lwz	r3,4(r4)			#AddTailPPC
-		stw	r5,4(r4)
-		stw	r4,0(r5)
-		stw	r3,4(r5)
-		stw	r5,0(r3)
-
-		mr	r5,r9
-		b	.NxtInQ
+		lwz	r3,MN_ARG1(r5)			#68K mirror task
+		lwz	r4,RunningTask(r0)		#Check for it in the running task
+		lwz	r8,TASKPPC_MIRROR68K(r4)
+		cmpw	r8,r3
+		bne	.ChkWait
+		
+		li	r3,TS_RUN
+		stb	r3,TC_STATE(r4)			#To negate a potential TS_CHANGING
+	
+.ReUseLoop:	lwz	r3,MN_ARG0(r5)			#Signals received by the 68K task
+		lwz	r8,TC_SIGRECVD(r4)		#Copy to PPC task
+		or	r8,r8,r3
+		stw	r8,TC_SIGRECVD(r4)
+		b	.RelFrame
+		
+.ChkWait:	la	r4,LIST_WAITINGTASKS(r10)	#Check for it in the waiting tasks
+		lwz	r4,0(r4)
+.ChkNextSig:	lwz	r7,0(r4)
+		mr.	r7,r7				#Check for the end of the list
+		beq	.ChkRdy		
+		lwz	r8,TASKPPC_MIRROR68K(r4)
+		cmpw	r8,r3
+		beq	.SetReady
+		mr	r4,r7
+		b	.ChkNextSig
+		
+.SetReady:	li	r3,TS_READY
+		stb	r3,TC_STATE(r4)
+		b	.ReUseLoop	
+		
+.ChkRdy:	la	r4,LIST_READYTASKS(r10)		#Check for it in the ready tasks
+		lwz	r4,0(r4)
+.ChkRdySig:	lwz	r7,0(r4)
+		mr.	r7,r7				#Check for the end of the list
+		beq	.RelFrame
+		lwz	r8,TASKPPC_MIRROR68K(r4)
+		cmpw	r8,r3
+		beq	.ReUseLoop
+		mr	r4,r7
+		b	.ChkRdySig
 
 #**********************************************************	
 
@@ -2028,9 +2071,8 @@ EInt:		b	.FPUnav				#0
 .MsgTPPC:	lwz	r4,MN_PPC(r5)
 		mr.	r4,r4
 		bne	.Done68
-		
-		lwz	r4,PowerPCBase(r0)		#Handles a RunPPC
-		la	r6,LIST_NEWTASKS(r4)
+
+		la	r6,LIST_NEWTASKS(r10)		#Handles a RunPPC
 
 		mr	r4,r5
 		lwz	r3,0(r4)			#RemovePPC
@@ -2061,12 +2103,11 @@ EInt:		b	.FPUnav				#0
 		mr.	r9,r9
 		bne	.TaskException
 
-		lwz	r4,PowerPCBase(r0)		
-		lbz	r5,FLAG_WAIT(r4)
+		lbz	r5,FLAG_WAIT(r10)
 		mr.	r5,r5
 		bne	.NoWaitTime
 		
-		la	r4,LIST_WAITTIME(r4)
+		la	r4,LIST_WAITTIME(r10)
 		lwz	r4,MLH_HEAD(r4)
 .NextWaitList:	lwz	r5,LN_SUCC(r4)
 
@@ -2106,8 +2147,7 @@ EInt:		b	.FPUnav				#0
 		b	.NextWaitList
 
 .NoWaitTime:	li	r9,TS_READY
-		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_WAITINGTASKS(r4)
+		la	r4,LIST_WAITINGTASKS(r10)
 		lwz	r4,MLH_HEAD(r4)
 .NextOnList:	lwz	r5,LN_SUCC(r4)
 		mr.	r5,r5
@@ -2137,8 +2177,7 @@ EInt:		b	.FPUnav				#0
 		stw	r3,0(r4)
 				
 		mr	r5,r6
-		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_READYTASKS(r4)
+		la	r4,LIST_READYTASKS(r10)
 		
 		addi	r4,r4,4				#AddTailPPC
 		lwz	r3,4(r4)
@@ -2156,12 +2195,11 @@ EInt:		b	.FPUnav				#0
 		b	.TrySwitch
 		
 .Dispatch:	lwz	r8,MN_ARG0(r9)
-		lwz	r31,PowerPCBase(r0)
-		lwz	r4,IdDefTasks(r31)
+		lwz	r4,IdDefTasks(r10)
 		addi	r4,r4,1
-		stw	r4,IdDefTasks(r31)
+		stw	r4,IdDefTasks(r10)
 		stw	r4,TASKPPC_ID(r8)
-		stw	r31,TASKPPC_POWERPCBASE(r8)		
+		stw	r10,TASKPPC_POWERPCBASE(r8)		
 		li	r4,TS_RUN
 		stb	r4,TC_STATE(r8)
 		li	r4,NT_PPCTASK
@@ -2209,15 +2247,15 @@ EInt:		b	.FPUnav				#0
 
 		stw	r6,TASKPPC_MSGPORT(r8)
 		stw	r8,RunningTask(r0)
+		stw	r8,ThisPPCProc(r10)
 
 		la	r5,TASKPPC_ALLTASK(r8)
 		stw	r8,TASKPTR_TASK(r5)		
 		stw	r5,TASKPPC_TASKPTR(r8)
 		lwz	r3,LN_NAME(r8)			#Copy Name pointer 
 		stw	r3,LN_NAME(r5)
-		
-		lwz	r4,PowerPCBase(r0)
-		addi	r4,r4,LIST_ALLTASKS
+
+		addi	r4,r10,LIST_ALLTASKS
 
 		addi	r4,r4,4				#AddTailPPC
 		lwz	r3,4(r4)
@@ -2226,14 +2264,15 @@ EInt:		b	.FPUnav				#0
 		stw	r3,4(r5)
 		stw	r5,0(r3)
 
-		lwz	r30,PowerPCBase(r0)		#Tasks +1
-		li	r0,0
-		la	r4,NumAllTasks(r30)
+		li	r0,0				#Tasks +1
+		la	r4,NumAllTasks(r10)
 		lwz	r3,0(r4)
 		addi	r3,r3,1
 		stw	r3,0(r4)
-		stb	r0,PortInUse(r30)
+		stb	r0,PortInUse(r10)
 		dcbst	r0,r4
+
+		lwz	r3,PowerPCBase(r0)
 
 		loadreg	r0,MACHINESTATE_DEFAULT
 		mtsrr1	r0		
@@ -2312,10 +2351,10 @@ EInt:		b	.FPUnav				#0
 		addi	r9,r9,1					#Whether exception is still
 		stw	r9,0xf0(r0)				#running
 		li	r0,0
-		lwz	r9,PowerPCBase(r0)
-		stb	r0,PortInUse(r9)
+		stb	r0,PortInUse(r10)
 
-		lwz	r9,0(r13)
+		lwz	r10,0(r13)
+		lwzu	r9,4(r13)
 		lwzu	r8,4(r13)
 		lwzu	r7,4(r13)
 		lwzu	r6,4(r13)
@@ -2529,8 +2568,7 @@ EInt:		b	.FPUnav				#0
 .TrySwitch:	mr.	r9,r9
 		bne	.CheckWait
 
-		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_NEWTASKS(r4)
+		la	r4,LIST_NEWTASKS(r10)
 
 		lwz	r5,0(r4)			#RemHeadPPC
 		lwz	r3,0(r5)
@@ -2543,8 +2581,7 @@ EInt:		b	.FPUnav				#0
 		
 		bne	.Dispatch
 
-		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_READYTASKS(r4)
+		la	r4,LIST_READYTASKS(r10)
 		
 		lwz	r5,0(r4)			#RemHeadPPC
 		lwz	r3,0(r5)
@@ -2561,7 +2598,8 @@ EInt:		b	.FPUnav				#0
 
 .DoReady:	li	r6,TS_RUN
 		stb	r6,TC_STATE(r9)
-		stw	r9,RunningTask(r0)		
+		stw	r9,RunningTask(r0)
+		stw	r9,ThisPPCProc(r10)		
 		b	.LoadContext
 
 .CheckWait:	li	r4,TS_REMOVED
@@ -2571,8 +2609,7 @@ EInt:		b	.FPUnav				#0
 		bne	.NotDeleted
 
 		mr	r5,r9
-		lwz	r3,PowerPCBase(r0)
-		la	r4,LIST_REMOVEDTASKS(r3)	#Deleted task list at base
+		la	r4,LIST_REMOVEDTASKS(r10)	#Deleted task list at base
 		addi	r4,r4,4				#AddTailPPC
 		lwz	r3,4(r4)
 		stw	r5,4(r4)
@@ -2588,6 +2625,7 @@ EInt:		b	.FPUnav				#0
 
 		li	r9,0
 		stw	r9,RunningTask(r0)
+		stw	r9,ThisPPCProc(r10)
 		b	.TrySwitch
 
 .NotDeleted:	li	r4,TS_CHANGING
@@ -2596,8 +2634,7 @@ EInt:		b	.FPUnav				#0
 		
 		beq	.GoToWait
 
-		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_NEWTASKS(r4)
+		la	r4,LIST_NEWTASKS(r10)
 		
 		lwz	r5,0(r4)			#RemHeadPPC
 		lwz	r3,0(r5)
@@ -2610,8 +2647,7 @@ EInt:		b	.FPUnav				#0
 .NoNode1:	mr.	r9,r3
 		bne	.SwitchNew			#Dispatch fixed bug
 
-		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_READYTASKS(r4)
+		la	r4,LIST_READYTASKS(r10)
 	
 		lwz	r5,0(r4)			#RemHeadPPC
 		lwz	r3,0(r5)
@@ -2626,10 +2662,10 @@ EInt:		b	.FPUnav				#0
 		
 		b	.SlowReturn
 	
-.SwitchOld:	lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_READYTASKS(r4)		#Old = Context, New = PPStruct
+.SwitchOld:	la	r4,LIST_READYTASKS(r10)		#Old = Context, New = PPStruct
 		lwz	r5,RunningTask(r0)
-		stw	r9,RunningTask(r0)								
+		stw	r9,RunningTask(r0)
+		stw	r9,ThisPPCProc(r10)								
 		li	r6,TS_READY
 		stb	r6,TC_STATE(r5)
 		li	r6,TS_RUN
@@ -2646,8 +2682,7 @@ EInt:		b	.FPUnav				#0
 
 		b	.LoadContext
 	
-.SwitchNew:	lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_READYTASKS(r4)		
+.SwitchNew:	la	r4,LIST_READYTASKS(r10)		
 		lwz	r5,RunningTask(r0)
 		li	r6,TS_READY
 		stb	r6,TC_STATE(r5)
@@ -2682,6 +2717,8 @@ EInt:		b	.FPUnav				#0
 		lwz	r0,0(r3)
 		stwu	r0,4(r6)			#r1
 		stwu	r2,4(r6)
+		lwz	r0,28(r13)
+		stwu	r0,4(r6)
 		lwz	r0,24(r13)
 		stwu	r0,4(r6)
 		lwz	r0,20(r13)
@@ -2696,7 +2733,6 @@ EInt:		b	.FPUnav				#0
 		stwu	r0,4(r6)
 		lwz	r0,0(r13)
 		stwu	r0,4(r6)
-		stwu	r10,4(r6)
 		stwu	r11,4(r6)
 		stwu	r12,4(r6)
 		lwz	r3,-4(r3)
@@ -2756,8 +2792,7 @@ EInt:		b	.FPUnav				#0
 			
 .LoadContext:	lwz	r9,TASKPPC_CONTEXTMEM(r9)
 		li	r0,0
-		lwz	r3,PowerPCBase(r0)
-		stb	r0,PortInUse(r3)
+		stb	r0,PortInUse(r10)
 		lwz	r0,0(r9)
 		mtsrr0	r0
 		lwzu	r0,4(r9)
@@ -2862,8 +2897,7 @@ EInt:		b	.FPUnav				#0
 
 .GoToWait:	li	r4,TS_WAIT
 		stb	r4,TC_STATE(r9)
-		lwz	r4,PowerPCBase(r0)
-		la	r4,LIST_WAITINGTASKS(r4)
+		la	r4,LIST_WAITINGTASKS(r10)
 		mr	r5,r9
 		
 		bl	.StoreContext
@@ -2877,6 +2911,7 @@ EInt:		b	.FPUnav				#0
 		
 		li	r9,0
 		stw	r9,RunningTask(r0)
+		stw	r9,ThisPPCProc(r10)
 		
 		b	.TrySwitch
 
@@ -2895,8 +2930,7 @@ EInt:		b	.FPUnav				#0
 		addi	r9,r9,1				#Whether exception is still running
 		li	r0,0
 		stw	r9,0xf0(r0)
-		lwz	r9,PowerPCBase(r0)
-		stb	r0,PortInUse(r9)
+		stb	r0,PortInUse(r10)
 
 		stw	r13,-4(r1)
 		subi	r13,r1,4
@@ -2960,6 +2994,7 @@ EInt:		b	.FPUnav				#0
 		stwu	r7,-4(r13)
 		stwu	r8,-4(r13)
 		stwu	r9,-4(r13)
+		stwu	r10,-4(r13)
 			
 		loadreg r0,'DECI'
 		stw	r0,0xf4(r0)
@@ -3072,8 +3107,7 @@ EInt:		b	.FPUnav				#0
 		stw	r5,0(r3)
 		b	.NoIABR
 		
-.NoExcHandlers:	lwz	r3,PowerPCBase(r0)
-		la	r4,LIST_REMOVEDEXC(r3)
+.NoExcHandlers:	la	r4,LIST_REMOVEDEXC(r9)
 		
 		lwz	r5,0(r4)			#RemHeadPPC
 		lwz	r3,0(r5)
@@ -3927,7 +3961,7 @@ EInt:		b	.FPUnav				#0
 		cmpwi	r0,0x31
 		beq	.lfsu
 		cmpwi	r0,0x1f
-#		beq	.lstfsx
+		beq	.lstfsx
 		cmpwi	r0,0x32
 		beq	.lfd
 		cmpwi	r0,0x36

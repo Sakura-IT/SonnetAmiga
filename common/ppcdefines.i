@@ -4,7 +4,7 @@
 #0x00008000	Semaphores				0x000200	512
 #0x00008200	Semaphore memory			0x000200	512
 #0x00008400	Idle Task				0x000c00	3072
-#0x00008000	System Stack				0x008000	32768
+#0x00009000	System Stack				0x008000	32768
 #0x00010000	Free memory				0x0e0000	917504
 #0x00100000	Message FIFOs				0x010000	65536	Must be 0x100000 aligned
 #0x00110000	Message Frames 2x4096xPP_SIZE+48	0x180000
@@ -47,7 +47,8 @@
 .set ViolationAddress,140			#Pointer
 .set MemSize,144
 .set RunPPCStart,148
-.set KrytenTask,152
+.set AdListStart,152
+.set AdListEnd,156
 
 #LibBase:
 .set LIST_WAITINGTASKS,128
@@ -92,7 +93,7 @@
 .set PortInUse,628
 .set BusyCounter,629
 .set NumAllTasks,630
-
+.set ThisPPCProc,634
 .set StartTBL,638
 .set CurrentTBL,642
 .set CPULoad,646
@@ -550,6 +551,16 @@
 .set BAT_CACHE_INHIBITED,	0x00000020
 .set BAT_COHERENT,		0x00000010
 .set BAT_GUARDED,		0x00000008
+
+# Some BAT Examples
+
+.set VGA_VIRTUAL,		0x62000000
+.set VGA_BASE,			0xA2000000
+
+.set IBAT3L_VAL,(VGA_BASE | BAT_READ_WRITE)
+.set IBAT3U_VAL,(VGA_VIRTUAL | BAT_BL_32M | BAT_VALID_SUPERVISOR | BAT_VALID_USER)
+.set DBAT3L_VAL,(VGA_BASE | BAT_WRITE_THROUGH | BAT_READ_WRITE)
+.set DBAT3U_VAL,(VGA_VIRTUAL | BAT_BL_32M | BAT_VALID_SUPERVISOR | BAT_VALID_USER)
 
 # WIMG bit settings  - Lower PTE
 .set PTE_WRITE_THROUGH,		0x00000008
