@@ -136,7 +136,7 @@ End:		mflr	r4
 		loadreg r28,0x7fffffff
 		mtdec	r28				#Decrementer.
 
-		lwz	r28,0(r14)
+		lwz	r28,0(r0)			#Get magic word
 		stw	r28,4(r29)			#Signal 68k that PPC is initialized
 
 		loadreg r6,'INIT'
@@ -260,48 +260,54 @@ End:		mflr	r4
 		stb	r6,BusyCounter(r3)
 		li	r6,6000
 		stw	r6,LowActivityPrio(r3)		#Not used
-
-		loadreg	r3,0x8000			#Put Semaphores at 0x8000
-		addi	r6,r3,0x200			#Put Semaphores memory at 0x8200
-		lwz	r30,SonnetBase(r0)
-		or	r3,r3,r30
-		or	r6,r6,r30
+		lwz	r6,SysBase(r0)
+		stw	r6,sonnet_SysBase(r3)
+		
+		mr	r14,r3
+		la	r6,SemMemory(r14)
+		la	r3,TaskListSem(r14)
 		
 		mr	r30,r3
 		mr	r29,r31
 		mr	r4,r3
-		stw 	r4,TaskListSem(r14)
+		stw	r4,sonnet_TaskListSem(r14)
 		bl	.InitSem
 
 		addi	r4,r30,SSPPC_SIZE
-		stw	r4,SemListSem(r14)
+		stw	r4,sonnet_SemListSem(r14)
 		addi	r6,r6,32
 		bl	.InitSem
 
 		addi	r4,r30,SSPPC_SIZE*2
-		stw	r4,PortListSem(r14)
+		stw	r4,sonnet_PortListSem(r14)
 		addi	r6,r6,32
 		bl	.InitSem
 	
 		addi	r4,r30,SSPPC_SIZE*3
-		stw	r4,SnoopSem(r14)
+		stw	r4,sonnet_SnoopSem(r14)
 		addi	r6,r6,32
 		bl	.InitSem
 	
 		addi	r4,r30,SSPPC_SIZE*4
-		stw	r4,MemSem(r14)
+		stw	r4,sonnet_MemSem(r14)
 		addi	r6,r6,32
 		bl	.InitSem
 		
 		addi	r4,r30,SSPPC_SIZE*5
-		stw	r4,WaitListSem(r14)
+		stw	r4,sonnet_WaitListSem(r14)
 		addi	r6,r6,32
 		bl	.InitSem
-				
-		bl	.SetupMsgFIFOs
 
 		mfpvr	r4
-		stw	r4,CPUInfo(r0)
+		stw	r4,sonnet_CPUInfo(r14)
+		
+		lwz	r4,MemSize(r0)
+		stw	r4,sonnet_MemSize(r14)
+		
+		lwz	r4,MCPort(r0)
+		stw	r4,sonnet_MCPort(r14)
+				
+		bl	.SetupMsgFIFOs
 
 		mfspr	r4,HID0
 		ori	r4,r4,HID0_DCFI|HID0_ICFI
@@ -699,9 +705,10 @@ Wait2:		mfl2cr	r3
 		
 .L2SizeDone:	li	r4,8
 		slw	r30,r30,r4
-		stw	r30,L2Size(r0)
-		stw	r30,L2SizeBU(r0)
-		
+		lwz	r4,PowerPCBase(r0)
+		stw	r30,sonnet_L2Size(r4)
+		stw	r30,sonnet_CurrentL2Size(r4)
+
 		mfl2cr	r4		
 		xoris	r4,r4,L2CR_SIZE_1MB|L2CR_TS_OFF
 		or	r4,r4,r7		
@@ -1717,18 +1724,13 @@ EInt:		b	.FPUnav				#0
 	
 .CheckQueue:	andi.	r9,r5,IMISR_IPQI
 		beq	.EndQueue
-		
-		li	r5,IMISR_IPQI			#Clear IPQI bit to clear interrupt
-		stwbrx	r5,r4,r3		
-		sync
 
 		li	r4,IPHPR			
 		lwbrx	r9,r4,r3
 		li	r4,IPTPR			#Get message from Inbound FIFO
 		lwbrx	r5,r4,r3		
 		cmpw	r5,r9				#Check if interrupt was triggered
-
-		beq	.QEmpty				#during previous interrupt
+		beq	.EndQueue			#during previous interrupt
 
 .QNotEmpty:	addi	r9,r5,4				#Increase FIFO pointer
 		li	r4,0x4000
@@ -1736,16 +1738,17 @@ EInt:		b	.FPUnav				#0
 		loadreg r4,0xffff7fff
 		and	r9,r9,r4			#Keep it 4000-7FFE		
 		sync
-		
-		lwz	r3,0x150(r0)
-		cmpw	r3,r5
+		lwz	r5,0(r5)
+
+
+		lwz	r3,0x150(r0)			##debug code to detect double
+		cmpw	r3,r5				##FIFO messages
 		bne	.NotError		
 		loadreg	r0,'UHOH'
 		stw	r0,0x154(r0)
 .Hat:		b	.Hat
 .NotError:	stw	r5,0x150(r0)
-		
-		lwz	r5,0(r5)
+
 
 		la	r4,LIST_MSGQUEUE(r10)
 		addi	r4,r4,4				#PutMsg r5 to queue
@@ -1769,9 +1772,16 @@ EInt:		b	.FPUnav				#0
 		stwbrx	r9,r4,r3
 		sync
 		
-.EndQueue:	clearreg r5
+.EndQueue:	lis	r3,EUMB
+		li	r4,IMISR
+		li	r5,IMISR_IPQI			#Clear IPQI bit to clear interrupt
+		stwbrx	r5,r4,r3		
+		sync
+
+		clearreg r5
 		lis	r3,EUMBEPICPROC
 		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
+		sync
 
 #**********************************************************
 

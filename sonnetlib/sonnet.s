@@ -22,7 +22,7 @@
 	include	exec/tasks.i
 	include sonnet_lib.i
 
-	XREF	FunctionsLen,LibFunctions,DebugLevel,CPUInfo
+	XREF	FunctionsLen,LibFunctions,DebugLevel,sonnet_CPUInfo
 
 	XREF	SetExcMMU,ClearExcMMU,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
@@ -616,12 +616,12 @@ NumFunc		cmp.l (a3)+,d0
 		move.l d3,d0
 		lsl #1,d3
 		add.l d0,d3
-		addq.l #3,d3
-		andi.w #-4,d3
-		move.l #1024,d0				;PosSize
+		add.l #31,d3
+		andi.w #-32,d3				;End up with a base 32 aligned. This messes up programs like Scout
+		move.l #1184,d0				;PosSize
 		move.l d0,d2
 		add.w d3,d0
-		move.l #MEMF_PUBLIC|MEMF_FAST|MEMF_PPC|MEMF_REVERSE,d1
+		move.l #MEMF_PPC|MEMF_REVERSE|MEMF_CLEAR,d1
 		jsr _LVOAllocMem(a6)
 		tst.l d0
 		beq.s NoFun
@@ -1237,8 +1237,7 @@ Reserved:
 
 GetCPU:
 		movem.l d1-a6,-(a7)			;As we only have G3 and G4 on a sonnet
-		move.l SonnetBase(pc),a1		;only those are returned (no 603/604 etc)
-		move.l CPUInfo(a1),d0
+		move.l sonnet_CPUInfo(a6),d0		;only those are returned (no 603/604 etc)
 		and.w #$0,d0
 		swap d0
 		subq.l #8,d0
@@ -2278,7 +2277,7 @@ DATATABLE:
 	INITLONG	LN_NAME,LibName
 	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITWORD	LIB_VERSION,17
-	INITWORD	LIB_REVISION,3
+	INITWORD	LIB_REVISION,4
 	INITLONG	LIB_IDSTRING,IDString
 	ds.l	1
 	
@@ -2522,7 +2521,7 @@ FUNCTABLE:
 
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0
-IDString	dc.b	"$VER: sonnet.library 17.3 (11-Nov-16)",0
+IDString	dc.b	"$VER: sonnet.library 17.4 (26-Dec-16)",0
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: fake warp.library 5.0 (01-Apr-16)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0

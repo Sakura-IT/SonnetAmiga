@@ -13,7 +13,7 @@
 .global ViolationOS
 .global LibFunctions
 .global TaskExit
-.global CPUInfo
+.global sonnet_CPUInfo
 .global TaskStart
 .global	ListStart
 .global	ListEnd
@@ -133,8 +133,8 @@ SetCache:
 		mtl2cr	r4
 		sync
 		
-		lwz	r4,L2SizeBU(r0)
-		stw	r4,L2Size(r0)
+		lwz	r4,sonnet_L2Size(r30)
+		stw	r4,sonnet_CurrentL2Size(r30)
 		mr	r4,r3
 
 		bl User
@@ -142,7 +142,9 @@ SetCache:
 		b	.DoneCache
 
 
-.L2DISABLE:	bl FlushDCache
+.L2DISABLE:	mr	r3,r30
+
+		bl FlushDCache
 
 		bl Super
 
@@ -153,7 +155,7 @@ SetCache:
 		sync
 		
 		li	r4,0
-		stw	r4,L2Size(r0)		
+		stw	r4,sonnet_CurrentL2Size(r30)		
 		mr	r4,r3
 		
 		bl User
@@ -1006,7 +1008,7 @@ AllocVec68K:	prolog 228,'TOC'
 		
 		addi	r8,r4,0x38					#d0
 		mr	r9,r5						#d1
-		lwz	r4,SysBase(r0)
+		lwz	r4,sonnet_SysBase(r29)
 		li	r5,_LVOAllocVec
 		mr	r3,r29
 			
@@ -1051,7 +1053,7 @@ FreeVec68K:	prolog 228,'TOC'
 		stwu	r7,-4(r13)
 
 		lwz	r7,-4(r4)					#a1
-		lwz	r4,SysBase(r0)
+		lwz	r4,sonnet_SysBase(r3)
 		li	r5,_LVOFreeVec
 
 		bl Run68KLowLevel
@@ -1088,13 +1090,13 @@ GetInfo:
 		mr	r4,r3
 
 		mfspr	r3,HID1
-		stw	r3,CPUHID1(r0)
+		stw	r3,sonnet_CPUHID1(r30)
 		mfspr	r3,HID0
-		stw	r3,CPUHID0(r0)
+		stw	r3,sonnet_CPUHID0(r30)
 		mfspr	r3,SDR1
-		stw	r3,CPUSDR1(r0)
+		stw	r3,sonnet_CPUSDR1(r30)
 		mfl2cr	r3
-		stw	r3,L2STATE(r0)
+		stw	r3,sonnet_L2STATE(r30)
 		
 		bl User	
 
@@ -1162,7 +1164,7 @@ GetInfo:
 		stw	r7,4(r4)
 		b	.NextInList
 
-.INFO_CPU:	lwz	r7,CPUInfo(r0)
+.INFO_CPU:	lwz	r7,sonnet_CPUInfo(r30)
 		rlwinm	r7,r7,16,28,31
 		andi.	r7,r7,4
 		beq+	.G3
@@ -1171,11 +1173,11 @@ GetInfo:
 .G3:		loadreg	r7,CPUF_G3
 		b	.GotCPU
 		
-.INFO_PVR:	lwz	r7,CPUInfo(r0)
+.INFO_PVR:	lwz	r7,sonnet_CPUInfo(r30)
 .GotCPU:	stw	r7,4(r4)
 		b	.NextInList
 		
-.INFO_ICACHE:	lwz	r8,CPUHID0(r0)
+.INFO_ICACHE:	lwz	r8,sonnet_CPUHID0(r30)
 		rlwinm	r8,r8,19,29,31
 .ReUse:		andi.	r8,r8,5
 		li	r7,1
@@ -1190,17 +1192,17 @@ GetInfo:
 		addi	r7,r7,4
 		b	.StoreTag
 
-.INFO_DCACHE:	lwz	r8,CPUHID0(r0)
+.INFO_DCACHE:	lwz	r8,sonnet_CPUHID0(r30)
 		rlwinm	r8,r8,20,29,31
 		b	.ReUse
 		
 .INFO_PAGETABLE:
-		lwz	r7,CPUSDR1(r0)
+		lwz	r7,sonnet_CPUSDR1(r30)
 		rlwinm	r7,r7,0,0,15
 		b 	.StoreTag
 		
 .INFO_TABLESIZE:
-		lwz	r8,CPUSDR1(r0)
+		lwz	r8,sonnet_CPUSDR1(r30)
 		li	r7,0
 		rlwinm.	r8,r8,0,23,31
 		beq	.NoShift
@@ -1217,7 +1219,7 @@ GetInfo:
 .StoreTag:	stw	r7,4(r4)
 		b	.NextInList
 		
-.INFO_CPUCLOCK:	lwz	r7,CPUHID1(r0)
+.INFO_CPUCLOCK:	lwz	r7,sonnet_CPUHID1(r30)
 		rlwinm	r7,r7,4,28,31
 		bl	.END_CFG
 		
@@ -1241,15 +1243,15 @@ GetInfo:
 .GotMHz:	lwz	r7,4(r6)
 		b	.StoreTag		
 
-.INFO_L2CACHE:	lwz	r7,L2STATE(r0)
+.INFO_L2CACHE:	lwz	r7,sonnet_L2STATE(r30)
 		rlwinm	r7,r7,1,31,31
 		b	.StoreTag
 		
-.INFO_L2WT:	lwz	r7,L2STATE(r0)
+.INFO_L2WT:	lwz	r7,sonnet_L2STATE(r30)
 		rlwinm	r7,r7,13,31,31
 		b	.StoreTag
 		
-.INFO_L2SIZE:	lwz	r7,L2Size(r0)
+.INFO_L2SIZE:	lwz	r7,sonnet_CurrentL2Size(r30)
 		b	.StoreTag
 
 #********************************************************************************************
@@ -1464,7 +1466,7 @@ FlushDCache:
 		mtdec	r29
 		
 		li	r29,0x400			#L1 Cache size/Cache line size
-		lwz	r27,L2Size(r0)
+		lwz	r27,sonnet_CurrentL2Size(r30)
 		
 		lbz	r4,DoDFlushAll(r30)
 		mr.	r4,r4
@@ -1478,7 +1480,7 @@ FlushDCache:
 		
 		mtctr	r29
 		
-		lwz	r29,MemSize(r0)
+		lwz	r29,sonnet_MemSize(r30)
 		subis	r29,r29,0x40
 		lwz	r4,SonnetBase(r0)		
 		add	r4,r4,r29
@@ -1903,7 +1905,7 @@ LockTaskList:
 		
 		mr	r31,r3
 
-		lwz	r4,TaskListSem(r0)
+		lwz	r4,sonnet_TaskListSem(r3)
 
 		bl ObtainSemaphorePPC
 
@@ -1923,7 +1925,7 @@ LockTaskList:
 UnLockTaskList:
 		prolog 228,'TOC'
 		
-		lwz	r4,TaskListSem(r0)
+		lwz	r4,sonnet_TaskListSem(r3)
 
 		bl ReleaseSemaphorePPC
 
@@ -2442,7 +2444,7 @@ AddSemaphorePPC:
 		mr.	r3,r3
 		beq-	.NoInitSem
 
-		lwz	r4,SemListSem(r0)
+		lwz	r4,sonnet_SemListSem(r31)
 		mr	r3,r31
 		
 		bl ObtainSemaphorePPC
@@ -2452,7 +2454,7 @@ AddSemaphorePPC:
 		
 		bl EnqueuePPC
 		
-		lwz	r4,SemListSem(r0)
+		lwz	r4,sonnet_SemListSem(r31)
 		mr	r3,r31
 		
 		bl ReleaseSemaphorePPC
@@ -2485,7 +2487,7 @@ RemSemaphorePPC:
 
 		bl FreeSemaphorePPC
 
-		lwz	r4,SemListSem(r0)
+		lwz	r4,sonnet_SemListSem(r30)
 		mr	r3,r30
 		
 		bl ObtainSemaphorePPC
@@ -2494,7 +2496,7 @@ RemSemaphorePPC:
 
 		bl RemovePPC
 
-		lwz	r4,SemListSem(r0)
+		lwz	r4,sonnet_SemListSem(r30)
 		mr	r3,r30
 
 		bl ReleaseSemaphorePPC
@@ -2523,7 +2525,7 @@ FindSemaphorePPC:
 		mr	r31,r3
 		mr	r30,r4
 
-		lwz	r4,SemListSem(r0)
+		lwz	r4,sonnet_SemListSem(r3)
 
 		bl ObtainSemaphorePPC
 
@@ -2534,7 +2536,7 @@ FindSemaphorePPC:
 
 		mr	r30,r3
 
-		lwz	r4,SemListSem(r0)
+		lwz	r4,sonnet_SemListSem(r31)
 		mr	r3,r31
 		
 		bl ReleaseSemaphorePPC
@@ -2570,7 +2572,7 @@ AddPortPPC:
 		stwu	r0,4(r3)
 		stwu	r3,-4(r3)
 
-		lwz	r4,PortListSem(r0)
+		lwz	r4,sonnet_PortListSem(r31)
 		mr	r3,r31
 
 		bl ObtainSemaphorePPC
@@ -2580,7 +2582,7 @@ AddPortPPC:
 
 		bl EnqueuePPC
 
-		lwz	r4,PortListSem(r0)
+		lwz	r4,sonnet_PortListSem(r31)
 		mr	r3,r31
 		
 		bl ReleaseSemaphorePPC
@@ -2613,7 +2615,7 @@ RemPortPPC:
 		mr	r30,r3
 		mr	r31,r4
 
-		lwz	r4,PortListSem(r0)
+		lwz	r4,sonnet_PortListSem(r3)
 
 		bl ObtainSemaphorePPC
 
@@ -2621,7 +2623,7 @@ RemPortPPC:
 		
 		bl RemovePPC
 
-		lwz	r4,PortListSem(r0)
+		lwz	r4,sonnet_PortListSem(r30)
 		mr	r3,r30
 		
 		bl ReleaseSemaphorePPC
@@ -2653,7 +2655,7 @@ FindPortPPC:
 		mr	r31,r3
 		mr	r5,r4
 
-		lwz	r4,PortListSem(r0)
+		lwz	r4,sonnet_PortListSem(r3)
 
 		bl ObtainSemaphorePPC
 
@@ -2663,7 +2665,7 @@ FindPortPPC:
 		bl FindNamePPC
 
 		mr	r30,r3
-		lwz	r4,PortListSem(r0)
+		lwz	r4,sonnet_PortListSem(r31)
 		mr	r3,r31
 
 		bl ReleaseSemaphorePPC
@@ -3069,6 +3071,7 @@ PutXMsgPPC:
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
+		stwu	r26,-4(r13)
 
 		li	r31,FPutXMsgPPC-FRun68K
 		bl	DebugStartFunction
@@ -3079,6 +3082,7 @@ PutXMsgPPC:
 		mr	r31,r5
 		mr	r28,r4
 		lhz	r29,MN_LENGTH(r31)
+		mr	r26,r3
 		
 		li	r4,CACHE_DCACHEFLUSH
 		mr	r6,r29
@@ -3089,7 +3093,7 @@ PutXMsgPPC:
 		
 		mr	r30,r3
 
-		lwz	r27,MCPort(r0)
+		lwz	r27,sonnet_MCPort(r26)
 		stw	r27,MN_MCPORT(r30)
 		sth	r29,MN_ARG1(r30)
 		stw	r31,MN_ARG2(r30)
@@ -3102,12 +3106,13 @@ PutXMsgPPC:
 		
 		bl SendMsgFramePPC
 
-		lwz	r27,0(r13)
-		lwz	r28,4(r13)
-		lwz	r29,8(r13)
-		lwz	r30,12(r13)
-		lwz	r31,16(r13)
-		addi	r13,r13,20
+		lwz	r26,0(r13)
+		lwz	r27,4(r13)
+		lwz	r28,8(r13)
+		lwz	r29,12(r13)
+		lwz	r30,16(r13)
+		lwz	r31,20(r13)
+		addi	r13,r13,24
 		
 		epilog 'TOC'
 
@@ -3299,14 +3304,14 @@ Run68K:
 
 		illegal					#DEBUG Not yet implemented (Stack transfer)
 		
-.FromRunPPC:	lwz	r4,MCPort(r0)
+.FromRunPPC:	lwz	r4,sonnet_MCPort(r28)
 		stw	r4,MN_MCPORT(r30)
 		li	r5,NT_MESSAGE
 		stb	r5,LN_TYPE(r30)
 		li	r5,192
 		sth	r5,MN_LENGTH(r30)
 
-		lwz	r4,SysBase(r0)
+		lwz	r4,sonnet_SysBase(r28)
 		lwz	r5,PP_CODE(r30)
 		cmpw	r4,r5
 		bne	.NotAllocMem
@@ -3929,7 +3934,7 @@ AddUniquePortPPC:
 		mr	r30,r4
 		li	r29,UNIPORT_SUCCESS
 
-		lwz	r4,PortListSem(r0)
+		lwz	r4,sonnet_PortListSem(r3)
 		mr	r3,r31
 
 		bl ObtainSemaphorePPC
@@ -3950,7 +3955,7 @@ AddUniquePortPPC:
 		b	.SkipDup
 
 .Duplicate:	li	r29,UNIPORT_NOTUNIQUE
-.SkipDup:	lwz	r4,PortListSem(r0)
+.SkipDup:	lwz	r4,sonnet_PortListSem(r31)
 		mr	r3,r31
 
 		bl ReleaseSemaphorePPC
@@ -3984,7 +3989,7 @@ AddUniqueSemaphorePPC:
 		mr	r30,r4
 		li	r29,UNISEM_SUCCESS
 
-		lwz	r4,SemListSem(r0)
+		lwz	r4,sonnet_SemListSem(r3)
 		
 		bl ObtainSemaphorePPC
 
@@ -4004,7 +4009,7 @@ AddUniqueSemaphorePPC:
 		b	.SkipDup2
 
 .Duplicate2:	li	r29,UNISEM_NOTUNIQUE
-.SkipDup2:	lwz	r4,SemListSem(r0)
+.SkipDup2:	lwz	r4,sonnet_SemListSem(r31)
 		mr	r3,r31
 
 		bl ReleaseSemaphorePPC
@@ -4040,7 +4045,7 @@ PutPublicMsgPPC:
 		mr	r30,r5
 		li	r29,PUBMSG_SUCCESS
 
-		lwz	r4,PortListSem(r0)
+		lwz	r4,sonnet_PortListSem(r3)
 
 		bl ObtainSemaphorePPC
 
@@ -4061,7 +4066,7 @@ PutPublicMsgPPC:
 		b	.SkipStatus
 
 .PortNotFound:	li	r29,PUBMSG_NOPORT
-.SkipStatus:	lwz	r4,PortListSem(r0)
+.SkipStatus:	lwz	r4,sonnet_PortListSem(r28)
 		mr	r3,r28
 
 		bl ReleaseSemaphorePPC
@@ -4817,7 +4822,7 @@ CreateTaskPPC:
 		lwz	r3,LN_NAME(r31)			#Copy Name pointer 
 		stw	r3,LN_NAME(r5) 
  
-		lwz	r4,TaskListSem(r0)
+		lwz	r4,sonnet_TaskListSem(r23)
 		mr	r3,r23
  
  		bl ObtainSemaphorePPC
@@ -4832,7 +4837,7 @@ CreateTaskPPC:
 		stw	r3,0(r4) 
 		dcbst	r0,r4				#Cache
 
- 		lwz	r4,TaskListSem(r0)
+ 		lwz	r4,sonnet_TaskListSem(r23)
  		mr	r3,r23
 
 		bl ReleaseSemaphorePPC
@@ -5133,7 +5138,7 @@ FindTaskPPC:
 .NotOwnTask:	mr	r31,r3
 		mr	r5,r4
 
-		lwz	r4,TaskListSem(r0)
+		lwz	r4,sonnet_TaskListSem(r30)
 		mr	r3,r30
 
 		bl ObtainSemaphorePPC
@@ -5149,7 +5154,7 @@ FindTaskPPC:
 		lwz	r3,TASKPTR_TASK(r3)		#Pointer to PPCTask in AllTasks list
 .NameNotFound:	mr	r31,r3
 
-		lwz	r4,TaskListSem(r0)
+		lwz	r4,sonnet_TaskListSem(r30)
 		mr	r3,r30
 		
 		bl ReleaseSemaphorePPC
@@ -5397,7 +5402,7 @@ SnoopTask:
 
 .SnoopStart:	stw	r3,22(r31)
 
-		lwz	r4,SnoopSem(r0)
+		lwz	r4,sonnet_SnoopSem(r29)
 		mr	r3,r29
 		
 		bl ObtainSemaphorePPC
@@ -5407,7 +5412,7 @@ SnoopTask:
 
 		bl AddHeadPPC
 
-		lwz	r4,SnoopSem(r0)
+		lwz	r4,sonnet_SnoopSem(r29)
 		mr	r3,r29
 		
 		bl ReleaseSemaphorePPC
@@ -5453,7 +5458,7 @@ EndSnoopTask:
 		mr.	r31,r31
 		beq-	.NoEndSnoop
 
-		lwz	r4,SnoopSem(r0)
+		lwz	r4,sonnet_SnoopSem(r3)
 		
 		bl ObtainSemaphorePPC
 
@@ -5461,7 +5466,7 @@ EndSnoopTask:
 		
 		bl RemovePPC
 
-		lwz	r4,SnoopSem(r0)
+		lwz	r4,sonnet_SnoopSem(r30)
 		mr	r3,r30
 		
 		bl ReleaseSemaphorePPC
@@ -5870,7 +5875,7 @@ DeleteTaskPPC:
 		mr	r4,r5
 .DelOtherTask:	mr	r31,r4				#task to r31
 
-		lwz	r4,SnoopSem(r0)
+		lwz	r4,sonnet_SnoopSem(r30)
 		mr	r3,r30
 		
 		bl ObtainSemaphorePPC
@@ -5894,7 +5899,7 @@ DeleteTaskPPC:
 .Link100:	mr	r28,r27
 		b	.Loop100
 
-.EmptySnoopLst:	lwz	r4,SnoopSem(r0)
+.EmptySnoopLst:	lwz	r4,sonnet_SnoopSem(r30)
 		mr	r3,r30
 		
 		bl ReleaseSemaphorePPC
@@ -5914,7 +5919,7 @@ DeleteTaskPPC:
 		
 		bl FreeVec68K
 
-.NoMsgPort:	lwz	r4,TaskListSem(r0)
+.NoMsgPort:	lwz	r4,sonnet_TaskListSem(r30)
 		mr	r3,r30
 		
 		bl ObtainSemaphorePPC
@@ -5932,7 +5937,7 @@ DeleteTaskPPC:
 		stw	r3,0(r4)
 		dcbst	r0,r4
 
-		lwz	r4,TaskListSem(r0)
+		lwz	r4,sonnet_TaskListSem(r30)
 		mr	r3,r30
 		
 		bl ReleaseSemaphorePPC
@@ -6265,7 +6270,7 @@ DeletePoolPPC:
 		mr.	r31,r4
 		beq-	.NoHeader
 		
-		lwz	r4,MemSem(r0)
+		lwz	r4,sonnet_MemSem(r3)
 		
 		bl ObtainSemaphorePPC
 		
@@ -6304,7 +6309,7 @@ DeletePoolPPC:
 		
 		bl FreeVec68K
 		
-		lwz	r4,MemSem(r0)
+		lwz	r4,sonnet_MemSem(r30)
 		mr	r3,r30
 		
 		bl ReleaseSemaphorePPC
@@ -6339,7 +6344,7 @@ AllocPooledPPC:
 		mr	r31,r4
 		mr	r30,r5
 		
-		lwz	r4,MemSem(r0)
+		lwz	r4,sonnet_MemSem(r3)
 		
 		bl ObtainSemaphorePPC
 		
@@ -6446,7 +6451,7 @@ AllocPooledPPC:
 		b	.LoopBack
 		
 .ExitPooledMem:	mr	r30,r3
-		lwz	r4,MemSem(r0)
+		lwz	r4,sonnet_MemSem(r25)
 		mr	r3,r25
 		
 		bl ReleaseSemaphorePPC
@@ -6697,7 +6702,7 @@ FreePooledPPC:
 		lwz	r28,-4(r30)
 		subi	r28,r28,32
 		
-.NoAmnesia:	lwz	r4,MemSem(r0)
+.NoAmnesia:	lwz	r4,sonnet_MemSem(r3)
 		
 		bl ObtainSemaphorePPC
 
@@ -6781,7 +6786,7 @@ FreePooledPPC:
 		
 		bl FreeVec68K		
 		
-.ExitFreePool:	lwz	r4,MemSem(r0)
+.ExitFreePool:	lwz	r4,sonnet_MemSem(r27)
 		mr	r3,r27
 		
 		bl ReleaseSemaphorePPC
@@ -6999,7 +7004,7 @@ Run68KLowLevel:
 		sth	r5,MN_LENGTH(r30)		
 		li	r5,NT_MESSAGE
 		stb	r5,LN_TYPE(r30)		
-		lwz	r4,MCPort(r0)
+		lwz	r4,sonnet_MCPort(r24)
 		stw	r4,MN_MCPORT(r30)
 		lwz	r5,ThisPPCProc(r24)
 		stw	r5,MN_PPC(r30)				
@@ -7061,7 +7066,7 @@ SignalPPC:
 
 .LegacyTask:	mr	r8,r30						#d0
 		mr	r7,r31						#a1
-		lwz	r4,SysBase(r0)
+		lwz	r4,sonnet_SysBase(r3)
 		li	r5,_LVOSignal
 		
 		bl Run68KLowLevel
@@ -8711,7 +8716,7 @@ WaitTime:
 		mr	r29,r3
 		mr	r30,r4
 		lwz	r26,ThisPPCProc(r3)
-		lwz	r4,WaitListSem(r0)
+		lwz	r4,sonnet_WaitListSem(r3)
 		
 		bl ObtainSemaphorePPC
 
@@ -8771,7 +8776,7 @@ WaitTime:
 		li	r0,0		
 		stb	r0,FLAG_WAIT(r29)
 
-		lwz	r4,WaitListSem(r0)
+		lwz	r4,sonnet_WaitListSem(r29)
 		mr	r3,r29
 		
 		bl ReleaseSemaphorePPC
@@ -9395,7 +9400,7 @@ DebugStartFunction:
 		stw	r7,MN_PPSTRUCT+20(r28)
 		mr	r7,r4					##Restore r7
 		
-		lwz	r4,MCPort(r0)
+		lwz	r4,sonnet_MCPort(r27)
 		stw	r4,MN_MCPORT(r28)
 		mr	r4,r28
 
@@ -9455,7 +9460,7 @@ DebugEndFunction:
 		loadreg	r31,'DBG2'
 		stw	r31,MN_IDENTIFIER(r28)
 		stw	r29,MN_PPSTRUCT+8(r28)
-		lwz	r4,MCPort(r0)
+		lwz	r4,sonnet_MCPort(r30)
 		stw	r4,MN_MCPORT(r28)
 
 		mr	r4,r28

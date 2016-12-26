@@ -1,9 +1,7 @@
 #Sonnet Memory Map
 #0x00000000	Zero Page				0x003000	12288
 #0x00003000	Exceptions/Scheduler			0x004000	16384
-#0x00008000	Semaphores				0x000200	512
-#0x00008200	Semaphore memory			0x000200	512
-#0x00008400	Idle Task				0x000c00	3072
+#0x00008000	Idle Task				0x000c00	3072
 #0x00009000	System Stack				0x008000	32768
 #0x00010000	Free memory				0x0e0000	917504
 #0x00100000	Message FIFOs				0x010000	65536	Must be 0x100000 aligned
@@ -21,36 +19,35 @@
 .set DOSBase,12
 .set MCPort,16
 .set Init,20					#Pointer
-.set CPUHID0,24
-.set CPUHID1,28
+.set PowerPCBase,24
+.set Atomic,28
 .set RunningTask,32				#Pointer
-.set Atomic,36
-.set TaskListSem,40				#Pointer
-.set SemListSem,44				#Pointer
-.set PortListSem,48				#Pointer
-.set L2STATE,52
-.set CPUSDR1,56					#Pointer
-.set TaskException,60				#Pointer
-.set ExceptionMode,66
-.set SnoopSem,68				#Pointer
-.set L2Size,76
-.set L2SizeBU,80
-.set MemSem,88
-.set PowerPCBase,92
-.set Break,96
-.set DebugLevel,109				#18737
-.set RTGType,112
-.set RTGBase,116
-.set TaskExitCode,120
-.set WaitListSem,124				#18150
-.set CPUInfo,128
-.set ViolationAddress,140			#Pointer
-.set MemSize,144
-.set RunPPCStart,148
-.set AdListStart,152
-.set AdListEnd,156
+.set TaskException,36				#Pointer
+.set Break,40
+.set RTGType,44
+.set RTGBase,48
+.set TaskExitCode,52
+.set ViolationAddress,56			#Pointer
+.set MemSize,60
+.set RunPPCStart,64
+.set AdListStart,68
+.set AdListEnd,72
+
+.set ExceptionMode,76
+.set DebugLevel,77				#18737 0x4d
 
 #LibBase:
+
+.set sonnet_MemSize,92
+.set sonnet_MCPort,96
+.set sonnet_L2Size,100
+.set sonnet_CurrentL2Size,104
+.set sonnet_L2STATE,108
+.set sonnet_CPUSDR1,112
+.set sonnet_CPUHID0,116
+.set sonnet_CPUHID1,120
+.set sonnet_CPUInfo,124
+
 .set LIST_WAITINGTASKS,128
 .set LIST_ALLTASKS,144
 .set LIST_SNOOP,160
@@ -79,6 +76,14 @@
 .set LIST_REMOVEDTASKS,528
 .set LIST_MSGQUEUE,544
 
+.set sonnet_SysBase,566
+.set sonnet_WaitListSem,570			#18150
+.set sonnet_TaskListSem,574
+.set sonnet_SemListSem,578
+.set sonnet_PortListSem,582
+.set sonnet_SnoopSem,586
+.set sonnet_MemSem,590
+
 .set AlignmentExcHigh,594
 .set AlignmentExcLow,598
 .set DataExcHigh,602
@@ -103,6 +108,15 @@
 .set IdSysTasks,662
 .set IdDefTasks,666
 .set LowActivityPrioOffset,670
+.set TaskListSem,674
+.set SemListSem,726
+.set PortListSem,778
+.set SnoopSem,830
+.set MemSem,882
+.set WaitListSem,934
+.set SemMemory,992
+
+#END = 1184
 
 .set EXCDATA_TYPE,8				#Always NT_INTERRUPT
 .set EXCDATA_PRI,9				#This
@@ -202,7 +216,7 @@
 .set _LVOFreeVec,		-690
 
 .set SysStack,			0x10000			#Length max $7000
-.set IdleTask,			0x8400
+.set IdleTask,			0x8000			#Address of idle task
 
 .set MEMF_PUBLIC,		0x00000001
 .set MEMF_CHIP,			0x00000002
