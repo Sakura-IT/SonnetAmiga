@@ -146,7 +146,7 @@ End:		mflr	r4
 		
 		isync					#Wait for 68k to set up library
 
-		loadreg	r3,IdleTask			#Start hardcoded at 0x8400
+		loadreg	r3,IdleTask			#Start hardcoded at 0x8000
 		lwz	r31,SonnetBase(r0)
 		or	r3,r3,r31
 
@@ -165,12 +165,11 @@ End:		mflr	r4
 				
 		lwz	r3,PowerPCBase(r0)
 		
-		la	r4,LIST_WAITINGTASKS-4(r3)
-		li	r5,600/4
-		li	r6,0
+		li	r5,sonnet_PosSize/32
 		mtctr	r5
 		
-.ClearBase:	stwu	r6,4(r4)
+.ClearBase:	dcbi	r0,r4
+		addi	r4,r4,L1_CACHE_LINE_SIZE
 		bdnz	.ClearBase
 		
 		la	r4,LIST_READYTASKS(r3)		#Set up various used lists
@@ -1725,6 +1724,10 @@ EInt:		b	.FPUnav				#0
 .CheckQueue:	andi.	r9,r5,IMISR_IPQI
 		beq	.EndQueue
 
+		li	r5,IMISR_IPQI			#Clear IPQI bit to clear interrupt
+		stwbrx	r5,r4,r3		
+		sync
+
 		li	r4,IPHPR			
 		lwbrx	r9,r4,r3
 		li	r4,IPTPR			#Get message from Inbound FIFO
@@ -1739,16 +1742,6 @@ EInt:		b	.FPUnav				#0
 		and	r9,r9,r4			#Keep it 4000-7FFE		
 		sync
 		lwz	r5,0(r5)
-
-
-		lwz	r3,0x150(r0)			##debug code to detect double
-		cmpw	r3,r5				##FIFO messages
-		bne	.NotError		
-		loadreg	r0,'UHOH'
-		stw	r0,0x154(r0)
-.Hat:		b	.Hat
-.NotError:	stw	r5,0x150(r0)
-
 
 		la	r4,LIST_MSGQUEUE(r10)
 		addi	r4,r4,4				#PutMsg r5 to queue
@@ -1772,13 +1765,7 @@ EInt:		b	.FPUnav				#0
 		stwbrx	r9,r4,r3
 		sync
 		
-.EndQueue:	lis	r3,EUMB
-		li	r4,IMISR
-		li	r5,IMISR_IPQI			#Clear IPQI bit to clear interrupt
-		stwbrx	r5,r4,r3		
-		sync
-
-		clearreg r5
+.EndQueue:	clearreg r5
 		lis	r3,EUMBEPICPROC
 		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
 		sync

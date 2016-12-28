@@ -116,7 +116,7 @@
 .set WaitListSem,934
 .set SemMemory,992
 
-#END = 1184
+.set sonnet_PosSize,1184			#Library PosSize
 
 .set EXCDATA_TYPE,8				#Always NT_INTERRUPT
 .set EXCDATA_PRI,9				#This

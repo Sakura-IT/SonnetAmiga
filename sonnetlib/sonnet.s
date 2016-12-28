@@ -1259,10 +1259,14 @@ ExCPU		movem.l (a7)+,d1-a6
 ;********************************************************************************************
 
 CreateMsgFrame:						;Fetch a free 192 bytes long message
-		move.l a2,-(a7)
-		move.l EUMBAddr(pc),a2
+		movem.l a1/a2,-(a7)
+TooFast4U	move.l EUMBAddr(pc),a2
 		move.l IFQPR(a2),a0
-		move.l (a7)+,a2
+		lea Previous(pc),a2
+		move.l (a2),a1
+		cmp.l a1,a0
+		beq.s TooFast4U				;To prevent duplicates (Is there a better way?)
+		movem.l (a7)+,a1/a2
 		rts
 
 ;********************************************************************************************
@@ -1274,7 +1278,7 @@ CreateMsgFrame:						;Fetch a free 192 bytes long message
 SendMsgFrame:
 		move.l a2,-(a7)				;Send the message to the PPC
 		move.l EUMBAddr(pc),a2
-		move.l a0,IFQPR(a2)
+		move.l a0,IFQPR(a2)		
 		move.l (a7)+,a2
 		rts
 
@@ -1287,7 +1291,7 @@ SendMsgFrame:
 FreeMsgFrame:
 		move.l a2,-(a7)				;Return a PPC message to the free
 		move.l EUMBAddr(pc),a2			;messages pool
-		move.l a0,OFQPR(a2)
+		move.l a0,OFQPR(a2)		
 		move.l (a7)+,a2
 		rts
 		
@@ -1300,7 +1304,7 @@ FreeMsgFrame:
 GetMsgFrame:
 		move.l a2,-(a7)				;Get next message send from the PPC
 		move.l EUMBAddr(pc),a2			;if available
-		move.l OFQPR(a2),a1
+		move.l OFQPR(a2),a1		
 		move.l (a7)+,a2
 		rts
 
@@ -2268,6 +2272,7 @@ OpenLibAddress	ds.l	1
 AllocMemAddress	ds.l	1
 MirrorList	ds.l	3
 RemSysTask	ds.l	1
+Previous	ds.l	1
 MyInterrupt	ds.b	IS_SIZE
 
 	cnop	0,4
