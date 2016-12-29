@@ -52,7 +52,7 @@
 	
 	ENDC
 
-	XREF 	PPCCode,PPCLen,RunningTask,LIST_WAITINGTASKS,MCPort,Init
+	XREF 	PPCCode,PPCLen,ThisPPCProc,LIST_WAITINGTASKS,MCPort,Init
 	XREF	SysBase,PowerPCBase,DOSBase
 	XDEF	_PowerPCBase
 
@@ -1983,18 +1983,15 @@ ClearMsg	clr.l (a2)+
 ;********************************************************************************************
 
 GetPPCState:
-		move.l a0,-(a7)
 		move.l d1,-(a7)
 		moveq.l #PPCSTATEF_POWERSAVE,d0		;If no waiting then POWERSAVE
-		move.l SonnetBase(pc),a0
-		move.l LIST_WAITINGTASKS(a0),d1		;PPC Cache?
+		move.l LIST_WAITINGTASKS(a6),d1		;PPC Cache?
 		beq.s NoWait
 		moveq.l #PPCSTATEF_APPACTIVE,d0
-NoWait		move.l RunningTask(a0),d1
+NoWait		move.l ThisPPCProc(a6),d1
 		beq.s NoRun
 		moveq.l #PPCSTATEF_APPRUNNING,d0
 NoRun		move.l (a7)+,d1
-		move.l (a7)+,a0
 		rts
 
 ;********************************************************************************************

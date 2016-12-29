@@ -1451,7 +1451,7 @@ FlushDCache:
 		mfctr	r28
 		mr	r30,r3
 
-.WLFlush:	li	r4,Atomic
+.WLFlush:	la	r4,sonnet_Atomic(r30)
 		bl 	AtomicTest
 		
 		mr.	r3,r3
@@ -1508,7 +1508,7 @@ FlushDCache:
 		bl User
 
 		mtctr	r28		
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r30)
 		
 		bl AtomicDone
 		
@@ -1743,6 +1743,8 @@ AllocSignalPPC:
 		li	r31,FAllocSignalPPC-FRun68K
 		bl	DebugStartFunction
 		
+		mr	r31,r3
+		
 		extsb	r4,r4
 
 		lwz	r5,ThisPPCProc(r3)
@@ -1775,7 +1777,7 @@ AllocSignalPPC:
 		or	r3,r3,r6
 		stw	r3,TASKLINK_SIG(r5)
 		
-.WaitingLine:	li	r4,Atomic
+.WaitingLine:	la	r4,sonnet_Atomic(r31)
 
 		bl AtomicTest
 
@@ -1789,7 +1791,7 @@ AllocSignalPPC:
 		andc	r7,r7,r6
 		stw	r7,TC_SIGWAIT(r5)
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r31)
 		
 		bl AtomicDone
 		
@@ -1857,7 +1859,7 @@ SetSignalPPC:
 		mr	r29,r3
 		mr	r30,r4
 		
-.WaitingLine2:	li	r4,Atomic
+.WaitingLine2:	la	r4,sonnet_Atomic(r29)
 
 		bl AtomicTest
 		
@@ -1870,12 +1872,13 @@ SetSignalPPC:
 		or	r30,r30,r7
 		stw	r30,TC_SIGRECVD(r6)
 		
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r29)
 		
 		bl AtomicDone
 
-		mr	r3,r6
-		li	r4,0
+		mr	r3,r29
+		mr	r4,r6
+		li	r5,0
 
 		bl CheckExcSignal
 
@@ -2037,7 +2040,7 @@ ObtainSemaphorePPC:
 		mr	r31,r3
 		mr	r30,r4
 
-.WaitRes:	li	r4,Atomic
+.WaitRes:	la	r4,sonnet_Atomic(r31)
 
 		bl AtomicTest
 
@@ -2052,7 +2055,7 @@ ObtainSemaphorePPC:
 		lwz	r3,ThisPPCProc(r31)
 		stw	r3,SS_OWNER(r30)
 		
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r31)
 
 		bl AtomicDone
 
@@ -2063,7 +2066,7 @@ ObtainSemaphorePPC:
 		cmplw	r3,r4
 		bne-	.SemNotFree
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r31)
 
 		bl AtomicDone
 
@@ -2082,7 +2085,7 @@ ObtainSemaphorePPC:
 		
 		bl AddTailPPC
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r31)
 
 		bl AtomicDone
 
@@ -2150,7 +2153,7 @@ AttemptSemaphorePPC:
 		mr	r30,r4
 		mr	r31,r3
 
-.WaitRes2:	li	r4,Atomic
+.WaitRes2:	la	r4,sonnet_Atomic(r31)
 
 		bl AtomicTest
 
@@ -2175,7 +2178,7 @@ AttemptSemaphorePPC:
 		sth	r5,SS_NESTCOUNT(r30)
 		li	r6,ATTEMPT_SUCCESS
 
-.Occupied:	li	r4,Atomic
+.Occupied:	la	r4,sonnet_Atomic(r31)
 
 		bl AtomicDone
 
@@ -2230,7 +2233,7 @@ ReleaseSemaphorePPC:
 		mr	r28,r3
 		mr	r31,r4
 
-.WaitRes3:	li	r4,Atomic
+.WaitRes3:	la	r4,sonnet_Atomic(r28)
 
 		bl AtomicTest
 
@@ -2249,7 +2252,7 @@ ReleaseSemaphorePPC:
 		subi	r5,r5,1
 		sth	r5,SS_QUEUECOUNT(r31)
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r28)
 
 		bl AtomicDone
 
@@ -2264,7 +2267,7 @@ ReleaseSemaphorePPC:
 		mr.	r5,r5
 		bge-	.NotLast
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r28)
 
 		bl AtomicDone
 
@@ -2273,7 +2276,7 @@ ReleaseSemaphorePPC:
 .NotLast:	li	r0,1
 		sth	r0,SSPPC_LOCK(r31)
 		
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r28)
 
 		bl AtomicDone
 
@@ -2412,7 +2415,8 @@ ReleaseSemaphorePPC:
 
 #********************************************************************************************	
 
-.Error68k:	li	r4,Atomic
+.Error68k:	la	r4,sonnet_Atomic(r28)
+
 		bl AtomicDone
 
 		loadreg	r0,'DBUG'
@@ -2712,7 +2716,7 @@ WaitPortPPC:
 		cmplw	r4,r5
 		beq-	.IntListEmpty4
 
-.WaitInLine:	li	r4,Atomic
+.WaitInLine:	la	r4,sonnet_Atomic(r28)
 
 		bl AtomicTest
 
@@ -2723,7 +2727,7 @@ WaitPortPPC:
 		mr.	r3,r3
 		beq-	.PortGood
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r28)
 
 		bl AtomicDone
 
@@ -2736,10 +2740,12 @@ WaitPortPPC:
 		li	r0,-1
 		stb	r0,PortInUse(r28)
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r28)
 
 		bl AtomicDone
 
+		mr	r3,r28
+		
 		bl CauseInterrupt
 
 .PortUseWait2:	lbz	r3,PortInUse(r28)
@@ -2776,7 +2782,7 @@ WaitPortPPC:
 		cmplw	r4,r5
 		beq-	.IntListEmpty5
 
-.WaitInLine2:	li	r4,Atomic
+.WaitInLine2:	la	r4,sonnet_Atomic(r28)
 
 		bl AtomicTest
 
@@ -2787,7 +2793,7 @@ WaitPortPPC:
 		mr.	r3,r3
 		beq-	.PortGood2
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r28)
 
 		bl AtomicDone
 
@@ -2801,9 +2807,11 @@ WaitPortPPC:
 		li	r0,-1
 		stb	r0,PortInUse(r28)
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r28)
 
 		bl AtomicDone
+		
+		mr	r3,r28
 
 		bl CauseInterrupt
 
@@ -3566,7 +3574,7 @@ TrySemaphorePPC:
 		mr	r30,r4
 		mr	r28,r5
 		
-.WaitAt1:	li	r4,Atomic
+.WaitAt1:	la	r4,sonnet_Atomic(r26)
 
 		bl AtomicTest
 
@@ -3592,7 +3600,7 @@ TrySemaphorePPC:
 
 		bl AtomicDone
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r26)
 
 		bl AtomicDone
 
@@ -3607,7 +3615,7 @@ TrySemaphorePPC:
 
 		bl AtomicDone
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r26)
 
 		bl AtomicDone
 
@@ -3633,7 +3641,7 @@ TrySemaphorePPC:
 
 		bl AtomicDone
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r26)
 
 		bl AtomicDone
 
@@ -3648,7 +3656,7 @@ TrySemaphorePPC:
 		mr.	r3,r3
 		bne+	.WeirdWait
 		
-.WaitAt3:	li	r4,Atomic
+.WaitAt3:	la	r4,sonnet_Atomic(r26)
 
 		bl AtomicTest
 
@@ -3659,7 +3667,7 @@ TrySemaphorePPC:
 		mr.	r3,r3
 		beq-	.Jump3
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r26)
 
 		bl AtomicDone
 
@@ -3681,7 +3689,7 @@ TrySemaphorePPC:
 		stw	r4,4(r3)
 		stw	r3,0(r4)
 		
-.Jump2:		li	r4,Atomic
+.Jump2:		la	r4,sonnet_Atomic(r26)
 
 		bl AtomicDone
 
@@ -4859,7 +4867,7 @@ CreateTaskPPC:
 
 		bl User
 
-.WaitAtomic01:	li	r4,Atomic
+.WaitAtomic01:	la	r4,sonnet_Atomic(r23)
 
 		bl AtomicTest
 
@@ -4901,9 +4909,11 @@ CreateTaskPPC:
 
 		li	r0,-1 
 		stb	r0,RescheduleFlag(r23)		#Reschedule flag 
- 		li	r4,Atomic
+ 		la	r4,sonnet_Atomic(r23)
 
  		bl AtomicDone
+ 		
+ 		mr	r3,r23
 
 		bl CauseInterrupt
 
@@ -5172,12 +5182,12 @@ FindTaskPPC:
 
 #********************************************************************************************
 #
-#	ExceptionMode = IsExceptionMode(void) // r3
+#	ExceptionMode = IsExceptionMode(PowerPCBase) // r3
 #
 #********************************************************************************************
 
 IsExceptionMode:
-		lbz	r3,ExceptionMode(r0)
+		lbz	r3,sonnet_ExceptionMode(r3)
 		blr
 		
 #********************************************************************************************
@@ -5201,7 +5211,7 @@ ProcurePPC:
 		mr	r30,r4
 		mr	r29,r5
 
-		lwz	r28,ThisPPCProc(r31)
+		lwz	r28,ThisPPCProc(r3)
 		stw	r28,SSM_SEMAPHORE(r29)
 		lwz	r4,LN_NAME(r29)				#0 = Exclusive 1 = Shared
 		stw	r4,LN_TYPE(r29)
@@ -5209,7 +5219,7 @@ ProcurePPC:
 		beq-	.ExcLock
 		li	r28,0
 
-.ExcLock:	li	r4,Atomic
+.ExcLock:	la	r4,sonnet_Atomic(r31)
 
 		bl AtomicTest
 
@@ -5229,7 +5239,7 @@ ProcurePPC:
 		addi	r5,r5,1
 		sth	r5,SS_NESTCOUNT(r30)
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r31)
 		
 		bl AtomicDone
 
@@ -5249,7 +5259,7 @@ ProcurePPC:
 
 		bl AddTailPPC
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r31)
 
 		bl AtomicDone
 
@@ -5285,7 +5295,7 @@ VacatePPC:
 		stw	r0,SSM_SEMAPHORE(r29)
 		stw	r0,LN_TYPE(r29)
 
-.AtomicVacate:	li	r4,Atomic
+.AtomicVacate:	la	r4,sonnet_Atomic(r31)
 
 		bl AtomicTest
 
@@ -5302,7 +5312,7 @@ VacatePPC:
 		mr.	r3,r3
 		bne+	.NextSSM
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r31)
 		
 		bl AtomicDone
 
@@ -5320,7 +5330,7 @@ VacatePPC:
 		
 		bl RemovePPC
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r31)
 		
 		bl AtomicDone
 
@@ -5516,7 +5526,7 @@ ObtainSemaphoreSharedPPC:
 		lwz	r31,ThisPPCProc(r3)
 		mr	r30,r4
 		
-.SharedAtomic:	li	r4,Atomic
+.SharedAtomic:	la	r4,sonnet_Atomic(r28)
 		
 		bl AtomicTest
 
@@ -5529,7 +5539,7 @@ ObtainSemaphoreSharedPPC:
 		extsh.	r0,r5
 		bne-	.SharedQ
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r28)
 		
 		bl AtomicDone
 
@@ -5540,7 +5550,7 @@ ObtainSemaphoreSharedPPC:
 		mr.	r4,r4
 		bne-	.HasOwner
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r28)
 
 		bl AtomicDone
 
@@ -5549,7 +5559,7 @@ ObtainSemaphoreSharedPPC:
 .HasOwner:	cmplw	r3,r4
 		bne-	.NotOwner
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r28)
 		
 		bl AtomicDone
 
@@ -5569,7 +5579,7 @@ ObtainSemaphoreSharedPPC:
 
 		bl AddTailPPC
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r28)
 		
 		bl AtomicDone
 
@@ -5623,6 +5633,7 @@ AttemptSemaphoreSharedPPC:
 		stwu	r0,-4(r13)
 		stwu	r31,-4(r13)
 		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
 		stwu	r12,-4(r13)
 		stwu	r11,-4(r13)
 		stwu	r10,-4(r13)
@@ -5636,10 +5647,11 @@ AttemptSemaphoreSharedPPC:
 		li	r31,FAttemptSemaphoreSharedPPC-FRun68K
 		bl	DebugStartFunction
 
+		mr	r29,r3
 		lwz	r31,ThisPPCProc(r3)
 		mr	r30,r4
 
-.SharedAttempt:	li	r4,Atomic
+.SharedAttempt:	la	r4,sonnet_Atomic(r29)
 
 		bl AtomicTest
 
@@ -5668,7 +5680,7 @@ AttemptSemaphoreSharedPPC:
 		sth	r5,SS_NESTCOUNT(r30)
 		li	r6,ATTEMPT_SUCCESS
 
-.ItFailed:	li	r4,Atomic
+.ItFailed:	la	r4,sonnet_Atomic(r29)
 
 		bl AtomicDone
 
@@ -5682,9 +5694,10 @@ AttemptSemaphoreSharedPPC:
 		lwz	r10,24(r13)
 		lwz	r11,28(r13)
 		lwz	r12,32(r13)
-		lwz	r30,36(r13)
-		lwz	r31,40(r13)
-		addi	r13,r13,44
+		lwz	r29,36(r13)
+		lwz	r30,40(r13)
+		lwz	r31,44(r13)
+		addi	r13,r13,48
 		lwz	r0,0(r13)
 		addi	r13,r13,4
 		mtctr	r0
@@ -5693,7 +5706,7 @@ AttemptSemaphoreSharedPPC:
 
 #********************************************************************************************
 #
-#	Support: void CauseInterrupt(void) // causing the system call interrupt
+#	Support: void CauseInterrupt(PowerPCBase) // causing the system call interrupt
 #
 #********************************************************************************************
 
@@ -5703,7 +5716,7 @@ CauseInterrupt:
 
 		stwu	r31,-4(r13)
 
-		lbz	r0,ExceptionMode(r0)
+		lbz	r0,sonnet_ExceptionMode(r3)
 		mr.	r0,r0
 		bne	.AlreadyInExc
 
@@ -5722,17 +5735,20 @@ CauseInterrupt:
 
 #********************************************************************************************
 #
-#	Support: oldSignals = CheckExcSignal(Task, Signal) // r3=r3,r4
+#	Support: oldSignals = CheckExcSignal(PowerPCBase, Task, Signal) // r3=r3,r4,r5
 #
 #********************************************************************************************		
 		
 CheckExcSignal:		
 		prolog 228,'TOC'
 
-		mr	r7,r3
-		mr	r8,r4
+		stwu	r31,-4(r13)
+		
+		mr	r31,r3
+		mr	r7,r4
+		mr	r8,r5
 
-.DoAtomic:	li	r4,Atomic
+.DoAtomic:	la	r4,sonnet_Atomic(r31)
 
 		bl AtomicTest
 
@@ -5749,25 +5765,30 @@ CheckExcSignal:
 		or	r5,r5,r4
 		stw	r5,TC_SIGRECVD(r7)
 		
-		stw	r7,TaskException(r0)
+		stw	r7,sonnet_TaskExcept(r31)
+		
+		mr	r3,r31
 
 		bl CauseInterrupt
 
-.IntWait2:	lwz	r0,TaskException(r0)
+.IntWait2:	lwz	r0,sonnet_TaskExcept(r31)
 		mr.	r0,r0
 		bne+	.IntWait2
 
-.NonePending:	li	r4,Atomic
+.NonePending:	la	r4,sonnet_Atomic(r31)
 
 		bl AtomicDone
 	
 		mr	r3,r8
 		
+		lwz	r31,0(r13)
+		addi	r13,r13,4
+		
 		epilog 'TOC'
 
 #********************************************************************************************
 #
-#	oldSignals = SetExceptPPC(newSignals, signalMask, flag) // r3=r4,r5,r6
+#	oldSignals = SetExceptPPC(PowerPCBase, newSignals, signalMask, flag) // r3=r3,r4,r5,r6
 #
 #********************************************************************************************
 
@@ -5778,17 +5799,19 @@ SetExceptPPC:
 		stwu	r30,-4(r13)
 		stwu	r29,-4(r13)
 		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
 
 		li	r31,FSetExceptPPC-FRun68K
 		bl	DebugStartFunction
 
+		mr	r27,r3
 		mr	r29,r6
 		mr	r28,r2
 
 		lwz	r6,ThisPPCProc(r3)
 		mr	r30,r4
 
-.DoAtomic2:	li	r4,Atomic
+.DoAtomic2:	la	r4,sonnet_Atomic(r27)
 
 		bl AtomicTest
 
@@ -5805,22 +5828,24 @@ SetExceptPPC:
 
 		stw	r28,TC_EXCEPTDATA(r6)
 
-.NoPassR2:	li	r4,Atomic
+.NoPassR2:	la	r4,sonnet_Atomic(r27)
 
 		bl AtomicDone
 
-		mr	r3,r6
-		li	r4,0
+		mr	r3,r27
+		mr	r4,r6
+		li	r5,0
 		
 		bl CheckExcSignal
 
 		mr	r3,r31
 
-		lwz	r28,0(r13)
-		lwz	r29,4(r13)
-		lwz	r30,8(r13)
-		lwz	r31,12(r13)
-		addi	r13,r13,16
+		lwz	r27,0(r13)
+		lwz	r28,4(r13)
+		lwz	r29,8(r13)
+		lwz	r30,12(r13)
+		lwz	r31,16(r13)
+		addi	r13,r13,20
 
 		epilog 'TOC'
 		
@@ -5963,11 +5988,13 @@ DeleteTaskPPC:
 		li	r0,-1
 		stb	r0,RescheduleFlag(r30)		#Reschedule
 		
+		mr	r3,r30
+		
 		bl CauseInterrupt
 
 .EndTask:	b	.EndTask			#Halt this Task
 
-.NotOwnTask2:	li	r4,Atomic
+.NotOwnTask2:	la	r4,sonnet_Atomic(r30)
 
 		bl AtomicTest
 
@@ -5986,7 +6013,7 @@ DeleteTaskPPC:
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r31)
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r30)
 		
 		bl AtomicDone
 
@@ -6821,10 +6848,11 @@ WaitPPC:
 		li	r31,FWaitPPC-FRun68K
 		bl	DebugStartFunction
 
+		mr	r30,r3
 		lwz	r31,ThisPPCProc(r3)
 		mr	r28,r4
 
-.WaitPPCAtom:	li	r4,Atomic
+.WaitPPCAtom:	la	r4,sonnet_Atomic(r30)
 
 		bl AtomicTest
 
@@ -6837,12 +6865,14 @@ WaitPPC:
 		mr.	r5,r5
 		bne-	.GotSignals
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r30)
 		
 		bl AtomicDone
 
 		li	r0,TS_CHANGING
 		stb	r0,TC_STATE(r31)
+		
+		mr	r3,r30
 		
 		bl CauseInterrupt
 
@@ -6850,7 +6880,7 @@ WaitPPC:
 		cmplwi	r0,TS_RUN
 		bne+	.WaitForRun
 		
-.WaitPPCAtom2:	li	r4,Atomic
+.WaitPPCAtom2:	la	r4,sonnet_Atomic(r30)
 
 		bl AtomicTest
 
@@ -6864,7 +6894,7 @@ WaitPPC:
 .GotSignals:	xor	r6,r5,r6
 		stw	r6,TC_SIGRECVD(r31)
 				
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r30)
 		
 		bl AtomicDone
 
@@ -6894,10 +6924,10 @@ SetTaskPriPPC:
 		li	r31,FSetTaskPriPPC-FRun68K
 		bl	DebugStartFunction
 
-		mr	r30,r4
 		mr	r31,r3
+		mr	r30,r4
 
-.PriAtomic:	li	r4,Atomic
+.PriAtomic:	la	r4,sonnet_Atomic(r31)
 
 		bl AtomicTest
 
@@ -6933,15 +6963,17 @@ SetTaskPriPPC:
 		cmplw	r4,r30
 		bne-	.DonePriChange
 
-.NoSelf:	li	r4,Atomic
+.NoSelf:	la	r4,sonnet_Atomic(r31)
 		
 		bl AtomicDone
+		
+		mr	r3,r31
 
 		bl CauseInterrupt
 
 		b	.ExitPri
 
-.DonePriChange:	li	r4,Atomic
+.DonePriChange:	la	r4,sonnet_Atomic(r31)
 
 		bl AtomicDone
 
@@ -7073,15 +7105,16 @@ SignalPPC:
 		
 		b	.SigExit
 
-.PPCTask:	mr	r3,r31
-		mr	r4,r30
+.PPCTask:	mr	r3,r29
+		mr	r4,r31
+		mr	r5,r30
 		mr	r30,r31
 		
 		bl CheckExcSignal
 
 		mr	r5,r3
 		
-.SigAtom:	li	r4,Atomic
+.SigAtom:	la	r4,sonnet_Atomic(r29)
 
 		bl AtomicTest
 
@@ -7101,7 +7134,7 @@ SignalPPC:
 		or	r0,r0,r5
 		stw	r0,TC_SIGRECVD(r30)
 		
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r29)
 
 		bl AtomicDone
 
@@ -7114,7 +7147,7 @@ SignalPPC:
 		and.	r0,r0,r5
 		bne-	.GotSignal
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r29)
 
 		bl AtomicDone
 
@@ -7132,7 +7165,7 @@ SignalPPC:
 		
 		bl InsertOnPri				#Prio recalculation
 							#r4 = ReadyTasksList r5 = Task
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r29)
 
 		bl AtomicDone
 
@@ -7142,6 +7175,8 @@ SignalPPC:
 		
 		li	r0,-1
 		stb	r0,RescheduleFlag(r29)
+		
+		mr	r3,r29
 
 		bl CauseInterrupt
 
@@ -7185,7 +7220,7 @@ GetMsgPPC:
 		cmplw	r4,r5					#See also other functions
 		beq-	.IntListEmpty				#probably system msging & port
 
-.GetMsgAtom:	li	r4,Atomic
+.GetMsgAtom:	la	r4,sonnet_Atomic(r29)
 
 		bl AtomicTest
 
@@ -7196,7 +7231,7 @@ GetMsgPPC:
 		mr.	r3,r3
 		beq-	.PortIsFree
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r29)
 
 		bl AtomicDone
 
@@ -7210,9 +7245,11 @@ GetMsgPPC:
 		li	r0,-1
 		stb	r0,PortInUse(r29)
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r29)
 
 		bl AtomicDone
+		
+		mr	r3,r29
 
 		bl CauseInterrupt
 
@@ -7311,7 +7348,7 @@ ReplyMsgPPC:
 		cmplw	r4,r5
 		beq-	.IntListEmpty2
 
-.ReplyAtom:	li	r4,Atomic
+.ReplyAtom:	la	r4,sonnet_Atomic(r29)
 
 		bl AtomicTest
 
@@ -7322,7 +7359,7 @@ ReplyMsgPPC:
 		mr.	r3,r3
 		beq-	.PortIzFree
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r29)
 		
 		bl AtomicDone
 
@@ -7336,9 +7373,11 @@ ReplyMsgPPC:
 		li	r0,-1
 		stb	r0,PortInUse(r29)
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r29)
 		
 		bl AtomicDone
+		
+		mr	r3,r29
 		
 		bl CauseInterrupt
 
@@ -7409,7 +7448,7 @@ PutMsgPPC:
 		cmplw	r4,r5
 		beq-	.IntListEmpty3
 
-.PutAtom:	li	r4,Atomic
+.PutAtom:	la	r4,sonnet_Atomic(r29)
 
 		bl AtomicTest
 
@@ -7420,7 +7459,7 @@ PutMsgPPC:
 		mr.	r3,r3
 		beq-	.CheckedPort
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r29)
 		
 		bl AtomicDone
 
@@ -7434,9 +7473,11 @@ PutMsgPPC:
 		li	r0,-1
 		stb	r0,PortInUse(r29)
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r29)
 
 		bl AtomicDone
+		
+		mr	r3,r29
 
 		bl CauseInterrupt
 
@@ -7995,7 +8036,7 @@ RemExcHandler:
 		mr	r31,r3
 		mr	r30,r4
 
-.RemExcAtom:	li	r4,Atomic
+.RemExcAtom:	la	r4,sonnet_Atomic(r31)
 
 		bl AtomicTest
 
@@ -8008,9 +8049,11 @@ RemExcHandler:
 
 		bl AddHeadPPC
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r31)
 
 		bl AtomicDone
+		
+		mr	r3,r31
 
 		bl CauseInterrupt
 
@@ -8478,7 +8521,7 @@ SetExcHandler:
 		mr	r26,r3
 .NoIABR:	stw	r26,EXCDATA_LASTEXC(r30)
 
-.SetExcAtom:	li	r4,Atomic
+.SetExcAtom:	la	r4,sonnet_Atomic(r27)
 		
 		bl AtomicTest
 
@@ -8490,9 +8533,11 @@ SetExcHandler:
 		
 		bl	.MakeLists
 
-		li	r4,Atomic
+		la	r4,sonnet_Atomic(r27)
 		
 		bl AtomicDone
+		
+		mr	r3,r27
 
 		bl CauseInterrupt
 
@@ -8792,7 +8837,7 @@ WaitTime:
 		li	r0,-1
 		stb	r0,FLAG_WAIT(r29)
 
-.WaitTimeAtom:	li	r4,Atomic
+.WaitTimeAtom:	la	r4,sonnet_Atomic(r29)
 		
 		bl AtomicTest
 
@@ -8815,7 +8860,7 @@ WaitTime:
 		xori	r4,r4,SIGF_WAIT
 		stw	r4,TC_SIGRECVD(r26)
 
-.SigBeforeTime:	li	r4,Atomic
+.SigBeforeTime:	la	r4,sonnet_Atomic(r29)
 
 		bl AtomicDone
 
@@ -9873,6 +9918,8 @@ ExitCode:	lwz	r17,RunningTask(r0)
 
 		li	r7,TS_REMOVED
 		stb	r7,TC_STATE(r31)
+		
+		mr	r3,r25
 
 		bl CauseInterrupt
 		

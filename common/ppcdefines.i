@@ -20,24 +20,24 @@
 .set MCPort,16
 .set Init,20					#Pointer
 .set PowerPCBase,24
-.set Atomic,28
+.set DebugLevel,28				#18737 0x40
 .set RunningTask,32				#Pointer
-.set TaskException,36				#Pointer
-.set Break,40
-.set RTGType,44
-.set RTGBase,48
-.set TaskExitCode,52
-.set ViolationAddress,56			#Pointer
-.set MemSize,60
-.set RunPPCStart,64
-.set AdListStart,68
-.set AdListEnd,72
 
-.set ExceptionMode,76
-.set DebugLevel,77				#18737 0x4d
+.set AdListStart,64
+.set AdListEnd,68
+.set RTGType,72
+.set RTGBase,76
+.set TaskExitCode,80
+.set ViolationAddress,84			#Pointer
+.set MemSize,88
+.set RunPPCStart,92
+
+				
 
 #LibBase:
 
+.set sonnet_Atomic,84
+.set sonnet_TaskExcept,88			#684
 .set sonnet_MemSize,92
 .set sonnet_MCPort,96
 .set sonnet_L2Size,100
@@ -90,6 +90,7 @@
 .set DataExcLow,606
 .set CurrentPort,610
 
+.set sonnet_ExceptionMode,622
 .set DoDFlushAll,623
 .set DState,624
 .set DLockState,625

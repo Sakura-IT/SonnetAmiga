@@ -2,7 +2,7 @@
 .include sonnet_libppc.i
 .include ppcmacros-std.i
 
-.global PPCCode,PPCLen,RunningTask,LIST_WAITINGTASKS,Init,ViolationAddress
+.global PPCCode,PPCLen,ThisPPCProc,LIST_WAITINGTASKS,Init,ViolationAddress
 .global MCPort,SysBase,PowerPCBase,DOSBase,DebugLevel
 
 .set	PPCLen,(PPCEnd-PPCCode)
@@ -164,13 +164,6 @@ End:		mflr	r4
 		stwu	r1,-284(r1)		
 				
 		lwz	r3,PowerPCBase(r0)
-		
-		li	r5,sonnet_PosSize/32
-		mtctr	r5
-		
-.ClearBase:	dcbi	r0,r4
-		addi	r4,r4,L1_CACHE_LINE_SIZE
-		bdnz	.ClearBase
 		
 		la	r4,LIST_READYTASKS(r3)		#Set up various used lists
 		bl	.MakeList
@@ -1671,9 +1664,6 @@ EInt:		b	.FPUnav				#0
 		isync					#Also reenable FPU
 		sync
 
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
-
 		mtsprg3	r1				
 		lwz	r0,SonnetBase(r0)		#Store user stack pointer
 		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
@@ -1700,7 +1690,9 @@ EInt:		b	.FPUnav				#0
 		loadreg	r3,'EXEX'
 		stw	r3,0xf4(r0)
 		
+		li	r5,-1
 		lwz	r10,PowerPCBase(r0)
+		stb	r5,sonnet_ExceptionMode(r10)
 
 		lis	r3,EUMBEPICPROC
 		lwz	r5,EPIC_IACK(r3)		#Read IACKR to acknowledge interrupt
@@ -1723,10 +1715,6 @@ EInt:		b	.FPUnav				#0
 	
 .CheckQueue:	andi.	r9,r5,IMISR_IPQI
 		beq	.EndQueue
-
-		li	r5,IMISR_IPQI			#Clear IPQI bit to clear interrupt
-		stwbrx	r5,r4,r3		
-		sync
 
 		li	r4,IPHPR			
 		lwbrx	r9,r4,r3
@@ -1765,7 +1753,13 @@ EInt:		b	.FPUnav				#0
 		stwbrx	r9,r4,r3
 		sync
 		
-.EndQueue:	clearreg r5
+.EndQueue:	lis	r3,EUMB
+		li	r4,IMISR
+		li	r5,IMISR_IPQI			#Clear IPQI bit to clear interrupt
+		stwbrx	r5,r4,r3		
+		sync
+
+		clearreg r5
 		lis	r3,EUMBEPICPROC
 		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
 		sync
@@ -1826,7 +1820,7 @@ EInt:		b	.FPUnav				#0
 		
 #**********************************************************
 
-.XSignal:	li	r4,Atomic
+.XSignal:	la	r4,sonnet_Atomic(r10)
 		lwarx	r0,r0,r4
 		cmpwi	r0,0
 		bne-	.Oopsie
@@ -2092,12 +2086,13 @@ EInt:		b	.FPUnav				#0
 .EndMsgQueue:	lwz	r9,RunningTask(r0)
 		mr.	r9,r9
 		beq	.NoAtomicTask
-		lbz	r9,TC_STATE(r9)
-		cmpwi	r9,TS_ATOMIC
+
+		lbz	r5,TC_STATE(r9)
+		cmpwi	r5,TS_ATOMIC
 		beq	.SlowReturn			##Needs fix/implementation
 
-.NoAtomicTask:	lwz	r9,TaskException(r0)
-		mr.	r9,r9
+.NoAtomicTask:	lwz	r5,sonnet_TaskExcept(r10)	##Needs implementation
+		mr.	r5,r5
 		bne	.TaskException
 
 		lbz	r5,FLAG_WAIT(r10)
@@ -2267,6 +2262,7 @@ EInt:		b	.FPUnav				#0
 		addi	r3,r3,1
 		stw	r3,0(r4)
 		stb	r0,PortInUse(r10)
+		stb	r0,sonnet_ExceptionMode(r10)
 		dcbst	r0,r4
 
 		lwz	r3,PowerPCBase(r0)
@@ -2281,9 +2277,6 @@ EInt:		b	.FPUnav				#0
 		isync
 		mtspr	HID0,r0
 		isync
-
-		li	r0,0
-		stb	r0,ExceptionMode(r0)
 
 		mr	r30,r9
 
@@ -2349,6 +2342,7 @@ EInt:		b	.FPUnav				#0
 		stw	r9,0xf0(r0)				#running
 		li	r0,0
 		stb	r0,PortInUse(r10)
+		stb	r0,sonnet_ExceptionMode(r10)
 
 		lwz	r10,0(r13)
 		lwzu	r9,4(r13)
@@ -2370,9 +2364,6 @@ EInt:		b	.FPUnav				#0
 		mtsrr1	r0
 		mfsprg0	r0
 		mtsrr0	r0
-
-		li	r0,0
-		stb	r0,ExceptionMode(r0)
 
 		loadreg	r0,'USER'
 		stw	r0,0xf4(r0)
@@ -2556,8 +2547,12 @@ EInt:		b	.FPUnav				#0
 #********************************************************************************************
 
 
-.TaskException:	li	r9,0				#Will be starting point for TC_EXCEPTCODE
-		stw	r9,TaskException(r0)		#Needs implementation
+.TaskException:	li	r5,0				#Will be starting point for TC_EXCEPTCODE
+		stw	r5,sonnet_TaskExcept(r10)	#Needs implementation
+		
+		loadreg	r5,'TEXC'
+		stw	r5,0xe0(r0)
+		
 		b	.SlowReturn
 		
 #********************************************************************************************
@@ -2790,6 +2785,7 @@ EInt:		b	.FPUnav				#0
 .LoadContext:	lwz	r9,TASKPPC_CONTEXTMEM(r9)
 		li	r0,0
 		stb	r0,PortInUse(r10)
+		stb	r0,sonnet_ExceptionMode(r10)
 		lwz	r0,0(r9)
 		mtsrr0	r0
 		lwzu	r0,4(r9)
@@ -2867,10 +2863,7 @@ EInt:		b	.FPUnav				#0
 		lfdu	f29,8(r9)
 		lfdu	f30,8(r9)
 		lfdu	f31,8(r9)
-		
-		li	r9,0
-		stb	r9,ExceptionMode(r0)
-		
+
 		loadreg	r9,'USER'
 		stw	r9,0xf4(r0)
 		
@@ -2928,6 +2921,7 @@ EInt:		b	.FPUnav				#0
 		li	r0,0
 		stw	r9,0xf0(r0)
 		stb	r0,PortInUse(r10)
+		stb	r0,sonnet_ExceptionMode(r10)
 
 		stw	r13,-4(r1)
 		subi	r13,r1,4
@@ -2947,10 +2941,7 @@ EInt:		b	.FPUnav				#0
 		
 		loadreg	r0,'IDLE'
 		stw	r0,0xf4(r0)
-		
-		li	r0,0
-		stb	r0,ExceptionMode(r0)
-		
+
 		rfi
 
 #********************************************************************************************
@@ -2966,9 +2957,6 @@ EInt:		b	.FPUnav				#0
 		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
 		isync					#Also reenable FPU
 		sync
-
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1				#Store user stack pointer
 		lwz	r0,SonnetBase(r0)
@@ -2996,8 +2984,11 @@ EInt:		b	.FPUnav				#0
 		loadreg r0,'DECI'
 		stw	r0,0xf4(r0)
 
-.ListLoop:	lwz	r9,PowerPCBase(r0)
-		la	r4,LIST_READYEXC(r9)
+		li	r5,-1
+		lwz	r9,PowerPCBase(r0)
+		stb	r5,sonnet_ExceptionMode(r9)
+		
+.ListLoop:	la	r4,LIST_READYEXC(r9)
 
 		lwz	r5,0(r4)			#RemHeadPPC
 		lwz	r3,0(r5)
@@ -3151,9 +3142,6 @@ EInt:		b	.FPUnav				#0
 		sync					#Reenable MMU & FPU
 		isync
 
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
-
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
 		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
@@ -3181,7 +3169,9 @@ EInt:		b	.FPUnav				#0
 		loadreg	r29,'IABR'
 		stw	r29,0xf4(r0)
 				
+		li	r0,-1
 		lwz	r31,PowerPCBase(r0)
+		stb	r0,sonnet_ExceptionMode(r31)
 		la	r31,LIST_EXCIABR(r31)
 		loadreg	r0,EXCF_IABR
 		stw	r0,36(r13)			#NOT VERY NICE!!
@@ -3197,9 +3187,6 @@ EInt:		b	.FPUnav				#0
 		mtmsr	r0
 		sync					#Reenable MMU & FPU
 		isync
-
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
@@ -3228,7 +3215,9 @@ EInt:		b	.FPUnav				#0
 		loadreg	r29,'CHCK'
 		stw	r29,0xf4(r0)
 				
+		li	r0,-1
 		lwz	r31,PowerPCBase(r0)
+		stb	r0,sonnet_ExceptionMode(r31)
 		la	r31,LIST_EXCMCHECK(r31)
 		li	r0,EXCF_MCHECK
 		stw	r0,36(r13)			#NOT VERY NICE!!
@@ -3248,9 +3237,6 @@ EInt:		b	.FPUnav				#0
 		mtmsr	r0
 		sync
 		isync
-
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
 
 		loadreg	r0,'SYSM'
 		stw	r0,0xf4(r0)
@@ -3279,7 +3265,9 @@ EInt:		b	.FPUnav				#0
 		mfcr	r0
 		stwu	r0,-4(r13)
 
+		li	r0,-1
 		lwz	r31,PowerPCBase(r0)
+		stb	r0,sonnet_ExceptionMode(r31)
 		la	r31,LIST_EXCSYSMAN(r31)
 		lis	r0,EXCF_SYSMAN@h
 		stw	r0,36(r13)			#NOT VERY NICE!!
@@ -3299,9 +3287,6 @@ EInt:		b	.FPUnav				#0
 		mtmsr	r0
 		sync
 		isync
-
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
 
 		loadreg	r0,'THRM'
 		stw	r0,0xf4(r0)
@@ -3330,7 +3315,9 @@ EInt:		b	.FPUnav				#0
 		mfcr	r0
 		stwu	r0,-4(r13)
 
+		li	r0,-1
 		lwz	r31,PowerPCBase(r0)
+		stb	r0,sonnet_ExceptionMode(r31)
 		la	r31,LIST_EXCTHERMAN(r31)
 		lis	r0,EXCF_THERMAN@h
 		stw	r0,36(r13)			#NOT VERY NICE!!
@@ -3350,9 +3337,6 @@ EInt:		b	.FPUnav				#0
 		mtmsr	r0
 		sync					#Reenable MMU & FPU
 		isync
-
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
@@ -3381,7 +3365,9 @@ EInt:		b	.FPUnav				#0
 		loadreg	r29,'SYSC'
 		stw	r29,0xf4(r0)
 				
+		li	r0,-1
 		lwz	r31,PowerPCBase(r0)
+		stb	r0,sonnet_ExceptionMode(r31)
 		la	r31,LIST_EXCSYSTEMCALL(r31)
 		li	r0,EXCF_SYSTEMCALL
 		stw	r0,36(r13)			#NOT VERY NICE!!
@@ -3400,9 +3386,6 @@ EInt:		b	.FPUnav				#0
 		mtmsr	r0
 		sync					#Reenable MMU & FPU
 		isync
-
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
@@ -3431,7 +3414,9 @@ EInt:		b	.FPUnav				#0
 		loadreg	r29,'TRCE'
 		stw	r29,0xf4(r0)
 				
+		li	r0,-1
 		lwz	r31,PowerPCBase(r0)
+		stb	r0,sonnet_ExceptionMode(r31)
 		la	r31,LIST_EXCTRACE(r31)
 		li	r0,EXCF_TRACE
 		stw	r0,36(r13)			#NOT VERY NICE!!
@@ -3733,7 +3718,11 @@ EInt:		b	.FPUnav				#0
 		
 		b	.NextTExc
 		
-.LastTrHandler:	lwz	r0,0(r13)
+.LastTrHandler:	li	r0,0
+		lwz	r27,PowerPCBase(r0)
+		stb	r0,sonnet_ExceptionMode(r27)
+
+		lwz	r0,0(r13)
 		mtcr	r0
 		lwz	r0,4(r13)
 		mtsprg0	r0
@@ -3749,9 +3738,6 @@ EInt:		b	.FPUnav				#0
 		lwz	r1,0(r1)
 		lwz	r13,-4(r1)
 		lwz	r1,0(r1)			#User stack restored
-		
-		li	r0,0
-		stb	r0,ExceptionMode(r0)
 
 		loadreg	r0,'USER'
 		stw	r0,0xf4(r0)
@@ -3795,9 +3781,6 @@ EInt:		b	.FPUnav				#0
 		sync					#Reenable MMU & FPU
 		isync
 
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
-
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
 		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
@@ -3825,7 +3808,9 @@ EInt:		b	.FPUnav				#0
 		loadreg	r29,'NOFP'
 		stw	r29,0xf4(r0)
 				
+		li	r0,-1
 		lwz	r31,PowerPCBase(r0)
+		stb	r0,sonnet_ExceptionMode(r31)
 		la	r31,LIST_EXCFPUN(r31)
 		li	r0,EXCF_FPUN
 		stw	r0,36(r13)			#NOT VERY NICE!!
@@ -4182,9 +4167,6 @@ EInt:		b	.FPUnav				#0
 		sync					#Reenable MMU & FPU
 		isync
 
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
-
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
 		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
@@ -4212,7 +4194,9 @@ EInt:		b	.FPUnav				#0
 		loadreg	r29,'ISI!'
 		stw	r29,0xf4(r0)
 				
+		li	r0,-1
 		lwz	r31,PowerPCBase(r0)
+		stb	r0,sonnet_ExceptionMode(r31)
 		la	r31,LIST_EXCIACCESS(r31)
 		li	r0,EXCF_IACCESS
 		stw	r0,36(r13)			#NOT VERY NICE!!
@@ -4231,9 +4215,6 @@ EInt:		b	.FPUnav				#0
 		mtmsr	r0
 		sync					#Reenable MMU & FPU
 		isync
-
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
 
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
@@ -4262,7 +4243,9 @@ EInt:		b	.FPUnav				#0
 		loadreg	r29,'PRFM'
 		stw	r29,0xf4(r0)
 				
+		li	r0,-1
 		lwz	r31,PowerPCBase(r0)
+		stb	r0,sonnet_ExceptionMode(r31)
 		la	r31,LIST_EXCPERFMON(r31)
 		loadreg	r0,EXCF_PERFMON
 		stw	r0,36(r13)			#NOT VERY NICE!!
@@ -4624,9 +4607,6 @@ EInt:		b	.FPUnav				#0
 		sync
 		isync
 
-		li	r0,-1
-		stb	r0,ExceptionMode(r0)
-
 		mtsprg3	r1
 		lwz	r0,SonnetBase(r0)
 		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
@@ -4658,13 +4638,9 @@ EInt:		b	.FPUnav				#0
 		cmplw	r0,r31
 		beq	.Privvy
 
-#		lis	r31,SRR1_TRAP-12
-#		mfsrr1	r0
-		
-#		and.	r0,r0,r31
-#		beq	.HaltErr			#skip ILLEGAL and PRIVILEGED
-
+		li	r0,-1
 		lwz	r31,PowerPCBase(r0)
+		stb	r0,sonnet_ExceptionMode(r31)
 		la	r31,LIST_EXCPROGRAM(r31)
 		lwz	r31,0(r31)
 		lwz	r0,0(r31)
@@ -4977,7 +4953,11 @@ EInt:		b	.FPUnav				#0
 		li	r0,0				#SuperKey
 		mtsprg0	r0
 
-.WasTrap:	lwz	r0,0(r13)
+.WasTrap:	li	r0,0
+		lwz	r27,PowerPCBase(r0)
+		stb	r0,sonnet_ExceptionMode(r27)
+
+		lwz	r0,0(r13)
 		mtcr	r0
 		lwz	r0,4(r13)
 		lwz	r2,8(r13)
@@ -4992,9 +4972,6 @@ EInt:		b	.FPUnav				#0
 		lwz	r1,0(r1)
 		lwz	r13,-4(r1)
 		lwz	r1,0(r1)			#User stack restored
-		
-		li	r0,0
-		stb	r0,ExceptionMode(r0)
 
 		loadreg	r0,'USER'
 		stw	r0,0xf4(r0)
