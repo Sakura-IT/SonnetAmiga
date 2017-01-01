@@ -20,22 +20,23 @@
 .set MCPort,16
 .set Init,20					#Pointer
 .set PowerPCBase,24
-.set DebugLevel,28				#18737 0x40
+
 .set RunningTask,32				#Pointer
 
 .set AdListStart,64
 .set AdListEnd,68
 .set RTGType,72
 .set RTGBase,76
-.set TaskExitCode,80
+.set RunPPCStart,80
 .set ViolationAddress,84			#Pointer
 .set MemSize,88
-.set RunPPCStart,92
 
-				
 
 #LibBase:
 
+.set sonnet_DebugLevel,72
+.set sonnet_TaskExitCode,76
+.set sonnet_SonnetBase,80
 .set sonnet_Atomic,84
 .set sonnet_TaskExcept,88			#684
 .set sonnet_MemSize,92
@@ -502,11 +503,10 @@
 
 .set CONFIG_ADDR,0xFEC0
 .set CONFIG_DAT,0xFEE0
-.set CMD_BASE,0x8000
-.set VEC_BASE,0xFFF0
+.set CMD_BASE,0x80000000
 .set EUMBBAR,0x78			#At 0x80000000 (Sonnet side)
-.set EUMB,0xF000
-.set EUMBEPICPROC,EUMB+6
+.set EUMB,0xF0000000
+.set EUMBEPICPROC,EUMB+0x60000
 .set EPIC_IACK,0xa0
 .set EPIC_EOI,0xb0
 

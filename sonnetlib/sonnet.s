@@ -22,7 +22,7 @@
 	include	exec/tasks.i
 	include sonnet_lib.i
 
-	XREF	FunctionsLen,LibFunctions,DebugLevel,sonnet_CPUInfo
+	XREF	FunctionsLen,LibFunctions,sonnet_DebugLevel,sonnet_CPUInfo
 
 	XREF	SetExcMMU,ClearExcMMU,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
@@ -1249,7 +1249,7 @@ GetCPU:
 G3		move.l #CPUF_G3,d0
 		bra.s ExCPU
 G4		move.l #CPUF_G4,d0
-ExCPU		movem.l (a7)+,d1-a6
+ExCPU		movem.l (a7)+,d1-a6			;sonnet_CPUInfo - Cache problem?
 		rts
 
 ;********************************************************************************************
@@ -1266,6 +1266,7 @@ TooFast4U	move.l EUMBAddr(pc),a2
 		move.l (a2),a1
 		cmp.l a1,a0
 		beq.s TooFast4U				;To prevent duplicates (Is there a better way?)
+		move.l a0,(a2)
 		movem.l (a7)+,a1/a2
 		rts
 
@@ -2164,10 +2165,7 @@ PowerDebugMode:
 		blt.s ExitDebug
 		cmp.b #4,d0
 		bge.s ExitDebug
-		move.l a0,-(a7)
-		move.l SonnetBase(pc),a0
-		move.b d0,DebugLevel(a0)
-		move.l (a7)+,a0
+		move.b d0,sonnet_DebugLevel(a6)		;Cache problem?
 ExitDebug	rts
 
 ;********************************************************************************************

@@ -502,17 +502,17 @@ ConfirmInterrupt:
 		blr
 		stw	r3,-12(r1)
 		stw	r4,-8(r1)
-		lis	r3,EUMBEPICPROC
+		lis	r3,EUMBEPICPROC@h
 		lwz	r4,0xa0(r3)			#Read IACKR to acknowledge it
 		eieio
 	
-		lis	r3,EUMB
+		lis	r3,EUMB@h
 		lis	r4,0x100			#Clear IM0 bit to clear interrupt
 		stw	r4,0x100(r3)
 		eieio
 
 		li	r4,0
-		lis	r3,EUMBEPICPROC
+		lis	r3,EUMBEPICPROC@h
 		stw	r4,0xb0(r3)			#Write 0 to EOI to End Interrupt
 
 		lwz	r4,-8(r1)
@@ -1482,7 +1482,7 @@ FlushDCache:
 		
 		lwz	r29,sonnet_MemSize(r30)
 		subis	r29,r29,0x40
-		lwz	r4,SonnetBase(r0)		
+		lwz	r4,sonnet_SonnetBase(r30)		
 		add	r4,r4,r29
 		mr	r31,r4
 	
@@ -2939,7 +2939,7 @@ CreateMsgFramePPC:
 
 		bl DisableIntPPC
 
-		lis	r3,EUMB
+		lis	r3,EUMB@h
 		li	r27,OFTPR
 		lwbrx	r30,r27,r3			
 		addi	r28,r30,4
@@ -2992,7 +2992,7 @@ SendMsgFramePPC:
 
 		bl DisableIntPPC
 
-		lis	r3,EUMB
+		lis	r3,EUMB@h
 		li	r27,OPHPR
 		lwbrx	r28,r27,r3		
 		stw	r30,0(r28)		
@@ -3040,7 +3040,7 @@ FreeMsgFramePPC:
 
 		bl DisableIntPPC
 
-		lis	r3,EUMB				#Free the message
+		lis	r3,EUMB@h			#Free the message
 		li	r27,IFHPR
 		lwbrx	r29,r27,r3		
 		stw	r30,0(r29)		
@@ -3234,7 +3234,9 @@ WaitFor68K:
 		
 		epilog 'TOC'
 
-.RunPPC:	bl	.StartRunPPC
+.RunPPC:	mr	r3,r25
+
+		bl	.StartRunPPC
 		
 		b	.NextMsg
 
@@ -4639,7 +4641,7 @@ CreateTaskPPC:
  		bl User
  
  		loadreg	r4,TASKATTR_EXITCODE
-		lwz	r5,TaskExitCode(r0)
+		lwz	r5,sonnet_TaskExitCode(r23)
 		mr	r6,r30 
  
  		bl GetTagDataPPC
@@ -9393,7 +9395,7 @@ RawDoFmtPPC:	prolog 228,'TOC'
 #********************************************************************************************
 
 DebugStartFunction:
-		lbz	r0,DebugLevel(r0)
+		lbz	r0,sonnet_DebugLevel(r3)
 		mr.	r0,r0
 		beq	.NoDebug
 
@@ -9471,7 +9473,7 @@ DebugStartFunction:
 #********************************************************************************************
 
 DebugEndFunction:
-		lbz	r0,DebugLevel(r0)
+		lbz	r0,sonnet_DebugLevel(r30)
 		mr.	r0,r0
 		beq	.NoDebug
 
@@ -9529,6 +9531,7 @@ DebugEndFunction:
 #********************************************************************************************		
 
 StartCode:	bl	.StartRunPPC
+
 		mr	r25,r3
 
 .WasNoEMsg:	lwz	r31,ThisPPCProc(r25)
@@ -9566,7 +9569,10 @@ StartCode:	bl	.StartRunPPC
 		cmpw	r4,r29
 		bne	.NextEMsg
 
+		mr	r3,r25
+
 		bl	.StartRunPPC
+		
 		b	.NextEMsg
 		
 #********************************************************************************************
@@ -9640,7 +9646,8 @@ StartCode:	bl	.StartRunPPC
 
 		mr	r9,r30
 		mr	r8,r9
-		lwz	r2,RunningTask(r0)
+		
+		lwz	r2,ThisPPCProc(r3)
 		stw	r9,TASKPPC_STARTMSG(r2)
 		lwz	r3,MN_ARG1(r8)
 		stw	r3,TC_SIGALLOC(r2)
@@ -9741,7 +9748,9 @@ StartCode:	bl	.StartRunPPC
 	
 .NoThrow:	blrl
 
-ExitCode:	lwz	r17,RunningTask(r0)
+ExitCode:	lwz	r14,0(r1)
+		lwz	r14,368(r14)				#PowerPCBase
+		lwz	r17,ThisPPCProc(r14)
 		lwz	r17,TASKPPC_STARTMSG(r17)
 		lwz	r17,PP_FLAGS(r17)
 		rlwinm.	r17,r17,(32-PPB_LINEAR),31,31
@@ -9775,7 +9784,7 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		li	r7,NT_MESSAGE
 		stb	r7,LN_TYPE(r9)
 
-		lwz	r7,RunningTask(r0)
+		lwz	r7,ThisPPCProc(r14)
 		lwz	r8,TC_SIGALLOC(r7)
 		stw	r8,MN_ARG1(r9)		
 		lwz	r7,TASKPPC_STARTMSG(r7)						
@@ -9804,15 +9813,14 @@ ExitCode:	lwz	r17,RunningTask(r0)
 		stfd	f6,PP_FREGS+5*8(r9)
 		stfd	f7,PP_FREGS+6*8(r9)
 		stfd	f8,PP_FREGS+7*8(r9)
-		lwz	r8,MCPort(r0)
+		lwz	r8,sonnet_MCPort(r14)
 		lwz	r7,MN_STACKFRAME(r9)			#StackFrame
 		stw	r8,MN_MCPORT(r9)
 
-		lwz	r4,RunningTask(r0)
+		lwz	r4,ThisPPCProc(r14)
 		stw	r4,MN_PPC(r9)
-		
-		lwz	r4,RunningTask(r0)			#Free original 68K -> PPC
-		lwz	r4,TASKPPC_STARTMSG(r4)			#message
+
+		lwz	r4,TASKPPC_STARTMSG(r4)			#Free original 68K -> PPC message
 
 		bl FreeMsgFramePPC
 		

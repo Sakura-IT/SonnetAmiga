@@ -3,15 +3,24 @@
 .include ppcmacros-std.i
 
 .global PPCCode,PPCLen,ThisPPCProc,LIST_WAITINGTASKS,Init,ViolationAddress
-.global MCPort,SysBase,PowerPCBase,DOSBase,DebugLevel
+.global MCPort,SysBase,PowerPCBase,DOSBase,sonnet_DebugLevel
 
 .set	PPCLen,(PPCEnd-PPCCode)
+.set	base_Comm,0
+.set	base_MemStart,4
+.set	base_MemLen,8
+.set	base_RTGBase,12
+.set	base_RTGType,16
+
+.set	rtgtype_ati,0x1002
+.set	rtgtype_voodoo3,0x121a
+.set	rtgtype_voodoo45,0x121b
 
 #********************************************************************************************
 
 .section "PPCSetup","acrx"
 
-PPCCode:	b	.SkipCom			#0x3000	System initialization
+PPCCode:	bl	.SkipCom			#0x3000	System initialization
 
 .long		0					#Used for initial communication
 .long		0					#MemStart
@@ -19,24 +28,25 @@ PPCCode:	b	.SkipCom			#0x3000	System initialization
 .long		0					#RTGBase
 .long		0					#RTGType
 
-.SkipCom:	
-		lis	r22,CMD_BASE			#Used in setpcireg macro
-		lis	r29,VEC_BASE			#0xfff00000
-		ori	r29,r29,0x3000			#For initial communication
+.SkipCom:	mflr	r29				#For initial communication with 68k
+		lis	r22,CMD_BASE@h			#Used in setpcireg macro
 
 		bl	Reset
 
 		setpcireg PICR1				#Setup various PCI registers of the Sonnet
 		loadreg r25,VAL_PICR1
 		bl	ConfigWrite32
+
 		setpcireg PICR2
 		loadreg r25,VAL_PICR2
 		bl	ConfigWrite32
+
 		setpcireg PMCR1
 		loadreg r25,VAL_PMCR1
 		bl	ConfigWrite16
+
 		setpcireg EUMBBAR
-		lis	r25,EUMB
+		lis	r25,EUMB@h
 		bl	ConfigWrite32
 
 		bl	ConfigMem			#Result = Sonnet Mem Len in r8
@@ -46,13 +56,13 @@ PPCCode:	b	.SkipCom			#0x3000	System initialization
 		bne	.GotRam
 
 .ErrorRam:	loadreg	r0,'Err2'
-		stw	r0,4(r29)
+		stw	r0,base_Comm(r29)
 		b	.ErrorRam
 
-.GotRam:	lhz	r3,20(r29)			#RTGType
-		cmpwi	r3,0x1002			#Check for ATI Gfx Card
+.GotRam:	lhz	r3,base_RTGType(r29)		#RTGType
+		cmpwi	r3,rtgtype_ati			#Check for ATI Gfx Card
 		beq	.MaxRam
-		cmpwi	r3,0x121b			#Check for VooDoo4/5
+		cmpwi	r3,rtgtype_voodoo45		#Check for VooDoo4/5
 		bne	.NoMaxRam	
 
 .MaxRam:	lis	r4,0x800			#Max 128MB RAM on Sonnet when ATI present
@@ -62,7 +72,7 @@ PPCCode:	b	.SkipCom			#0x3000	System initialization
 		mr	r8,r4	
 
 .NoMaxRam:	lis	r27,0x8000			#Upper boundary PCI Memory Mediator
-		lwz	r26,16(r29)			#Get gfx mem (RTGBase)
+		lwz	r26,base_RTGBase(r29)		#Get gfx mem (RTGBase)
 		cmplw	r26,r27
 		blt	.ZorroX				#Is Zorro3
 		lis	r27,0x9000			#Zorro2 plus 256MB ATI
@@ -91,7 +101,7 @@ SetLen:		mr	r30,r28
 		slw	r30,r30,r25
 		slw	r30,r30,r28
 		subf	r27,r30,r27
-		lis	r26,EUMB
+		lis	r26,EUMB@h
 		ori	r26,r26,ITWR
 		stwbrx	r25,0,r26			#Set size of Inbound Translate Window
 		sync
@@ -108,14 +118,14 @@ SetLen:		mr	r30,r28
 .Clear0:	stwu	r0,4(r3)
 		bdnz+	.Clear0				#Clear first part of zero page
 
-		lwz	r3,16(r29)			#RTGBase
+		lwz	r3,base_RTGBase(r29)		#RTGBase
 		stw	r3,RTGBase(r0)
-		lhz	r3,20(r29)			#RTGType
+		lhz	r3,base_RTGType(r29)		#RTGType
 		sth	r3,RTGType(r0)		
 		stw	r8,MemSize(r0)		
 
-		stw	r27,8(r29)			#MemStart
-		stw	r8,12(r29)			#MemLen
+		stw	r27,base_MemStart(r29)		#MemStart
+		stw	r8,base_MemLen(r29)		#MemLen
 
 		bl	mmuSetup			#Setup the Memory Management Unit
 		bl	Epic				#Setup the EPIC controller
@@ -137,7 +147,7 @@ End:		mflr	r4
 		mtdec	r28				#Decrementer.
 
 		lwz	r28,0(r0)			#Get magic word
-		stw	r28,4(r29)			#Signal 68k that PPC is initialized
+		stw	r28,base_Comm(r29)		#Signal 68k that PPC is initialized
 
 		loadreg r6,'INIT'
 .WInit:		lwz	r28,Init(r0)
@@ -298,7 +308,10 @@ End:		mflr	r4
 		
 		lwz	r4,MCPort(r0)
 		stw	r4,sonnet_MCPort(r14)
-				
+		
+		lwz	r4,SonnetBase(r0)
+		stw	r4,sonnet_SonnetBase(r14)
+						
 		bl	.SetupMsgFIFOs
 
 		mfspr	r4,HID0
@@ -311,18 +324,23 @@ End:		mflr	r4
 		loadreg	r0,MACHINESTATE_DEFAULT
 		mtsrr1	r0				#load up user MSR. Also clears PSL_IP
 		
-		lwz	r4,PowerPCBase(r0)
-		lwz	r4,_LVOSetCache+2(r4)
+		lwz	r14,PowerPCBase(r0)
+		lwz	r4,_LVOSetCache+2(r14)
+		
 		addi	r6,r4,ViolationOS		
 		stw	r6,ViolationAddress(r0)
-		addi	r6,r4,TaskExit
-		stw	r6,TaskExitCode(r0)
+		
 		addi	r6,r4,TaskStart
 		stw	r6,RunPPCStart(r0)
+		
 		addi	r6,r4,ListStart
 		stw	r6,AdListStart(r0)
+		
 		addi	r6,r4,ListEnd
-		stw	r6,AdListEnd(r0)		
+		stw	r6,AdListEnd(r0)
+		
+		addi	r6,r4,TaskExit
+		stw	r6,sonnet_TaskExitCode(r14)
 
 		bl	Caches				#Setup the L1 and L2 cache
 
@@ -358,7 +376,7 @@ End:		mflr	r4
 
 #********************************************************************************************		
 
-.SetupMsgFIFOs:	lis	r14,EUMB
+.SetupMsgFIFOs:	lis	r14,EUMB@h
 		
 		li	r4,MUCR_CQS_FIFO4K		#4K entries (16k x 4 FIFOs)
 		li	r5,MUCR
@@ -391,7 +409,7 @@ End:		mflr	r4
 		addi	r5,r5,192
 		bdnz	.FillOBFL
 
-		lis	r14,EUMB
+		lis	r14,EUMB@h
 		
 		li	r5,IFTPR
 		li	r4,4096*0+4
@@ -559,7 +577,7 @@ ifpdr_value:	mflr	r3
 
 #********************************************************************************************
 
-Epic:		lis	r26,EUMB
+Epic:		lis	r26,EUMB@h
 		loadreg	r27,EPIC_GCR
 		add	r27,r26,r27
 		li	r28,0xa0
@@ -602,7 +620,7 @@ Epic:		lis	r26,EUMB
 		rlwinm	r28,r28,16,21,31		#Get FRR[NIRQ]
 
 		mtctr	r28				#Doc says clear all possible ints
-		lis	r26,EUMBEPICPROC
+		lis	r26,EUMBEPICPROC@h
 
 ClearInts:	lwz	r27,0xa0(r26)			#IACKR
 		eieio
@@ -719,7 +737,7 @@ mmuSetup:
 
 		bl	.SetupPT
 		
-		lis	r3,EUMB					#PCI memory (EUMB) start effective address
+		lis	r3,EUMB@h				#PCI memory (EUMB) start effective address
 		addis	r4,r3,0x10				#end effective address
 		mr	r5,r3					#start physical address
 		loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED	#WIMG
@@ -736,13 +754,13 @@ mmuSetup:
 		bl	.DoTBLs
 		
 		lhz	r3,RTGType(r0)
-		cmpwi	r3,0x1002
+		cmpwi	r3,rtgtype_ati
 		bne	.DoInhibit
 		loadreg	r6,PTE_WRITE_THROUGH
 		b	.DoWT
 
-.DoInhibit:	loadreg	r6,PTE_CACHE_INHIBITED		
-.DoWT:		cmpwi	r3,0x121b
+.DoInhibit:	loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED		
+.DoWT:		cmpwi	r3,rtgtype_voodoo45
 		lwz	r3,RTGBase(r0)			#32MB Video RAM (ATi) or Config (Avenger)
 		addis	r4,r3,0x200
 		bne	.Voodoo3
@@ -754,9 +772,9 @@ mmuSetup:
 		bl	.DoTBLs
 		
 		lhz	r3,RTGType(r0)
-		cmpwi	r3,0x121a
+		cmpwi	r3,rtgtype_voodoo3
 		beq	.Is3DFX
-		cmpwi	r3,0x121b
+		cmpwi	r3,rtgtype_voodoo45
 		bne	.No3DFX
 		
 		lwz	r3,RTGBase(r0)			#32MB Video RAM (Napalm)
@@ -780,7 +798,7 @@ mmuSetup:
 		bl	.DoTBLs
 		
 .No3DFX:	lhz	r3,RTGType(r0)
-		cmpwi	r3,0x1002
+		cmpwi	r3,rtgtype_ati
 		bne	.NoATI
 		mr	r3,r24
 		addis	r5,r3,0x4000
@@ -1008,7 +1026,7 @@ mmuSetup:
 		blr
 
 .ExitTBLErr:	loadreg	r0,'Err1'
-		stw	r0,4(r29)
+		stw	r0,base_Comm(r29)
 		loadreg	r0,'TBL!'
 		stw	r0,0xf4(r0)
 		b	.ExitTBLErr
@@ -1694,14 +1712,14 @@ EInt:		b	.FPUnav				#0
 		lwz	r10,PowerPCBase(r0)
 		stb	r5,sonnet_ExceptionMode(r10)
 
-		lis	r3,EUMBEPICPROC
+		lis	r3,EUMBEPICPROC@h
 		lwz	r5,EPIC_IACK(r3)		#Read IACKR to acknowledge interrupt
 
 		rlwinm	r5,r5,8,0,31
 		cmpwi	r5,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
 		beq	.SlowReturn
 		
-.IntReturn:	lis	r3,EUMB
+.IntReturn:	lis	r3,EUMB@h
 		li	r4,IMISR
 		lwbrx	r5,r4,r3
 		andi.	r9,r5,IMISR_IM0I
@@ -1739,7 +1757,7 @@ EInt:		b	.FPUnav				#0
 		stw	r3,4(r5)
 		stw	r5,0(r3)
 		
-		lis	r3,EUMB				#Check if header (IPHPR) is equal to
+		lis	r3,EUMB@h			#Check if header (IPHPR) is equal to
 		li	r4,IPHPR			#tail (IPTPR). If so, queue is empty
 		lwbrx	r5,r4,r3
 		cmpw	r5,r9
@@ -1753,14 +1771,14 @@ EInt:		b	.FPUnav				#0
 		stwbrx	r9,r4,r3
 		sync
 		
-.EndQueue:	lis	r3,EUMB
+.EndQueue:	lis	r3,EUMB@h
 		li	r4,IMISR
 		li	r5,IMISR_IPQI			#Clear IPQI bit to clear interrupt
 		stwbrx	r5,r4,r3		
 		sync
 
 		clearreg r5
-		lis	r3,EUMBEPICPROC
+		lis	r3,EUMBEPICPROC@h
 		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
 		sync
 
@@ -1875,7 +1893,7 @@ EInt:		b	.FPUnav				#0
 		stw	r4,4(r3)
 		stw	r3,0(r4)
 	
-		lis	r3,EUMB				#Free the message
+		lis	r3,EUMB@h			#Free the message
 		li	r4,IFHPR
 		lwbrx	r6,r4,r3		
 		stw	r5,0(r6)		
@@ -1928,7 +1946,7 @@ EInt:		b	.FPUnav				#0
 		stw	r4,4(r3)
 		stw	r3,0(r4)
 
-		lis	r3,EUMB				#Free the message
+		lis	r3,EUMB@h			#Free the message
 		li	r4,IFHPR
 		lwbrx	r6,r4,r3		
 		stw	r5,0(r6)		
@@ -1987,7 +2005,7 @@ EInt:		b	.FPUnav				#0
 
 		lwz	r7,MN_ARG2(r5)
 
-		lis	r3,EUMB				#Free the message
+		lis	r3,EUMB@h			#Free the message
 		li	r4,IFHPR
 		lwbrx	r6,r4,r3		
 		stw	r5,0(r6)		
@@ -4550,7 +4568,7 @@ EInt:		b	.FPUnav				#0
 
 #*************************************************
 
-.DoSixtyEight:	lis	r28,EUMB
+.DoSixtyEight:	lis	r28,EUMB@h
 		li	r24,OFTPR
 		lwbrx	r25,r24,r28			
 		addi	r23,r25,4
@@ -4575,7 +4593,7 @@ EInt:		b	.FPUnav				#0
 
 		sync
 
-		lis	r28,EUMB
+		lis	r28,EUMB@h
 		li	r24,OPHPR
 		lwbrx	r22,r24,r28		
 		stw	r25,0(r22)		
@@ -5139,7 +5157,7 @@ EInt:		b	.FPUnav				#0
 		mfctr	r0
 		stwu	r0,4(r31)
 		
-		lis	r28,EUMB
+		lis	r28,EUMB@h
 		li	r24,OFTPR
 		lwbrx	r25,r24,r28			
 		addi	r23,r25,4
@@ -5164,7 +5182,7 @@ EInt:		b	.FPUnav				#0
 
 		sync
 
-		lis	r28,EUMB
+		lis	r28,EUMB@h
 		li	r24,OPHPR
 		lwbrx	r22,r24,r28		
 		stw	r25,0(r22)		
