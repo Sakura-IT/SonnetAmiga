@@ -1,15 +1,15 @@
 #Sonnet Memory Map
 #0x00000000	Zero Page				0x003000	12288
-#0x00003000	Exceptions/Scheduler			0x004000	16384
-#0x00008000	Idle Task				0x000c00	3072
-#0x00009000	System Stack				0x008000	32768
-#0x00010000	Free memory				0x0e0000	917504
+#0x00003000	Exceptions/Scheduler			0x005000	20480
 #0x00100000	Message FIFOs				0x010000	65536	Must be 0x100000 aligned
-#0x00110000	Message Frames 2x4096xPP_SIZE+48	0x180000
-#0x00290000	Free memory				
-#0x02f00000	Room for the page table			0x100000	1048576 (for 128MB addressing)
+#0x00200000	Message Frames 2x4096xPP_SIZE+48	0x180000
+#0x00380000	Idle Task				0x000c00	3072
+#0x00381000	System Stack				0x0EF000	32768
+#0x00400000	Free memory
+#0x7xf00000	Room for the page table			0x100000	1048576 (for 128MB addressing)
 
-#Overhead = 3.5MB
+
+#Overhead = 5MB
 
 #Sonnet Base:
 
@@ -30,6 +30,7 @@
 .set RunPPCStart,80
 .set ViolationAddress,84			#Pointer
 .set MemSize,88
+.set FLAG_PAGETABLE,92
 
 
 #LibBase:
@@ -46,7 +47,7 @@
 .set sonnet_L2STATE,108
 .set sonnet_CPUSDR1,112
 .set sonnet_CPUHID0,116
-.set sonnet_CPUHID1,120
+.set sonnet_CPUSpeed,120
 .set sonnet_CPUInfo,124
 
 .set LIST_WAITINGTASKS,128
@@ -217,8 +218,8 @@
 .set _LVOAllocVec,		-684
 .set _LVOFreeVec,		-690
 
-.set SysStack,			0x10000			#Length max $7000
-.set IdleTask,			0x8000			#Address of idle task
+.set SysStack,			0x400000		#Length max $a0000
+.set IdleTask,			0x380000		#Address of idle task
 
 .set MEMF_PUBLIC,		0x00000001
 .set MEMF_CHIP,			0x00000002

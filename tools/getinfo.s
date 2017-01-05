@@ -13,8 +13,7 @@ FUNC_CNT	SET	FUNC_CNT-6	* Standard offset-6 bytes each
 PPCINFO_L2CACHE	EQU	$8010200A		;State of L2 Cache (on/off)
 PPCINFO_L2STATE	EQU	$8010200B		;L2 in copyback or writethrough?
 PPCINFO_L2SIZE	EQU	$8010200C
-AlignmentExcLow	EQU	604
-DataExcLow	EQU	612
+HINFO_DSEXC_LOW EQU	$80103003
 
 ;************************************************************************************************
 
@@ -47,6 +46,11 @@ DataExcLow	EQU	612
 		move.l a1,d1
 		
 		RUNPOWERPC	_PowerPCBase,GetSysTimePPC
+		
+		lea HalInfoTags-infotext(a4),a1
+		move.l a1,d1
+		
+		RUNPOWERPC	_PowerPCBase,GetHALInfo		
 		
 		lea Tags-infotext(a4),a2
 		
@@ -172,11 +176,9 @@ Done		move.l 52(a2),d2
 		divu.l d3,d2		
 		move.l d2,72(a1)
 		
-		move.l _PowerPCBase-infotext(a4),a3
-		move.l 	AlignmentExcLow(a3),d2
-		move.l d2,76(a1)
-		move.l 	DataExcLow(a3),d2
-		move.l d2,80(a1)
+		lea HalInfoTags-infotext(a4),a3
+		move.l 4(a3),76(a1)
+		move.l 12(a3),80(a1)
 		
 		move.l a1,d2
 		jsr _LVOVPrintf(a6)
@@ -229,6 +231,8 @@ Args		dc.l	0,0,0,0,0,0,0,0,0,0
 Time		dc.l	0,0
 		dc.l	0,0,0,0,0,0
 		dc.l	0,0,0,0
+		
+HalInfoTags	dc.l	HINFO_ALEXC_LOW,0,HINFO_DSEXC_LOW,0,TAG_END
 		
 DosBase		dc.l	0
 _PowerPCBase	dc.l	0

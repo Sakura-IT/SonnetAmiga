@@ -131,8 +131,7 @@ SetLen:		mr	r30,r28
 		bl	Epic				#Setup the EPIC controller
 		bl	End
 
-Start:		loadreg	r0,'REDY'			#Dummy entry at absolute 0x8400
-		stw	r0,Init(r0)
+Start:							#Dummy task at absolute (see ppcdefines)
 .IdleLoop:	nop					#IdleTask
 		nop
 		nop
@@ -158,10 +157,10 @@ End:		mflr	r4
 
 		loadreg	r3,IdleTask			#Start hardcoded at 0x8000
 		lwz	r31,SonnetBase(r0)
-		or	r3,r3,r31
+		add	r3,r3,r31
 
 		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
-		or	r1,r1,r31
+		add	r1,r1,r31
 		mr	r31,r3
 		
 		addi	r5,r4,End-Start
@@ -344,6 +343,9 @@ End:		mflr	r4
 
 		bl	Caches				#Setup the L1 and L2 cache
 
+		loadreg	r0,'REDY'			
+		stw	r0,Init(r0)
+		
 		loadreg	r4,QuickQuantum
 		mtdec	r4
 
@@ -389,12 +391,9 @@ End:		mflr	r4
 		stwbrx	r4,r5,r14
 		sync
 		
-		mr	r5,r4
 		subi	r4,r4,4
-		
-		lis	r14,0x1
-		or	r5,r5,r6
-		add	r5,r5,r14
+		lis	r5,0x20
+		add	r5,r5,r6
 		
 		li	r6,4096
 		mr	r7,r6
@@ -648,9 +647,9 @@ Caches:		mfspr	r4,HID0				#Invalidatem then enable L1 caches
 		 	
 #		blr					#REMOVE ME FOR L2 CACHE		
 
-		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS|L2CR_DO
-#		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS|L2CR_DO|L2CR_L2WT
-
+#		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS|L2CR_DO
+		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS
+		
 		mtl2cr	r4				# Set up on chip L2 cache controller.
 		sync
 		
@@ -677,7 +676,7 @@ Wait2:		mfl2cr	r3
 		lwz	r6,MemSize(r0)			#Address to start writing
 		subis	r6,r6,0x40			#Substract 4 MB
 		lwz	r5,SonnetBase(r0)
-		or	r6,r6,r5
+		add	r6,r6,r5
 		lis	r5,L2_SIZE_1M_U			#Size of memory to write to
 		
 .L2SzWriteLoop:	dcbz	r4,r6
@@ -719,7 +718,50 @@ Wait2:		mfl2cr	r3
 		stw	r30,sonnet_L2Size(r4)
 		stw	r30,sonnet_CurrentL2Size(r4)
 
-		mfl2cr	r4		
+		mfspr	r9,HID1
+		rlwinm	r9,r9,4,28,31
+		mflr	r10
+
+		bl	.END_CFG
+		
+		.long	0,0						#For the Modders
+.PLL_CFG:	.long	0b1101,400000000,0b0001,500000000
+		.long	0b0101,433333333,0b0010,466666666
+		.long	0b1100,533333333
+.END_CFG:
+
+		mflr	r6
+		li	r8,(.END_CFG-.PLL_CFG)/8
+		mtctr	r8
+		
+.NextPLL:	lwzu	r8,8(r6)
+		cmpw	r9,r8
+		beq	.GotMHz
+		bdnz	.NextPLL
+		li	r9,0				#Unknown speed
+		b	.StoreSpeed
+		
+.GotMHz:	lwz	r9,4(r6)
+.StoreSpeed:	stw	r9,sonnet_CPUSpeed(r4)
+
+		loadreg	r8,400000000
+		cmpw	r8,r9
+		bne	.DefL2Speed
+		
+		lis	r8,L2CR_SIZE_1MB		#check for 400/1MB (= 200MHz cache)
+		cmpw	r8,r7
+		bne	.DefL2Speed
+		
+		mfl2cr	r4
+		xoris	r4,r4,L2CR_L2CLK_3@h
+		oris	r4,r4,L2CR_L2CLK_2@h
+		mtl2cr	r4
+		sync
+		isync
+
+.DefL2Speed:	mtlr	r10
+		
+		mfl2cr	r4
 		xoris	r4,r4,L2CR_SIZE_1MB|L2CR_TS_OFF
 		or	r4,r4,r7		
 		mtl2cr	r4				#Set correct size and switch Test off
@@ -732,6 +774,7 @@ Wait2:		mfl2cr	r3
 
 mmuSetup:	
 		mflr	r30
+		
 
 		lis	r6,0x800				#Amount of memory to virtualize (128MB)
 
@@ -781,7 +824,32 @@ mmuSetup:
 		addis	r3,r3,0x800
 		addis	r4,r3,0x200
 		addis	r5,r3,0x4000
-		loadreg	r6,PTE_WRITE_THROUGH
+				
+		lbz	r7,FLAG_PAGETABLE(r0)
+		mr.	r7,r7
+		bne	.DoGFXPT1
+		
+		li	r17,BAT_READ_WRITE
+		li	r18,BAT_BL_32M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
+		li	r19,BAT_WRITE_THROUGH | BAT_READ_WRITE
+		li	r20,BAT_BL_32M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
+		
+		or	r17,r17,r5
+		or	r18,r18,r3
+		or	r19,r19,r5
+		or	r20,r20,r3
+		
+		mtspr	ibat1l,r17
+		mtspr	ibat1u,r18
+		mtspr	dbat1l,r19
+		mtspr	dbat1u,r20
+
+		sync
+		isync
+		
+		b	.No3DFX
+		
+.DoGFXPT1:	loadreg	r6,PTE_WRITE_THROUGH
 		li	r7,2
 		
 		bl	.DoTBLs
@@ -792,7 +860,32 @@ mmuSetup:
 		addis	r3,r3,0x200
 		addis	r4,r3,0x200
 		addis	r5,r3,0x4000
-		loadreg	r6,PTE_WRITE_THROUGH
+		
+		lbz	r7,FLAG_PAGETABLE(r0)
+		mr.	r7,r7
+		bne	.DoGFXPT2
+		
+		li	r17,BAT_READ_WRITE
+		li	r18,BAT_BL_32M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
+		li	r19,BAT_WRITE_THROUGH | BAT_READ_WRITE
+		li	r20,BAT_BL_32M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
+		
+		or	r17,r17,r5
+		or	r18,r18,r3
+		or	r19,r19,r5
+		or	r20,r20,r3
+		
+		mtspr	ibat1l,r17
+		mtspr	ibat1u,r18
+		mtspr	dbat1l,r19
+		mtspr	dbat1u,r20
+
+		sync
+		isync
+		
+		b	.No3DFX
+		
+.DoGFXPT2:	loadreg	r6,PTE_WRITE_THROUGH
 		li	r7,2
 		
 		bl	.DoTBLs
@@ -812,52 +905,92 @@ mmuSetup:
 .NoATI:		li	r3,0				#Zeropage (4K no cache)
 		li	r4,0x1000			#no cache for shared stuff with 68k
 		mr	r5,r3
-		loadreg	r6,PTE_CACHE_INHIBITED
+				
+		lbz	r7,FLAG_PAGETABLE(r0)
+		mr.	r7,r7
+		bne	.DoKernelPT2
+
+		li	r17,BAT_READ_WRITE
+		li	r18,BAT_BL_2M | BAT_VALID_SUPERVISOR
+		li	r19,BAT_CACHE_INHIBITED | BAT_READ_WRITE
+		li	r20,BAT_BL_2M | BAT_VALID_SUPERVISOR
+		
+		or	r17,r17,r5
+		or	r18,r18,r3
+		or	r19,r19,r5
+		or	r20,r20,r3
+		
+		mtspr	ibat0l,r17
+		mtspr	ibat0u,r18
+		mtspr	dbat0l,r19
+		mtspr	dbat0u,r20
+
+		sync
+		isync
+
+		b	.SkipNxtTab2
+
+.DoKernelPT2:	loadreg	r6,PTE_CACHE_INHIBITED
 		li	r7,2				#pp = 2 - Read/Write Access
 		
 		bl	.DoTBLs						
-		
+
 		li	r3,0x1000			#Exception code (16K cached)
 		loadreg	r4,0x8000
 		mr	r5,r3
-		li	r6,r0
+		li	r6,0
 		li	r7,0				#pp = 0 - Supervisor access only.
 							#Otherwise DSI/ISI (e.g. CHIP access)
-		bl	.DoTBLs
-		
-		lis	r3,0x10				#Message FIFOs (64k no cache)
-		lis	r4,0x11
-		mr	r5,r3
-		li	r6,PTE_CACHE_INHIBITED
-		li	r7,0				#pp = 0 - Supervisor access only.
-							#Otherwise DSI/ISI (e.g. CHIP access)
-		bl	.DoTBLs
-		
-		lis	r3,0x11				#Message (1.5MB no cache)
-		lis	r4,0x29				#MOVE THIS TO 0x200000?
-		mr	r5,r3				#MOVE TBLS HERE?
-		or	r3,r3,r27
-		or	r4,r4,r27
-		li	r6,PTE_CACHE_INHIBITED
-		li	r7,2
-		
 		bl	.DoTBLs
 
-		
-		loadreg	r3,0x8000			#First free block (~1MB cached)
-		lis	r4,0x10				#SHOULD PROBABLY MAKE THIS SUPERVISOR ACCESS
-		mr	r5,r3				#ONLY TOO TO EMULATE CHIP ACCESS!!
-		or	r3,r3,r27			#(TO 0x200000?)
-		or	r4,r4,r27
+		lis	r3,0x10				#Message FIFOs (1MB no cache)
+		lis	r4,0x20
+		mr	r5,r3
+#		li	r6,PTE_CACHE_INHIBITED
 		li	r6,0
+		li	r7,0				#pp = 0 - Supervisor access only.
+							#Otherwise DSI/ISI (e.g. CHIP access)
+		bl	.DoTBLs
+		
+.SkipNxtTab2:	lis	r3,0x20				#Messages / Idle / Stack (2MB no cache)
+		lis	r4,0x40
+		mr	r5,r3
+		add	r3,r3,r27
+		add	r4,r4,r27
+		
+		lbz	r7,FLAG_PAGETABLE(r0)
+		mr.	r7,r7
+		bne	.DoKernelPT
+		
+		li	r17,BAT_READ_WRITE
+		li	r18,BAT_BL_2M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
+		li	r19,BAT_CACHE_INHIBITED | BAT_READ_WRITE
+		li	r20,BAT_BL_2M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
+		
+		or	r17,r17,r5
+		or	r18,r18,r3
+		or	r19,r19,r5
+		or	r20,r20,r3
+		
+		mtspr	ibat2l,r17
+		mtspr	ibat2u,r18
+		mtspr	dbat2l,r19
+		mtspr	dbat2u,r20
+
+		sync
+		isync
+
+		b	.SkipNxtTab
+
+.DoKernelPT:	li	r6,PTE_CACHE_INHIBITED
 		li	r7,2
 		
 		bl	.DoTBLs
 		
-		lis	r3,0x29				#Sonnet memory (Rest cached)
+.SkipNxtTab:	lis	r3,0x40				#Sonnet memory (Rest cached)
 		lwz	r4,MemSize(r0)
 		mr	r5,r3
-		or	r3,r3,r27
+		add	r3,r3,r27
 		add	r4,r4,r27
 		
 		li	r6,0
@@ -872,19 +1005,6 @@ mmuSetup:
 		addi	r7,r7,0x1000
 		bdnz+	.tlblp
 		tlbsync
-
-		
-#		loadreg	r0,IBAT3L_VAL
-#		mtspr	ibat3l,r0
-#		loadreg	r0,IBAT3U_VAL
-#		mtspr	ibat3u,r0
-#		loadreg r0,DBAT3L_VAL
-#		mtspr	dbat3l,r0
-#		loadreg	r0,DBAT3U_VAL
-#		mtspr	dbat3u,r0
-#		sync
-#		isync
-
 
 		loadreg	r0,PSL_IR|PSL_DR|PSL_FP		#Turn on MMU
 		sync

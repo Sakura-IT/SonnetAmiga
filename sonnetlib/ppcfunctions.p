@@ -1089,8 +1089,6 @@ GetInfo:
 
 		mr	r4,r3
 
-		mfspr	r3,HID1
-		stw	r3,sonnet_CPUHID1(r30)
 		mfspr	r3,HID0
 		stw	r3,sonnet_CPUHID0(r30)
 		mfspr	r3,SDR1
@@ -1219,29 +1217,8 @@ GetInfo:
 .StoreTag:	stw	r7,4(r4)
 		b	.NextInList
 		
-.INFO_CPUCLOCK:	lwz	r7,sonnet_CPUHID1(r30)
-		rlwinm	r7,r7,4,28,31
-		bl	.END_CFG
-		
-		.long	0,0						#For the Modders
-.PLL_CFG:	.long	0b1101,400000000,0b0001,500000000
-		.long	0b0101,433333333,0b0010,466666666
-		.long	0b1100,533333333
-.END_CFG:
-
-		mflr	r6
-		li	r8,(.END_CFG-.PLL_CFG)/8
-		mtctr	r8
-		
-.NextPLL:	lwzu	r8,8(r6)
-		cmpw	r7,r8
-		beq	.GotMHz
-		bdnz	.NextPLL
-		li	r7,0
+.INFO_CPUCLOCK:	lwz	r7,sonnet_CPUSpeed(r30)
 		b	.StoreTag
-		
-.GotMHz:	lwz	r7,4(r6)
-		b	.StoreTag		
 
 .INFO_L2CACHE:	lwz	r7,sonnet_L2STATE(r30)
 		rlwinm	r7,r7,1,31,31
@@ -7648,7 +7625,7 @@ GetHALInfo:
 		lwz	r4,DataExcHigh(r30)
 		stw	r4,4(r3)
 		
-.NoHALTag3:	loadreg	r4,HINFO_DSEXC_HIGH
+.NoHALTag3:	loadreg	r4,HINFO_DSEXC_LOW
 		mr	r5,r31
 		
 		bl FindTagItemPPC

@@ -323,7 +323,7 @@ Wait		move.l $3004(a1),d5
 NoSonRam	lea SonnetMemError(pc),a2
 		bra PrintError
 
-PPCReady	move.l #StackSize,d7			;Set stack
+PPCReady	move.l #NoMemAccess,d7			;Part of memory not accessible
 		move.l $3008(a1),d5
 		move.l d5,SonnetBase-Buffer(a4)
 		add.l d7,d5
@@ -373,7 +373,7 @@ GotMemName	move.l d0,a0
 		beq.s NoPCILb
 
 		move.l d4,a2
-		sub.l #StackSize,d5
+		sub.l #NoMemAccess,d5
 		move.l d5,PCI_SPACE0(a2)
 		moveq.l #0,d6
 		sub.l d7,d6
@@ -425,11 +425,6 @@ GotLibMade	move.l SonnetBase(pc),a1
 		jsr _LVOMakeLibrary(a6)
 		move.l d0,a1
 		jsr _LVOAddLibrary(a6)
-
-		move.l SonnetBase(pc),a1
-		add.l #$100000,a1
-		move.l #$190000,d0			;Reserve space for the msg FIFOs
-		jsr _LVOAllocAbs(a6)			;and the inter CPU messages themselves
 
 		lea MyInterrupt(pc),a1
 		lea SonInt(pc),a2
