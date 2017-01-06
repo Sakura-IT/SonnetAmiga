@@ -6011,7 +6011,7 @@ DeleteTaskPPC:
 
 #********************************************************************************************
 #
-#	Status = SetHardware(hardwareflags, parameter) // r3=r4,r5
+#	Status = SetHardware(PowerPCBase, hardwareflags, parameter) // r3=r3,r4,r5
 #
 #********************************************************************************************
 
@@ -6043,6 +6043,12 @@ SetHardware:
 		beq-	.SetDBreak
 		cmplwi	r4,HW_CLEARDBREAK
 		beq-	.ClearDBreak
+		cmplwi	r4,HW_CPUTYPE
+		beq-	.CPUType
+		cmplwi	r4,HW_SETDEBUGMODE
+		beq-	.SetDebugMode
+		cmplwi	r4,HW_PPCSTATE
+		beq-	.PPCState
 		b	.HWEnd
 
 .TraceOn:	bl Super
@@ -6177,10 +6183,35 @@ SetHardware:
 		
 		bl User
 		
+		b	.HWEnd
+		
+.CPUType:	lwz	r3,sonnet_CPUInfo(r3)
+
+		b	.PrivateEnd
+		
+.SetDebugMode:	stb	r5,sonnet_DebugLevel(r3)
+
+		b	.HWEnd
+		
+.PPCState:	mr	r31,r3
+		lwz	r5,LIST_WAITINGTASKS(r3)
+		li	r3,PPCSTATEF_POWERSAVE
+		lwz	r5,0(r5)
+		mr.	r5,r5
+		beq	.NoWaiting
+		
+		li	r3,PPCSTATEF_APPACTIVE
+.NoWaiting:	lwz	r5,ThisPPCProc(r31)
+		mr.	r5,r5
+		beq	.PrivateEnd
+		
+		li	r3,PPCSTATEF_APPRUNNING
+		b	.PrivateEnd
+		
 .HWEnd:		li	r4,HW_AVAILABLE
 		mr	r3,r4
 
-		lwz	r31,0(r13)
+.PrivateEnd:	lwz	r31,0(r13)
 		addi	r13,r13,4
 
 		epilog 'TOC'

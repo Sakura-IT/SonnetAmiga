@@ -22,8 +22,6 @@
 	include	exec/tasks.i
 	include sonnet_lib.i
 
-	XREF	FunctionsLen,LibFunctions,sonnet_DebugLevel,sonnet_CPUInfo
-
 	XREF	SetExcMMU,ClearExcMMU,InsertPPC,AddHeadPPC,AddTailPPC
 	XREF	RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
 	XREF	AddTimePPC,SubTimePPC,CmpTimePPC,AllocVecPPC,FreeVecPPC,GetInfo,GetSysTimePPC
@@ -52,9 +50,8 @@
 	
 	ENDC
 
-	XREF 	PPCCode,PPCLen,ThisPPCProc,LIST_WAITINGTASKS,MCPort,Init
-	XREF	SysBase,PowerPCBase,DOSBase
-	XDEF	_PowerPCBase
+	XREF 	PPCCode,PPCLen,MCPort,Init,SysBase,PowerPCBase,DOSBase
+	XDEF	_PowerPCBase,FunctionsLen,LibFunctions
 
 ;********************************************************************************************
 
@@ -1232,7 +1229,11 @@ Reserved:
 
 GetCPU:
 		movem.l d1-a6,-(a7)			;As we only have G3 and G4 on a sonnet
-		move.l sonnet_CPUInfo(a6),d0		;only those are returned (no 603/604 etc)
+		
+		moveq.l #HW_CPUTYPE,d1			;only those are returned (no 603/604 etc)			
+		
+		RUNPOWERPC	_PowerPCBase,SetHardware
+		
 		and.w #$0,d0
 		swap d0
 		subq.l #8,d0
@@ -1244,7 +1245,7 @@ GetCPU:
 G3		move.l #CPUF_G3,d0
 		bra.s ExCPU
 G4		move.l #CPUF_G4,d0
-ExCPU		movem.l (a7)+,d1-a6			;sonnet_CPUInfo - Cache problem?
+ExCPU		movem.l (a7)+,d1-a6
 		rts
 
 ;********************************************************************************************
@@ -1958,7 +1959,7 @@ NoFPU2		rts
 
 CrossSignals	bsr CreateMsgFrame
 
-debugxx		moveq.l #47,d1				;MsgLen/4-1
+		moveq.l #47,d1				;MsgLen/4-1
 		move.l a0,a2
 ClearMsg	clr.l (a2)+
 		dbf d1,ClearMsg
@@ -1978,16 +1979,13 @@ ClearMsg	clr.l (a2)+
 ;
 ;********************************************************************************************
 
-GetPPCState:
-		move.l d1,-(a7)
-		moveq.l #PPCSTATEF_POWERSAVE,d0		;If no waiting then POWERSAVE
-		move.l LIST_WAITINGTASKS(a6),d1		;PPC Cache?
-		beq.s NoWait
-		moveq.l #PPCSTATEF_APPACTIVE,d0
-NoWait		move.l ThisPPCProc(a6),d1
-		beq.s NoRun
-		moveq.l #PPCSTATEF_APPRUNNING,d0
-NoRun		move.l (a7)+,d1
+GetPPCState:	movem.l d1-a6,-(a7)
+
+		moveq.l #HW_PPCSTATE,d1
+
+		RUNPOWERPC	_PowerPCBase,SetHardware
+
+		movem.l (a7)+,d1-a6
 		rts
 
 ;********************************************************************************************
@@ -2156,12 +2154,20 @@ CacheIt		movem.l (a7)+,d2-d4/a2/a6
 ;********************************************************************************************
 
 PowerDebugMode:
+		movem.l d1-a6,-(a7)
 		cmp.b #0,d0
 		blt.s ExitDebug
 		cmp.b #4,d0
 		bge.s ExitDebug
-		move.b d0,sonnet_DebugLevel(a6)		;Cache problem?
-ExitDebug	rts
+		
+		moveq.l #HW_SETDEBUGMODE,d1
+		move.l d0,a0
+		
+		RUNPOWERPC	_PowerPCBase,SetHardware
+		
+ExitDebug	movem.l (a7)+,d1-a6
+
+		rts
 
 ;********************************************************************************************
 ;
@@ -2516,7 +2522,7 @@ FUNCTABLE:
 
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0
-IDString	dc.b	"$VER: sonnet.library 17.4 (26-Dec-16)",0
+IDString	dc.b	"$VER: sonnet.library 17.4 (06-Jan-17)",0
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: fake warp.library 5.0 (01-Apr-16)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0

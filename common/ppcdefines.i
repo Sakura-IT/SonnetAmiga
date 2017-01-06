@@ -33,7 +33,7 @@
 .set FLAG_PAGETABLE,92
 
 
-#LibBase:
+#LibBase:					All this stuff is PPC only! No access allowed from 68k!
 
 .set sonnet_DebugLevel,72
 .set sonnet_TaskExitCode,76
@@ -487,6 +487,9 @@
 .set HW_CLEARIBREAK,8				#clear instruction breakpoint
 .set HW_SETDBREAK,9				#set data breakpoint (604[E] only)
 .set HW_CLEARDBREAK,10
+.set HW_CPUTYPE,11				#Private
+.set HW_SETDEBUGMODE,12				#Private
+.set HW_PPCSTATE,13				#Private
 .set HW_NOTAVAILABLE,0
 .set HW_AVAILABLE,-1
 
@@ -860,3 +863,7 @@
 
 .set TAG_DONE,0
 .set MEMERR_SUCCESS,0
+
+.set PPCSTATEF_POWERSAVE,1	    	# PPC is in power save mode
+.set PPCSTATEF_APPACTIVE,2    		# PPC application tasks are active
+.set PPCSTATEF_APPRUNNING,4		# PPC apllication task is running
