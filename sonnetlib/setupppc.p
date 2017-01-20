@@ -3960,7 +3960,7 @@ EInt:		b	.FPUnav				#0
 
 #********************************************************************************************
 
-.Alignment:	mtsprg0	r0				#FPU Alignment Exception
+.Alignment:	mtsprg0	r0				#Alignment Exception
 		mtsprg1	r1
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
@@ -4054,7 +4054,7 @@ EInt:		b	.FPUnav				#0
 		mr	r31,r1				#Start of fp regtable in r31
 
 		lwz	r5,PowerPCBase(r0)		#For GetHALInfo
-		lwz	r6,AlignmentExcLow(r5)		#Counts number of FPU aligment issues
+		lwz	r6,AlignmentExcLow(r5)		#Counts number of aligment issues
 		addic	r6,r6,1				#For debugging and optimization purposes
 		stw	r6,AlignmentExcLow(r5)
 		lwz	r6,AlignmentExcHigh(r5)
@@ -4123,7 +4123,12 @@ EInt:		b	.FPUnav				#0
 		stfdx	f1,r31,r6			#Store the 64 bit value
 		b	.AligExit
 		
-.lstfsx:	rlwinm	r8,r5,23,25,29			#get index register
+.lstfsx:	rlwinm.	r0,r5,25,31,31			#0 = s; 1 = d
+		bne	.HaltAlign
+		rlwinm.	r0,r5,26,31,31			#0 = x; 1 = ux
+		bne	.HaltAlign
+
+		rlwinm	r8,r5,23,25,29			#get index register
 		lwzx	r8,r30,r8			#get index register value
 		rlwinm.	r0,r5,24,31,31
 		bne	.stfs
@@ -5155,7 +5160,7 @@ EInt:		b	.FPUnav				#0
 .EProgram:	.string	"Program"
 .EDSI:		.string	"Data Storage"
 .EISI:		.string	"Instruction Storage"
-.EAlign:	.string "FPU Alignment"
+.EAlign:	.string "Alignment"
 .EFP:		.string	"FPU Unavailable"
 .ETrace:	.string "Trace"
 .ESM:		.string "System Management"
