@@ -257,12 +257,15 @@ End:		mflr	r4
 
 		li	r6,100				#Insert default values here
 		stw	r6,IdDefTasks(r3)
+		stb	r6,sonnet_AltivecOn(r3)
 		li	r6,24
 		stb	r6,BusyCounter(r3)
 		li	r6,6000
 		stw	r6,LowActivityPrio(r3)		#Not used
 		lwz	r6,SysBase(r0)
 		stw	r6,sonnet_SysBase(r3)
+		lwz	r6,DOSBase(r0)
+		stw	r6,sonnet_DosBase(r3)
 		
 		mr	r14,r3
 		la	r6,SemMemory(r14)
@@ -1788,8 +1791,9 @@ EInt:		b	.FPUnav				#0
 		b	.PerfMon			#28
 		b	.SysMan				#2c
 		b	.TherMan			#30
+		b	.VMXUnav			#34
 
-		mtsprg2	r0				#34
+		mtsprg2	r0				#38
 		
 		mfsrr1	r0
 		mtsprg1	r0
@@ -2832,175 +2836,334 @@ EInt:		b	.FPUnav				#0
 		mfsprg0	r3
 		stw	r3,0(r6)
 		mfsprg1 r3
-		stwu	r3,4(r6)
+		stw	r3,4(r6)
 		lwz	r3,0(r1)			#User stack
 		lwz	r0,8(r3)			#lr
-		stwu	r0,4(r6)
+		stw	r0,8(r6)
 		lwz	r0,4(r3)			#cr
-		stwu	r0,4(r6)
+		stw	r0,12(r6)
 		mfctr	r0
-		stwu	r0,4(r6)
+		stw	r0,16(r6)
 		mfsprg3	r0
-		stwu	r0,4(r6)			#xer
+		stw	r0,20(r6)			#xer
 		mfsprg2	r0
-		stwu	r0,4(r6)
+		stw	r0,24(r6)
 		lwz	r0,0(r3)
-		stwu	r0,4(r6)			#r1
-		stwu	r2,4(r6)
+		stw	r0,28(r6)			#r1
+		stw	r2,32(r6)
 		lwz	r0,28(r13)
-		stwu	r0,4(r6)
+		stw	r0,36(r6)
 		lwz	r0,24(r13)
-		stwu	r0,4(r6)
+		stw	r0,40(r6)
 		lwz	r0,20(r13)
-		stwu	r0,4(r6)
+		stw	r0,44(r6)
 		lwz	r0,16(r13)
-		stwu	r0,4(r6)
+		stw	r0,48(r6)
 		lwz	r0,12(r13)
-		stwu	r0,4(r6)
+		stw	r0,52(r6)
 		lwz	r0,8(r13)
-		stwu	r0,4(r6)
+		stw	r0,56(r6)
 		lwz	r0,4(r13)
-		stwu	r0,4(r6)
+		stw	r0,60(r6)
 		lwz	r0,0(r13)
-		stwu	r0,4(r6)
-		stwu	r11,4(r6)
-		stwu	r12,4(r6)
+		stw	r0,64(r6)
+		stw	r11,68(r6)
+		stw	r12,72(r6)
 		lwz	r3,-4(r3)
-		stwu	r3,4(r6)
-		stwu	r14,4(r6)
-		stwu	r15,4(r6)
-		stwu	r16,4(r6)
-		stwu	r17,4(r6)
-		stwu	r18,4(r6)
-		stwu	r19,4(r6)
-		stwu	r20,4(r6)
-		stwu	r21,4(r6)
-		stwu	r22,4(r6)
-		stwu	r23,4(r6)
-		stwu	r24,4(r6)
-		stwu	r25,4(r6)
-		stwu	r26,4(r6)
-		stwu	r27,4(r6)
-		stwu	r28,4(r6)
-		stwu	r29,4(r6)
-		stwu	r30,4(r6)
-		stwu	r31,4(r6)
+		stw	r3,76(r6)
+		stw	r14,80(r6)
+		stw	r15,84(r6)
+		stw	r16,88(r6)
+		stw	r17,92(r6)
+		stw	r18,96(r6)
+		stw	r19,100(r6)
+		stw	r20,104(r6)
+		stw	r21,108(r6)
+		stw	r22,112(r6)
+		stw	r23,116(r6)
+		stw	r24,120(r6)
+		stw	r25,124(r6)
+		stw	r26,128(r6)
+		stw	r27,132(r6)
+		stw	r28,136(r6)
+		stw	r29,140(r6)
+		stw	r30,144(r6)
+		stw	r31,148(r6)
 
-		stfdu	f0,4(r6)			#NO Pad to make align on 8
-		stfdu	f1,8(r6)
-		stfdu	f2,8(r6)
-		stfdu	f3,8(r6)
-		stfdu	f4,8(r6)
-		stfdu	f5,8(r6)
-		stfdu	f6,8(r6)
-		stfdu	f7,8(r6)
-		stfdu	f8,8(r6)
-		stfdu	f9,8(r6)
-		stfdu	f10,8(r6)
-		stfdu	f11,8(r6)
-		stfdu	f12,8(r6)
-		stfdu	f13,8(r6)
-		stfdu	f14,8(r6)
-		stfdu	f15,8(r6)		
-		stfdu	f16,8(r6)
-		stfdu	f17,8(r6)
-		stfdu	f18,8(r6)
-		stfdu	f19,8(r6)
-		stfdu	f20,8(r6)
-		stfdu	f21,8(r6)
-		stfdu	f22,8(r6)
-		stfdu	f23,8(r6)
-		stfdu	f24,8(r6)
-		stfdu	f25,8(r6)
-		stfdu	f26,8(r6)
-		stfdu	f27,8(r6)
-		stfdu	f28,8(r6)
-		stfdu	f29,8(r6)
-		stfdu	f30,8(r6)
-		stfdu	f31,8(r6)
-		blr
-			
+		stfd	f0,160(r6)			#NO Pad to make align on 8
+		mffs	f0
+		stfd	f0,152(r6)
+		stfd	f1,168(r6)
+		stfd	f2,176(r6)
+		stfd	f3,184(r6)
+		stfd	f4,192(r6)
+		stfd	f5,200(r6)
+		stfd	f6,208(r6)
+		stfd	f7,216(r6)
+		stfd	f8,224(r6)
+		stfd	f9,232(r6)
+		stfd	f10,240(r6)
+		stfd	f11,248(r6)
+		stfd	f12,256(r6)
+		stfd	f13,264(r6)
+		stfd	f14,272(r6)
+		stfd	f15,280(r6)		
+		stfd	f16,288(r6)
+		stfd	f17,296(r6)
+		stfd	f18,304(r6)
+		stfd	f19,312(r6)
+		stfd	f20,320(r6)
+		stfd	f21,328(r6)
+		stfd	f22,336(r6)
+		stfd	f23,344(r6)
+		stfd	f24,352(r6)
+		stfd	f25,360(r6)
+		stfd	f26,368(r6)
+		stfd	f27,376(r6)
+		stfd	f28,384(r6)
+		stfd	f29,392(r6)
+		stfd	f30,400(r6)
+		stfd	f31,408(r6)
+		
+		lwz	r3,4(r6)
+		andis.	r3,r3,PSL_VEC@h
+		beq	.NoStoreVMX
+		
+		li	r3,544+16
+		stvx	v0,r6,r3
+		
+		li	r3,544
+		mfvscr	v0
+		stvx	v0,r6,r3
+		addi	r3,r3,32
+		stvx	v1,r6,r3
+		addi	r3,r3,16
+		stvx	v2,r6,r3
+		addi	r3,r3,16
+		stvx	v3,r6,r3
+		addi	r3,r3,16
+		stvx	v4,r6,r3
+		addi	r3,r3,16
+		stvx	v5,r6,r3
+		addi	r3,r3,16
+		stvx	v6,r6,r3
+		addi	r3,r3,16
+		stvx	v7,r6,r3
+		addi	r3,r3,16
+		stvx	v8,r6,r3
+		addi	r3,r3,16
+		stvx	v9,r6,r3
+		addi	r3,r3,16
+		stvx	v10,r6,r3
+		addi	r3,r3,16
+		stvx	v11,r6,r3
+		addi	r3,r3,16
+		stvx	v12,r6,r3
+		addi	r3,r3,16
+		stvx	v13,r6,r3
+		addi	r3,r3,16
+		stvx	v14,r6,r3
+		addi	r3,r3,16
+		stvx	v15,r6,r3
+		addi	r3,r3,16
+		stvx	v16,r6,r3
+		addi	r3,r3,16
+		stvx	v17,r6,r3
+		addi	r3,r3,16
+		stvx	v18,r6,r3
+		addi	r3,r3,16
+		stvx	v19,r6,r3
+		addi	r3,r3,16
+		stvx	v20,r6,r3
+		addi	r3,r3,16
+		stvx	v21,r6,r3
+		addi	r3,r3,16
+		stvx	v22,r6,r3
+		addi	r3,r3,16
+		stvx	v23,r6,r3
+		addi	r3,r3,16
+		stvx	v24,r6,r3
+		addi	r3,r3,16
+		stvx	v25,r6,r3
+		addi	r3,r3,16
+		stvx	v26,r6,r3
+		addi	r3,r3,16
+		stvx	v27,r6,r3
+		addi	r3,r3,16
+		stvx	v28,r6,r3
+		addi	r3,r3,16
+		stvx	v29,r6,r3
+		addi	r3,r3,16
+		stvx	v30,r6,r3
+		addi	r3,r3,16
+		stvx	v31,r6,r3
+		
+		mfspr	r3,VRSAVE
+		stw	r3,1072(r6)
+		
+.NoStoreVMX:	blr
+
+#********************************************************************************************			
+
 .LoadContext:	lwz	r9,TASKPPC_CONTEXTMEM(r9)
 		li	r0,0
 		stb	r0,PortInUse(r10)
 		stb	r0,sonnet_ExceptionMode(r10)
-		lwz	r0,0(r9)
+		
+		lwz	r10,4(r9)
+		andis.	r10,r10,PSL_VEC@h
+		beq	.NoLoadVMX
+
+		li	r10,544
+		lvx	v0,r9,r10
+		mtvscr	v0
+		addi	r10,r10,16
+		lvx	v0,r9,r10
+		addi	r10,r10,16
+		lvx	v1,r9,r10
+		addi	r10,r10,16
+		lvx	v2,r9,r10
+		addi	r10,r10,16
+		lvx	v3,r9,r10
+		addi	r10,r10,16
+		lvx	v4,r9,r10
+		addi	r10,r10,16
+		lvx	v5,r9,r10
+		addi	r10,r10,16
+		lvx	v6,r9,r10
+		addi	r10,r10,16
+		lvx	v7,r9,r10
+		addi	r10,r10,16
+		lvx	v8,r9,r10
+		addi	r10,r10,16
+		lvx	v9,r9,r10
+		addi	r10,r10,16
+		lvx	v10,r9,r10
+		addi	r10,r10,16
+		lvx	v11,r9,r10
+		addi	r10,r10,16
+		lvx	v12,r9,r10
+		addi	r10,r10,16
+		lvx	v13,r9,r10
+		addi	r10,r10,16
+		lvx	v14,r9,r10
+		addi	r10,r10,16
+		lvx	v15,r9,r10
+		addi	r10,r10,16
+		lvx	v16,r9,r10
+		addi	r10,r10,16
+		lvx	v17,r9,r10
+		addi	r10,r10,16
+		lvx	v18,r9,r10
+		addi	r10,r10,16
+		lvx	v19,r9,r10
+		addi	r10,r10,16
+		lvx	v20,r9,r10
+		addi	r10,r10,16
+		lvx	v21,r9,r10
+		addi	r10,r10,16
+		lvx	v22,r9,r10
+		addi	r10,r10,16
+		lvx	v23,r9,r10
+		addi	r10,r10,16
+		lvx	v24,r9,r10
+		addi	r10,r10,16
+		lvx	v25,r9,r10
+		addi	r10,r10,16
+		lvx	v26,r9,r10
+		addi	r10,r10,16
+		lvx	v27,r9,r10
+		addi	r10,r10,16
+		lvx	v28,r9,r10
+		addi	r10,r10,16
+		lvx	v29,r9,r10
+		addi	r10,r10,16
+		lvx	v30,r9,r10
+		addi	r10,r10,16
+		lvx	v31,r9,r10
+
+		lwz	r10,1072(r9)			#544+33*16
+		mtspr	VRSAVE,r10
+		
+.NoLoadVMX:	lwz	r0,0(r9)
 		mtsrr0	r0
-		lwzu	r0,4(r9)
+		lwz	r0,4(r9)
 		mtsrr1	r0
-		lwzu	r0,4(r9)
+		lwz	r0,8(r9)
 		mtlr	r0
-		lwzu	r0,4(r9)
+		lwz	r0,12(r9)
 		mtcr	r0
-		lwzu	r0,4(r9)
+		lwz	r0,16(r9)
 		mtctr	r0
-		lwzu	r0,4(r9)
+		lwz	r0,20(r9)
 		mtxer	r0
-		lwzu	r0,4(r9)
-		lwzu	r1,4(r9)
-		lwzu	r2,4(r9)
-		lwzu	r3,4(r9)
-		lwzu	r4,4(r9)
-		lwzu	r5,4(r9)
-		lwzu	r6,4(r9)
-		lwzu	r7,4(r9)
-		lwzu	r8,4(r9)
-		lwzu	r10,4(r9)
+		lwz	r0,24(r9)
+		lwz	r1,28(r9)
+		lwz	r2,32(r9)
+		lwz	r3,36(r9)
+		lwz	r4,40(r9)
+		lwz	r5,44(r9)
+		lwz	r6,48(r9)
+		lwz	r7,52(r9)
+		lwz	r8,56(r9)
+		lwz	r10,60(r9)
 		mtsprg3	r10
-		lwzu	r10,4(r9)
-		lwzu	r11,4(r9)
-		lwzu	r12,4(r9)
-		lwzu	r13,4(r9)
-		lwzu	r14,4(r9)
-		lwzu	r15,4(r9)
-		lwzu	r16,4(r9)
-		lwzu	r17,4(r9)
-		lwzu	r18,4(r9)
-		lwzu	r19,4(r9)
-		lwzu	r20,4(r9)
-		lwzu	r21,4(r9)
-		lwzu	r22,4(r9)
-		lwzu	r23,4(r9)
-		lwzu	r24,4(r9)
-		lwzu	r25,4(r9)
-		lwzu	r26,4(r9)
-		lwzu	r27,4(r9)
-		lwzu	r28,4(r9)
-		lwzu	r29,4(r9)
-		lwzu	r30,4(r9)
-		lwzu	r31,4(r9)
-		lfdu	f0,4(r9)			#NO Pad to make align on 8
-		lfdu	f1,8(r9)
-		lfdu	f2,8(r9)
-		lfdu	f3,8(r9)
-		lfdu	f4,8(r9)
-		lfdu	f5,8(r9)
-		lfdu	f6,8(r9)
-		lfdu	f7,8(r9)
-		lfdu	f8,8(r9)
-		lfdu	f9,8(r9)
-		lfdu	f10,8(r9)
-		lfdu	f11,8(r9)
-		lfdu	f12,8(r9)
-		lfdu	f13,8(r9)
-		lfdu	f14,8(r9)
-		lfdu	f15,8(r9)
-		lfdu	f16,8(r9)
-		lfdu	f17,8(r9)
-		lfdu	f18,8(r9)
-		lfdu	f19,8(r9)
-		lfdu	f20,8(r9)
-		lfdu	f21,8(r9)
-		lfdu	f22,8(r9)
-		lfdu	f23,8(r9)
-		lfdu	f24,8(r9)
-		lfdu	f25,8(r9)
-		lfdu	f26,8(r9)
-		lfdu	f27,8(r9)
-		lfdu	f28,8(r9)
-		lfdu	f29,8(r9)
-		lfdu	f30,8(r9)
-		lfdu	f31,8(r9)
+		lwz	r10,64(r9)
+		lwz	r11,68(r9)
+		lwz	r12,72(r9)
+		lwz	r13,76(r9)
+		lwz	r14,80(r9)
+		lwz	r15,84(r9)
+		lwz	r16,88(r9)
+		lwz	r17,92(r9)
+		lwz	r18,96(r9)
+		lwz	r19,100(r9)
+		lwz	r20,104(r9)
+		lwz	r21,108(r9)
+		lwz	r22,112(r9)
+		lwz	r23,116(r9)
+		lwz	r24,120(r9)
+		lwz	r25,124(r9)
+		lwz	r26,128(r9)
+		lwz	r27,132(r9)
+		lwz	r28,136(r9)
+		lwz	r29,140(r9)
+		lwz	r30,144(r9)
+		lwz	r31,148(r9)
+		lfd	f0,152(r9)			#Must be 8 aligned
+		mtfsf	0xff,f0
+		lfd	f0,160(r9)
+		lfd	f1,168(r9)
+		lfd	f2,176(r9)
+		lfd	f3,184(r9)
+		lfd	f4,192(r9)
+		lfd	f5,200(r9)
+		lfd	f6,208(r9)
+		lfd	f7,216(r9)
+		lfd	f8,224(r9)
+		lfd	f9,232(r9)
+		lfd	f10,240(r9)
+		lfd	f11,248(r9)
+		lfd	f12,256(r9)
+		lfd	f13,264(r9)
+		lfd	f14,272(r9)
+		lfd	f15,280(r9)
+		lfd	f16,288(r9)
+		lfd	f17,296(r9)
+		lfd	f18,304(r9)
+		lfd	f19,312(r9)
+		lfd	f20,320(r9)
+		lfd	f21,328(r9)
+		lfd	f22,336(r9)
+		lfd	f23,344(r9)
+		lfd	f24,352(r9)
+		lfd	f25,360(r9)
+		lfd	f26,368(r9)
+		lfd	f27,376(r9)
+		lfd	f28,384(r9)
+		lfd	f29,392(r9)
+		lfd	f30,400(r9)
+		lfd	f31,408(r9)
 
 		loadreg	r9,'USER'
 		stw	r9,0xf4(r0)
@@ -4397,7 +4560,95 @@ EInt:		b	.FPUnav				#0
 		mtsprg1	r0
 
 		b	.ExcReUse
-	
+
+#********************************************************************************************
+
+.VMXUnav:	mtsprg0	r0				#AltiVec Unavailable Exception
+
+		mfmsr	r0
+		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
+		mtmsr	r0
+		sync					#Reenable MMU & FPU
+		isync
+
+		mtsprg3	r1
+		lwz	r0,SonnetBase(r0)
+		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
+		or	r1,r1,r0
+		mfsprg3	r0
+		stwu	r0,-4(r1)			#Store user stack
+		
+		mfsprg0	r0
+
+		stw	r13,-4(r1)
+		subi	r13,r1,4
+		stwu	r1,-1080(r1)
+		stwu	r31,-4(r13)
+		stwu	r30,-4(r13)
+		stwu	r29,-4(r13)
+		stwu	r28,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r3,-4(r13)
+		stwu	r2,-4(r13)
+		stwu	r0,-4(r13)		
+		mfcr	r0
+		stwu	r0,-4(r13)
+				
+		loadreg	r29,'VMXU'
+		stw	r29,0xf4(r0)
+				
+		li	r0,-1
+		lwz	r31,PowerPCBase(r0)
+		stb	r0,sonnet_ExceptionMode(r31)
+		lbz	r30,sonnet_AltivecOn(r31)
+		mr.	r30,r30
+		beq	.ErrorVMX
+		
+		mfsrr1	r0
+		oris	r0,r0,PSL_VEC@h
+		mtsrr1	r0
+		sync
+		isync
+		
+		li	r0,0
+		lwz	r27,PowerPCBase(r0)
+		stb	r0,sonnet_ExceptionMode(r27)
+
+		lwz	r0,0(r13)
+		mtcr	r0
+		lwz	r0,4(r13)
+		mtsprg0	r0
+		lwz	r2,8(r13)
+		lwz	r3,12(r13)
+		lwz	r27,16(r13)
+		lwz	r28,20(r13)
+		lwz	r29,24(r13)
+		lwz	r30,28(r13)
+		lwz	r31,32(r13)
+		addi	r13,r13,36
+
+		lwz	r1,0(r1)
+		lwz	r13,-4(r1)
+		lwz	r1,0(r1)			#User stack restored
+
+		loadreg	r0,'USER'
+		stw	r0,0xf4(r0)
+		
+		mfspr	r0,HID0
+		ori	r0,r0,HID0_ICFI
+		isync
+		mtspr	HID0,r0
+		isync
+
+		mfsprg0	r0
+		
+		rfi
+
+.ErrorVMX:	li	r0,.VMXUnavble-.EMonitor
+		mtsprg1	r0
+
+		b	.NormErr
+
 #********************************************************************************************
 
 .DSI:		mtsprg0	r0
@@ -5134,7 +5385,7 @@ EInt:		b	.FPUnav				#0
 		li	r0,.EProgram-.EMonitor
 		mtsprg1	r0
 		
-		lwz	r0,0(r13)
+.NormErr:	lwz	r0,0(r13)
 		mtcr	r0
 		lwz	r0,4(r13)
 		lwz	r2,8(r13)
@@ -5155,6 +5406,7 @@ EInt:		b	.FPUnav				#0
 		bl .GotStrings
 
 .EMonitor:	.string	"Perfomance Monitor"
+.VMXUnavble:	.string "AltiVec Unavailable"
 .ESC:		.string	"System Call"
 .EMachCheck:	.string	"Machine Check"
 .EProgram:	.string	"Program"
@@ -5323,9 +5575,12 @@ EInt:		b	.FPUnav				#0
 #********************************************************************************************
 	
 EIntEnd:
-		mflr	r4				#Setup a small jumptable for exceptions			
-		loadreg r5,0x48002b34
+		mflr	r4				#Setup a small jumptable for exceptions
+
+		loadreg r5,0x48002b38
 		stw	r5,0x500(r0)			#External Interrupt
+		loadreg r5,0x48002114
+		stw	r5,0xf20(r0)			#AltiVec Unavailable
 		loadreg	r5,0x48001930			
 		stw	r5,0x1700(r0)			#Thermal Management
 		loadreg	r5,0x48001c2c

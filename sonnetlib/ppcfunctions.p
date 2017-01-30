@@ -3317,9 +3317,27 @@ Run68K:
 		and.	r5,r4,r5
 		bne	.NotAllocMem
 		ori	r4,r4,MEMF_PPC
-		stw	r4,PP_REGS+4(r30)			
+		stw	r4,PP_REGS+4(r30)
+		
+#		li	r4,CACHE_DCACHEFLUSH
+#		li	r5,0
+#		li	r6,0
+#		mr	r3,r28
+		
+#		bl SetCache				
 
-.NotAllocMem:	mr	r4,r30
+.NotAllocMem:	lwz	r4,sonnet_DosBase(r28)
+		lwz	r5,PP_CODE(r30)
+		bne	.NoDOS
+
+		li	r4,CACHE_DCACHEFLUSH
+		li	r5,0
+		li	r6,0
+		mr	r3,r28
+		
+		bl SetCache
+
+.NoDOS:		mr	r4,r30
 
 		bl SendMsgFramePPC
 
@@ -9652,11 +9670,11 @@ StartCode:	bl	.StartRunPPC
 		stfdu	f30,-8(r1)
 		stfdu	f31,-8(r1)
 
-		mr	r9,r30
-		mr	r8,r9
+		mr	r31,r3
+		mr	r8,r30
 		
 		lwz	r2,ThisPPCProc(r3)
-		stw	r9,TASKPPC_STARTMSG(r2)
+		stw	r30,TASKPPC_STARTMSG(r2)
 		lwz	r3,MN_ARG1(r8)
 		stw	r3,TC_SIGALLOC(r2)
 		lwz	r2,PP_REGS+12*4(r8)

@@ -1628,7 +1628,7 @@ GotMsgPort	move.l d0,Port(a5)
 		move.l 4.w,a6
 		move.l ThisTask(a6),a1
 		move.l d6,a2
-		move.l #255,d0
+		move.l #511,d0
 ClearTaskMem	clr.l (a2)+
 		dbf d0,ClearTaskMem
 		
@@ -2278,7 +2278,7 @@ DATATABLE:
 	INITLONG	LN_NAME,LibName
 	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITWORD	LIB_VERSION,17
-	INITWORD	LIB_REVISION,4
+	INITWORD	LIB_REVISION,5
 	INITLONG	LIB_IDSTRING,IDString
 	ds.l	1
 	
@@ -2522,7 +2522,7 @@ FUNCTABLE:
 
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0
-IDString	dc.b	"$VER: sonnet.library 17.4 (06-Jan-17)",0
+IDString	dc.b	"$VER: sonnet.library 17.5 (31-Jan-17)",0
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: fake warp.library 5.0 (01-Apr-16)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0

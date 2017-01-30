@@ -15,7 +15,7 @@ POSIXLIB_LDPARAM=$(POSIXLIB)/AmigaOS3/posix.lib
 
 IRAPARAM=-M68020
 ASM68KPARAM=-m68020up -allmp -Fhunk -I$(LOCAL_INC_DIR)
-ASMPPCPARAM=-many -mppc32 -Fhunk -I$(LOCAL_INC_DIR)
+ASMPPCPARAM=-many -mppc32 -mavec -Fhunk -I$(LOCAL_INC_DIR)
 
 DISTRIBUTION=sonnet.lha
 
