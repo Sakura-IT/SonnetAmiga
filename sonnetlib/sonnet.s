@@ -1317,22 +1317,23 @@ GetMsgFrame:
 ;********************************************************************************************
 
 ExitCode	movem.l d0-a6,-(a7)			;called when an 68K task is removed
+		move.l 4.w,a6
 		bsr.s CommonCode
 		movem.l (a7)+,d0-a6
 		move.l RemTaskAddress(pc),-(a7)
 		rts
 
 ExitCode2	movem.l d0-a6,-(a7)
-		bsr.s CommonCode
+		move.l 4.w,a6
+		bsr.s Common2
 		movem.l (a7)+,d0-a6
 		move.l RemSysTask(pc),-(a7)
 		rts
 
-CommonCode	move.l 4.w,a6
-		move.l a1,d1
+CommonCode	move.l a1,d1
 		bne.s NotSelf
 
-		move.l ThisTask(a6),d1
+Common2		move.l ThisTask(a6),d1
 		move.l d1,a1
 NotSelf		cmp.b #NT_PROCESS,LN_TYPE(a1)
 		bne.s DoneMList
@@ -1480,11 +1481,12 @@ Best		move.l d7,-(a7)
 		move.b TC_FLAGS(a3),d7
 		btst #2,d7					;Check if task was tagged by sonnet.library
 		bne.s DoBit					;If yes, then redirect to PPC memory
-		
+		cmp.b #NT_PROCESS,LN_TYPE(a3)			;Is it a DOS process?
+		bne.s IsTask
 		move.l pr_CLI(a3),d7				;Was this task started by CLI?
 		bne.s IsHell					;If yes, go there
 		
-		move.l LN_NAME(a3),d7				;Has the task a name?
+IsTask		move.l LN_NAME(a3),d7				;Has the task a name?
 		beq.s NoBit					;If no then exit
 		move.l d7,a2
 		cmp.l #"ahi.",(a2)

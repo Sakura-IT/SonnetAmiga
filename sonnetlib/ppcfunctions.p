@@ -3328,6 +3328,7 @@ Run68K:
 
 .NotAllocMem:	lwz	r4,sonnet_DosBase(r28)
 		lwz	r5,PP_CODE(r30)
+		cmpw	r4,r5
 		bne	.NoDOS
 
 		li	r4,CACHE_DCACHEFLUSH
@@ -3335,7 +3336,7 @@ Run68K:
 		li	r6,0
 		mr	r3,r28
 		
-		bl SetCache
+#		bl SetCache
 
 .NoDOS:		mr	r4,r30
 
