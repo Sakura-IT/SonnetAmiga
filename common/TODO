@@ -1,8 +1,8 @@
-The TO-DO list (01SEP16):
+The TO-DO list (18FEB17):
 
 PPC -> 68K Communication	99%	Needs testing
 68K -> PPC Communication	99%	Needs testing
-Scheduler			90%	Multitasking is implemented and working in a simple preemptive round-robin system
+Scheduler			99%	Multitasking is implemented and working in a simple preemptive round-robin system
 MMU Table Setup			100%	Needs testing.
 PPC -> PPC Communication	99%	Needs testing
 Library Functionality		95%	5% of the functions not working or not implemented. Mostly memory and debug related
@@ -10,3 +10,4 @@ Cache Coherency			100%	Needs testing
 WarpOS Compatibility		90%	Patching still mandetory or recompilation.
 AmigaOS Patcher			75%	Semi-integrated in Hardware emulator
 Hardware emulator		75%	Library catches some loads and stores to Amiga Hardware. Not all yet implemented
+AltiVec support			75%	Needs testing

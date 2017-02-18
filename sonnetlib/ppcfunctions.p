@@ -9674,7 +9674,33 @@ StartCode:	bl	.StartRunPPC
 		mr	r31,r3
 		mr	r8,r30
 		
-		lwz	r2,ThisPPCProc(r3)
+		lwz	r5,PP_STACKPTR(r30)
+		mr.	r15,r5
+		beq 	.NoStack
+
+		lwz	r6,PP_STACKSIZE(r30)
+		mr.	r16,r6
+		beq	.NoStack
+
+		li	r4,CACHE_DCACHEINV
+		bl	SetCache
+
+		mr	r14,r1
+		sub	r1,r1,r16
+		mr	r4,r15
+		mr	r5,r1
+		mr	r6,r16
+		subi	r1,r1,24
+		stw	r14,0(r1)
+		mr	r3,r31
+		
+		bl	CopyMemPPC
+		
+		mr	r3,r31
+		b	.DoneStack
+
+.NoStack:	stwu	r1,-60(r1)
+.DoneStack:	lwz	r2,ThisPPCProc(r3)
 		stw	r30,TASKPPC_STARTMSG(r2)
 		lwz	r3,MN_ARG1(r8)
 		stw	r3,TC_SIGALLOC(r2)
@@ -9723,32 +9749,7 @@ StartCode:	bl	.StartRunPPC
 		mr	r20,r0
 		mr	r21,r0
 		
-		lwz	r16,PP_STACKPTR(r17)
-		mr.	r16,r16
-		beq 	.NoStack
-		lwz	r15,PP_STACKSIZE(r17)
-		mr.	r15,r15
-		beq	.NoStack
-
-		mtctr	r15
-		mr	r14,r1
-		sub	r1,r1,r15
-		mr	r19,r1
-		lwz	r16,MN_STACKFRAME(r17)
-		la	r16,MN_PPSTRUCT(r16)
-		subi	r19,r19,1
-		subi	r16,r16,1
-
-.CpPPCStck:	lbzu	r18,1(r16)
-		stbu	r18,1(r19)
-		bdnz	.CpPPCStck
-		
-		subi	r1,r1,24
-		stw	r14,0(r1)
-		b	.DoneStack
-
-.NoStack:	stwu	r1,-60(r1)
-.DoneStack:	lwz	r16,PP_FLAGS(r17)
+		lwz	r16,PP_FLAGS(r17)
 		rlwinm.	r16,r16,(32-PPB_LINEAR),31,31
 		beq	.NotLinear
 
@@ -9850,20 +9851,8 @@ ExitCode:	lwz	r14,0(r1)
 		lwz	r4,TASKPPC_STARTMSG(r4)			#Free original 68K -> PPC message
 
 		bl FreeMsgFramePPC
-		
-		lwz	r4,PP_STACKPTR(r9)
-		mr.	r4,r4
-		beq	.NoStck
-		
-		lwz	r4,PP_STACKSIZE(r9)
-		mr.	r4,r4
-		beq	.NoStck
-		
-		mr	r4,r7
-		
-		bl FreeMsgFramePPC				#Free up StackFrame
-		
-.NoStck:	mr	r4,r9
+			
+		mr	r4,r9
 		
 		bl SendMsgFramePPC
 		

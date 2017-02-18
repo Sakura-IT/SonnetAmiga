@@ -108,14 +108,14 @@ GotExp		move.l d0,ExpBase-Buffer(a4)
 		move.l d0,a6
 		sub.l a0,a0
 		move.l #VENDOR_ELBOX,d0			;ELBOX
-		moveq.l #33,d1				;Mediator MKII
+		moveq.l #MEDIATOR_MKII,d1		;Mediator MKII
 		jsr _LVOFindConfigDev(a6)		;Find A3000/A4000 mediator
 		tst.l d0
 		bne.s FoundMed
 
 		sub.l a0,a0
 		move.l #VENDOR_ELBOX,d0			;ELBOX
-		moveq.l #60,d1				;Mediator 1200TX
+		moveq.l #MEDIATOR_1200TX,d1		;Mediator 1200TX
 		jsr _LVOFindConfigDev(a6)		;Find 1200TX mediator
 		move.l LExecBase(pc),a6
 		tst.l d0
@@ -135,7 +135,7 @@ FoundMed	move.l LExecBase(pc),a6
 		tst.l d0
 		bne.s Clean
 
-		moveq.l #11,d0
+		moveq.l #PCI_VERSION,d0			;Minimal version of pci.library
 		lea pcilib(pc),a1
 		jsr _LVOOpenLibrary(a6)
 		move.l d0,PCIBase-Buffer(a4)
@@ -467,55 +467,14 @@ PPCInit		move.l SonnetBase(pc),a1
 		move.l d0,OMBAR(a3)			;Is probably 0x60000000-0x80000000
 		
 		jsr _LVODisable(a6)
-
-		sub.l a1,a1				;Built-in RamLibPatch (16k stack) 
-		jsr _LVOFindTask(a6)			;as this is LibInit, we are running inside the ramlib process
-		tst.l d0
-		beq.s VeryStrange
 		
-		move.l d0,a3
-		move.l TC_SPUPPER(a3),d0
-		move.l TC_SPLOWER(a3),d1
-		sub.l d1,d0
-		move.l #$4000,d6			;make RamLib stack 16kb
-		cmp.l d6,d0
-		bge.s VeryStrange
-		
-		move.l d6,d0
 		moveq.l #MEMF_PUBLIC,d1
-		jsr _LVOAllocVec(a6)
-		tst.l d0
-		beq.s VeryStrange
+		move.l #$4000,d2
+		moveq.l #0,d3
 		
-		move.l d0,-(a7)
-		add.l d6,d0
-		move.l d0,-(a7)
-		move.l TC_SPUPPER(a3),d1
-		move.l TC_SPREG(a3),d2
-		move.l d2,a0
-		sub.l d2,d1
-		sub.l d1,d0
-		move.l d0,a1
-		move.l a1,-(a7)
-		move.l d1,d0
+		bsr ChangeStack68K			;Enlarge RamLib stack
 		
-		jsr _LVOCopyMem(a6)			;Copy stack to new spot
-		
-		move.l (a7)+,TC_SPREG(a3)
-		move.l (a7)+,d0
-		move.l TC_SPUPPER(a3),d2
-		move.l d0,TC_SPUPPER(a3)
-		move.l (a7)+,TC_SPLOWER(a3)
-		move.l a7,d1
-		move.l d0,d3
-		sub.l d1,d2
-		sub.l d2,d3
-		lsr.l #2,d0
-		move.l d0,pr_StackBase(a3)
-		move.l d6,pr_StackSize(a3)
-		move.l d3,a7				;Set new stack pointer		
-		
-VeryStrange	move.l #_LVOAddTask,a0			;Set system patches
+		move.l #_LVOAddTask,a0			;Set system patches
 		lea StartCode(pc),a3
 		move.l a3,d0
 		move.l a6,a1
@@ -667,7 +626,7 @@ IntName		dc.b "Gort",0
 MasterControl:
 		move.l #"INIT",d6
 		move.l SonnetBase(pc),a4
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		jsr _LVOCreateMsgPort(a6)
 		tst.l d0
 		beq.s MasterControl
@@ -715,7 +674,6 @@ NoXReply	move.l MN_IDENTIFIER(a1),d0
 		beq Crashed
 		bra.s GetLoop
 
-
 		move.l a1,a0
 		moveq.l #0,d1
 		move.w MN_LENGTH(a2),d1
@@ -755,7 +713,7 @@ MsgLL68		move.l MN_PPSTRUCT+0*4(a1),a6
 		move.l MN_PPSTRUCT+3*4(a1),a1
 		rts
 
-RtnLL		move.l 4.w,a6
+RtnLL		move.l LExecBase(pc),a6
 		move.l (a7)+,a1
 		move.l a1,d5
 		bsr CreateMsgFrame			;Get message for reply
@@ -792,7 +750,7 @@ MsgFree		move.l MN_PPSTRUCT+0*4(a1),a6		;Asynchronous FreeMem call from the PPC.
 		move.l MN_PPSTRUCT+3*4(a1),a1
 		rts
 
-RtnFree		move.l 4.w,a6
+RtnFree		move.l LExecBase(pc),a6
 		move.l (a7)+,a0
 		bsr FreeMsgFrame
 		bra GetLoop
@@ -835,7 +793,7 @@ CopyPPCName	move.b (a0)+,(a2)+
 		
 		add.l d2,a7
 		move.l (a7)+,a1
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		tst.l d0
 		beq.s MsgMir68
 		move.l d0,a0
@@ -860,13 +818,13 @@ DebugEnd	move.l a1,a3
 		bsr SPrintF68K
 		move.l a3,a0
 		bsr FreeMsgFrame
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		bra GetLoop
 		
 ;********************************************************************************************		
 ;********************************************************************************************
 
-MirrorTask	move.l 4.w,a6				;Mirror task for PPC task
+MirrorTask	move.l LExecBase(pc),a6			;Mirror task for PPC task
 		move.l ThisTask(a6),a0			;set up by MsgMir68
 		
 		or.b #TF_PPC,TC_FLAGS(a0)
@@ -972,7 +930,7 @@ VeryBad		movem.l (a7)+,d0-a6
 ;********************************************************************************************
 
 SonInt:		movem.l d1-a6,-(a7)			;68K interrupt which distributes
-		move.l 4.w,a6				;messages send by the PPC
+		move.l LExecBase(pc),a6			;messages send by the PPC
 		move.l EUMBAddr(pc),a2
 		move.l OMISR(a2),d3
 		move.l #$20000000,d4			;OMISR[OPQI]
@@ -1145,7 +1103,7 @@ WarpOpen:
 		move.l a6,d0				;Dummy Open() for warp.library
 		tst.l d0
 		beq.s NoA6
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		move.l ThisTask(a6),a6
 		or.b #TF_PPC,TC_FLAGS(a6)
 		move.l d0,a6
@@ -1167,9 +1125,23 @@ Open:
 		move.l a6,d0				;Standard LibOpen() routine
 		tst.l d0
 		beq.s NoA6
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		move.l ThisTask(a6),a6
 		or.b #TF_PPC,TC_FLAGS(a6)
+		
+;		movem.l d0-a6,-(a7)
+;		move.l LN_NAME(a6),a1
+;		cmp.l #"raml",(a1)
+;		beq.s DontDoRamLib
+;		move.l LExecBase(pc),a6
+;		jsr _LVODisable(a6)
+;		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE,d1
+;		moveq.l #0,d2
+;		moveq.l #1,d3
+;		bsr ChangeStack68K
+;		jsr _LVOEnable(a6)
+;DontDoRamLib	movem.l (a7)+,d0-a6
+
 		move.l d0,a6
 		move.l a1,-(a7)
 		lea _PowerPCBase(pc),a1
@@ -1200,7 +1172,7 @@ Expunge:
 
 NotOpen		movem.l d2/a5/a6,-(a7)
 		move.l a6,a5
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		move.l a5,a1
 		jsr _LVORemove(a6)
 		moveq.l #0,d0
@@ -1317,14 +1289,14 @@ GetMsgFrame:
 ;********************************************************************************************
 
 ExitCode	movem.l d0-a6,-(a7)			;called when an 68K task is removed
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		bsr.s CommonCode
 		movem.l (a7)+,d0-a6
 		move.l RemTaskAddress(pc),-(a7)
 		rts
 
 ExitCode2	movem.l d0-a6,-(a7)
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		bsr.s Common2
 		movem.l (a7)+,d0-a6
 		move.l RemSysTask(pc),-(a7)
@@ -1505,6 +1477,8 @@ FindEnd		move.b (a2)+,d7
 		beq.s DoBit
 		cmp.l #"sk_1",d7
 		beq.s DoBit
+		cmp.l #"trol",d7
+		beq.s DoBit
 		bra.s NoBit
 
 IsHell		lsl.l #2,d7
@@ -1529,9 +1503,6 @@ NoBit		move.l (a7)+,a2
 		move.l (a7)+,d7
 NoFast		move.l AllocMemAddress(pc),-(a7)
 		rts
-
-ClrBit		bclr #13,d1
-		bra.s NoBit
 
 ;*********************************************************************************************
 ;
@@ -1560,7 +1531,7 @@ RunPPC:		link a5,#-12
 		moveq.l #0,d0		
 		move.l d0,Port(a5)
 		move.l a0,PStruct(a5)
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		move.l ThisTask(a6),a1
 		cmp.b #NT_PROCESS,LN_TYPE(a1)
 		beq.s IsProc
@@ -1627,7 +1598,7 @@ GotMsgPort	move.l d0,Port(a5)
 		move.l d0,d6
 		beq Stacker
 
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		move.l ThisTask(a6),a1
 		move.l d6,a2
 		move.l #511,d0
@@ -1678,7 +1649,7 @@ EndName		move.l #"_PPC",(a2)			;Check Alignment?
 							;Also push dcache
 NoASyncErr	bsr CreateMsgFrame
 
-		moveq.l #47,d0				;MsgLen/4-1
+		moveq.l #MSG_LEN/4-1,d0
 		move.l a0,a2
 ClrMsg		clr.l (a2)+
 		dbf d0,ClrMsg
@@ -1709,41 +1680,45 @@ SetSigAlloc	move.l d7,MN_ARG1(a0)
 		tst.l PP_STACKPTR(a1)
 		beq.s SetupCp
 
-		move.l PP_STACKSIZE(a1),d1
-		beq.s SetupCp
-
-		move.l d1,d2
-		and.l #3,d2
-		bne AlignmentErr
-
-		cmp.l #164,d1				;Max size for stack to be transferred
-		ble SupSize
+		move.l PP_STACKSIZE(a1),d0
+		bne DoStack
 		
-		move.l PP_FLAGS(a1),d2			;Passing stack through a message frame
-		btst #PPB_ASYNC,d2			;Docs say don't do it while async
-		beq SupSize
+		moveq.l #0,d0
+		move.l d0,PP_STACKPTR(a1)
+		bra SetupCp
 
-AlignmentErr	lea StackRunError(pc),a2
+DoStack		move.l PP_FLAGS(a1),d2			;Passing stack through a message frame
+		btst #PPB_ASYNC,d2			;Docs say don't do it while async
+		bne StackErr
+
+		move.l a0,a4
+		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE,d1
+		move.l _PowerPCBase(pc),a6
+		jsr _LVOAllocVec32(a6)
+		
+		tst.l d0
+		beq StackErr
+		
+		move.l PP_STACKPTR(a3),a0
+		move.l d0,a1
+		move.l d0,PP_STACKPTR(a3)
+		move.l PP_STACKSIZE(a3),d0
+		move.l LExecBase(pc),a6
+		jsr _LVOCopyMem(a6)
+		
+		move.l #CACHE_DCACHEFLUSH,d0
+		move.l PP_STACKPTR(a3),a0
+		move.l PP_STACKSIZE(a3),d1
+		bsr SetCache68K
+
+		move.l a4,a0
+		bra SetupCp
+		
+StackErr	lea StackRunError(pc),a2
 		bra PrintError
 
-SupSize		move.l a0,-(a7)
-		bsr CreateMsgFrame
-		move.l (a7),a2
-		move.l a0,MN_STACKFRAME(a2)
-		move.l #"STCK",MN_IDENTIFIER(a0)
+SetupCp		move.l a3,a1
 		lea MN_PPSTRUCT(a0),a2
-		move.l PP_STACKPTR(a1),a4
-		subq.l #1,d1
-CpStack		move.b (a4)+,(a2)+
-		dbf d1,CpStack
-		
-		move.l d5,MN_PPC(a0)
-		
-		bsr SendMsgFrame			;Send stack ahead of normal frame
-		
-		move.l (a7)+,a0				;(Do we actually need to send this frame??)
-
-SetupCp		lea MN_PPSTRUCT(a0),a2
 		moveq.l #PP_SIZE/4-1,d0
 
 CpMsg2		move.l (a3)+,(a2)+
@@ -1770,7 +1745,7 @@ WaitForPPC:	link a5,#-12
 		movem.l d1-a6,-(a7)
 		move.l a0,PStruct(a5)
 
-		move.l 4.w,a6		
+		move.l LExecBase(pc),a6
 		move.l ThisTask(a6),d6
 		lea MirrorList(pc),a2
 		move.l MLH_HEAD(a2),a2
@@ -1826,13 +1801,19 @@ GtLoop		move.l Port(a5),a0
 		bsr.s Runk862
 		bra.s GtLoop
 
-DizDone		move.l a0,-(a7)
+DizDone		move.l a0,a2
 		move.l MirrorNode(a5),a1
-		move.l MN_PPC(a0),MT_MIRROR(a1)		
+		move.l MN_PPC(a2),MT_MIRROR(a1)		
 		move.l PStruct(a5),a1
-		lea PP_REGS(a1),a1
-		move.l (a7)+,a0
-		move.l a0,a2
+		move.l PP_STACKPTR(a1),d0
+		beq NoFrStackPtr
+
+		move.l a1,-(a7)
+		move.l d0,a1
+		bsr FreeVec32
+		move.l (a7)+,a1
+
+NoFrStackPtr	lea PP_REGS(a1),a1
 		lea MN_PPSTRUCT+PP_REGS(a2),a2
 		moveq.l #(PP_SIZE-PP_REGS)/4-1,d0
 CpBck		move.l (a2)+,(a1)+
@@ -1843,7 +1824,7 @@ CpBck		move.l (a2)+,(a1)+
 		bra.s Success
 
 Cannot		moveq.l #-1,d7
-Success		move.l 4.w,a6
+Success		move.l LExecBase(pc),a6
 EndIt		move.l d7,d0
 		movem.l (a7)+,d1-a6
 		unlk a5
@@ -1905,7 +1886,7 @@ xBack		move.l a6,-(a7)
 		move.l a6,a0
 		move.l (a7)+,a6
 		move.l a6,(a0)
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		btst #AFB_FPU40,AttnFlags+1(a6)
 		beq.s NoFPU4
 		move.l (a7),a6
@@ -1919,12 +1900,12 @@ xBack		move.l a6,-(a7)
 		fmove.d fp6,(a6)+
 		fmove.d fp7,(a6)+
 
-NoFPU4		move.l 4.w,a6
+NoFPU4		move.l LExecBase(pc),a6
 		move.l (a7),a1
 		bsr CreateMsgFrame
 		
 		move.l a0,a3
-		moveq.l #47,d1
+		moveq.l #MSG_LEN/4-1,d1
 DoReslt		move.l (a1)+,(a3)+
 		dbf d1,DoReslt
 		
@@ -1961,7 +1942,7 @@ NoFPU2		rts
 
 CrossSignals	bsr CreateMsgFrame
 
-		moveq.l #47,d1				;MsgLen/4-1
+		moveq.l #MSG_LEN/4-1,d1
 		move.l a0,a2
 ClearMsg	clr.l (a2)+
 		dbf d1,ClearMsg
@@ -2038,7 +2019,7 @@ FreeVec32:
 		move.l a1,d0
 		beq NoMemAddr
 		move.l -4(a1),a1
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		jsr _LVOFreeVec(a6)
 NoMemAddr	move.l (a7)+,a6
 		rts
@@ -2181,7 +2162,7 @@ SPrintF68K:
 		movem.l a2,-(a7)
 		lea PutChProc(pc),a2
 		move.l a6,-(a7)
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		jsr _LVORawDoFmt(a6)
 		move.l (a7)+,a6
 		move.l (a7)+,a2
@@ -2189,7 +2170,7 @@ SPrintF68K:
 
 PutChProc:
 		move.l a6,-(a7)
-		move.l 4.w,a6
+		move.l LExecBase(pc),a6
 		jsr _LVORawPutChar(a6)
 		move.l (a7)+,a6
 		rts
@@ -2205,7 +2186,7 @@ PutXMsg:	movem.l d0-a6,-(a7)
 		move.b #NT_XMSG68K,LN_TYPE(a1)
 		bsr CreateMsgFrame		
 
-		moveq.l #47,d0				;MsgLen/4-1
+		moveq.l #MSG_LEN/4-1,d0
 		move.l a0,a2
 ClrXMsg		clr.l (a2)+
 		dbf d0,ClrXMsg
@@ -2243,6 +2224,78 @@ CausePPCInterrupt:
 
 		movem.l (a7)+,d1-a6
 		rts
+
+;********************************************************************************************
+;
+;	void ChangeStack68K(mem_attributes, size, flags) // d1, d2, d3	If d2=0 then keep old size
+;
+;********************************************************************************************
+
+ChangeStack68K:						;moves stack. Does not release old stack!!
+		move.l d1,d5
+		move.l d2,d6
+		sub.l a1,a1
+		jsr _LVOFindTask(a6)
+		tst.l d0
+		beq PatchError
+
+		move.l d0,a3
+		move.l TC_SPUPPER(a3),d0
+		move.l TC_SPLOWER(a3),d1
+		tst.l d3
+		beq.s NoPPCCheck
+	
+		move.l d1,d3
+		rol.l #8,d3
+		and.b #$F0,d3
+		cmp.b #$70,d3
+		beq.s PatchError
+		
+NoPPCCheck	sub.l d1,d0
+		cmp.l d6,d0				;don't make stack smaller!
+		blt.s DoStackMagic
+		tst.l d6
+		bne.s PatchError
+		move.l d0,d6
+		
+DoStackMagic	move.l d6,d0
+		move.l d5,d1
+		jsr _LVOAllocVec(a6)
+		tst.l d0
+		beq.s PatchError
+		
+		move.l d0,-(a7)
+		add.l d6,d0
+		move.l d0,-(a7)
+		move.l TC_SPUPPER(a3),d1
+		move.l TC_SPREG(a3),d2
+		move.l d2,a0
+		sub.l d2,d1
+		sub.l d1,d0
+		move.l d0,a1
+		move.l a1,-(a7)
+		move.l d1,d0
+		
+		jsr _LVOCopyMem(a6)			;Copy stack to new spot
+		
+		move.l (a7)+,TC_SPREG(a3)
+		move.l (a7)+,d0
+		move.l TC_SPUPPER(a3),d2
+		move.l d0,TC_SPUPPER(a3)
+		move.l (a7)+,TC_SPLOWER(a3)
+		move.l a7,d1
+		move.l d0,d3
+		sub.l d1,d2
+		sub.l d2,d3
+		cmp.b #NT_PROCESS,LN_TYPE(a3)
+		bne.s NotAProc
+
+		lsr.l #2,d0
+		move.l d0,pr_StackBase(a3)
+		move.l d6,pr_StackSize(a3)
+NotAProc	move.l d3,a7				;Set new stack pointer
+;		jsr _LVOCacheClearU(a6)
+PatchError	rts
 
 ;********************************************************************************************
 
