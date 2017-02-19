@@ -3271,8 +3271,7 @@ Run68K:
 		stw	r4,MN_ARG1(r30)
 		lwz	r4,TC_SIGRECVD(r5)
 		stw	r4,MN_ARG2(r30)
-		
-		
+
 		lwz	r4,PP_CODE(r30)
 		mr.	r4,r4
 		li	r4,PPERR_MISCERR
@@ -3281,16 +3280,23 @@ Run68K:
 		mr.	r4,r4
 		bne	.GivErr
 		lwz	r4,PP_STACKPTR(r30)
-		mr.	r4,r4
+		mr.	r5,r4
 		beq	.FromRunPPC
 		lwz	r4,PP_STACKSIZE(r30)
-		mr.	r4,r4
-		beq	.FromRunPPC
+		mr.	r6,r4
+		bne	.DoStackPPC
+		
+		li	r4,0
+		stw	r4,PP_STACKPTR(r30)
+		b	.FromRunPPC
 		
 .GivErr:	loadreg	r0,'DBUG'
 
-		illegal					#DEBUG Not yet implemented (Stack transfer)
+		illegal					#DEBUG Not yet implemented (async)
 		
+.DoStackPPC:	li	r4,CACHE_DCACHEFLUSH
+		bl	SetCache
+
 .FromRunPPC:	lwz	r4,sonnet_MCPort(r28)
 		stw	r4,MN_MCPORT(r30)
 		li	r5,NT_MESSAGE
@@ -9690,7 +9696,7 @@ StartCode:	bl	.StartRunPPC
 		mr	r4,r15
 		mr	r5,r1
 		mr	r6,r16
-		subi	r1,r1,24
+		subi	r1,r1,24				#Stack arguments 24 bytes into stack
 		stw	r14,0(r1)
 		mr	r3,r31
 		

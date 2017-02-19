@@ -1842,14 +1842,10 @@ Runk86		btst #AFB_FPU40,AttnFlags+1(a6)
 		fmove.d fp5,-(a7)
 		fmove.d fp6,-(a7)
 		fmove.d fp7,-(a7)
+		
 NoFPU		movem.l d0-a6,-(a7)			;68k routines called from PPC
 		move.l a0,-(a7)
 		lea MN_PPSTRUCT(a0),a1
-		pea xBack(pc)
-							
-		move.l PP_CODE(a1),a0
-		add.l PP_OFFSET(a1),a0
-		move.l a0,-(a7)
 		btst #AFB_FPU40,AttnFlags+1(a6)
 		beq.s NoFPU3
 		lea PP_FREGS(a1),a6
@@ -1861,12 +1857,44 @@ NoFPU		movem.l d0-a6,-(a7)			;68k routines called from PPC
 		fmove.d (a6)+,fp5
 		fmove.d (a6)+,fp6
 		fmove.d (a6)+,fp7
-NoFPU3		lea PP_REGS(a1),a6			;PP_STACKSIZE & PP_STACKPTR to be done
+NoFPU3		move.l a1,a5
+		move.l PP_STACKPTR(a1),d0
+		beq NoStckPtr
+
+		move.l d0,a0
+		move.l PP_STACKSIZE(a1),d1
+		beq NoStckPtr
+
+		moveq.l #CACHE_DCACHEINV,d0
+		bsr SetCache68K
+
+		move.l PP_STACKPTR(a5),a0
+		move.l PP_STACKSIZE(a5),d0
+		move.l a7,a1
+;		sub.l d0,a1
+
+		cmp.l #512,d0				;DEBUG
+		ble StackLimit				;DEBUG
+		ILLEGAL					;DEBUG
+
+StackLimit	lea -512(a1),a1				;Stack overflow?
+		move.l a1,a7
+		move.l LExecBase(pc),a6
+		jsr _LVOCopyMem(a6)
+		pea xBack2(pc)
+		bra StckPtr
+
+NoStckPtr	pea xBack(pc)
+StckPtr		move.l PP_CODE(a5),a0
+		add.l PP_OFFSET(a5),a0
+		move.l a0,-(a7)
+		lea PP_REGS(a5),a6
 		movem.l (a6)+,d0-a5
 		move.l (a6),a6
 		rts
-
-xBack		move.l a6,-(a7)
+		
+xBack2		lea 512(a7),a7
+xBack		move.l a6,-(a7)				;Restore correct stack?
 		move.l 4(a7),a6
 		lea MN_PPSTRUCT+PP_REGS(a6),a6
 		move.l d0,(a6)+
