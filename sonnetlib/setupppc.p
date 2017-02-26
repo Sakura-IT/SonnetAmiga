@@ -127,7 +127,7 @@ SetLen:		mr	r30,r28
 		stw	r27,base_MemStart(r29)		#MemStart
 		stw	r8,base_MemLen(r29)		#MemLen
 
-		bl	mmuSetup			#Setup the Memory Management Unit
+		bl	mmuSetup			#Setup the Memory Management Unit	
 		bl	Epic				#Setup the EPIC controller
 		bl	End
 
@@ -137,8 +137,7 @@ Start:							#Dummy task at absolute (see ppcdefines)
 		nop
 		b	.IdleLoop
 
-End:		mflr	r4
-		
+End:		mflr	r4		
 		li	r14,0				#Reset
 		mtspr	285,r14				#Time Base Upper,
 		mtspr	284,r14				#Time Base Lower and
@@ -154,7 +153,6 @@ End:		mflr	r4
 		bne	.WInit
 		
 		isync					#Wait for 68k to set up library
-
 		loadreg	r3,IdleTask			#Start hardcoded at 0x8000
 		lwz	r31,SonnetBase(r0)
 		add	r3,r3,r31
@@ -326,15 +324,15 @@ End:		mflr	r4
 		loadreg	r0,MACHINESTATE_DEFAULT
 		mtsrr1	r0				#load up user MSR. Also clears PSL_IP
 		
-		lwz	r14,PowerPCBase(r0)
+		lwz	r14,PowerPCBase(r0)				
 		lwz	r4,_LVOSetCache+2(r14)
-		
+
 		addi	r6,r4,ViolationOS		
 		stw	r6,ViolationAddress(r0)
-		
+				
 		addi	r6,r4,TaskStart
 		stw	r6,RunPPCStart(r0)
-		
+				
 		addi	r6,r4,ListStart
 		stw	r6,AdListStart(r0)
 		
@@ -678,7 +676,7 @@ Wait2:		mfl2cr	r3
 
 		lwz	r6,MemSize(r0)			#Address to start writing
 		subis	r6,r6,0x40			#Substract 4 MB
-		lwz	r5,SonnetBase(r0)
+		lwz	r5,SonnetBase(r0)		
 		add	r6,r6,r5
 		lis	r5,L2_SIZE_1M_U			#Size of memory to write to
 		
@@ -777,18 +775,16 @@ Wait2:		mfl2cr	r3
 
 mmuSetup:	
 		mflr	r30
-		
-
 		lis	r6,0x800				#Amount of memory to virtualize (128MB)
 
 		bl	.SetupPT
-		
+
 		lis	r3,EUMB@h				#PCI memory (EUMB) start effective address
 		addis	r4,r3,0x10				#end effective address
 		mr	r5,r3					#start physical address
 		loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED	#WIMG
 		li	r7,2					#pp = 2 - Read/Write Access (0 = No Access)
-		
+
 		bl	.DoTBLs
 
 		lis	r3,0xfff0			#Fake ROM (64k)
@@ -796,9 +792,9 @@ mmuSetup:
 		mr	r5,r3
 		loadreg	r6,PTE_CACHE_INHIBITED
 		li	r7,2
-		
+
 		bl	.DoTBLs
-		
+
 		lhz	r3,RTGType(r0)
 		cmpwi	r3,rtgtype_ati
 		bne	.DoInhibit
@@ -814,34 +810,34 @@ mmuSetup:
 .Voodoo3:	mr	r24,r4
 		addis	r5,r3,0x4000
 		li	r7,2
-		
+
 		bl	.DoTBLs
-		
+
 		lhz	r3,RTGType(r0)
 		cmpwi	r3,rtgtype_voodoo3
 		beq	.Is3DFX
 		cmpwi	r3,rtgtype_voodoo45
 		bne	.No3DFX
-		
+
 		lwz	r3,RTGBase(r0)			#32MB Video RAM (Napalm)
 		addis	r3,r3,0x800
 		addis	r4,r3,0x200
 		addis	r5,r3,0x4000
-				
+
 		lbz	r7,FLAG_PAGETABLE(r0)
 		mr.	r7,r7
 		bne	.DoGFXPT1
-		
+
 		li	r17,BAT_READ_WRITE
 		li	r18,BAT_BL_32M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
 		li	r19,BAT_WRITE_THROUGH | BAT_READ_WRITE
 		li	r20,BAT_BL_32M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
-		
+
 		or	r17,r17,r5
 		or	r18,r18,r3
 		or	r19,r19,r5
 		or	r20,r20,r3
-		
+
 		mtspr	ibat1l,r17
 		mtspr	ibat1u,r18
 		mtspr	dbat1l,r19
@@ -849,7 +845,7 @@ mmuSetup:
 
 		sync
 		isync
-		
+
 		b	.No3DFX
 		
 .DoGFXPT1:	loadreg	r6,PTE_WRITE_THROUGH
@@ -896,19 +892,20 @@ mmuSetup:
 .No3DFX:	lhz	r3,RTGType(r0)
 		cmpwi	r3,rtgtype_ati
 		bne	.NoATI
+		
 		mr	r3,r24
 		addis	r5,r3,0x4000
 		mr	r4,r3
-		addis	r4,r4,0xf00			#256-32MB max Video RAM (ATI)
-		li	r6,0
+		addis	r4,r4,0xe00			#256-32MB max Video RAM (ATI)
+		loadreg	r6,PTE_WRITE_THROUGH
 		li	r7,2
-		
+
 		bl	.DoTBLs		
-		
+
 .NoATI:		li	r3,0				#Zeropage (4K no cache)
 		li	r4,0x1000			#no cache for shared stuff with 68k
 		mr	r5,r3
-				
+
 		lbz	r7,FLAG_PAGETABLE(r0)
 		mr.	r7,r7
 		bne	.DoKernelPT2
@@ -917,12 +914,12 @@ mmuSetup:
 		li	r18,BAT_BL_2M | BAT_VALID_SUPERVISOR
 		li	r19,BAT_CACHE_INHIBITED | BAT_READ_WRITE
 		li	r20,BAT_BL_2M | BAT_VALID_SUPERVISOR
-		
+
 		or	r17,r17,r5
 		or	r18,r18,r3
 		or	r19,r19,r5
 		or	r20,r20,r3
-		
+
 		mtspr	ibat0l,r17
 		mtspr	ibat0u,r18
 		mtspr	dbat0l,r19
@@ -935,7 +932,7 @@ mmuSetup:
 
 .DoKernelPT2:	loadreg	r6,PTE_CACHE_INHIBITED
 		li	r7,2				#pp = 2 - Read/Write Access
-		
+
 		bl	.DoTBLs						
 
 		li	r3,0x1000			#Exception code (16K cached)
@@ -954,27 +951,27 @@ mmuSetup:
 		li	r7,0				#pp = 0 - Supervisor access only.
 							#Otherwise DSI/ISI (e.g. CHIP access)
 		bl	.DoTBLs
-		
+
 .SkipNxtTab2:	lis	r3,0x20				#Messages / Idle / Stack (2MB no cache)
 		lis	r4,0x40
 		mr	r5,r3
 		add	r3,r3,r27
 		add	r4,r4,r27
-		
+
 		lbz	r7,FLAG_PAGETABLE(r0)
 		mr.	r7,r7
 		bne	.DoKernelPT
-		
+
 		li	r17,BAT_READ_WRITE
 		li	r18,BAT_BL_2M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
 		li	r19,BAT_CACHE_INHIBITED | BAT_READ_WRITE
 		li	r20,BAT_BL_2M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
-		
+
 		or	r17,r17,r5
 		or	r18,r18,r3
 		or	r19,r19,r5
 		or	r20,r20,r3
-		
+
 		mtspr	ibat2l,r17
 		mtspr	ibat2u,r18
 		mtspr	dbat2l,r19
@@ -987,20 +984,20 @@ mmuSetup:
 
 .DoKernelPT:	li	r6,PTE_CACHE_INHIBITED
 		li	r7,2
-		
+
 		bl	.DoTBLs
-		
+
 .SkipNxtTab:	lis	r3,0x40				#Sonnet memory (Rest cached)
 		lwz	r4,MemSize(r0)
 		mr	r5,r3
 		add	r3,r3,r27
 		add	r4,r4,r27
-		
+
 		li	r6,0
 		li	r7,2
-		
+
 		bl	.DoTBLs
-		
+
 		li	r7,64				#Now invalidate tlb entries
 		mtctr	r7
 		li	r7,0

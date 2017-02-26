@@ -188,6 +188,11 @@ FndMem		move.l d0,d7
 		lea LPCIError(pc),a2
 		bra PrintError
 		
+CheckATI	move.w #VENDOR_ATI,d0
+		move.w d0,d5
+		moveq.l #0,d2
+		jmp _LVOPCIFindCard(a6)			;Check for ATI 92xx	
+
 GotPCI		move.l d0,a6
 		move.w #VENDOR_MOTOROLA,d0
 		move.w #DEVICE_MPC107,d1
@@ -222,31 +227,23 @@ Nxt3DFX		move.w #VENDOR_3DFX,d0
 		move.l PCI_SPACE0(a2),d4
 		bra.s FoundGfx
 			
-Not3DFX		move.w #VENDOR_ATI,d0
-		move.w d0,d5
-		move.w #DEVICE_RV280PRO,d1
-		moveq.l #0,d2
-		jsr _LVOPCIFindCard(a6)			;Check for ATI 92xx
-		tst.l d0
-		beq.s NxtATI
-		move.l d0,a2
-		move.l PCI_SPACE0(a2),d4
-		bra.s FoundGfx
-				
-NxtATI		move.w #VENDOR_ATI,d0
-		move.w d0,d5
-		move.w #DEVICE_RV280MOB,d1		;Check for ATI 92xx (more possibilities?)
-		moveq.l #0,d2
-		jsr _LVOPCIFindCard(a6)
-		tst.l d0
-		bne.s GotVGA
+Not3DFX		lea ATIs(pc),a3
+NextATI		move.l (a3)+,d1
+		beq.s NoATI
 		
-		lea VGAError(pc),a2
+		bsr CheckATI
+		tst.l d0
+		bne.s GotATI
+		bra.s NextATI
+		
+NoATI		lea VGAError(pc),a2
 		bra PrintError
-		
-GotVGA		move.l d0,a2
+
+ATIs		dc.l	DEVICE_RV280PRO,DEVICE_RV280MOB,DEVICE_RV280SE,0		
+
+GotATI		move.l d0,a2
 		move.l PCI_SPACE0(a2),d4
-		
+
 FoundGfx	move.l LExecBase(pc),a6
 		move.l d4,GfxMem-Buffer(a4)
 		move.w d5,GfxType-Buffer(a4)
