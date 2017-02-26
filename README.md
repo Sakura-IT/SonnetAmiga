@@ -20,7 +20,7 @@ SonnetAmiga has the following hardware requirements:
   the other models.
 - Sonnet Crescendo 7200 with local memory installed (up to 128 or 256MB
   depending on installed graphics card).
-- 3Dfx Voodoo 3, 4, 5 or ATI Radeon 9200 (ID $5960 and $5C63) graphics card.
+- 3Dfx Voodoo 3 or ATI Radeon 9200 (ID $5960, $5964 and $5C63) graphics card.
 
 # Building
 
