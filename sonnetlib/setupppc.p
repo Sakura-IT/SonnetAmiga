@@ -53,10 +53,43 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 		bl	InstallExceptions		#Put exceptions in place
 
 		mr.	r8,r8
-		bne	.GotRam
+		beq	.ErrorRam
+		
+		li	r7,0
+		
+		bl	DirtyMemCheck
+
+		mr	r28,r6
+
+		li	r7,0
+
+		bl	DirtyMemCheck
+
+		cmplw	r28,r6
+		beq	.PassedTest1
+
+.MemUnstable:	loadreg	r0,'Err3'
+		b	.Unstable
+
+.PassedTest1:	mr	r7,r8
+		loadreg	r6,0x100000
+		sub	r7,r7,r6
+		mr	r31,r7
+		
+		bl	DirtyMemCheck
+		
+		mr	r28,r6		
+		mr	r7,r31
+		
+		bl	DirtyMemCheck
+		
+		cmplw	r28,r6
+		beq	.GotRam
+		
+		b	.MemUnstable
 
 .ErrorRam:	loadreg	r0,'Err2'
-		stw	r0,base_Comm(r29)
+.Unstable:	stw	r0,base_Comm(r29)
 		b	.ErrorRam
 
 .GotRam:	lhz	r3,base_RTGType(r29)		#RTGType
@@ -1179,7 +1212,20 @@ ConfigWrite8:	lis	r20,CONFIG_ADDR
 		blr
 
 #********************************************************************************************
-	
+
+DirtyMemCheck:
+		li	r6,0
+		loadreg r21,0x40000
+		mtctr	r21
+
+		lwz	r20,0(r7)
+.SimpleAdd:	add	r6,r6,r20
+		lwzu	r20,4(r7)
+		bdnz	.SimpleAdd
+		blr
+
+#********************************************************************************************	
+
 ConfigMem:	mflr	r15			#Code lifted from the Sonnet Driver
 		setpcireg MCCR4			#by Mastatabs from A1k fame
 

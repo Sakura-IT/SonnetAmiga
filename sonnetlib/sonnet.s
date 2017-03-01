@@ -306,12 +306,17 @@ NoCmm		move.l #WP_TRIG01,WP_CONTROL(a3)	;Negate HRESET. Now code gets executed
 Wait		move.l $3004(a1),d5
 		cmp.l #"Boon",d5			;This is returned when PPC is set up
 		beq.s PPCReady
+		cmp.l #"Err3",d5
+		beq.s UnstableRam
 		cmp.l #"Err2",d5			;When no memory found on the Sonnet
 		beq.s NoSonRam
 		cmp.l #"Err1",d5			;When the MMU was not set up correctly
 		bne.s Wait
 		
 		lea PPCMMUError(pc),a2
+		bra PrintError
+		
+UnstableRam	lea SonnetUnstable(pc),a2
 		bra PrintError
 
 NoSonRam	lea SonnetMemError(pc),a2
@@ -2620,6 +2625,7 @@ PPCMMUError	dc.b	"Error during MMU setup of PPC",0
 GenMemError	dc.b	"General memory allocation error",0
 LSetupError	dc.b	"Error during library function setup",0
 SonnetMemError	dc.b	"No memory detected on the Sonnet card",0
+SonnetUnstable	dc.b	"Memory corruption detected during setup",0
 StackRunError	dc.b	"RunPPC Stack transfer error (size/async)",0
 
 ramlib		dc.b "ramlib",0		
