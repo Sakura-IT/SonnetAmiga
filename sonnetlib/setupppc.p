@@ -31,6 +31,9 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 .SkipCom:	mflr	r29				#For initial communication with 68k
 		lis	r22,CMD_BASE@h			#Used in setpcireg macro
 
+		loadreg	r0,'Init'
+		stw	r0,base_Comm(r29)
+
 		bl	Reset
 
 		setpcireg PICR1				#Setup various PCI registers of the Sonnet

@@ -302,8 +302,12 @@ loop2		move.l (a2)+,(a5)+			;Copy code to 0x3000
 		move.l d5,COMMAND(a5)
 
 NoCmm		move.l #WP_TRIG01,WP_CONTROL(a3)	;Negate HRESET. Now code gets executed
-							;at 0xfff00100 which jumps to 0xfff03000
-Wait		move.l $3004(a1),d5
+							;at 0xfff00100 which jumps to 0xfff03000							
+		move.l	#$EC0000,d7			;Simple Time-out timer
+		
+Wait		subq.l #1,d7
+		beq.s TimeOut
+		move.l $3004(a1),d5
 		cmp.l #"Boon",d5			;This is returned when PPC is set up
 		beq.s PPCReady
 		cmp.l #"Err3",d5
@@ -315,6 +319,15 @@ Wait		move.l $3004(a1),d5
 		
 		lea PPCMMUError(pc),a2
 		bra PrintError
+		
+TimeOut		cmp.l #"Init",d5
+		bne.s PPCError
+		
+		lea PPCCrash(pc),a2
+		bra PrintError
+		
+PPCError	lea NoPPCFound(pc),a2
+		bra PrintError		
 		
 UnstableRam	lea SonnetUnstable(pc),a2
 		bra PrintError
@@ -2626,7 +2639,9 @@ GenMemError	dc.b	"General memory allocation error",0
 LSetupError	dc.b	"Error during library function setup",0
 SonnetMemError	dc.b	"No memory detected on the Sonnet card",0
 SonnetUnstable	dc.b	"Memory corruption detected during setup",0
-StackRunError	dc.b	"RunPPC Stack transfer error (size/async)",0
+PPCCrash	dc.b	"PowerPC CPU possibly crashed during setup",0
+NoPPCFound	dc.b	"PowerPC CPU not responding",0
+StackRunError	dc.b	"RunPPC Stack transfer error",0
 
 ramlib		dc.b "ramlib",0		
 		
