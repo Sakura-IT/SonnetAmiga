@@ -321,9 +321,12 @@ Wait		subq.l #1,d7
 		bra PrintError
 		
 TimeOut		cmp.l #"Init",d5
-		bne.s PPCError
+		beq.s PPCCrashed
 		
-		lea PPCCrash(pc),a2
+		cmp.l #"Boon",d5
+		bne.s PPCError
+
+PPCCrashed	lea PPCCrash(pc),a2
 		bra PrintError
 		
 PPCError	lea NoPPCFound(pc),a2
