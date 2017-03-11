@@ -50,7 +50,7 @@
 	
 	ENDC
 
-	XREF 	PPCCode,PPCLen,MCPort,Init,SysBase,PowerPCBase,DOSBase
+	XREF 	PPCCode,PPCLen,MCPort,Init,SysBase,PowerPCBase,DOSBase,sonnet_PosSize
 	XDEF	_PowerPCBase,FunctionsLen,LibFunctions
 
 ;********************************************************************************************
@@ -85,7 +85,16 @@ LIBINIT:
 		move.l a0,(a4)				;SegList
 		move.l a6,LExecBase-Buffer(a4)
 
-		lea DosLib(pc),a1
+		lea LibList(a6),a0
+		lea PowerName(pc),a1			;Check for WarpOS
+		jsr _LVOFindName(a6)
+		tst.l d0
+		beq.s NoWOS
+
+		lea PowerPCError(pc),a2
+		bra PrintError
+
+NoWOS		lea DosLib(pc),a1
 		moveq.l #37,d0
 		jsr _LVOOpenLibrary(a6)
 		tst.l d0
@@ -395,29 +404,12 @@ GotMemName	move.l d0,a0
 		move.l d6,PCI_SPACELEN0(a2)		;Correct MemSpace0 in the PCI database
 NoPCILb		jsr _LVOEnqueue(a6)			;Add the memory node
 
-		move.l #FunctionsLen,d0
-		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE|MEMF_CLEAR,d1
-		bsr AllocVec32				;Reserve space for the function table
-		tst.l d0				;to be copied to PPC memory
-		bne GotFuncMem
-	
-		lea GenMemError(pc),a2
-		bra PrintError
-		
-GotFuncMem	move.l d0,PPCCodeMem-Buffer(a4)
-		move.l d0,a1
-		lea LibFunctions(pc),a0
-		move.l #FunctionsLen,d1
-		lsr.l #2,d1
-		subq.l #1,d1
-MoveSon		move.l (a0)+,(a1)+
-		dbf d1,MoveSon				;Do the copy to PPC/Sonnet memory
-
+		lea DATATABLE(pc),a2
 		bsr MakeLibrary
 		tst.l d0
 		bne.s GotLibMade
 
-		jsr _LVOEnable(a6)
+NotLibMade	jsr _LVOEnable(a6)
 		lea LSetupError(pc),a2
 		bra PrintError
 
@@ -430,7 +422,17 @@ GotLibMade	move.l SonnetBase(pc),a1
 		move.l DosBase(pc),DOSBase(a1)
 
 		move.l d0,a1
+		addq.w #1,LIB_OPENCNT(a1)		;Prevent closure and all kinds of problems
 		jsr _LVOAddLibrary(a6)
+
+		lea POWERDATATABLE(pc),a2
+		bsr MakeLibrary
+		tst.l d0
+		beq NotLibMade
+		
+		move.l d0,a1
+		addq.w #1,LIB_OPENCNT(a1)		;Prevent closure and all kinds of problems
+;		jsr _LVOAddLibrary(a6)			;DEBUG: DISABLED FOR NOW
 
 		lea WARPFUNCTABLE(pc),a0		;Set up a fake warp.library
 		lea WARPDATATABLE(pc),a1		;Some programs do a version
@@ -492,7 +494,23 @@ PPCInit		move.l SonnetBase(pc),a1
 		
 		bsr ChangeStack68K			;Enlarge RamLib stack
 		
-		move.l #_LVOAddTask,a0			;Set system patches
+		move.l #_LVOLoadSeg,a0			;Set system patches
+		lea NewOldLoadSeg(pc),a3
+		move.l a3,d0
+		move.l DosBase(pc),a1
+		jsr _LVOSetFunction(a6)			;LoadSeg to correctly scatter-load sonnet exes
+		lea LoadSegAddress(pc),a3
+		move.l d0,(a3)
+		
+		move.l #_LVONewLoadSeg,a0
+		lea NewNewLoadSeg(pc),a3
+		move.l a3,d0
+		move.l DosBase(pc),a1
+		jsr _LVOSetFunction(a6)			;NewLoadSeg to correctly scatter-load sonnet exes
+		lea NewLoadSegAddress(pc),a3
+		move.l d0,(a3)
+	
+		move.l #_LVOAddTask,a0
 		lea StartCode(pc),a3
 		move.l a3,d0
 		move.l a6,a1
@@ -568,11 +586,32 @@ PrintError	move.l LExecBase(pc),a6			;Put up a requester and give out
 ;********************************************************************************************
 
 MakeLibrary
-		movem.l d1-a6,-(a7)			;Sets up library base and function table
+		movem.l d1-a6,-(a7)			;Sets up library base and function table		
+		move.l #FunctionsLen,d0
+		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE|MEMF_CLEAR,d1
+		bsr AllocVec32				;Reserve space for the function table
+		tst.l d0				;to be copied to PPC memory
+		beq NoFun
+		
+		move.l PPCCodeMem(pc),d1
+		beq.s FirstMem
+
+		move.l d0,PPCCodeMem2-Buffer(a4)
+		bra.s SecondMem
+
+FirstMem	move.l d0,PPCCodeMem-Buffer(a4)
+SecondMem	move.l d0,a1
+		lea LibFunctions(pc),a0
+		move.l #FunctionsLen,d1
+		lsr.l #2,d1
+		subq.l #1,d1
+MoveSon		move.l (a0)+,(a1)+
+		dbf d1,MoveSon				;Do the copy to PPC/Sonnet memory		
+		
 		sub.l a0,a1
 		move.l a1,d6
 		lea FUNCTABLE(pc),a0
-		lea DATATABLE(pc),a1
+		move.l a2,a1
 		move.l a0,d4
 		move.l a1,d5
 		moveq.l #-1,d3
@@ -587,7 +626,7 @@ NumFunc		cmp.l (a3)+,d0
 		add.l d0,d3
 		add.l #31,d3
 		andi.w #-32,d3				;End up with a base 32 aligned. This messes up programs like Scout
-		move.l #1184,d0				;PosSize
+		move.l #sonnet_PosSize,d0		;PosSize
 		move.l d0,d2
 		add.w d3,d0
 		move.l #MEMF_PPC|MEMF_REVERSE|MEMF_CLEAR,d1
@@ -1183,7 +1222,8 @@ NoExp		rts
 
 Expunge:
 		tst.w LIB_OPENCNT(a6)
-		beq.s NotOpen
+;		beq.s NotOpen
+		nop					;DEBUG Library should not be expunged due to fake powerpc stuff
 		bset #LIBB_DELEXP,LIB_FLAGS(a6)
 		moveq.l #0,d0
 		rts
@@ -1521,7 +1561,24 @@ NoBit		move.l (a7)+,a2
 		move.l (a7)+,d7
 NoFast		move.l AllocMemAddress(pc),-(a7)
 		rts
+		
+;********************************************************************************************
+;
+;		LoadSeg() Patch
+;
+;********************************************************************************************
 
+NewOldLoadSeg	move.l LoadSegAddress(pc),-(a7)
+		rts
+
+;********************************************************************************************
+;
+;		NewLoadSeg() Patch
+;
+;********************************************************************************************
+
+NewNewLoadSeg	move.l NewLoadSegAddress(pc),-(a7)
+		rts
 ;*********************************************************************************************
 ;
 ;	status = RunPPC(PPStruct) // d0=a0
@@ -2348,29 +2405,32 @@ PatchError	rts
 		cnop	0,4
 
 Buffer
-SegList		ds.l	1
-PPCCodeMem	ds.l	1
-_PowerPCBase	ds.l	1
-SonnetBase	ds.l	1
-MediatorBase	ds.l	1
-DosBase		ds.l	1
-ExpBase		ds.l	1
-PCIBase		ds.l	1
-LExecBase	ds.l	1
-ROMMem		ds.l	1
-GfxMem		ds.l	1
-GfxType		ds.l	1
-ComProc		ds.l	1
-SonAddr		ds.l	1
-EUMBAddr	ds.l	1
-AddTaskAddress	ds.l	1
-RemTaskAddress	ds.l	1
-OpenLibAddress	ds.l	1
-AllocMemAddress	ds.l	1
-MirrorList	ds.l	3
-RemSysTask	ds.l	1
-Previous	ds.l	1
-MyInterrupt	ds.b	IS_SIZE
+SegList			ds.l	1
+PPCCodeMem		ds.l	1
+PPCCodeMem2		ds.l	1
+_PowerPCBase		ds.l	1
+SonnetBase		ds.l	1
+MediatorBase		ds.l	1
+DosBase			ds.l	1
+ExpBase			ds.l	1
+PCIBase			ds.l	1
+LExecBase		ds.l	1
+ROMMem			ds.l	1
+GfxMem			ds.l	1
+GfxType			ds.l	1
+ComProc			ds.l	1
+SonAddr			ds.l	1
+EUMBAddr		ds.l	1
+AddTaskAddress		ds.l	1
+RemTaskAddress		ds.l	1
+OpenLibAddress		ds.l	1
+AllocMemAddress		ds.l	1
+LoadSegAddress		ds.l	1
+NewLoadSegAddress	ds.l	1
+MirrorList		ds.l	3
+RemSysTask		ds.l	1
+Previous		ds.l	1
+MyInterrupt		ds.b	IS_SIZE
 
 	cnop	0,4
 
@@ -2390,6 +2450,15 @@ WARPDATATABLE:
 	INITWORD	LIB_VERSION,5
 	INITWORD	LIB_REVISION,0
 	INITLONG	LIB_IDSTRING,WarpIDString
+	ds.l	1
+
+POWERDATATABLE:
+	INITBYTE	LN_TYPE,NT_LIBRARY
+	INITLONG	LN_NAME,PowerName
+	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
+	INITWORD	LIB_VERSION,17
+	INITWORD	LIB_REVISION,5
+	INITLONG	LIB_IDSTRING,PowerIDString
 	ds.l	1
 
 WARPFUNCTABLE:
@@ -2623,12 +2692,16 @@ FUNCTABLE:
 
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0
-IDString	dc.b	"$VER: sonnet.library 17.5 (31-Jan-17)",0
+IDString	dc.b	"$VER: sonnet.library 17.5 (11-Mar-17)",0
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: fake warp.library 5.0 (01-Apr-16)",0
+PowerName	dc.b	"powerpc.library",0
+PowerIDString	dc.b	"$VER: fake powerpc.library 17.5 (11-Mar-17)",0
+
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
+PowerPCError	dc.b	"Powerpc.library (WarpOS) already active",0
 LDOSError	dc.b	"Could not open dos.library V37+",0
 LExpError	dc.b	"Could not open expansion.library V37+",0
 LPCIError	dc.b	"Could not open pci.library V11+",0
@@ -2646,8 +2719,8 @@ PPCCrash	dc.b	"PowerPC CPU possibly crashed during setup",0
 NoPPCFound	dc.b	"PowerPC CPU not responding",0
 StackRunError	dc.b	"RunPPC Stack transfer error",0
 
-ramlib		dc.b "ramlib",0		
-		
+ramlib		dc.b "ramlib",0
+
 WhiteList	dc.b 12,w1-WhiteList-2,"mpega.library",0
 w1		dc.b w2-w1-1,"Warp3DPPC.library",0
 w2		dc.b w3-w2-1,"agleppc.library",0

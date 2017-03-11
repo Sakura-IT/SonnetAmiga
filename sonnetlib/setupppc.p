@@ -3,7 +3,7 @@
 .include ppcmacros-std.i
 
 .global PPCCode,PPCLen,ThisPPCProc,LIST_WAITINGTASKS,Init,ViolationAddress
-.global MCPort,SysBase,PowerPCBase,DOSBase,sonnet_DebugLevel
+.global MCPort,SysBase,PowerPCBase,DOSBase,sonnet_DebugLevel,sonnet_PosSize
 
 .set	PPCLen,(PPCEnd-PPCCode)
 .set	base_Comm,0
