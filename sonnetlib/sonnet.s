@@ -121,24 +121,34 @@ GotExp		move.l d0,ExpBase-Buffer(a4)
 		jsr _LVOFindConfigDev(a6)		;Find A3000/A4000 mediator
 		tst.l d0
 		bne.s FoundMed
-
-		sub.l a0,a0
-		move.l #VENDOR_ELBOX,d0			;ELBOX
-		moveq.l #MEDIATOR_1200TX,d1		;Mediator 1200TX
-		jsr _LVOFindConfigDev(a6)		;Find 1200TX mediator
-		move.l LExecBase(pc),a6
-		tst.l d0
-		bne.s FoundMed
 		
-		lea MedError(pc),a2
+WeirdMed	lea MedError(pc),a2
 		bra PrintError
 
-FoundMed	move.l LExecBase(pc),a6
-		move.l d0,a1
-		move.l cd_BoardAddr(a1),d0		;Start address Configspace Mediator
-		move.l d0,MediatorBase-Buffer(a4)
+FoundMed	sub.l a0,a0
+		move.l #VENDOR_ELBOX,d0			;ELBOX
+		move.l #MEDIATOR_LOGIC,d1		;Mediator Logic board for A3/4000
+		jsr _LVOFindConfigDev(a6)
+		tst.l d0
+		beq.s WeirdMed
 
-		lea MemList(a6),a0
+		move.l d0,a1
+		move.l LExecBase(pc),a6
+		move.l cd_BoardAddr(a1),d0		;Start address Configspace Mediator
+		cmp.l #$60000000,d0			;MemorySpace at default position?
+		beq CorrectConfigJ
+
+		lea MedConfigJ(pc),a2
+		bra PrintError
+
+CorrectConfigJ	move.l cd_BoardSize(a1),d0
+		cmp.l #$20000000,d0			;WindowSize 512MB?
+		beq CorrectWindowJ
+
+		lea MedWindowJ(pc),a2
+		bra PrintError
+
+CorrectWindowJ	lea MemList(a6),a0
 		lea MemName(pc),a1
 		jsr _LVOFindName(a6)			;Check for sonnet memory
 		tst.l d0
@@ -2410,7 +2420,6 @@ PPCCodeMem		ds.l	1
 PPCCodeMem2		ds.l	1
 _PowerPCBase		ds.l	1
 SonnetBase		ds.l	1
-MediatorBase		ds.l	1
 DosBase			ds.l	1
 ExpBase			ds.l	1
 PCIBase			ds.l	1
@@ -2718,6 +2727,8 @@ SonnetUnstable	dc.b	"Memory corruption detected during setup",0
 PPCCrash	dc.b	"PowerPC CPU possibly crashed during setup",0
 NoPPCFound	dc.b	"PowerPC CPU not responding",0
 StackRunError	dc.b	"RunPPC Stack transfer error",0
+MedConfigJ	dc.b	"Mediator ConfigSwap jumper incorrectly configured",0
+MedWindowJ	dc.b	"Mediator WindowSize jumper incorrectly configured",0
 
 ramlib		dc.b "ramlib",0
 
