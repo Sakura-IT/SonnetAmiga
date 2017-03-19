@@ -134,21 +134,21 @@ FoundMed	sub.l a0,a0
 
 		move.l d0,a1
 		move.l LExecBase(pc),a6
-		move.l cd_BoardAddr(a1),d0		;Start address Configspace Mediator
-		cmp.l #$60000000,d0			;MemorySpace at default position?
-		beq CorrectConfigJ
-
-		lea MedConfigJ(pc),a2
-		bra PrintError
-
-CorrectConfigJ	move.l cd_BoardSize(a1),d0
-		cmp.l #$20000000,d0			;WindowSize 512MB?
-		beq CorrectWindowJ
+		move.l cd_BoardSize(a1),d0		;Start address Configspace Mediator
+		cmp.l #$20000000,d0
+		beq CorrectWindowJ			;WindowSize 512MB?
 
 		lea MedWindowJ(pc),a2
 		bra PrintError
 
-CorrectWindowJ	lea MemList(a6),a0
+CorrectWindowJ	move.l cd_BoardAddr(a1),d0
+		cmp.l #$60000000,d0
+		beq CorrectConfigJ			;MemorySpace at default position?
+
+		lea MedConfigJ(pc),a2
+		bra PrintError
+
+CorrectConfigJ	lea MemList(a6),a0
 		lea MemName(pc),a1
 		jsr _LVOFindName(a6)			;Check for sonnet memory
 		tst.l d0
