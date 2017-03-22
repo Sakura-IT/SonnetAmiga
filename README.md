@@ -7,7 +7,7 @@ This project is an attempt at reimplementation of WarpOS for Sonnet Crescendo
 The main part of the project is sonnet.library, which aims at API and ABI
 compatibility with WarpOS powerpc.library.
 
-This project is in very early stage of development. Don't expect it to do
+This project is in an early stage of development. Don't expect it to do
 anything useful (yet).
 
 # Hardware
@@ -28,6 +28,34 @@ See the "Building SonnetAmiga project from source" article on project's Wiki:
 https://github.com/Sakura-IT/SonnetAmiga/wiki
 
 Automated binary builds are available from Jenkins: https://sonnet.uguu.waw.pl/jenkins/job/sonnetamiga/
+
+# Installation
+
+In the archive there are two versions of the library: sonnet.library and powerpc.library. For
+installation you need to install one of them in LIBS:. They are mutually exclusive.
+
+DO NOT INSTALL BOTH!!
+
+When sonnet.library is installed, you need to install InitSonnet. When powerpc.library is installed
+you need InitPPC. You can execute the initialization program from a shell after workbench has loaded
+or if you feel lucky you can add it to the startup-sequence after LoadMonDrvs and before AddDataTypes
+using 'Run >NIL: <NIL: C:InitPPC' in case for the powerpc.library.
+
+The initialization is needed to correctly patch the system. Do not run WarpOS (patched) binaries without
+first running the initialization program.
+
+Both included libraries ARE NOT COMPATIBLE with the powerpc.library from the WarpUp distribution.
+
+DO NOT INSTALL BOTH WARPUP LIBRARIES AND SONNET LIBRARIES!!
+
+# Differences between the included libraries
+
+The sonnet.library does not patch the system to transparantly load WarpOS executables. You need to
+patch the WarpOS executables to work with sonnet.library.
+
+The powerpc.library is currently even more experimental than sonnet.library. It patches the system to
+transparantly load WarpOS binaries. Did we mention it is experimental? Use at own risk!
+
 
 # Bugs
 
