@@ -2472,7 +2472,7 @@ WARPDATATABLE:
 	INITLONG	LN_NAME,WarpName
 	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITWORD	LIB_VERSION,5
-	INITWORD	LIB_REVISION,0
+	INITWORD	LIB_REVISION,1
 	INITLONG	LIB_IDSTRING,WarpIDString
 	ds.l	1
 
@@ -2716,7 +2716,7 @@ FUNCTABLE:
 
 EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
-WarpIDString	dc.b	"$VER: fake warp.library 5.0 (01-Apr-16)",0
+WarpIDString	dc.b	"$VER: fake warp.library 5.1 (22-Mar-17)",0
 PowerName	dc.b	"powerpc.library",0
 PowerIDString	dc.b	"$VER: fake powerpc.library 17.5 (11-Mar-17) for Sonnet Crescendo 7200",0
 
