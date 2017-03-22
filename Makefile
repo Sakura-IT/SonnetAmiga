@@ -1,4 +1,4 @@
-HOST=aos3    # pass unix on any unix-like
+HOST=aos3	# pass unix on any unix-like
 
 ASM68K=vasmm68k_mot
 ASMPPC=vasmppc_std
@@ -40,34 +40,34 @@ export
 all : $(SONNETLIB_N) $(SONNETRUN_N) $(SONNETO_N) $(TOOLS_N) $(WOSDB_N)
 
 $(SONNETLIB_N) :
-    $(MAKE) -C $(SONNETLIB_N)
+	$(MAKE) -C $(SONNETLIB_N)
 
 $(SONNETRUN_N) :
-    $(MAKE) -C $(SONNETRUN_N)
+	$(MAKE) -C $(SONNETRUN_N)
 
 $(TOOLS_N) :
-    $(MAKE) -C $(TOOLS_N)
+	$(MAKE) -C $(TOOLS_N)
 
 $(SONNETO_N) :
-    $(MAKE) -C $(SONNETO_DIR) 
+	$(MAKE) -C $(SONNETO_DIR) 
 
 $(WOSDB_N) :
-    $(MAKE) -C $(WOSDB_N)
+	$(MAKE) -C $(WOSDB_N)
 
 disasm68k :
-    $(MAKE) -C $(SONNETLIB_N) disasm68k
-    $(MAKE) -C $(TOOLS_N) disasm68k
-    
+	$(MAKE) -C $(SONNETLIB_N) disasm68k
+	$(MAKE) -C $(TOOLS_N) disasm68k
+	
 clean :
-    $(MAKE) -C $(SONNETLIB_N) clean
-    $(MAKE) -C $(SONNETRUN_N) clean
-    $(MAKE) -C $(SONNETO_DIR) clean
-    $(MAKE) -C $(TOOLS_N) clean
-    $(MAKE) -C $(WOSDB_N) clean
-    $(RM) $(DISTRIBUTION)
+	$(MAKE) -C $(SONNETLIB_N) clean
+	$(MAKE) -C $(SONNETRUN_N) clean
+	$(MAKE) -C $(SONNETO_DIR) clean
+	$(MAKE) -C $(TOOLS_N) clean
+	$(MAKE) -C $(WOSDB_N) clean
+	$(RM) $(DISTRIBUTION)
 
 distribution :
-    $(LHA) ao5 $(DISTRIBUTION) $(SONNETLIB_N)/$(SONNETLIB_LIB) $(SONNETLIB_N)/$(POWERLIB_LIB) $(TOOLS_N)/$(TOOLS_GETINFO) $(TOOLS_N)/$(TOOLS_GETINFOPPC) $(TOOLS_N)/$(TOOLS_INITSONNET) $(SONNETRUN_N)/$(SONNETRUN_SONNETPATCH) $(SONNETO_DIR)/$(SONNETO_O) $(SONNETO_DIR)/$(SONNETO_X) $(WOSDB_N)/$(WOSDB_WOSDB) README.md
+	$(LHA) ao5 $(DISTRIBUTION) $(SONNETLIB_N)/$(SONNETLIB_LIB) $(SONNETLIB_N)/$(POWERLIB_LIB) $(TOOLS_N)/$(TOOLS_GETINFO) $(TOOLS_N)/$(TOOLS_GETINFOPPC) $(TOOLS_N)/$(TOOLS_INITSONNET) $(SONNETRUN_N)/$(SONNETRUN_SONNETPATCH) $(SONNETO_DIR)/$(SONNETO_O) $(SONNETO_DIR)/$(SONNETO_X) $(WOSDB_N)/$(WOSDB_WOSDB) README.md
 
 .PHONY: $(SONNETLIB_N) $(SONNETRUN_N) $(TOOLS_N) $(SONNETO_N) $(WOSDB_N)
 
