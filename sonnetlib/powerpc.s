@@ -1939,10 +1939,14 @@ EndIt		move.l d7,d0
 		movem.l (a7)+,d1-a6
 		unlk a5
 		rts
+		
+;********************************************************************************************
 
 Runk862		move.l MirrorNode(a5),a1
 		move.l MN_PPC(a0),MT_MIRROR(a1)
-Runk86		btst #AFB_FPU40,AttnFlags+1(a6)
+Runk86		link a3,#-16
+		lea -16(a3),a3
+		btst #AFB_FPU40,AttnFlags+1(a6)
 		beq.s NoFPU
 		fmove.d fp0,-(a7)
 		fmove.d fp1,-(a7)
@@ -1967,31 +1971,37 @@ NoFPU		movem.l d0-a6,-(a7)			;68k routines called from PPC
 		fmove.d (a6)+,fp5
 		fmove.d (a6)+,fp6
 		fmove.d (a6)+,fp7
+
 NoFPU3		move.l a1,a5
 		move.l PP_STACKPTR(a1),d0
 		beq NoStckPtr
-
-		move.l d0,a0
-		move.l PP_STACKSIZE(a1),d1
+		move.l PP_STACKSIZE(a5),d1
 		beq NoStckPtr
 
+		move.l a3,a2
+		move.l #$2e7a0008,(a2)+
+		move.w #$4ef9,(a2)+
+		move.l #xBack,(a2)+
+		move.l a7,(a2)+
+		move.l LExecBase(pc),a6
+		jsr _LVOCacheClearU(a6)
+
+		move.l PP_STACKPTR(a5),a0
+		lea 24(a0),a0				;Offset into stack must be 24 (see docs Run68K)
+		move.l PP_STACKSIZE(a5),d1
 		moveq.l #CACHE_DCACHEINV,d0
 		bsr SetCache68K
 
 		move.l PP_STACKPTR(a5),a0
+		lea 24(a0),a0				;See above about offset
 		move.l PP_STACKSIZE(a5),d0
+		addq.l #3,d0
+		and.l #$fffffffc,d0			;Make is 4 aligned
 		move.l a7,a1
-;		sub.l d0,a1
-
-		cmp.l #512,d0				;DEBUG
-		ble StackLimit				;DEBUG
-		ILLEGAL					;DEBUG
-
-StackLimit	lea -512(a1),a1				;Stack overflow?
+		sub.l d0,a1
 		move.l a1,a7
-		move.l LExecBase(pc),a6
 		jsr _LVOCopyMem(a6)
-		pea xBack2(pc)
+		move.l a3,-(a7)				;Return function
 		bra StckPtr
 
 NoStckPtr	pea xBack(pc)
@@ -2002,9 +2012,8 @@ StckPtr		move.l PP_CODE(a5),a0
 		movem.l (a6)+,d0-a5
 		move.l (a6),a6
 		rts
-		
-xBack2		lea 512(a7),a7
-xBack		move.l a6,-(a7)				;Restore correct stack?
+
+xBack		move.l a6,-(a7)
 		move.l 4(a7),a6
 		lea MN_PPSTRUCT+PP_REGS(a6),a6
 		move.l d0,(a6)+
@@ -2076,7 +2085,13 @@ DoReslt		move.l (a1)+,(a3)+
 		fmove.d (a7)+,fp2
 		fmove.d (a7)+,fp1
 		fmove.d (a7)+,fp0
-NoFPU2		rts
+		
+NoFPU2		move.l a7,a0
+		lea 16(a0),a0
+		unlk a0		
+		rts
+		
+;********************************************************************************************
 
 CrossSignals	bsr CreateMsgFrame
 
@@ -2481,7 +2496,7 @@ POWERDATATABLE:
 	INITLONG	LN_NAME,PowerName
 	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITWORD	LIB_VERSION,17
-	INITWORD	LIB_REVISION,5
+	INITWORD	LIB_REVISION,6
 	INITLONG	LIB_IDSTRING,PowerIDString
 	ds.l	1
 
@@ -2718,7 +2733,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: fake warp.library 5.1 (22-Mar-17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: fake powerpc.library 17.5 (11-Mar-17) for Sonnet Crescendo 7200",0
+PowerIDString	dc.b	"$VER: fake powerpc.library 17.6 (01-Apr-17) for Sonnet Crescendo 7200",0
 
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0

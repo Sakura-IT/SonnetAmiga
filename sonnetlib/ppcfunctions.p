@@ -456,17 +456,29 @@ SetCache:
 
 #********************************************************************************************
 #
-#	void SetExcMMU(void) // Only from within Exception Handler (STUB)
+#	void SetExcMMU(void) // Only from within Exception Handler
 #
 #********************************************************************************************
 
 SetExcMMU:
-		prolog 228,'TOC'			#DUMMY pending better MMU support
+		prolog 228,'TOC'
 
 		stwu	r31,-4(r13)
 
 		li	r31,FSetExcMMU-FRun68K
 		bl	DebugStartFunction
+		
+#		bl Super
+#		
+#		mfmsr	r31
+#		ori	r31,r31,(PSL_IR|PSL_DR)
+#		mtmsr	r31
+#		sync					#Reenable MMU
+#		isync
+#
+#		mr	r4,r3
+#		
+#		bl User
 
 		lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -475,17 +487,30 @@ SetExcMMU:
 
 #********************************************************************************************
 #
-#	void ClearExcMMU(void) // Only from within Exception Handler (STUB)
+#	void ClearExcMMU(void) // Only from within Exception Handler
 #
 #********************************************************************************************
 
 ClearExcMMU:	
-		prolog 228,'TOC'			#DUMMY pending better MMU support
+		prolog 228,'TOC'
 
 		stwu	r31,-4(r13)
 
 		li	r31,FClearExcMMU-FRun68K
 		bl	DebugStartFunction
+		
+#		bl Super
+#		
+#		mfmsr	r31
+#		ori	r31,r31,(PSL_IR|PSL_DR)
+#		xori	r31,r31,(PSL_IR|PSL_DR)
+#		mtmsr	r31
+#		sync					#Disable MMU
+#		isync
+#
+#		mr	r4,r3
+#		
+#		bl User
 
 		lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -8253,8 +8278,8 @@ SetExcHandler:
 		mr	r27,r3
 		mr	r31,r4
 
-		li	r4,98
-		loadreg	r5,0x10001			#NEEDS PROPER ATTRIBUTES
+		li	r4,SIZE_EXCDATA
+		loadreg	r5,(MEMF_CLEAR|MEMF_PUBLIC)
 		li	r6,0
 		li	r7,0
 		
@@ -8365,8 +8390,8 @@ SetExcHandler:
 		rlwinm.	r0,r29,(32-EXC_MCHECK),31,31
 		beq-	.NoMachineChk
 
-		li	r4,46
-		loadreg	r5,0x10001
+		li	r4,SIZE_EXCNODE
+		loadreg	r5,(MEMF_CLEAR|MEMF_PUBLIC)
 		li	r6,0
 		li	r7,0
 		mr	r3,r27
@@ -8381,8 +8406,8 @@ SetExcHandler:
 .NoMachineChk:	rlwinm.	r0,r29,(32-EXC_DACCESS),31,31
 		beq-	.NoDataAccess
 
-		li	r4,46
-		loadreg	r5,0x10001
+		li	r4,SIZE_EXCNODE
+		loadreg	r5,(MEMF_CLEAR|MEMF_PUBLIC)
 		li	r6,0
 		li	r7,0
 		mr	r3,r27
@@ -8397,8 +8422,8 @@ SetExcHandler:
 .NoDataAccess:	rlwinm.	r0,r29,(32-EXC_IACCESS),31,31
 		beq-	.NoInstAccess
 
-		li	r4,46
-		loadreg	r5,0x10001
+		li	r4,SIZE_EXCNODE
+		loadreg	r5,(MEMF_CLEAR|MEMF_PUBLIC)
 		li	r6,0
 		li	r7,0
 		mr	r3,r27
@@ -8413,8 +8438,8 @@ SetExcHandler:
 .NoInstAccess:	rlwinm.	r0,r29,(32-EXC_INTERRUPT),31,31
 		beq-	.NoExtInt
 
-		li	r4,46
-		loadreg	r5,0x10001
+		li	r4,SIZE_EXCNODE
+		loadreg	r5,(MEMF_CLEAR|MEMF_PUBLIC)
 		li	r6,0
 		li	r7,0
 		mr	r3,r27
@@ -8429,8 +8454,8 @@ SetExcHandler:
 .NoExtInt:	rlwinm.	r0,r29,(32-EXC_ALIGN),31,31
 		beq-	.NoAlignment
 
-		li	r4,46
-		loadreg	r5,0x10001
+		li	r4,SIZE_EXCNODE
+		loadreg	r5,(MEMF_CLEAR|MEMF_PUBLIC)
 		li	r6,0
 		li	r7,0
 		mr	r3,r27
@@ -8445,8 +8470,8 @@ SetExcHandler:
 .NoAlignment:	rlwinm.	r0,r29,(32-EXC_PROGRAM),31,31
 		beq-	.NoProgram
 
-		li	r4,46
-		loadreg	r5,0x10001
+		li	r4,SIZE_EXCNODE
+		loadreg	r5,(MEMF_CLEAR|MEMF_PUBLIC)
 		li	r6,0
 		li	r7,0
 		mr	r3,r27
@@ -8461,8 +8486,8 @@ SetExcHandler:
 .NoProgram:	rlwinm.	r0,r29,(32-EXC_FPUN),31,31
 		beq-	.NoFPUnavail
 
-		li	r4,46
-		loadreg	r5,0x10001
+		li	r4,SIZE_EXCNODE
+		loadreg	r5,(MEMF_CLEAR|MEMF_PUBLIC)
 		li	r6,0
 		li	r7,0
 		mr	r3,r27
@@ -8477,8 +8502,8 @@ SetExcHandler:
 .NoFPUnavail:	rlwinm.	r0,r29,(32-EXC_DECREMENTER),31,31
 		beq-	.NoDecrementer
 
-		li	r4,46
-		loadreg	r5,0x10001
+		li	r4,SIZE_EXCNODE
+		loadreg	r5,(MEMF_CLEAR|MEMF_PUBLIC)
 		li	r6,0
 		li	r7,0
 		mr	r3,r27
@@ -8493,8 +8518,8 @@ SetExcHandler:
 .NoDecrementer:	rlwinm.	r0,r29,(32-EXC_SYSTEMCALL),31,31
 		beq-	.NoSC
 
-		li	r4,46
-		loadreg	r5,0x10001
+		li	r4,SIZE_EXCNODE
+		loadreg	r5,(MEMF_CLEAR|MEMF_PUBLIC)
 		li	r6,0
 		li	r7,0
 		mr	r3,r27
@@ -8509,8 +8534,8 @@ SetExcHandler:
 .NoSC:		rlwinm.	r0,r29,(32-EXC_TRACE),31,31
 		beq-	.NoTrace
 
-		li	r4,46
-		loadreg	r5,0x10001
+		li	r4,SIZE_EXCNODE
+		loadreg	r5,(MEMF_CLEAR|MEMF_PUBLIC)
 		li	r6,0
 		li	r7,0
 		mr	r3,r27
@@ -8525,8 +8550,8 @@ SetExcHandler:
 .NoTrace:	rlwinm.	r0,r29,(32-EXC_PERFMON),31,31
 		beq-	.NoPerfMon
 
-		li	r4,46
-		loadreg	r5,0x10001
+		li	r4,SIZE_EXCNODE
+		loadreg	r5,(MEMF_CLEAR|MEMF_PUBLIC)
 		li	r6,0
 		li	r7,0
 		mr	r3,r27
@@ -8541,8 +8566,8 @@ SetExcHandler:
 .NoPerfMon:	rlwinm.	r0,r29,(32-EXC_IABR),31,31
 		beq-	.NoIABR
 
-		li	r4,46
-		loadreg	r5,0x10001
+		li	r4,SIZE_EXCNODE
+		loadreg	r5,(MEMF_CLEAR|MEMF_PUBLIC)
 		li	r6,0
 		li	r7,0
 		mr	r3,r27
