@@ -565,7 +565,10 @@ PPCInit		move.l SonnetBase(pc),a1
 
 ;********************************************************************************************
 
-PrintError	move.l LExecBase(pc),a6			;Put up a requester and give out
+PrintError	bsr.s PrintError2
+		bra Clean
+
+PrintError2	move.l LExecBase(pc),a6			;Put up a requester and give out
 		lea IntuitionLib(pc),a1			;an error message
 		moveq.l #33,d0
 		jsr _LVOOpenLibrary(a6)
@@ -584,8 +587,7 @@ PrintError	move.l LExecBase(pc),a6			;Put up a requester and give out
 		jsr _LVOEasyRequestArgs(a6)
 		move.l a6,a1
 		move.l LExecBase(pc),a6
-		jsr _LVOCloseLibrary(a6)
-		bra Clean
+		jmp _LVOCloseLibrary(a6)
 		
 ;********************************************************************************************
 
@@ -714,7 +716,9 @@ CheckMsg	move.l d0,a1
 		move.l LN_NAME(a1),d0
 		bne.s MsgRXMSG
 		
-		ILLEGAL
+		lea IllegalMsg(pc),a2
+		bsr PrintError2
+		bra.s GetLoop
 		
 NoXReply	move.l MN_IDENTIFIER(a1),d0
 		cmp.l #"T68K",d0			;Message to 68K
@@ -1823,9 +1827,10 @@ DoStack		move.l PP_FLAGS(a1),d2			;Passing stack through a message frame
 
 		move.l a4,a0
 		bra SetupCp
-		
+
 StackErr	lea StackRunError(pc),a2
-		bra PrintError
+		bsr PrintError2
+		bra Cannot
 
 SetupCp		move.l a3,a1
 		lea MN_PPSTRUCT(a0),a2
@@ -1930,11 +1935,9 @@ CpBck		move.l (a2)+,(a1)+
 		dbf d0,CpBck
 		moveq.l #PPERR_SUCCESS,d7
 		bsr FreeMsgFrame
-
-		bra.s Success
+		bra.s EndIt
 
 Cannot		moveq.l #-1,d7
-Success		move.l LExecBase(pc),a6
 EndIt		move.l d7,d0
 		movem.l (a7)+,d1-a6
 		unlk a5
@@ -2111,7 +2114,7 @@ ClearMsg	clr.l (a2)+
 
 ;********************************************************************************************
 ;
-;	PPCState = GetPCState(void) // d0		THIS NEEDS AN OVERHAUL!!
+;	PPCState = GetPPCState(void) // d0
 ;
 ;********************************************************************************************
 
@@ -2757,6 +2760,7 @@ NoPPCFound	dc.b	"PowerPC CPU not responding",0
 StackRunError	dc.b	"RunPPC Stack transfer error",0
 MedConfigJ	dc.b	"Mediator ConfigSwap jumper incorrectly configured",0
 MedWindowJ	dc.b	"Mediator WindowSize jumper incorrectly configured",0
+IllegalMsg	dc.b	"Illegal message received by MasterControl",0
 
 ConWindow	dc.b	"CON:0/20/680/250/Sonnet - PowerPC Exception/AUTO/CLOSE/WAIT/"
 		dc.b	"INACTIVE",0		
