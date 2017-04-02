@@ -6251,7 +6251,8 @@ SetHardware:
 		beq	.NoWaiting
 		
 		li	r3,PPCSTATEF_APPACTIVE
-.NoWaiting:	lwz	r5,ThisPPCProc(r31)
+.NoWaiting:	lwz	r5,LIST_READYTASKS(r31)
+		lwz	r5,0(r5)
 		mr.	r5,r5
 		beq	.PrivateEnd
 		

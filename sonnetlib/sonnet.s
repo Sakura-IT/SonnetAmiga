@@ -435,15 +435,6 @@ GotLibMade	move.l SonnetBase(pc),a1
 		addq.w #1,LIB_OPENCNT(a1)		;Prevent closure and all kinds of problems
 		jsr _LVOAddLibrary(a6)
 
-		lea POWERDATATABLE(pc),a2
-		bsr MakeLibrary
-		tst.l d0
-		beq NotLibMade
-		
-		move.l d0,a1
-		addq.w #1,LIB_OPENCNT(a1)		;Prevent closure and all kinds of problems
-;		jsr _LVOAddLibrary(a6)			;DEBUG: DISABLED FOR NOW
-
 		lea WARPFUNCTABLE(pc),a0		;Set up a fake warp.library
 		lea WARPDATATABLE(pc),a1		;Some programs do a version
 		sub.l a2,a2				;check on this
@@ -503,22 +494,6 @@ PPCInit		move.l SonnetBase(pc),a1
 		moveq.l #0,d3
 		
 		bsr ChangeStack68K			;Enlarge RamLib stack
-		
-		move.l #_LVOLoadSeg,a0			;Set system patches
-		lea NewOldLoadSeg(pc),a3
-		move.l a3,d0
-		move.l DosBase(pc),a1
-		jsr _LVOSetFunction(a6)			;LoadSeg to correctly scatter-load sonnet exes
-		lea LoadSegAddress(pc),a3
-		move.l d0,(a3)
-		
-		move.l #_LVONewLoadSeg,a0
-		lea NewNewLoadSeg(pc),a3
-		move.l a3,d0
-		move.l DosBase(pc),a1
-		jsr _LVOSetFunction(a6)			;NewLoadSeg to correctly scatter-load sonnet exes
-		lea NewLoadSegAddress(pc),a3
-		move.l d0,(a3)
 	
 		move.l #_LVOAddTask,a0
 		lea StartCode(pc),a3
@@ -1195,20 +1170,6 @@ Open:
 		move.l LExecBase(pc),a6
 		move.l ThisTask(a6),a6
 		or.b #TF_PPC,TC_FLAGS(a6)
-		
-;		movem.l d0-a6,-(a7)
-;		move.l LN_NAME(a6),a1
-;		cmp.l #"raml",(a1)
-;		beq.s DontDoRamLib
-;		move.l LExecBase(pc),a6
-;		jsr _LVODisable(a6)
-;		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE,d1
-;		moveq.l #0,d2
-;		moveq.l #1,d3
-;		bsr ChangeStack68K
-;		jsr _LVOEnable(a6)
-;DontDoRamLib	movem.l (a7)+,d0-a6
-
 		move.l d0,a6
 		move.l a1,-(a7)
 		lea _PowerPCBase(pc),a1
@@ -1232,8 +1193,7 @@ NoExp		rts
 
 Expunge:
 		tst.w LIB_OPENCNT(a6)
-;		beq.s NotOpen
-		nop					;DEBUG Library should not be expunged due to fake powerpc stuff
+		beq.s NotOpen
 		bset #LIBB_DELEXP,LIB_FLAGS(a6)
 		moveq.l #0,d0
 		rts
@@ -1572,23 +1532,6 @@ NoBit		move.l (a7)+,a2
 NoFast		move.l AllocMemAddress(pc),-(a7)
 		rts
 		
-;********************************************************************************************
-;
-;		LoadSeg() Patch
-;
-;********************************************************************************************
-
-NewOldLoadSeg	move.l LoadSegAddress(pc),-(a7)
-		rts
-
-;********************************************************************************************
-;
-;		NewLoadSeg() Patch
-;
-;********************************************************************************************
-
-NewNewLoadSeg	move.l NewLoadSegAddress(pc),-(a7)
-		rts
 ;*********************************************************************************************
 ;
 ;	status = RunPPC(PPStruct) // d0=a0
@@ -1954,7 +1897,7 @@ NoFPU3		move.l a1,a5
 		beq NoStckPtr
 
 		move.l a3,a2
-		move.l #$2e7a0008,(a2)+
+		move.l #$2e7a0008,(a2)+			;Put return function on stack
 		move.w #$4ef9,(a2)+
 		move.l #xBack,(a2)+
 		move.l a7,(a2)+
@@ -2086,7 +2029,7 @@ ClearMsg	clr.l (a2)+
 
 ;********************************************************************************************
 ;
-;	PPCState = GetPCState(void) // d0		THIS NEEDS AN OVERHAUL!!
+;	PPCState = GetPCState(void) // d0
 ;
 ;********************************************************************************************
 
@@ -2309,7 +2252,8 @@ PutChProc:
 ;
 ;********************************************************************************************
 
-PutXMsg:	movem.l d0-a6,-(a7)
+PutXMsg:	
+		movem.l d0-a6,-(a7)
 		move.l a0,d7
 		move.b #NT_XMSG68K,LN_TYPE(a1)
 		bsr CreateMsgFrame		
@@ -2474,15 +2418,6 @@ WARPDATATABLE:
 	INITWORD	LIB_VERSION,5
 	INITWORD	LIB_REVISION,1
 	INITLONG	LIB_IDSTRING,WarpIDString
-	ds.l	1
-
-POWERDATATABLE:
-	INITBYTE	LN_TYPE,NT_LIBRARY
-	INITLONG	LN_NAME,PowerName
-	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
-	INITWORD	LIB_VERSION,17
-	INITWORD	LIB_REVISION,5
-	INITLONG	LIB_IDSTRING,PowerIDString
 	ds.l	1
 
 WARPFUNCTABLE:
@@ -2716,11 +2651,10 @@ FUNCTABLE:
 
 EndFlag		dc.l	-1
 LibName		dc.b	"sonnet.library",0
-IDString	dc.b	"$VER: sonnet.library 17.5 (11-Mar-17)",0
+IDString	dc.b	"$VER: sonnet.library 17.6 FINAL (01-Apr-17)",0
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: fake warp.library 5.1 (22-Mar-17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: fake powerpc.library 17.5 (11-Mar-17)",0
 
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
