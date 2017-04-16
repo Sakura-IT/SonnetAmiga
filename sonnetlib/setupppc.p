@@ -5095,6 +5095,7 @@ EInt:		b	.FPUnav				#0
 		mr.	r0,r0
 		beq 	.DoExc
 		
+		lwz	r29,PowerPCBase(r0)
 		lwz	r28,ThisPPCProc(r29)
 		cmpw	r0,r28
 		beq	.DoExc
