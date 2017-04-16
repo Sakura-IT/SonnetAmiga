@@ -21,8 +21,6 @@
 .set Init,20					#Pointer
 .set PowerPCBase,24
 
-.set RunningTask,32				#Pointer
-
 .set AdListStart,64
 .set AdListEnd,68
 .set RTGType,72
