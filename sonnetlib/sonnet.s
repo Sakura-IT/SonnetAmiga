@@ -17,6 +17,7 @@
 	include intuition/intuition_lib.i
 	include exec/ports.i
 	include dos/dosextens.i
+	include dos/var.i
 	include	exec/interrupts.i
 	include hardware/intbits.i
 	include	exec/tasks.i
@@ -2448,6 +2449,8 @@ NewLoadSegAddress	ds.l	1
 MirrorList		ds.l	3
 RemSysTask		ds.l	1
 Previous		ds.l	1
+ENVBuff			ds.l	1
+ENVOptions		ds.l	3
 MyInterrupt		ds.b	IS_SIZE
 
 	cnop	0,4
