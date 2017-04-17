@@ -263,11 +263,14 @@ ATIs		dc.l	DEVICE_RV280PRO,DEVICE_RV280MOB,DEVICE_RV280SE,0
 GotATI		move.l d0,a2
 		move.l PCI_SPACE0(a2),d4
 
-FoundGfx	move.l LExecBase(pc),a6
-		move.l d4,GfxMem-Buffer(a4)
+FoundGfx	move.l d4,GfxMem-Buffer(a4)
 		move.w d5,GfxType-Buffer(a4)
 		move.l d6,a2
 		move.l a2,SonAddr-Buffer(a4)
+		
+		bsr GetENVs
+		
+		move.l LExecBase(pc),a6
 		
 		move.l #$20000,d0
 		move.l #MEMF_PUBLIC|MEMF_PPC,d1
@@ -650,6 +653,50 @@ DoneFun		jsr _LVOCacheClearU(a6)
 		jsr _LVOInitStruct(a6)
 		move.l a3,d0
 NoFun		movem.l (a7)+,d1-a6
+		rts
+
+;********************************************************************************************
+
+GetENVs		move.l DosBase(pc),a6
+		lea ENVOptions(pc),a5
+		lea EnEDOMem(pc),a1
+		bsr DoENV
+		bmi.s NoEDOMem
+		move.b (a3),(a5)
+NoEDOMem	lea EnDebug(pc),a1
+		bsr DoENV
+		bmi.s NoEnDebug
+		move.b (a3),1(a5)
+NoEnDebug	lea EnAlignExc(pc),a1
+		bsr DoENV
+		bmi.s NoEnAlignExc
+		move.b (a3),2(a5)
+NoEnAlignExc	lea DisL2Cache(pc),a1
+		bsr DoENV
+		bmi.s NoDisL2Cache
+		move.b (a3),3(a5)
+NoDisL2Cache	lea DisL2Flush(pc),a1
+		bsr DoENV
+		bmi.s NoDisL2Flush
+		move.b (a3),4(a5)
+NoDisL2Flush	lea EnPageSetup(pc),a1
+		bsr DoENV
+		bmi.s NoEnPageSetup
+		move.b (a3),5(a5)
+NoEnPageSetup	rts		
+
+DoENV		move.l a1,d1
+		lea ENVBuff(pc),a1
+		move.l a1,a3
+		move.l a1,d2
+		moveq.l #4,d3
+		move.l #GVF_GLOBAL_ONLY,d4
+		jsr _LVOGetVar(a6)
+		tst.l d0
+		bpl.s GotENV
+		move.b #0,(a3)
+GotENV		and.b #$03,(a3)
+		tst.l d0
 		rts
 
 ;********************************************************************************************
@@ -2705,7 +2752,14 @@ b1		dc.b b2-b1-1,"Picasso96API.library",0
 b2		dc.b -1
 
 ConWindow	dc.b	"CON:0/20/680/250/Sonnet - PowerPC Exception/AUTO/CLOSE/WAIT/"
-		dc.b	"INACTIVE",0		
+		dc.b	"INACTIVE",0
+
+EnEDOMem	dc.b	"sonnet/EnEDOMem",0			;0
+EnDebug		dc.b	"sonnet/Debug",0			;1
+EnAlignExc	dc.b	"sonnet/EnAlignExc",0			;2
+DisL2Cache	dc.b	"sonnet/DisL2Cache",0			;3
+DisL2Flush	dc.b	"sonnet/DisL2Flush",0			;4
+EnPageSetup	dc.b	"sonnet/EnPageSetup",0			;5
 
 		cnop	0,4
 		

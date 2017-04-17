@@ -30,6 +30,12 @@
 .set MemSize,88
 .set FLAG_PAGETABLE,92
 
+.set option_EnEDOMem,0
+.set option_EnDebug,1
+.set option_EnAlignExc,2
+.set option_DisL2Cache,3
+.set option_DisL2Flush,4
+.set option_EnPageSetup,5
 
 #LibBase:					All this stuff is PPC only! No access allowed from 68k!
 
@@ -299,6 +305,7 @@
 .set EXCF_IABR,			0x00080000
 .set EXCF_SYSMAN,		0x00100000
 .set EXCF_THERMAN,		0x00800000
+.set EXCF_VMXUN,		0x01000000
 
 .set EXC_MCHECK,2            				#machine check exception
 .set EXC_DACCESS,3           				#data access exception

@@ -11,6 +11,7 @@
 .set	base_MemLen,8
 .set	base_RTGBase,12
 .set	base_RTGType,16
+.set	base_Options,20
 
 .set	rtgtype_ati,0x1002
 .set	rtgtype_voodoo3,0x121a
@@ -27,6 +28,9 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 .long		0					#MemLen
 .long		0					#RTGBase
 .long		0					#RTGType
+.long		0					#Options1
+.long		0					#Options2
+.long		0					#Options3
 
 .SkipCom:	mflr	r29				#For initial communication with 68k
 		lis	r22,CMD_BASE@h			#Used in setpcireg macro
@@ -300,13 +304,15 @@ End:		mflr	r4
 		stw	r6,sonnet_SysBase(r3)
 		lwz	r6,DOSBase(r0)
 		stw	r6,sonnet_DosBase(r3)
+		la	r14,base_Options(r29)
+		lbz	r6,option_EnDebug(r14)
+		stb	r6,sonnet_DebugLevel(r3)
 		
 		mr	r14,r3
 		la	r6,SemMemory(r14)
 		la	r3,TaskListSem(r14)
 		
 		mr	r30,r3
-		mr	r29,r31
 		mr	r4,r3
 		stw	r4,sonnet_TaskListSem(r14)
 		bl	.InitSem
@@ -355,7 +361,7 @@ End:		mflr	r4
 		mtspr	HID0,r4
 		sync
 
-		mtsrr0	r29
+		mtsrr0	r31
 		
 		loadreg	r0,MACHINESTATE_DEFAULT
 		mtsrr1	r0				#load up user MSR. Also clears PSL_IP
@@ -398,18 +404,17 @@ End:		mflr	r4
 
 		blr
 
-.InitSem:	mr	r31,r4				#InitSemaphore()
-		addi	r5,r31,SS_WAITQUEUE
+.InitSem:	addi	r5,r4,SS_WAITQUEUE		#InitSemaphore()
 		stw	r5,8(r5)
 		li	r0,0
 		stwu	r0,4(r5)
 		stwu	r5,-4(r5)
 		li	r0,0
-		stw	r0,SS_OWNER(r31)
-		sth	r0,SS_NESTCOUNT(r31)
+		stw	r0,SS_OWNER(r4)
+		sth	r0,SS_NESTCOUNT(r4)
 		li	r0,-1
-		sth	r0,SS_QUEUECOUNT(r31)
-		stw	r6,SSPPC_RESERVE(r31)
+		sth	r0,SS_QUEUECOUNT(r4)
+		stw	r6,SSPPC_RESERVE(r4)
 		
 		blr
 
@@ -681,8 +686,12 @@ Caches:		mfspr	r4,HID0				#Invalidatem then enable L1 caches
 		sync
 		mtspr	HID0,r4
 		sync
-		 	
-#		blr					#REMOVE ME FOR L2 CACHE		
+		 
+		la	r4,base_Options(r29)
+		lbz	r5,option_DisL2Cache(r4)
+		mr.	r5,r5
+		li	r30,0
+		bne	.L2SizeDone
 
 #		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS|L2CR_DO
 		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS
@@ -1250,8 +1259,15 @@ ConfigMem:	mflr	r15			#Code lifted from the Sonnet Driver
 		bl	ConfigWrite32		#set MCCR3 to 0x2A29C
 	
 		setpcireg MCCR2
-		loadreg	r25,0xe0001040	
-		bl	ConfigWrite32		#set MCCR2 to 0xE0001040
+		loadreg	r25,0xe0001040
+		la	r3,base_Options(r29)
+		lbz	r4,option_EnEDOMem(r3)
+		mr.	r4,r4
+		beq	.DoFPMMem
+		lis	r3,1
+		or	r25,r25,r3		#Enable EDO
+		
+.DoFPMMem:	bl	ConfigWrite32		#set MCCR2 to 0xE0001040
 						#MCCR2 Memory Control Config Reg   = 0xe0001040
 						#    Read Modify Write parity      = 0x0 Disabled
 						#    RSV_PG Reserve one open page  = 0x0 Four open page mode
