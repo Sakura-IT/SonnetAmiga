@@ -699,7 +699,11 @@ NoDisL2Flush	lea EnPageSetup(pc),a1
 		bsr DoENV
 		bmi.s NoEnPageSetup
 		move.b (a3),5(a5)
-NoEnPageSetup	rts		
+NoEnPageSetup	lea EnDAccessExc(pc),a1
+		bsr DoENV
+		bmi.s NoEnDAccessExc
+		move.b (a3),6(a5)
+NoEnDAccessExc	rts		
 
 DoENV		move.l a1,d1
 		lea ENVBuff(pc),a1
@@ -2786,10 +2790,9 @@ FUNCTABLE:
 
 EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
-WarpIDString	dc.b	"$VER: fake warp.library 5.1 (22-Mar-17)",0
+WarpIDString	dc.b	"$VER: stub warp.library 5.1 (22-Mar-17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: fake powerpc.library 17.6 (01-Apr-17) for Sonnet Crescendo 7200",0
-
+PowerIDString	dc.b	"$VER: powerpc.library 17.6 (17-Apr-17) for Sonnet Crescendo 7200",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
@@ -2823,6 +2826,7 @@ EnAlignExc	dc.b	"sonnet/EnAlignExc",0			;2
 DisL2Cache	dc.b	"sonnet/DisL2Cache",0			;3
 DisL2Flush	dc.b	"sonnet/DisL2Flush",0			;4
 EnPageSetup	dc.b	"sonnet/EnPageSetup",0			;5
+EnDAccessExc	dc.b	"sonnet/EnDAccessExc",0			;6
 
 		cnop	0,4
 		

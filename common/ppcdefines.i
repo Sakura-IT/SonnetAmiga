@@ -36,10 +36,13 @@
 .set option_DisL2Cache,3
 .set option_DisL2Flush,4
 .set option_EnPageSetup,5
+.set option_EnDAccessExc,6
 
 #LibBase:					All this stuff is PPC only! No access allowed from 68k!
 
 .set sonnet_DebugLevel,72
+.set sonnet_EnAlignExc,73
+.set sonnet_EnDAccessExc,74
 .set sonnet_TaskExitCode,76
 .set sonnet_SonnetBase,80
 .set sonnet_Atomic,84
