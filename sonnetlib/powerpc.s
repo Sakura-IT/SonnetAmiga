@@ -1153,7 +1153,7 @@ MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
 		move.l MP_SIGTASK(a2),a2
 		move.l MN_ARG1(a1),TC_SIGALLOC(a2)
 		move.l MN_ARG2(a1),d0
-		or.l d0,TC_SIGRECVD(a2)				
+;		or.l d0,TC_SIGRECVD(a2)				
 		bra DoPutMsg
 
 ;********************************************************************************************
@@ -1938,8 +1938,11 @@ DidAsync	moveq.l #0,d0
 		move.l d0,MT_FLAGS(a2)
 
 Stacker		move.l ThisTask(a6),a1
-
-		move.l TC_SIGALLOC(a1),d0		
+		cmp.b #3,LN_PRI(a1)
+		blt.s NoAdjustPri
+		move.b #3,LN_PRI(a1)				;Kludge to prevent high pri stuff blocking
+								;the system like Heretic II.
+NoAdjustPri	move.l TC_SIGALLOC(a1),d0		
 		and.l #$fffff000,d0
 		
 		jsr _LVOWait(a6)
@@ -2152,13 +2155,13 @@ NoFPU2		move.l a7,a0
 
 CrossSignals	bsr CreateMsgFrame
 
-		moveq.l #MSG_LEN/4-1,d1
+		moveq.l #MSG_LEN/4-1,d0
 		move.l a0,a2
 ClearMsg	clr.l (a2)+
-		dbf d1,ClearMsg
+		dbf d0,ClearMsg
 
 		move.l #"LLPP",MN_IDENTIFIER(a0)
-		move.l d0,MN_ARG0(a0)
+		move.l d1,MN_ARG0(a0)
 		move.l ThisTask(a6),a3
 		move.l a3,MN_ARG1(a0)
 		
