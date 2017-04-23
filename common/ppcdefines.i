@@ -217,7 +217,7 @@
 .set CONTEXT_FREGS,		152		#256 bytes long
 .set CONTEXT_BATS,		412		#64 bytes long
 .set CONTEXT_SEGMENTS,		480		#64 bytes long		
-.set CONTEXT_LENGTH,		1064		#544		#End of context
+.set CONTEXT_LENGTH,		1076		#544 + 33x16(Altivec) + 4
 
 .set MACHINESTATE_DEFAULT,	PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE|PSL_ME
 

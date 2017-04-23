@@ -57,6 +57,20 @@ The powerpc.library is currently even more experimental than sonnet.library. It 
 transparantly load WarpOS binaries. Did we mention it is experimental? Use at own risk!
 
 
+# Options
+
+Currently the following options are supported through variables in ENVARC:sonnet
+
+- EnEDOMem (0 or 1): Enable if you have EDO RAM installed. Default = 0.
+- Debug (0-3): set the level of debug messages. 0 = no messages (default).
+- EnAlignExc (0 or 1): Enable the installation of a user handler for the
+  Align Exception. Default = 0.
+- DisL2Cache: (0 or 1): Disable the L2 cache. Default = 0.
+- DisL2Flush: (0 or 1): Disables the full flush of the L2 cache. 
+  Can speed up things if it doesn't crash. Default = 0.
+- EnDAccessExc: See EnAlignExc, but now for the Data Access Exception (DSI).
+
+
 # Bugs
 
 We're using GitHub Issues for bug tracking:
