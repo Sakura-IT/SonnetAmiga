@@ -239,7 +239,7 @@ _PowerPCBase	dc.l	0
 
 DosLib		dc.b 	"dos.library",0
 		cnop	0,2
-PowerPCLib	dc.b	"sonnet.library",0
+PowerPCLib	dc.b	"powerpc.library",0
 		cnop	0,4
 	
 Tags		dc.l	PPCINFO_CPU,0,PPCINFO_PVR,0,PPCINFO_CPUCLOCK,0,PPCINFO_BUSCLOCK,0
