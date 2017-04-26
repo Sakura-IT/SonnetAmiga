@@ -1,21 +1,12 @@
-OBJECTS68K=sonnet.o
-OBJECTS68K_2=powerpc.o
+OBJECTS68K=powerpc.o
 OBJECTSPPC=setupppc.o ppcfunctions.o
 
-EXECUTABLE=sonnet.library
-EXECUTABLE2=powerpc.library
-EXECUTABLE_RS=sonnet.library.rs
+EXECUTABLE=powerpc.library
 
-all: $(EXECUTABLE) $(EXECUTABLE2)
-
-disasm68k : $(EXECUTABLE_RS)
+all: $(EXECUTABLE)
 
 $(EXECUTABLE) : $(OBJECTS68K) $(OBJECTSPPC)
 	$(LD) -mrel -s $(OBJECTS68K) $(OBJECTSPPC) -o $(EXECUTABLE)
-	
-$(EXECUTABLE2) : $(OBJECTS68K_2) $(OBJECTSPPC)
-	$(LD) -mrel -s $(OBJECTS68K_2) $(OBJECTSPPC) -o $(EXECUTABLE2)
-
 
 %.o : %.p $(LOCAL_INCS) 
 	$(ASMPPC) $(ASMPPCPARAM) -o $@ $< 
@@ -23,9 +14,6 @@ $(EXECUTABLE2) : $(OBJECTS68K_2) $(OBJECTSPPC)
 %.o : %.s $(LOCAL_INCS)
 	$(ASM68K) $(ASM68KPARAM) -o $@ $<
 
-%.rs : %
-	$(IRA) $(IRAPARAM) $< $@
-
 clean :
-	$(RM) $(OBJECTS68K) $(OBJECTSPPC) $(EXECUTABLE) $(EXECUTABLE_RS) $(EXECUTABLE2) $(OBJECTS68K_2)
+	$(RM) $(OBJECTSPPC) $(EXECUTABLE) $(OBJECTS68K)
 

@@ -5,10 +5,6 @@ ifndef INCLUDE_I
 $(error INCLUDE_I is undefined, read the TOOLCHAIN file)
 endif
 
-ifndef POSIXLIB
-$(error POSIXLIB is undefined, read the TOOLCHAIN file)
-endif
-
 ifndef VBCC
 $(error VBCC is undefined, read the TOOLCHAIN file)
 endif
