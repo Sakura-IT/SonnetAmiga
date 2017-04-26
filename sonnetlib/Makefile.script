@@ -1,5 +1,0 @@
-vasmm68k_mot -Iinclude_i: -I../common -m68020up -Fhunk sonnet.s -o sonnet.o
-vasmppc_std -I../common -many -mppc32 -Fhunk ppcfunctions.p -o ppcfunctions.o
-vasmppc_std -I../common -many -mppc32 -mavec -Fhunk setupppc.p -o setupppc.o
-vlink -s sonnet.o setupppc.o ppcfunctions.o -o sonnet.library
-copy sonnet.library libs:
