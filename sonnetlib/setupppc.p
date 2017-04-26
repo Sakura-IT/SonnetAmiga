@@ -4531,7 +4531,8 @@ EInt:		b	.FPUnav				#0
 		mtsprg3	r2
 		lwz	r2,EXCDATA_DATA(r4)
 		mtsprg1	r6
-		mtsprg2	r1
+		lwz	r3,0(r1)
+		mtsprg2	r3			#store original r1 and pass it on in SPRG2
 		
 		la	r6,104(r1)
 		lwz	r3,44(r1)

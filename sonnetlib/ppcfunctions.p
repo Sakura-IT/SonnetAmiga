@@ -8366,7 +8366,7 @@ SetExcHandler:
 		lwz	r3,ThisPPCProc(r27)
 .ExcIsGlobal:	stw	r3,EXCDATA_TASK(r30)
 
-		loadreg	r4,0x80101007				#Unknown Tag
+		loadreg	r4,EXCATTR_TIMEDREMOVAL
 		li	r5,0
 		mr	r6,r31
 		
@@ -8375,10 +8375,10 @@ SetExcHandler:
 		mr.	r3,r3
 		beq-	.NoUnknownTag
 
-		stw	r3,EXCDATA_UNKNOWN1(r30)
+		stw	r3,EXCDATA_REMOVALTIME(r30)
 		li	r0,0
-		stw	r0,EXCDATA_UNKNOWN2(r30)
-		stw	r0,EXCDATA_UNKNOWN3(r30)
+		stw	r0,EXCDATA_TIMEBASEUPPER(r30)
+		stw	r0,EXCDATA_TIMEBASELOWER(r30)
 
 .NoUnknownTag:	loadreg	r4,EXCATTR_EXCID
 		li	r5,0
@@ -8785,12 +8785,12 @@ SetExcHandler:
 		stw	r0,EXCDATA_TASK(r5)
 		lwz	r0,EXCDATA_FLAGS(r6)
 		stw	r0,EXCDATA_FLAGS(r5)
-		lwz	r0,EXCDATA_UNKNOWN1(r6)
-		stw	r0,EXCDATA_UNKNOWN1(r5)
-		lwz	r0,EXCDATA_UNKNOWN2(r6)
-		stw	r0,EXCDATA_UNKNOWN2(r5)
-		lwz	r0,EXCDATA_UNKNOWN3(r6)
-		stw	r0,EXCDATA_UNKNOWN3(r5)
+		lwz	r0,EXCDATA_REMOVALTIME(r6)
+		stw	r0,EXCDATA_REMOVALTIME(r5)
+		lwz	r0,EXCDATA_TIMEBASEUPPER(r6)
+		stw	r0,EXCDATA_TIMEBASEUPPER(r5)
+		lwz	r0,EXCDATA_TIMEBASELOWER(r6)
+		stw	r0,EXCDATA_TIMEBASELOWER(r5)
 		stw	r3,EXCDATA_EXCID(r5)
 		lwz	r0,0(r13)
 		addi	r13,r13,4
