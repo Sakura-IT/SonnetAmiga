@@ -330,14 +330,7 @@ loop2		move.l (a2)+,(a5)+			;Copy code to 0x3000
 
 		jsr _LVOCacheClearU(a6)
 
-		tst.l d4
-		bne.s NoCmm
-		move.l d5,a5
-		move.l COMMAND(a5),d5
-		bset #26,d5				;Set Bus Master bit
-		move.l d5,COMMAND(a5)
-
-NoCmm		move.l #WP_TRIG01,WP_CONTROL(a3)	;Negate HRESET. Now code gets executed
+		move.l #WP_TRIG01,WP_CONTROL(a3)	;Negate HRESET. Now code gets executed
 							;at 0xfff00100 which jumps to 0xfff03000							
 		move.l	#$EC0000,d7			;Simple Time-out timer
 		
@@ -420,16 +413,13 @@ GotMemName	move.l d0,a0
 
 		jsr _LVODisable(a6)
 		lea MemList(a6),a0
-		tst.l d4
-		beq.s NoPCILb
-
 		move.l d4,a2
 		sub.l #NoMemAccess,d5
 		move.l d5,PCI_SPACE0(a2)
 		moveq.l #0,d6
 		sub.l d7,d6
 		move.l d6,PCI_SPACELEN0(a2)		;Correct MemSpace0 in the PCI database
-NoPCILb		jsr _LVOEnqueue(a6)			;Add the memory node
+		jsr _LVOEnqueue(a6)			;Add the memory node
 
 		lea POWERDATATABLE(pc),a2
 		bsr MakeLibrary
@@ -1052,7 +1042,7 @@ SonInt:		movem.l d1-a6,-(a7)			;68K interrupt which distributes
 		and.l d4,d3
 		beq DidNotInt
 
-		bsr GetMsgFrame
+NxtMsg		bsr GetMsgFrame
 		move.l a1,d3
 		cmp.l #-1,d3
 		beq DidNotInt
@@ -1083,12 +1073,7 @@ IntMsgLoop	moveq.l #11,d4
 CommandMaster	move.l d3,a1
 		move.l MN_MCPORT(a1),a0
 DoPutMsg	jsr _LVOPutMsg(a6)
-
-NxtMsg		bsr GetMsgFrame
-		move.l a1,d3
-		cmp.l #-1,d3
-		beq.s DidInt
-		bra.s IntMsgLoop
+		bra.s NxtMsg
 
 DidInt		movem.l (a7)+,d1-a6
 		moveq.l #-1,d0				;Clear Z flag if server handled interrupt
@@ -2209,9 +2194,11 @@ AllocVec32:
 		move.l a6,-(a7)
 		add.l #$38,d0
 		move.l LExecBase(pc),a6
+		cmp.l #MEMF_PUBLIC|MEMF_FAST,d1
+		beq.s DoFASTMem						;force marked hunks into FAST mem
 		and.l #MEMF_CLEAR,d1
 		or.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE,d1		;attributes are FIXED to Sonnet mem
-		jsr _LVOAllocVec(a6)
+DoFASTMem	jsr _LVOAllocVec(a6)
 		move.l d0,d1
 		beq.s MemErr
 		add.l #$27,d0
