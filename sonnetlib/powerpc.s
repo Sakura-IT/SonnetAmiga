@@ -2195,10 +2195,12 @@ AllocVec32:
 		add.l #$38,d0
 		move.l LExecBase(pc),a6
 		cmp.l #MEMF_PUBLIC|MEMF_FAST,d1
-		beq.s DoFASTMem						;force marked hunks into FAST mem
+		beq.s DoNormMem						;force marked hunks into Amiga mem
+		cmp.l #MEMF_PUBLIC|MEMF_CHIP,d1
+		beq.s DoNormMem
 		and.l #MEMF_CLEAR,d1
 		or.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE,d1		;attributes are FIXED to Sonnet mem
-DoFASTMem	jsr _LVOAllocVec(a6)
+DoNormMem	jsr _LVOAllocVec(a6)
 		move.l d0,d1
 		beq.s MemErr
 		add.l #$27,d0
