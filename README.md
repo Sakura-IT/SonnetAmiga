@@ -51,10 +51,12 @@ Currently the following options are supported through variables in ENVARC:sonnet
 - Debug (0-3): set the level of debug messages. 0 = no messages (default).
 - EnAlignExc (0 or 1): Enable the installation of a user handler for the
   Align Exception. Default = 0.
-- DisL2Cache: (0 or 1): Disable the L2 cache. Default = 0.
-- DisL2Flush: (0 or 1): Disables the full flush of the L2 cache. 
+- DisL2Cache (0 or 1): Disable the L2 cache. Default = 0.
+- DisL2Flush (0 or 1): Disables the full flush of the L2 cache. 
   Can speed up things if it doesn't crash. Default = 0.
 - EnDAccessExc: See EnAlignExc, but now for the Data Access Exception (DSI).
+- DisHunkPatch (0 or 1): Disable automatic pushing first code hunk to FAST RAM.
+  Default = 0.
 
 # Bugs
 

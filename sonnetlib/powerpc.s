@@ -18,6 +18,7 @@
 	include exec/ports.i
 	include dos/dosextens.i
 	include dos/var.i
+	include dos/doshunks.i
 	include	exec/interrupts.i
 	include hardware/intbits.i
 	include	exec/tasks.i
@@ -693,7 +694,12 @@ NoEnPageSetup	lea EnDAccessExc(pc),a1
 		bsr DoENV
 		bmi.s NoEnDAccessExc
 		move.b (a3),6(a5)
-NoEnDAccessExc	rts		
+NoEnDAccessExc	lea DisHunkPatch(pc),a1
+		bsr DoENV
+		bmi.s NoDisHunkPatch
+		lea Options68K(pc),a5
+		move.b (a3),(a5)
+NoDisHunkPatch	rts		
 
 DoENV		move.l a1,d1
 		lea ENVBuff(pc),a1
@@ -1579,7 +1585,7 @@ Loader		movem.l d2-a6,-(a7)
 DoInternalSeg	sub.l a0,a0
 		pea FreeVec32(pc)
 		pea AllocVec32(pc)
-		pea _LVORead(a6)
+		pea InternalRead(pc)
 		move.l a7,a1
 		clr.l -(a7)
 		move.l a7,a2
@@ -1644,6 +1650,28 @@ ExitSeg		move.l LExecBase(pc),a1
 		rts
 
 NoInternal	movem.l (a7)+,d2-a6
+		rts
+
+InternalRead	jsr _LVORead(a6)
+		movem.l d0-a6,-(a7)
+		move.b Options68K(pc),d0
+		bne.s NoHunkPatch
+		move.l d2,a2
+		cmp.l #HUNK_HEADER,(a2)
+		bne.s NoHunkPatch
+		move.l 4(a2),d0
+		bne.s NoHunkPatch
+		move.l 12(a2),d0
+		bne.s NoHunkPatch
+		move.l 8(a2),d0
+		move.l 16(a2),d1
+		sub.l d1,d0
+		subq.l #1,d0
+		bne.s NoHunkPatch
+		btst #6,20(a2)
+		bne.s NoHunkPatch
+		bset #7,20(a2)
+NoHunkPatch	movem.l (a7)+,d0-a6
 		rts
 
 ;********************************************************************************************
@@ -2527,6 +2555,7 @@ NewLoadSegAddress	ds.l	1
 MirrorList		ds.l	3
 RemSysTask		ds.l	1
 Previous		ds.l	1
+Options68K		ds.l	1
 ENVBuff			ds.l	1
 ENVOptions		ds.l	3
 MyInterrupt		ds.b	IS_SIZE
@@ -2819,6 +2848,7 @@ DisL2Cache	dc.b	"sonnet/DisL2Cache",0			;3
 DisL2Flush	dc.b	"sonnet/DisL2Flush",0			;4
 EnPageSetup	dc.b	"sonnet/EnPageSetup",0			;5
 EnDAccessExc	dc.b	"sonnet/EnDAccessExc",0			;6
+DisHunkPatch	dc.b	"sonnet/DisHunkPatch",0			;7
 
 		cnop	0,4
 		
