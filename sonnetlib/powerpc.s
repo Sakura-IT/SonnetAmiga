@@ -141,14 +141,6 @@ GotExp		move.l d0,a6
 		tst.l d0
 		bne.s FoundMed
 
-;		sub.l a0,a0
-;		move.l #VENDOR_ELBOX,d0			;ELBOX
-;		moveq.l #MEDIATOR_1200TX,d1		;Mediator 1200TX
-;		jsr _LVOFindConfigDev(a6)		;Find 1200TX mediator
-;		move.l LExecBase(pc),a6
-;		tst.l d0
-;		bne.s FoundMed
-
 WeirdMed	lea MedError(pc),a2
 		bra PrintError
 
@@ -168,21 +160,14 @@ FoundMed	sub.l a0,a0
 		lea MedWindowJ(pc),a2
 		bra PrintError
 
-CorrectWindowJ	move.l cd_BoardAddr(a1),d0
-		cmp.l #$60000000,d0
-		beq CorrectConfigJ			;MemorySpace at default position?
-
-		lea MedConfigJ(pc),a2
-		bra PrintError
-
-CorrectConfigJ	moveq.l #PCI_VERSION,d0			;Minimal version of pci.library
+CorrectWindowJ	moveq.l #PCI_VERSION,d0			;Minimal version of pci.library
 		lea pcilib(pc),a1
 		jsr _LVOOpenLibrary(a6)
 
 		move.l d0,PCIBase-Buffer(a4)
 		tst.l d0
 		bne.s FndPCI
-
+		
 		lea LPCIError(pc),a2
 		bra PrintError
 
@@ -209,7 +194,16 @@ ClsLib  	move.l d0,a1
 FreeROM		move.l d0,a1
 		jmp _LVOFreeVec(a6)
 
-FndPCI		jsr _LVODisable(a6)
+FndPCI		
+;		move.l d0,a6				;;
+;		move.l $26(a6),a1			;;
+;		move.b 1(a1),d0				;;
+;		bset #1,d0				;;
+;		move.b 1(a1),d0				;;
+		
+;		move.l LExecBase(pc),a6
+
+		jsr _LVODisable(a6)
 		move.l d7,a1
 		jsr _LVORemove(a6)
 		lea MemList(a6),a0
@@ -492,7 +486,7 @@ PPCInit		move.l SonnetBase(pc),a1
 		swap d0
 		rol.w #8,d0
 		move.l d0,OTWR(a3)
-		add.b #$40,d0				;Translated to PPC PCI Memory
+		add.b #$50,d0				;Translated to PPC PCI Memory
 		move.l d0,OMBAR(a3)			;Is probably 0x60000000-0x80000000
 		
 		jsr _LVODisable(a6)
@@ -1003,12 +997,12 @@ DoRunk86	move.l (a7),MN_MIRROR(a0)
 
 		cnop 0,4
 
-PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,4,NP_StackSize,$20000,TAG_END
+PrcTags		dc.l NP_Entry,MasterControl,NP_Name,PrcName,NP_Priority,1,NP_StackSize,$20000,TAG_END
 PrcName		dc.b "MasterControl",0
 
 		cnop 0,4
 		
-Prc2Tags	dc.l NP_Entry,MirrorTask,NP_Name,Prc2Name,NP_Priority,3,NP_StackSize,$20000,TAG_END
+Prc2Tags	dc.l NP_Entry,MirrorTask,NP_Name,Prc2Name,NP_Priority,0,NP_StackSize,$20000,TAG_END
 Prc2Name	dc.b "Joshua",0
 
 		cnop 0,4
@@ -1054,7 +1048,7 @@ NxtMsg		bsr GetMsgFrame
 		beq DidNotInt
 
 IntMsgLoop	moveq.l #11,d4
-;		bsr.s InvMsg				;PCI memory is cache inhibited for 68k
+		bsr.s InvMsg				;PCI memory is cache inhibited for 68k?
 		move.l d3,a1
 		
 		move.l MN_IDENTIFIER(a1),d0
@@ -1474,14 +1468,14 @@ NewAlloc	cmp.l #$f4248,d0				;HARDCODED FreeSpace PATCH!!
 		bne NoFast
 		nop						;Let everything else through..?		
 		
-Best		move.l d7,-(a7)
-		move.l a3,-(a7)
-		move.l a2,-(a7)
-		move.l ThisTask(a6),d7
-		move.l d7,a3
-		rol.l #2,d7
-		btst #0,d7
-		beq.s NotAPPCMemTask
+Best		movem.l d6-d7/a2-a3,-(a7)
+		move.l ThisTask(a6),a3
+		move.b ThisTask(a6),d7
+		move.b SonnetBase(pc),d6
+		and.b #$f0,d6
+		and.b #$f0,d7
+		eor.b d6,d7
+		bne.s NotAPPCMemTask
 		
 		move.b TC_FLAGS(a3),d7
 		bset #2,d7
@@ -1506,7 +1500,7 @@ IsTask		move.l LN_NAME(a3),d7				;Has the task a name?
 FindEnd		move.b (a2)+,d7
 		bne.s FindEnd
 		move.l -5(a2),d7
-		cmp.l #"2005",d7				;Task has name with 2005 at end?
+Checkers	cmp.l #"2005",d7				;Task has name with 2005 at end?
 		beq.s DoBit					;if yes, then redirect to PPC memory
 		cmp.l #"_68K",d7
 		beq.s DoBit
@@ -1531,15 +1525,11 @@ IsHell		lsl.l #2,d7
 		subq.l #4,d7
 		bmi.s NoBit
 		move.l 1(a3,d7.l),d7
-		cmp.l #"2005",d7				;Check if CLI or Shell CommandName ends with 2005
-		beq.s DoBit					;If yes, then redirect to PPC memory
-		bra.s NoBit	
+		bra.s Checkers
 
 DoBit		bset #13,d1					;Set attribute MEMF_PPC
 		bset #18,d1					;MEMF_REVERSE
-NoBit		move.l (a7)+,a2
-		move.l (a7)+,a3
-		move.l (a7)+,d7
+NoBit		movem.l (a7)+,d6-d7/a2-a3
 NoFast		move.l AllocMemAddress(pc),-(a7)
 		rts
 		
@@ -1951,9 +1941,9 @@ DidAsync	moveq.l #0,d0
 		move.l d0,MT_FLAGS(a2)
 
 Stacker		move.l ThisTask(a6),a1
-		cmp.b #3,LN_PRI(a1)
+		cmp.b #0,LN_PRI(a1)
 		blt.s NoAdjustPri
-		move.b #3,LN_PRI(a1)				;Kludge to prevent high pri stuff blocking
+		move.b #0,LN_PRI(a1)				;Kludge to prevent high pri stuff blocking
 								;the system like Heretic II.
 NoAdjustPri	move.l TC_SIGALLOC(a1),d0		
 		and.l #$fffff000,d0
@@ -2834,7 +2824,6 @@ SonnetUnstable	dc.b	"Memory corruption detected during setup",0
 PPCCrash	dc.b	"PowerPC CPU possibly crashed during setup",0
 NoPPCFound	dc.b	"PowerPC CPU not responding",0
 StackRunError	dc.b	"RunPPC Stack transfer error",0
-MedConfigJ	dc.b	"Mediator ConfigSwap jumper incorrectly configured",0
 MedWindowJ	dc.b	"Mediator WindowSize jumper incorrectly configured",0
 IllegalMsg	dc.b	"Illegal message received by MasterControl",0
 

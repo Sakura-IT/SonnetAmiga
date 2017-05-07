@@ -114,11 +114,17 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 .NoMaxRam:	lis	r27,0x8000			#Upper boundary PCI Memory Mediator
 		lwz	r26,base_RTGBase(r29)		#Get gfx mem (RTGBase)
 		cmplw	r26,r27
-		blt	.ZorroX				#Is Zorro3
+		blt	.ZorroX2			#Is Zorro3
 		lis	r27,0x9000			#Zorro2 plus 256MB ATI
 		cmplw	r26,r27
 		beq	.ZorroX
 		lis	r27,0x9800			#Zorro2 plus 128MB (or less) ATI
+		b	.ZorroX
+		
+.ZorroX2:	rlwinm	r26,r26,4,28,30
+		cmpwi	r26,4		
+		bne	.ZorroX
+		lis	r27,0x6000			#Config jumper closed
 		
 .ZorroX:	mr	r26,r8
 
@@ -857,7 +863,7 @@ mmuSetup:
 		bne	.Voodoo3
 		addis	r4,r4,0x600
 .Voodoo3:	mr	r24,r4
-		addis	r5,r3,0x4000
+		addis	r5,r3,0x5000
 		li	r7,2
 
 		bl	.DoTBLs
@@ -871,7 +877,7 @@ mmuSetup:
 		lwz	r3,RTGBase(r0)			#32MB Video RAM (Napalm)
 		addis	r3,r3,0x800
 		addis	r4,r3,0x200
-		addis	r5,r3,0x4000
+		addis	r5,r3,0x5000
 
 		lbz	r7,FLAG_PAGETABLE(r0)
 		mr.	r7,r7
@@ -907,7 +913,7 @@ mmuSetup:
 .Is3DFX:	lwz	r3,RTGBase(r0)			#32MB Video RAM (Avenger)
 		addis	r3,r3,0x200
 		addis	r4,r3,0x200
-		addis	r5,r3,0x4000
+		addis	r5,r3,0x5000
 		
 		lbz	r7,FLAG_PAGETABLE(r0)
 		mr.	r7,r7
@@ -943,7 +949,7 @@ mmuSetup:
 		bne	.NoATI
 		
 		mr	r3,r24
-		addis	r5,r3,0x4000
+		addis	r5,r3,0x5000
 		mr	r4,r3
 		addis	r4,r4,0xe00			#256-32MB max Video RAM (ATI)
 		loadreg	r6,PTE_WRITE_THROUGH
