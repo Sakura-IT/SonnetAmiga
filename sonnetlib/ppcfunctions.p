@@ -859,7 +859,7 @@ CmpTimePPC:
 
 #********************************************************************************************
 #
-#	MemBlock = AllocVecPPC(PowerPCBase, Length, Null, Alignment)	// r3=r3,r4,r6 (r5 is ignored for now)
+#	MemBlock = AllocVecPPC(PowerPCBase, Length, Attributes, Alignment)	// r3=r3,r4,r6
 #
 #********************************************************************************************
 
@@ -888,12 +888,11 @@ AllocVecPPC:	prolog 228,'TOC'
 		subi	r27,r5,36
 		mr.	r6,r6
 		bne	.AListNotEmpty
-		
-		
-		loadreg	r4,MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE
-#		or	r4,r4,r30
-		lis	r5,0x8						#512kb
-		lis	r6,0x1						#64kb
+
+		andc	r4,r30,MEMF_CHIP
+		ori	r4,r4,MEMF_PPC
+		lis	r5,0x40						#4MB
+		lis	r6,0x10						#1MB
 		mr	r3,r26
 		
 		bl CreatePoolPPC
@@ -903,7 +902,7 @@ AllocVecPPC:	prolog 228,'TOC'
 		
 		b	.GotPool
 		
-.AListNotEmpty:	lis	r4,0x1
+.AListNotEmpty:	lis	r4,0x10
 		lwz	r5,POOL_TRESHSIZE(r27)
 		cmpw	r4,r5
 		beq	.GotPool
@@ -1029,8 +1028,9 @@ AllocVec68K:	prolog 228,'TOC'
 
 		mr	r31,r4
 
-		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC|MEMF_REVERSE	#Fixed for now
-		
+		andc	r5,r5,MEMF_CHIP
+		ori	r5,r5,MEMF_PPC
+
 		addi	r8,r4,0x38					#d0
 		mr	r9,r5						#d1
 		lwz	r4,sonnet_SysBase(r29)

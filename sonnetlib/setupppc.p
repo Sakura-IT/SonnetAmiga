@@ -317,6 +317,8 @@ End:		mflr	r4
 		stb	r6,sonnet_EnAlignExc(r3)
 		lbz	r6,option_EnDAccessExc(r14)
 		stb	r6,sonnet_EnAlignExc(r3)
+		lbz	r6,option_DisL2Flush(r14)
+		stb	r6,DoDFlushAll(r3)
 		
 		mr	r14,r3
 		la	r6,SemMemory(r14)
