@@ -889,7 +889,8 @@ AllocVecPPC:	prolog 228,'TOC'
 		mr.	r6,r6
 		bne	.AListNotEmpty
 
-		andc	r4,r30,MEMF_CHIP
+		li	r4,MEMF_CHIP
+		andc	r4,r30,r4
 		ori	r4,r4,MEMF_PPC
 		lis	r5,0x40						#4MB
 		lis	r6,0x10						#1MB
@@ -1028,7 +1029,8 @@ AllocVec68K:	prolog 228,'TOC'
 
 		mr	r31,r4
 
-		andc	r5,r5,MEMF_CHIP
+		li	r30,MEMF_CHIP
+		andc	r5,r5,r30
 		ori	r5,r5,MEMF_PPC
 
 		addi	r8,r4,0x38					#d0
