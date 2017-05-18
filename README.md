@@ -21,6 +21,8 @@ SonnetAmiga has the following hardware requirements:
 - Sonnet Crescendo 7200 with local memory installed (up to 128 or 256MB
   depending on installed graphics card).
 - 3Dfx Voodoo 3, 4, 5 or ATI Radeon 9200 (ID $5960, $5964 and $5C63) graphics card.
+- 5V 168 pins FPM DIMMs 2K Refresh (up to 256MB with Voodoo3; 128MB with other
+  supported video cards).
 
 # Building
 
@@ -73,5 +75,9 @@ unified diff and attach it to the issue. Or mail it.
 We, the developers, are officially stating that all code interacting with 
 Mediator boards was developed without access to the official Mediator SDK.
 This project is not endorsed by ELBOX in any way.
+
+We are not responsible for any damages as a result of hardware modifications you performed needed to get
+the Sonnet working in your system and neither for making your system work with a Sonnet. Buy a Sonnet
+card at your own risk!
 
 
