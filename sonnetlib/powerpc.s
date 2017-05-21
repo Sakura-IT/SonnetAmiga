@@ -1586,6 +1586,9 @@ DoInternalSeg	sub.l a0,a0
 		clr.l -(a7)
 		move.l a7,a2
 		move.l d4,d0		
+		move.l LExecBase(pc),a3
+		move.l ThisTask(a3),a3
+		bset #TB_PPC,TC_FLAGS(a3)	;set bit				
 		jsr _LVOInternalLoadSeg(a6)
 
 		lea 16(a7),a7
@@ -1628,8 +1631,7 @@ EndSeg		move.l (a1),d2
 		jsr _LVOUnLoadSeg(a6)
 DoNormalSeg	move.l LExecBase(pc),a1
 		move.l ThisTask(a1),a1
-		or.b #TF_PPC,TC_FLAGS(a1)
-		eor.b #TF_PPC,TC_FLAGS(a1)	;clear bit
+		bclr #TB_PPC,TC_FLAGS(a1)	;clear bit
 		move.l d5,d1
 		bset #1,d6
 		move.l d6,d2
@@ -1638,10 +1640,7 @@ DoNormalSeg	move.l LExecBase(pc),a1
 		move.l d5,d1
 		bra.s NoInternal
 		
-ExitSeg		move.l LExecBase(pc),a1
-		move.l ThisTask(a1),a1
-		or.b #TF_PPC,TC_FLAGS(a1)	;set bit
-		movem.l (a7)+,d2-a6
+ExitSeg		movem.l (a7)+,d2-a6
 		lea 4(a7),a7
 		rts
 
@@ -2809,7 +2808,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: stub warp.library 5.1 (22-Mar-17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.6 (17-Apr-17) for Sonnet Crescendo 7200",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.6 (21-May-17) for Sonnet Crescendo 7200",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
