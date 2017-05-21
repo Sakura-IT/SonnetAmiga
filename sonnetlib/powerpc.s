@@ -886,29 +886,30 @@ GetPPCName	addq.l #1,d1
 		move.l MN_ARG0(a1),a0
 CopyPPCName	move.b (a0)+,(a2)+
 		dbf d2,CopyPPCName
+
 		move.l #"_68K",(a2)+			;add _68K to PPC mirror task name
 		clr.b (a2)
-		move.l d1,d2
-		
+		move.l d1,d2		
+		move.l ThisTask(a6),a1
+		bclr #TB_PPC,TC_FLAGS(a1)
 		move.l DosBase(pc),a6
 		lea Prc2Tags(pc),a1
 		move.l a7,12(a1)
 		move.l a1,d1
 		jsr _LVOCreateNewProc(a6)		;start the process
-		
+
 		add.l d2,a7
 		move.l (a7)+,a1
 		move.l LExecBase(pc),a6
+		move.l ThisTask(a6),a0
+		bset #TB_PPC,TC_FLAGS(a0)
 		tst.l d0
 		beq.s MsgMir68
 		move.l d0,a0
-		
-		jsr _LVODisable(a6)
 		move.l MN_ARG1(a1),TC_SIGALLOC(a0)	;set up the allocated signals
-		jsr _LVOEnable(a6)
-		
 		lea pr_MsgPort(a0),a0
 		jsr _LVOPutMsg(a6)
+
 		bra GetLoop
 
 ;********************************************************************************************
@@ -1455,10 +1456,7 @@ ExitTrue	movem.l (a7)+,d0/a1
 ;
 ;********************************************************************************************
 
-NewAlloc	cmp.l #$f4248,d0				;HARDCODED FreeSpace PATCH!!
-		beq NoFast
-
-		tst.w d1					;Patch code - Test for attribute $0000 (Any)
+NewAlloc	tst.w d1					;Patch code - Test for attribute $0000 (Any)
 		beq.s Best
 		btst #2,d1					;If FAST requested, redirect
 		bne.s Best					
@@ -1476,17 +1474,16 @@ Best		movem.l d6-d7/a2-a3,-(a7)
 		and.b #$f0,d7
 		eor.b d6,d7
 		bne.s NotAPPCMemTask
+
+		moveq.l #1,d6
+		bset #TB_PPC,TC_FLAGS(a3)
+		bra GoCheck					;bra DoBit
 		
-		move.b TC_FLAGS(a3),d7
-		bset #2,d7
-		move.b d7,TC_FLAGS(a3)
-		bra DoBit
-		
-NotAPPCMemTask	move.b TC_FLAGS(a3),d7
-		btst #2,d7					;Check if task was tagged by sonnet.library
-		bne.s DoBit					;If yes, then redirect to PPC memory
+NotAPPCMemTask	moveq.l #0,d6
+		btst #TB_PPC,TC_FLAGS(a3)			;Check if task was tagged by sonnet.library
+		bne DoBit					;If yes, then redirect to PPC memory
 				
-		cmp.b #NT_PROCESS,LN_TYPE(a3)			;Is it a DOS process?
+GoCheck		cmp.b #NT_PROCESS,LN_TYPE(a3)			;Is it a DOS process?
 		bne.s IsTask
 		move.l pr_CLI(a3),d7				;Was this task started by CLI?
 		bne.s IsHell					;If yes, go there
@@ -1494,8 +1491,6 @@ NotAPPCMemTask	move.b TC_FLAGS(a3),d7
 IsTask		move.l LN_NAME(a3),d7				;Has the task a name?
 		beq.s NoBit					;If no then exit
 		move.l d7,a2
-		cmp.l #"ahi.",(a2)
-		beq DoBit
 
 FindEnd		move.b (a2)+,d7
 		bne.s FindEnd
@@ -1510,25 +1505,36 @@ Checkers	cmp.l #"2005",d7				;Task has name with 2005 at end?
 		beq.s DoBit
 		cmp.l #"sk_1",d7
 		beq.s DoBit
-		cmp.l #"trol",d7
-		beq.s DoBit
+		tst.l d6
+		beq.s NoBit
+		cmp.l #".exe",d7
+		beq.s FreeBit
+		btst #TB_PPC,TC_FLAGS(a3)
+ToSpace		bne.s DoBit
 		bra.s NoBit
 
+FreeBit		move.l -9(a2),d7				;Checking for FreeSpace
+		cmp.l #"pace",d7
+		bra.s ToSpace
+
 IsHell		lsl.l #2,d7
-		move.l d7,a3
-		move.l cli_CommandName(a3),d7			;Get name of task started by CLI
+		move.l d7,a2
+		move.l cli_CommandName(a2),d7			;Get name of task started by CLI
 		beq.s NoBit
+
 		lsl.l #2,d7
-		move.l d7,a3
+		move.l d7,a2
 		clr.l d7
-		move.b (a3),d7
+		move.b (a2)+,d7
 		subq.l #4,d7
 		bmi.s NoBit
-		move.l 1(a3,d7.l),d7
+
+		add.l d7,a2
+		move.l (a2),d7
+		addq.l #5,a2
 		bra.s Checkers
 
 DoBit		bset #13,d1					;Set attribute MEMF_PPC
-		bset #18,d1					;MEMF_REVERSE
 NoBit		movem.l (a7)+,d6-d7/a2-a3
 NoFast		move.l AllocMemAddress(pc),-(a7)
 		rts
