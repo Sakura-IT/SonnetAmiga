@@ -380,25 +380,25 @@ End:		mflr	r4
 		bl	.SetupMsgFIFOs
 
 		mtsrr0	r31
-		
+
 		loadreg	r0,MACHINESTATE_DEFAULT
 		mtsrr1	r0				#load up user MSR. Also clears PSL_IP
-		
+
 		lwz	r14,PowerPCBase(r0)				
 		lwz	r4,_LVOSetCache+2(r14)
 
 		addi	r6,r4,ViolationOS		
 		stw	r6,ViolationAddress(r0)
-				
+
 		addi	r6,r4,TaskStart
 		stw	r6,RunPPCStart(r0)
-				
+
 		addi	r6,r4,ListStart
 		stw	r6,AdListStart(r0)
-		
+
 		addi	r6,r4,ListEnd
 		stw	r6,AdListEnd(r0)
-		
+
 		addi	r6,r4,TaskExit
 		stw	r6,sonnet_TaskExitCode(r14)
 
@@ -5069,9 +5069,7 @@ EInt:		b	.FPUnav				#0
 		lwz	r9,ThisPPCProc(r10)
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r9)
-		
-.debugger:	b	.debugger
-		
+
 		b	.TrySwitch			#Try to salvage the system
 
 #********************************************************************************************
