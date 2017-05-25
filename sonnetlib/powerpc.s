@@ -44,7 +44,7 @@
 	XREF	AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
 	XREF	AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
 	XREF	AddUniqueSemaphorePPC,IsExceptionMode,CreateMsgFramePPC,SendMsgFramePPC
-	XREF	FreeMsgFramePPC
+	XREF	FreeMsgFramePPC,StartSystem
 	
 	IFD	_IFUSION_
 	
@@ -547,6 +547,17 @@ PPCInit		move.l SonnetBase(pc),a1
 
 		jsr _LVOEnable(a6)
 		
+		move.l _PowerPCBase(pc),a6
+		move.l _LVOStartSystem+2(a6),a1
+		addq.l #4,a1
+		lea KrytenTags(pc),a0
+
+		move.l a1,4(a0)
+		addq.l #4,a1
+		move.l a1,12(a0)
+		move.l a6,20(a0)
+		bsr CreatePPCTask
+
 		move.l LExecBase(pc),a6
 		moveq.l #0,d0
 		lea ppclib(pc),a1
@@ -1005,6 +1016,10 @@ PrcName		dc.b "MasterControl",0
 		
 Prc2Tags	dc.l NP_Entry,MirrorTask,NP_Name,Prc2Name,NP_Priority,0,NP_StackSize,$20000,TAG_END
 Prc2Name	dc.b "Joshua",0
+
+		cnop 0,4
+
+KrytenTags	dc.l TASKATTR_CODE,0,TASKATTR_NAME,0,TASKATTR_R3,0,TASKATTR_SYSTEM,-1,TAG_END
 
 		cnop 0,4
 
@@ -2803,6 +2818,7 @@ FUNCTABLE:
 	dc.l	CreateMsgFramePPC
 	dc.l	SendMsgFramePPC
 	dc.l	FreeMsgFramePPC
+	dc.l	StartSystem
 
 EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0

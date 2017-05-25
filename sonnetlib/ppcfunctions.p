@@ -37,7 +37,8 @@
 .global SetNiceValue,AllocPrivateMem,FreePrivateMem,SetExceptPPC,ObtainSemaphoreSharedPPC
 .global AttemptSemaphoreSharedPPC,ProcurePPC,VacatePPC,CauseInterrupt,DeletePoolPPC
 .global AllocPooledPPC,FreePooledPPC,RawDoFmtPPC,PutPublicMsgPPC,AddUniquePortPPC
-.global AddUniqueSemaphorePPC,IsExceptionMode,CreateMsgFramePPC,SendMsgFramePPC,FreeMsgFramePPC
+.global AddUniqueSemaphorePPC,IsExceptionMode,CreateMsgFramePPC,SendMsgFramePPC
+.global FreeMsgFramePPC,StartSystem
 
 .global	WarpIllegal
 
@@ -460,25 +461,19 @@ SetCache:
 #
 #********************************************************************************************
 
-SetExcMMU:
+SetExcMMU:	
 		prolog 228,'TOC'
 
 		stwu	r31,-4(r13)
 
 		li	r31,FSetExcMMU-FRun68K
 		bl	DebugStartFunction
-		
-#		bl Super
-#		
+
 #		mfmsr	r31
 #		ori	r31,r31,(PSL_IR|PSL_DR)
 #		mtmsr	r31
 #		sync					#Reenable MMU
 #		isync
-#
-#		mr	r4,r3
-#		
-#		bl User
 
 		lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -499,18 +494,12 @@ ClearExcMMU:
 		li	r31,FClearExcMMU-FRun68K
 		bl	DebugStartFunction
 		
-#		bl Super
-#		
 #		mfmsr	r31
 #		ori	r31,r31,(PSL_IR|PSL_DR)
 #		xori	r31,r31,(PSL_IR|PSL_DR)
 #		mtmsr	r31
 #		sync					#Disable MMU
 #		isync
-#
-#		mr	r4,r3
-#		
-#		bl User
 
 		lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -859,7 +848,7 @@ CmpTimePPC:
 
 #********************************************************************************************
 #
-#	MemBlock = AllocVecPPC(PowerPCBase, Length, Attributes, Alignment)	// r3=r3,r4,r6
+#	MemBlock = AllocVecPPC(PowerPCBase, Length, Attributes, Alignment)	// r3=r3,r4,r5,r6
 #
 #********************************************************************************************
 
@@ -871,12 +860,14 @@ AllocVecPPC:	prolog 228,'TOC'
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
-		
+				
 		li	r31,FAllocVecPPC-FRun68K
 		bl	DebugStartFunction
 				
 		mr	r31,r6
-		mr	r30,r5
+		li	r29,MEMF_CHIP
+		andc	r30,r5,r29
+		ori	r30,r30,MEMF_PPC
 		mr	r29,r4
 		mr	r26,r3
 
@@ -889,11 +880,9 @@ AllocVecPPC:	prolog 228,'TOC'
 		mr.	r6,r6
 		bne	.AListNotEmpty
 
-		li	r4,MEMF_CHIP
-		andc	r4,r30,r4
-		ori	r4,r4,MEMF_PPC
-		lis	r5,0x40						#4MB
-		lis	r6,0x10						#1MB
+		mr	r4,r30
+		lis	r5,0x10						#1MB
+		lis	r6,0x8						#512kb
 		mr	r3,r26
 		
 		bl CreatePoolPPC
@@ -903,12 +892,16 @@ AllocVecPPC:	prolog 228,'TOC'
 		
 		b	.GotPool
 		
-.AListNotEmpty:	lis	r4,0x10
+.AListNotEmpty:	lis	r4,0x8
 		lwz	r5,POOL_TRESHSIZE(r27)
 		cmpw	r4,r5
+		bne	.WrongPool
+
+		lwz	r5,POOL_REQUIREMENTS(r27)
+		cmpw	r30,r5
 		beq	.GotPool
-		
-		mr	r5,r6
+
+.WrongPool:	mr	r5,r6
 		b	.NxtPool
 
 .GotPool:	mr.	r31,r31
@@ -6444,7 +6437,7 @@ AllocPooledPPC:
 		bge	.DoPuddle
 		
 		addi	r4,r30,32			#Make room for Node, 32 aligned
-		lwz	r5,POOL_REQUIREMENTS(r31)
+		lwz	r5,POOL_REQUIREMENTS(r31)		
 		li	r6,32
 		mr	r3,r25
 		
@@ -6473,7 +6466,7 @@ AllocPooledPPC:
 		
 .DoPuddle:	la	r4,POOL_PUDDLELIST(r31)
 
-		bl	RemHeadPPC
+		bl RemHeadPPC
 		
 		mr.	r4,r3
 		beq	.MakeHeader
@@ -9448,6 +9441,69 @@ RawDoFmtPPC:	prolog 228,'TOC'
 .SkipToNext:	bdnz+	.NextHex
 
 		blr
+		
+#********************************************************************************************
+#
+#	void StartSystem(PowerPCBase) // r3				#Dummy function
+#
+#********************************************************************************************
+
+StartSystem:	blr							#Dummy function
+
+		b	.SkipName
+
+		.string	"Kryten"
+		.align 2
+
+.SkipName:	prolog	228,'TOC'
+
+		mr	r31,r3
+
+.GoToWait:	mr	r3,r31
+		li	r4,0
+		li	r5,5000						#5000 microseconds
+
+		bl WaitTime
+
+.NextRemTask:	la	r4,LIST_REMOVEDTASKS(r31)
+
+		bl RemHeadPPC
+
+		mr.	r30,r3
+		beq	.GoToWait
+
+.NextTaskPool:	la	r4,TASKPPC_TASKPOOLS(r30)
+
+		bl RemHeadPPC
+
+		mr.	r4,r3
+		beq	.CheckMemEntry
+
+		subi	r4,r4,36
+		mr	r3,r31
+
+		bl DeletePoolPPC
+
+		b	.NextTaskPool
+		
+.CheckMemEntry:	la	r4,TC_MEMENTRY(r30)
+
+		bl RemHeadPPC
+		
+		mr.	r29,r3
+		beq	.NextRemTask
+		
+		lwz	r4,ML_SIZE+ME_ADDR(r29)
+		mr	r3,r31
+		
+		bl FreeVec68K
+
+		mr	r4,r29
+		mr	r3,r31
+		
+		bl FreeVec68K
+		
+		b	.CheckMemEntry
 
 #********************************************************************************************
 #

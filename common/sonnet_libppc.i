@@ -121,3 +121,4 @@
 .set _LVOCreateMsgFramePPC   ,       -870    #PRIVATE
 .set _LVOSendMsgFramePPC     ,       -876    #PRIVATE
 .set _LVOFreeMsgFramePPC     ,       -882    #PRIVATE
+.set _LVOStartSystem         ,       -888    #PRIVATE

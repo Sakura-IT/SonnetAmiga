@@ -177,11 +177,14 @@ SetLen:		mr	r30,r28
 		bl	Epic				#Setup the EPIC controller
 		bl	End
 
+#*********************************************************
+
 Start:							#Dummy task at absolute (see ppcdefines)
-.IdleLoop:	nop					#IdleTask
-		nop
+.IdleLoop:	nop
 		nop
 		b	.IdleLoop
+
+#*********************************************************
 
 End:		mflr	r4		
 		li	r14,0				#Reset
@@ -302,21 +305,29 @@ End:		mflr	r4
 		li	r6,100				#Insert default values here
 		stw	r6,IdDefTasks(r3)
 		stb	r6,sonnet_AltivecOn(r3)
+
 		li	r6,24
 		stb	r6,BusyCounter(r3)
+
 		li	r6,6000
 		stw	r6,LowActivityPrio(r3)		#Not used
+
 		lwz	r6,SysBase(r0)
 		stw	r6,sonnet_SysBase(r3)
+
 		lwz	r6,DOSBase(r0)
 		stw	r6,sonnet_DosBase(r3)
+
 		la	r14,base_Options(r29)
 		lbz	r6,option_EnDebug(r14)
 		stb	r6,sonnet_DebugLevel(r3)
+
 		lbz	r6,option_EnAlignExc(r14)
 		stb	r6,sonnet_EnAlignExc(r3)
+
 		lbz	r6,option_EnDAccessExc(r14)
 		stb	r6,sonnet_EnAlignExc(r3)
+
 		lbz	r6,option_DisL2Flush(r14)
 		stb	r6,DoDFlushAll(r3)
 		
@@ -368,11 +379,6 @@ End:		mflr	r4
 						
 		bl	.SetupMsgFIFOs
 
-		mfspr	r4,HID0
-		ori	r4,r4,HID0_DCFI|HID0_ICFI
-		mtspr	HID0,r4
-		sync
-
 		mtsrr0	r31
 		
 		loadreg	r0,MACHINESTATE_DEFAULT
@@ -400,9 +406,6 @@ End:		mflr	r4
 
 		loadreg	r0,'REDY'			
 		stw	r0,Init(r0)
-		
-		loadreg	r4,QuickQuantum
-		mtdec	r4
 
 		rfi					#To user code
 		
@@ -686,11 +689,7 @@ ClearInts:	lwz	r27,0xa0(r26)			#IACKR
 
 #********************************************************************************************
 
-Caches:		mfspr	r4,HID0				#Invalidatem then enable L1 caches
-		ori	r4,r4,HID0_ICFI|HID0_DCFI
-		mtspr	HID0,r4
-		sync
-		
+Caches:				
 #		blr					#REMOVE ME FOR L1 CACHE
 
 		mfspr	r4,HID0
@@ -2516,7 +2515,6 @@ EInt:		b	.FPUnav				#0
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
-		isync
 		mtspr	HID0,r0
 		isync
 
@@ -2612,7 +2610,6 @@ EInt:		b	.FPUnav				#0
 		
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
-		isync
 		mtspr	HID0,r0
 		isync
 
@@ -3267,7 +3264,6 @@ EInt:		b	.FPUnav				#0
 		
 		mfspr	r9,HID0
 		ori	r9,r9,HID0_ICFI
-		isync
 		mtspr	HID0,r9
 		isync
 
@@ -3329,7 +3325,6 @@ EInt:		b	.FPUnav				#0
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
-		isync
 		mtspr	HID0,r0
 		isync
 
@@ -4121,7 +4116,6 @@ EInt:		b	.FPUnav				#0
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
-		isync
 		mtspr	HID0,r0
 		isync
 
@@ -4574,7 +4568,8 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		mfsprg0	r4
 		beq	.ExitException
-		
+
+		lwz	r3,PowerPCBase(r0)
 		b	.NextExcOnList
 	
 .LargeContext:	stw	r0,104(r1)
@@ -4677,7 +4672,7 @@ EInt:		b	.FPUnav				#0
 		lwz	r0,108(r1)		#Skips Exc type
 		mtsrr0	r0
 		lwz	r0,112(r1)
-		mtsrr1	r0
+		mtsrr1	r0		
 		lwz	r0,116(r1)
 		mtdar	r0
 		lwz	r0,120(r1)
@@ -4770,9 +4765,12 @@ EInt:		b	.FPUnav				#0
 		stw	r4,0(r1)			#Change User Stack
 		mfsprg0	r4
 		cmpwi	r3,EXCRETURN_ABORT
+
 		lwz	r3,156(r1)
-		stw	r3,44(r1)
+		stw	r3,44(r1)	
 		beq	.ExitException
+		
+		lwz	r3,PowerPCBase(r0)
 		b	.NextExcOnList
 
 #****************************************************
@@ -5071,6 +5069,9 @@ EInt:		b	.FPUnav				#0
 		lwz	r9,ThisPPCProc(r10)
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r9)
+		
+.debugger:	b	.debugger
+		
 		b	.TrySwitch			#Try to salvage the system
 
 #********************************************************************************************

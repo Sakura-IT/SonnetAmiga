@@ -118,3 +118,12 @@
 		mtlr    r0
 		blrl
 .endm
+
+.macro CALLWOS function, register
+		.ifnb \register
+			mr r3,\register
+		.endif
+		lwz r0,_LVO\function+2(r3)
+		mtlr r0
+		blrl
+.endm

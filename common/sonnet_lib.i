@@ -121,6 +121,7 @@ _LVOIsExceptionMode	=	-864
 _LVOCreateMsgFramePPC	=	-870	;PRIVATE
 _LVOSendMsgFramePPC	=	-876	;PRIVATE
 _LVOFreeMsgFramePPC	=	-882	;PRIVATE
+_LVOStartSystem		=	-888	;PRIVATE
 
 		IFND    _POWERMODE
 
@@ -145,5 +146,5 @@ CALLPOWERPC     MACRO
 		ENDC
 
 POWERPCNAME     MACRO
-		dc.b    'sonnet.library',0
+		dc.b    'powerpc.library',0
 		ENDM
