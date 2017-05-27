@@ -194,16 +194,7 @@ ClsLib  	move.l d0,a1
 FreeROM		move.l d0,a1
 		jmp _LVOFreeVec(a6)
 
-FndPCI		
-;		move.l d0,a6				;;
-;		move.l $26(a6),a1			;;
-;		move.b 1(a1),d0				;;
-;		bset #1,d0				;;
-;		move.b 1(a1),d0				;;
-		
-;		move.l LExecBase(pc),a6
-
-		jsr _LVODisable(a6)
+FndPCI		jsr _LVODisable(a6)
 		move.l d7,a1
 		jsr _LVORemove(a6)
 		lea MemList(a6),a0
@@ -729,8 +720,6 @@ pcilib		dc.b "pci.library",0
 ppclib		dc.b "ppc.library",0
 MemName		dc.b "Sonnet memory",0
 PCIMem		dc.b "pcidma memory",0
-MonitorDrv	dc.b "C:LoadMonDrvs",0
-NilFile		dc.b "NIL:",0
 IntName		dc.b "Gort",0
 		cnop	0,4
 
@@ -1054,14 +1043,15 @@ SonInt:		movem.l d1-a6,-(a7)			;68K interrupt which distributes
 		move.l LExecBase(pc),a6			;messages send by the PPC
 		move.l EUMBAddr(pc),a2
 		move.l OMISR(a2),d3
-		move.l #$20000000,d4			;OMISR[OPQI]
-		and.l d4,d3
-		beq DidNotInt
+		moveq.l #0,d5
+		and.l #OPQI,d3
+		beq DidInt
 
 NxtMsg		bsr GetMsgFrame
 		move.l a1,d3
 		cmp.l #-1,d3
-		beq DidNotInt
+		beq DidInt
+		moveq.l #-1,d5
 
 IntMsgLoop	moveq.l #11,d4
 		bsr.s InvMsg				;PCI memory is cache inhibited for 68k?
@@ -1091,9 +1081,10 @@ CommandMaster	move.l d3,a1
 DoPutMsg	jsr _LVOPutMsg(a6)
 		bra.s NxtMsg
 
-DidInt		movem.l (a7)+,d1-a6
-		moveq.l #-1,d0				;Clear Z flag if server handled interrupt
-		rts
+DidInt		move.l d5,d0
+		movem.l (a7)+,d1-a6
+		tst.l d0				;Clear Z flag if server handled interrupt
+		rts					;Set Z flag if we did not handle interrupt
 
 InvMsg		cinvl dc,(a1)				;040+
 		lea L1_CACHE_LINE_SIZE_040(a1),a1	;Cache_Line 040/060 = 16 bytes
@@ -1101,10 +1092,6 @@ InvMsg		cinvl dc,(a1)				;040+
 		rts
 
 IntData		dc.l 0
-
-DidNotInt	movem.l (a7)+,d1-a6
-		moveq.l #0,d0				;Set Z flag if we did not handle interrupt
-		rts
 
 ;********************************************************************************************
 
@@ -1154,7 +1141,6 @@ MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
 		move.l MP_SIGTASK(a2),a2
 		move.l MN_ARG1(a1),TC_SIGALLOC(a2)
 		move.l MN_ARG2(a1),d0
-;		or.l d0,TC_SIGRECVD(a2)				
 		bra DoPutMsg
 
 ;********************************************************************************************
@@ -1245,10 +1231,6 @@ Open:
 		move.l ThisTask(a6),a6
 		or.b #TF_PPC,TC_FLAGS(a6)
 		move.l d0,a6
-;		move.l a1,-(a7)
-;		lea _PowerPCBase(pc),a1
-;		move.l a6,(a1)
-;		move.l (a7)+,a1
 		addq.w #1,LIB_OPENCNT(a6)
 		bclr #LIBB_DELEXP,LIB_FLAGS(a6)
 NoA6		rts
@@ -2237,7 +2219,7 @@ AllocVec32:
 		cmp.l #MEMF_PUBLIC|MEMF_CHIP,d1
 		beq.s DoNormMem
 		and.l #MEMF_CLEAR,d1
-		or.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE,d1		;attributes are FIXED to Sonnet mem
+		or.l #MEMF_PUBLIC|MEMF_PPC,d1					;attributes are FIXED to Sonnet mem
 DoNormMem	jsr _LVOAllocVec(a6)
 		move.l d0,d1
 		beq.s MemErr
@@ -2822,9 +2804,9 @@ FUNCTABLE:
 
 EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
-WarpIDString	dc.b	"$VER: stub warp.library 5.1 (22-Mar-17)",0
+WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.6 (21-May-17) for Sonnet Crescendo 7200",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.6 (27.5.17)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		

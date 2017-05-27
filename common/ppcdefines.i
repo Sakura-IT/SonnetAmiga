@@ -28,7 +28,6 @@
 .set RunPPCStart,80
 .set ViolationAddress,84			#Pointer
 .set MemSize,88
-.set FLAG_PAGETABLE,92
 
 .set option_EnEDOMem,0
 .set option_EnDebug,1
@@ -128,8 +127,11 @@
 .set MemSem,882
 .set WaitListSem,934
 .set SemMemory,992
+.set sonnet_ExceptionBATs,1184
+.set sonnet_StoredBATs,1248
+.set sonnet_SystemBATs,1312
 
-.set sonnet_PosSize,1184			#Library PosSize
+.set sonnet_PosSize,1376			#Library PosSize
 
 .set EXCDATA_TYPE,8				#Always NT_INTERRUPT
 .set EXCDATA_PRI,9				#This
@@ -161,29 +163,6 @@
 .set XCO_SIZE,8
 .set EC_SIZE,424
 
-.set BASE_STOREBAT0,482
-.set IBATU0Store,482
-.set IBATL0Store,486
-.set DBATU0Store,490
-.set DBATL0Store,494
-.set BASE_STOREBAT1,498
-.set IBATU1Store,498
-.set IBATL1Store,502
-.set DBATU1Store,506
-.set DBATL1Store,510
-.set BASE_STOREBAT2,514
-.set IBATU2Store,514
-.set IBATL2Store,518
-.set DBATU2Store,522
-.set DBATL2Store,526
-.set BASE_STOREBAT3,530
-.set IBATU3Store,530
-.set IBATL3Store,534
-.set DBATU3Store,538
-.set DBATL3Store,542
-
-.set BASE_INVALBATS,546
-
 .set TASKPPC_BAT0,0
 .set TASKPPC_BAT1,16
 .set TASKPPC_BAT2,32
@@ -194,8 +173,15 @@
 .set CHMMU_BAT2,2
 .set CHMMU_BAT3,3
 
+.set BASE_STOREBAT0,sonnet_StoredBATs
+.set BASE_STOREBAT1,sonnet_StoredBATs+16
+.set BASE_STOREBAT2,sonnet_StoredBATs+32
+.set BASE_STOREBAT3,sonnet_StoredBATs+48
+
 .set CHMMU_STANDARD,1
 .set CHMMU_BAT,2
+
+.set BASE_INVALBATS,546
 
 .set CONTEXT_CODE,		0
 .set CONTEXT_SRR1,		4
@@ -217,7 +203,7 @@
 .set CONTEXT_FREGS,		152		#256 bytes long
 .set CONTEXT_BATS,		412		#64 bytes long
 .set CONTEXT_SEGMENTS,		480		#64 bytes long		
-.set CONTEXT_LENGTH,		1076		#544 + 33x16(Altivec) + 4
+.set CONTEXT_LENGTH,		1076		#544		#End of context
 
 .set MACHINESTATE_DEFAULT,	PSL_IR|PSL_DR|PSL_FP|PSL_PR|PSL_EE|PSL_ME
 
@@ -596,11 +582,17 @@
 .set DBAT3L_VAL,(VGA_BASE | BAT_WRITE_THROUGH | BAT_READ_WRITE)
 .set DBAT3U_VAL,(VGA_VIRTUAL | BAT_BL_32M | BAT_VALID_SUPERVISOR | BAT_VALID_USER)
 
+# PageTable Access bits
+
+.set PP_USER_RW,2
+.set PP_SUPERVISOR_RW,0
+
 # WIMG bit settings  - Lower PTE
 .set PTE_WRITE_THROUGH,		0x00000008
 .set PTE_CACHE_INHIBITED,	0x00000004
 .set PTE_COHERENT,		0x00000002
 .set PTE_GUARDED,		0x00000001
+.set PTE_COPYBACK,		0x00000000
 
 # Protection bits - Lower BAT
 .set BAT_NO_ACCESS,		0x00000000
@@ -727,6 +719,10 @@
 .set TASKLINK_USED,128
 
 .set TASKPPC_BATSTORAGE,130
+.set TASKPPC_CORE,134
+.set TASKPPC_TABLELINK,138
+.set TASKPPC_TABLE,146
+.set TASKPPC_DEBUGDATA,150
 .set TASKPPC_PAD,154
 .set TASKPPC_TIMESTAMP,156
 .set TASKPPC_TIMESTAMP2,160

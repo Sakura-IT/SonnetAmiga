@@ -180,6 +180,23 @@ SetLen:		mr	r30,r28
 #*********************************************************
 
 Start:							#Dummy task at absolute (see ppcdefines)
+		bl	.SkipNiceTable
+		
+		.long	0x01000000,0x011c0cbf,0x013b2c48,0x015db4d0
+		.long	0x01840600,0x01ae89fa,0x01ddb680,0x02120e3e
+		.long	0x024c2231,0x028c9336,0x02d413cd,0x03236a04
+		.long	0x037b719b,0x03dd1e6a,0x04497efc,0x04c1bf83
+		.long	0x05472d15,0x05db3948,0x067f7e2f,0x0735c2ce
+		.long	0x08000000,0x08e065f6,0x09d9623e,0x0aeda684
+		.long	0x0c203002,0x0d744fcd,0x0eedb401,0x109071f4
+		.long	0x12611187,0x146499af,0x16a09e67,0x191b501c
+		.long	0x1bdb8cdb,0x1ee8f34e,0x224bf7dc,0x260dfc14
+		.long	0x2a3968a7,0x2ed9ca3f,0x33fbf17a,0x39ae166c
+		.long	0x40000000
+		
+.SkipNiceTable:	mflr	r4
+		stw	r4,Table_NICE(r3)		#NICE values are not used (yet).
+
 .IdleLoop:	nop
 		nop
 		b	.IdleLoop
@@ -406,6 +423,8 @@ End:		mflr	r4
 
 		loadreg	r0,'REDY'			
 		stw	r0,Init(r0)
+		
+		lwz	r3,PowerPCBase(r0)
 
 		rfi					#To user code
 		
@@ -880,10 +899,6 @@ mmuSetup:
 		addis	r4,r3,0x200
 		addis	r5,r3,0x5000
 
-		lbz	r7,FLAG_PAGETABLE(r0)
-		mr.	r7,r7
-		bne	.DoGFXPT1
-
 		li	r17,BAT_READ_WRITE
 		li	r18,BAT_BL_32M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
 		li	r19,BAT_WRITE_THROUGH | BAT_READ_WRITE
@@ -902,13 +917,6 @@ mmuSetup:
 		sync
 		isync
 
-		b	.No3DFX
-		
-.DoGFXPT1:	loadreg	r6,PTE_WRITE_THROUGH
-		li	r7,2
-		
-		bl	.DoTBLs
-		
 		b	.No3DFX
 		
 .Is3DFX:	lwz	r3,RTGBase(r0)			#32MB Video RAM (Avenger)
@@ -916,10 +924,6 @@ mmuSetup:
 		addis	r4,r3,0x200
 		addis	r5,r3,0x5000
 		
-		lbz	r7,FLAG_PAGETABLE(r0)
-		mr.	r7,r7
-		bne	.DoGFXPT2
-		
 		li	r17,BAT_READ_WRITE
 		li	r18,BAT_BL_32M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
 		li	r19,BAT_WRITE_THROUGH | BAT_READ_WRITE
@@ -937,14 +941,7 @@ mmuSetup:
 
 		sync
 		isync
-		
-		b	.No3DFX
-		
-.DoGFXPT2:	loadreg	r6,PTE_WRITE_THROUGH
-		li	r7,2
-		
-		bl	.DoTBLs
-		
+
 .No3DFX:	lhz	r3,RTGType(r0)
 		cmpwi	r3,rtgtype_ati
 		bne	.NoATI
@@ -961,10 +958,6 @@ mmuSetup:
 .NoATI:		li	r3,0				#Zeropage (4K no cache)
 		li	r4,0x1000			#no cache for shared stuff with 68k
 		mr	r5,r3
-
-		lbz	r7,FLAG_PAGETABLE(r0)
-		mr.	r7,r7
-		bne	.DoKernelPT2
 
 		li	r17,BAT_READ_WRITE
 		li	r18,BAT_BL_2M | BAT_VALID_SUPERVISOR
@@ -984,39 +977,11 @@ mmuSetup:
 		sync
 		isync
 
-		b	.SkipNxtTab2
-
-.DoKernelPT2:	loadreg	r6,PTE_CACHE_INHIBITED
-		li	r7,2				#pp = 2 - Read/Write Access
-
-		bl	.DoTBLs						
-
-		li	r3,0x1000			#Exception code (16K cached)
-		loadreg	r4,0x8000
-		mr	r5,r3
-		li	r6,0
-		li	r7,0				#pp = 0 - Supervisor access only.
-							#Otherwise DSI/ISI (e.g. CHIP access)
-		bl	.DoTBLs
-
-		lis	r3,0x10				#Message FIFOs (1MB no cache)
-		lis	r4,0x20
-		mr	r5,r3
-#		li	r6,PTE_CACHE_INHIBITED
-		li	r6,0
-		li	r7,0				#pp = 0 - Supervisor access only.
-							#Otherwise DSI/ISI (e.g. CHIP access)
-		bl	.DoTBLs
-
-.SkipNxtTab2:	lis	r3,0x20				#Messages / Idle / Stack (2MB no cache)
+		lis	r3,0x20				#Messages / Idle / Stack (2MB no cache)
 		lis	r4,0x40
 		mr	r5,r3
 		add	r3,r3,r27
 		add	r4,r4,r27
-
-		lbz	r7,FLAG_PAGETABLE(r0)
-		mr.	r7,r7
-		bne	.DoKernelPT
 
 		li	r17,BAT_READ_WRITE
 		li	r18,BAT_BL_2M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
@@ -1036,14 +1001,7 @@ mmuSetup:
 		sync
 		isync
 
-		b	.SkipNxtTab
-
-.DoKernelPT:	li	r6,PTE_CACHE_INHIBITED
-		li	r7,2
-
-		bl	.DoTBLs
-
-.SkipNxtTab:	lis	r3,0x40				#Sonnet memory (Rest cached)
+		lis	r3,0x40				#Sonnet memory (Rest cached)
 		lwz	r4,MemSize(r0)
 		mr	r5,r3
 		add	r3,r3,r27
@@ -2714,11 +2672,11 @@ EInt:		b	.FPUnav				#0
 		addi	r31,r7,20
 		rlwinm	r31,r31,2,0,29
 		lwz	r7,Table_NICE(r2)
-#		lwzx	r31,r7,r31
-#		rlwinm	r31,r31,24,8,31
+		lwzx	r31,r7,r31
+		rlwinm	r31,r31,24,8,31
 		rlwinm	r7,r29,16,0,15
-#		divwu	r0,r7,r31
-#		stw	r0,TASKPPC_DESIRED(r4)			#Needs implementation
+		divwu	r0,r7,r31
+		stw	r0,TASKPPC_DESIRED(r4)
 		srawi	r0,r5,10
 		srawi	r11,r11,10
 		sub.	r11,r0,r11

@@ -6,8 +6,8 @@
 .set ViolationOS,(Violation-SetCache)
 .set TaskExit,(EndTaskPPC-SetCache)
 .set TaskStart,(StartCode-SetCache)
-.set ListStart,(InsertPPC-SetCache)
-.set ListEnd,(FindNamePPC-SetCache)
+.set ListStart,(InsertPPC-SetCache)			#All functions between InsertPPC and FindNamePPC
+.set ListEnd,(FindNamePPC-SetCache)			#are protected from task switching through this.
 
 .global FunctionsLen
 .global ViolationOS
@@ -457,7 +457,7 @@ SetCache:
 
 #********************************************************************************************
 #
-#	void SetExcMMU(void) // Only from within Exception Handler
+#	void SetExcMMU(void) // Only from within Exception Handler (in Supervisor mode)
 #
 #********************************************************************************************
 
@@ -482,7 +482,7 @@ SetExcMMU:
 
 #********************************************************************************************
 #
-#	void ClearExcMMU(void) // Only from within Exception Handler
+#	void ClearExcMMU(void) // Only from within Exception Handler (in Supervisor mode)
 #
 #********************************************************************************************
 
@@ -3339,32 +3339,13 @@ Run68K:
 		bne	.NotAllocMem
 		
 .DoingMem:	lwz	r4,PP_REGS+4(r30)
-		loadreg	r5,MEMF_CHIP
+		loadreg	r5,MEMF_CHIP			#No relocation of CHIP to PPC
 		and.	r5,r4,r5
 		bne	.NotAllocMem
 		ori	r4,r4,MEMF_PPC
 		stw	r4,PP_REGS+4(r30)
-		
-#		li	r4,CACHE_DCACHEFLUSH
-#		li	r5,0
-#		li	r6,0
-#		mr	r3,r28
-		
-#		bl SetCache				
 
-.NotAllocMem:	lwz	r4,sonnet_DosBase(r28)
-		lwz	r5,PP_CODE(r30)
-		cmpw	r4,r5
-		bne	.NoDOS
-
-		li	r4,CACHE_DCACHEFLUSH
-		li	r5,0
-		li	r6,0
-		mr	r3,r28
-		
-#		bl SetCache
-
-.NoDOS:		mr	r4,r30
+.NotAllocMem:	mr	r4,r30
 
 		bl SendMsgFramePPC
 
@@ -4918,16 +4899,16 @@ CreateTaskPPC:
 		mr	r5,r31				#Task
 		loadreg	r0,Quantum
 		stw	r0,TASKPPC_QUANTUM(r31)
-#		lwz	r7,TASKPPC_NICE(r31)		
-#		addi	r8,r7,20
-#		rlwinm	r8,r8,2,0,29
-#		lwz	r7,Table_NICE(r23)		#Getting DESIRED from a table
-#		lwzx	r8,r7,r8
-#		rlwinm	r8,r8,24,8,31
-#		lis	r7,2000
-#		ori	r7,r7,0
-#		divwu	r0,r7,r8
-#		stw	r0,TASKPPC_DESIRED(r31)
+		lwz	r7,TASKPPC_NICE(r31)		
+		addi	r8,r7,20
+		rlwinm	r8,r8,2,0,29			#Multiply 0-40 x 4
+		lwz	r7,Table_NICE(r23)		#Getting DESIRED from a table
+		lwzx	r8,r7,r8
+		rlwinm	r8,r8,24,8,31
+		lis	r7,2000
+		ori	r7,r7,0
+		divwu	r0,r7,r8
+		stw	r0,TASKPPC_DESIRED(r31)
 
 		bl InsertOnPri
 
