@@ -70,6 +70,16 @@ is just a public mirror of CVS development repostiory. Therefore, if you are
 crazy enough to send patches, don't use GitHub Pull Requests, just make a
 unified diff and attach it to the issue. Or mail it.
 
+# Legal status
+
+SonnetAmiga project is licensed under MIT License, with some notable exceptions.
+
+The following components are *not* licensed under MIT:
+
+- Parts of `ppcfunctions.p` contain code reassembled from original WarpOS. This is the only file that contains offending code. Even though Sam Jordan agreed on code reuse, copyright on this code is held by Haage & Partner. This file should be rewritten to avoid potential legal disputes. See issue #2 on GitHub.
+- The low level WarpOS debugger (all files in `wosdb` directory) is copyright Frank Wille. The author has granted permission for inclusion in SonnetAmiga project, but anyone willing to further modify or use wosdb code (especially for commercial purposes) should contact the author first.
+- The bogomips program by Jeff Tranter is based on a Linux kernel code, therefore we assume it is covered by GNU GPL license.
+
 # Disclaimers
 
 We, the developers, are officially stating that all code interacting with 
@@ -79,5 +89,4 @@ This project is not endorsed by ELBOX in any way.
 We are not responsible for any damages as a result of hardware modifications you performed needed to get
 the Sonnet working in your system and neither for making your system work with a Sonnet. Buy a Sonnet
 card at your own risk!
-
 
