@@ -1857,13 +1857,26 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		stw	r0,48(r1)
 		mfcr	r0
-		stw	r0,52(r1)		
+		stw	r0,52(r1)
+
+		lis	r3,EUMB@h
+		li	r4,IMISR
+		lwbrx	r3,r3,r4
+		andi.	r0,r3,IMISR_IM0I		#From CausePPCInterrupt
+		lwz	r3,PowerPCBase(r0)
+		beq	.NoEHandler
+
+.EHandler:	li	r0,0
+		stb	r0,sonnet_ExternalInt(r3)
 		li	r0,EXCF_INTERRUPT
 		stw	r0,60(r1)
-
-		lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_EXCINTERRUPT(r3)
 		b	.CommonHandler
+
+.NoEHandler:	li	r0,-1
+		stb	r0,sonnet_ExceptionMode(r3)
+		stw	r5,36(r1)
+		stw	r6,32(r1)
 
 #***********************************************		
 
@@ -1930,8 +1943,8 @@ EInt:		b	.FPUnav				#0
 		mr	r9,r5
 		li	r5,IMISR_IM0I|IMISR_IM1I
 		stwbrx	r5,r4,r3			#Clear IM0/IM1 bit to clear interrupt
-		sync					#These are no longer used in current version
-		mr	r5,r9				#as we are using FIFO now and not these registers
+		sync					#IMR0 is used by CausePPCInterrupt
+		mr	r5,r9	
 	
 .CheckQueue:	andi.	r9,r5,IMISR_IPQI
 		beq	.EndQueue
@@ -3315,19 +3328,53 @@ EInt:		b	.FPUnav				#0
 		rfi
 
 #********************************************************************************************
-		
-.DecInt:	mtsprg2	r0
 
-		mfsrr1	r0
-		mtsprg1	r0
-		mfsrr0	r0
-		mtsprg0	r0
+.DecInt:	mtsprg0	r0
+
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
 		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
 		isync					#Also reenable FPU
 		sync
 
+		mfsprg0	r0
+
+		stwu	r1,-1080(r1)
+		stw	r4,40(r1)
+		stw	r3,44(r1)
+		stw	r0,48(r1)
+		mfcr	r0
+		stw	r0,52(r1)
+
+		lwz	r3,PowerPCBase(r0)
+		lbz	r4,sonnet_ExternalInt(r3)	#From CauseInterrupt
+		mr.	r4,r4
+		bne	.EHandler
+
+		li	r0,EXCF_DECREMENTER
+		stw	r0,60(r1)
+		la	r4,LIST_EXCDECREMENTER(r3)
+		b	.CommonHandler
+
+#***********************************************		
+
+.DoDInt:	lwz	r3,44(r1)
+		lwz	r4,40(r1)
+		lwz	r5,36(r1)
+		lwz	r6,32(r1)
+		lwz	r0,52(r1)
+		mtcr	r0
+		lwz	r0,48(r1)
+		lwz	r1,0(r1)
+
+#***********************************************	
+
+		mtsprg2	r0
+		mfsrr1	r0
+		mtsprg1	r0
+		mfsrr0	r0
+		mtsprg0	r0
+		
 		mtsprg3	r1				#Store user stack pointer
 		lwz	r0,SonnetBase(r0)
 		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
@@ -3520,11 +3567,11 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		stw	r0,48(r1)
 		mfcr	r0
-		stw	r0,52(r1)		
+		stw	r0,52(r1)
+
+		lwz	r3,PowerPCBase(r0)		
 		lis	r0,EXCF_IABR@h
 		stw	r0,60(r1)
-
-		lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_EXCIABR(r3)
 		b	.CommonHandler
 
@@ -3546,11 +3593,11 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		stw	r0,48(r1)
 		mfcr	r0
-		stw	r0,52(r1)		
+		stw	r0,52(r1)
+
+		lwz	r3,PowerPCBase(r0)		
 		li	r0,EXCF_MCHECK
 		stw	r0,60(r1)
-
-		lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_EXCMCHECK(r3)
 		b	.CommonHandler
 
@@ -3572,11 +3619,11 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		stw	r0,48(r1)
 		mfcr	r0
-		stw	r0,52(r1)		
+		stw	r0,52(r1)
+
+		lwz	r3,PowerPCBase(r0)		
 		lis	r0,EXCF_SYSMAN@h
 		stw	r0,60(r1)
-
-		lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_EXCSYSMAN(r3)
 		b	.CommonHandler
 
@@ -3598,11 +3645,11 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		stw	r0,48(r1)
 		mfcr	r0
-		stw	r0,52(r1)		
-		lis	r0,EXCF_THERMAN@h
-		stw	r0,60(r1)
+		stw	r0,52(r1)
 
 		lwz	r3,PowerPCBase(r0)
+		lis	r0,EXCF_THERMAN@h
+		stw	r0,60(r1)
 		la	r4,LIST_EXCTHERMAN(r3)
 		b	.CommonHandler
 
@@ -3624,11 +3671,11 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		stw	r0,48(r1)
 		mfcr	r0
-		stw	r0,52(r1)		
-		li	r0,EXCF_SYSTEMCALL
-		stw	r0,60(r1)
+		stw	r0,52(r1)
 
 		lwz	r3,PowerPCBase(r0)
+		li	r0,EXCF_SYSTEMCALL
+		stw	r0,60(r1)
 		la	r4,LIST_EXCSYSTEMCALL(r3)
 		b	.CommonHandler
 
@@ -3650,11 +3697,11 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		stw	r0,48(r1)
 		mfcr	r0
-		stw	r0,52(r1)		
+		stw	r0,52(r1)
+
+		lwz	r3,PowerPCBase(r0)		
 		li	r0,EXCF_TRACE
 		stw	r0,60(r1)
-
-		lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_EXCTRACE(r3)
 		b	.CommonHandler
 		
@@ -3676,11 +3723,11 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		stw	r0,48(r1)
 		mfcr	r0
-		stw	r0,52(r1)		
-		li	r0,EXCF_FPUN
-		stw	r0,60(r1)
+		stw	r0,52(r1)
 
 		lwz	r3,PowerPCBase(r0)
+		li	r0,EXCF_FPUN
+		stw	r0,60(r1)
 		la	r4,LIST_EXCFPUN(r3)
 		b	.CommonHandler
 
@@ -3702,11 +3749,11 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		stw	r0,48(r1)
 		mfcr	r0
-		stw	r0,52(r1)		
+		stw	r0,52(r1)
+
+		lwz	r3,PowerPCBase(r0)		
 		li	r0,EXCF_ALIGN
 		stw	r0,60(r1)
-
-		lwz	r3,PowerPCBase(r0)
 		lbz	r4,sonnet_EnAlignExc(r3)
 		mr.	r4,r4
 		beq	.AlignWOS2
@@ -3967,7 +4014,7 @@ EInt:		b	.FPUnav				#0
 		mfsrr0	r3
 		addi	r3,r3,4				#Exit beyond offending instruction
 		mtsrr0	r3
-		
+
 		lwz	r3,PowerPCBase(r0)
 		li	r0,0
 		stb	r0,sonnet_ExceptionMode(r3)
@@ -4003,11 +4050,11 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		stw	r0,48(r1)
 		mfcr	r0
-		stw	r0,52(r1)		
+		stw	r0,52(r1)
+
+		lwz	r3,PowerPCBase(r0)		
 		li	r0,EXCF_IACCESS
 		stw	r0,60(r1)
-
-		lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_EXCIACCESS(r3)
 		b	.CommonHandler
 
@@ -4029,11 +4076,11 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		stw	r0,48(r1)
 		mfcr	r0
-		stw	r0,52(r1)		
-		li	r0,-(EXCF_PERFMON)		##There a better way to load 0x8000?
-		stw	r0,60(r1)
+		stw	r0,52(r1)
 
 		lwz	r3,PowerPCBase(r0)
+		li	r0,-(EXCF_PERFMON)		##There a better way to load 0x8000?
+		stw	r0,60(r1)
 		la	r4,LIST_EXCPERFMON(r3)
 		b	.CommonHandler
 
@@ -4057,27 +4104,27 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		stw	r0,48(r1)
 		mfcr	r0
-		stw	r0,52(r1)		
+		stw	r0,52(r1)
+
+		lwz	r3,PowerPCBase(r0)		#No LIST_ implemented yet.		
 		lis	r0,EXCF_VMXUN@h
 		stw	r0,60(r1)
 
-		lwz	r3,PowerPCBase(r0)		#No LIST_ implemented yet.
-				
 		loadreg	r0,'VMXU'
 		stw	r0,0xf4(r0)
-				
+
 		li	r0,-1
 		stb	r0,sonnet_ExceptionMode(r3)
 		lbz	r4,sonnet_AltivecOn(r3)
 		mr.	r4,r4
 		beq	.ErrorVMX
-		
+
 		mfsrr1	r0
 		oris	r0,r0,PSL_VEC@h
 		mtsrr1	r0
 		sync
 		isync
-		
+
 		li	r0,0
 		stb	r0,sonnet_ExceptionMode(r3)
 
@@ -4124,11 +4171,11 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		stw	r0,48(r1)
 		mfcr	r0
-		stw	r0,52(r1)		
+		stw	r0,52(r1)
+
+		lwz	r3,PowerPCBase(r0)		
 		li	r0,EXCF_DACCESS
 		stw	r0,60(r1)
-
-		lwz	r3,PowerPCBase(r0)
 		lbz	r4,sonnet_EnDAccessExc(r3)
 		mr.	r4,r4
 		beq	.DoDSI2
@@ -4465,11 +4512,11 @@ EInt:		b	.FPUnav				#0
 		stw	r3,44(r1)
 		stw	r0,48(r1)
 		mfcr	r0
-		stw	r0,52(r1)		
+		stw	r0,52(r1)
+
+		lwz	r3,PowerPCBase(r0)		
 		li	r0,EXCF_PROGRAM
 		stw	r0,60(r1)
-
-		lwz	r3,PowerPCBase(r0)
 		la	r4,LIST_EXCPROGRAM(r3)
 
 #****************************************************
@@ -4762,6 +4809,8 @@ EInt:		b	.FPUnav				#0
 		beq	.DoDSI
 		cmpwi	r5,EXCF_INTERRUPT
 		beq	.DoEInt
+		cmpwi	r5,EXCF_DECREMENTER
+		beq	.DoDInt
 		mr	r0,r5
 		b	.CommonError
 

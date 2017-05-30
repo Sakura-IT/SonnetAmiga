@@ -2743,7 +2743,7 @@ WaitPortPPC:
 
 		mr	r3,r28
 		
-		bl CauseInterrupt
+		bl CauseDECInterrupt
 
 .PortUseWait2:	lbz	r3,PortInUse(r28)
 		mr.	r3,r3
@@ -2810,7 +2810,7 @@ WaitPortPPC:
 		
 		mr	r3,r28
 
-		bl CauseInterrupt
+		bl CauseDECInterrupt
 
 .PortUseWait4:	lbz	r3,PortInUse(r28)
 		mr.	r3,r3
@@ -4920,7 +4920,7 @@ CreateTaskPPC:
  		
  		mr	r3,r23
 
-		bl CauseInterrupt
+		bl CauseDECInterrupt
 
 		mr	r3,r31
 		b	.SkipToEnd			#All good, go to exit
@@ -5711,7 +5711,36 @@ AttemptSemaphoreSharedPPC:
 
 #********************************************************************************************
 #
-#	Support: void CauseInterrupt(PowerPCBase) // causing the system call interrupt
+#	Support: void CauseDECInterrupt(PowerPCBase) // causing the decrementer interrupt
+#
+#********************************************************************************************
+
+CauseDECInterrupt:
+
+		prolog 228,'TOC'
+
+		stwu	r31,-4(r13)
+
+		lbz	r0,sonnet_ExceptionMode(r3)
+		mr.	r0,r0
+		bne	.AlreadyInDExc
+
+		bl Super
+
+		mr	r4,r3
+		li	r3,10
+		mtdec	r3
+
+		bl User
+
+.AlreadyInDExc:	lwz	r31,0(r13)
+		addi	r13,r13,4
+
+		epilog 'TOC'
+
+#********************************************************************************************
+#
+#	void CauseInterrupt(PowerPCBase) // causing the external interrupt
 #
 #********************************************************************************************
 
@@ -5721,11 +5750,16 @@ CauseInterrupt:
 
 		stwu	r31,-4(r13)
 
+		mr	r31,r3
+
 		lbz	r0,sonnet_ExceptionMode(r3)
 		mr.	r0,r0
 		bne	.AlreadyInExc
-
+		
 		bl Super
+
+		li	r0,-1
+		stb	r0,sonnet_ExternalInt(r31)
 
 		mr	r4,r3
 		li	r3,10
@@ -5774,7 +5808,7 @@ CheckExcSignal:
 		
 		mr	r3,r31
 
-		bl CauseInterrupt
+		bl CauseDECInterrupt
 
 .IntWait2:	lwz	r0,sonnet_TaskExcept(r31)
 		mr.	r0,r0
@@ -5864,7 +5898,7 @@ EndTaskPPC:
 		bl Super
 		
 		lwz	r31,PowerPCBase(r0)		#zero page will be soon privileged
-		mr	r3,r4
+		mr	r4,r3
 		
 		bl User
 		
@@ -5995,7 +6029,7 @@ DeleteTaskPPC:
 		
 		mr	r3,r30
 		
-		bl CauseInterrupt
+		bl CauseDECInterrupt
 
 .EndTask:	b	.EndTask			#Halt this Task
 
@@ -6911,7 +6945,7 @@ WaitPPC:
 		
 		mr	r3,r30
 		
-		bl CauseInterrupt
+		bl CauseDECInterrupt
 
 .WaitForRun:	lbz	r0,TC_STATE(r31)
 		cmplwi	r0,TS_RUN
@@ -7006,7 +7040,7 @@ SetTaskPriPPC:
 		
 		mr	r3,r31
 
-		bl CauseInterrupt
+		bl CauseDECInterrupt
 
 		b	.ExitPri
 
@@ -7215,7 +7249,7 @@ SignalPPC:
 		
 		mr	r3,r29
 
-		bl CauseInterrupt
+		bl CauseDECInterrupt
 
 .SigExit:	mr	r30,r29
 		li	r31,FSignalPPC-FRun68K
@@ -7288,7 +7322,7 @@ GetMsgPPC:
 		
 		mr	r3,r29
 
-		bl CauseInterrupt
+		bl CauseDECInterrupt
 
 .PortWait2:	lbz	r3,PortInUse(r29)
 		mr.	r3,r3
@@ -7416,7 +7450,7 @@ ReplyMsgPPC:
 		
 		mr	r3,r29
 		
-		bl CauseInterrupt
+		bl CauseDECInterrupt
 
 .WaitForPort2:	lbz	r3,PortInUse(r29)
 		mr.	r3,r3
@@ -7516,7 +7550,7 @@ PutMsgPPC:
 		
 		mr	r3,r29
 
-		bl CauseInterrupt
+		bl CauseDECInterrupt
 
 .W8ForPort2:	lbz	r3,PortInUse(r29)
 		mr.	r3,r3
@@ -8092,7 +8126,7 @@ RemExcHandler:
 		
 		mr	r3,r31
 
-		bl CauseInterrupt
+		bl CauseDECInterrupt
 
 		lwz	r3,EXCDATA_LASTEXC(r30)
 .WaitActive:	lwz	r4,EXCDATA_FLAGS(r3)
@@ -8576,7 +8610,7 @@ SetExcHandler:
 		
 		mr	r3,r27
 
-		bl CauseInterrupt
+		bl CauseDECInterrupt
 
 		mr.	r26,r26
 		beq-	.NoExcDefined
@@ -9442,7 +9476,7 @@ StartSystem:	blr							#Dummy function
 
 .GoToWait:	mr	r3,r31
 		li	r4,0
-		li	r5,5000						#5000 microseconds
+		lis	r5,0x1e					#slight less than 2s
 
 		bl WaitTime
 
@@ -10016,7 +10050,7 @@ ExitCode:	lwz	r14,0(r1)
 		
 		mr	r3,r25
 
-		bl CauseInterrupt
+		bl CauseDECInterrupt
 		
 Pause:		nop
 		nop

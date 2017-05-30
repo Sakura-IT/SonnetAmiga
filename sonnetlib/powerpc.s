@@ -2461,7 +2461,9 @@ ClrXMsg		clr.l (a2)+
 CausePPCInterrupt:
 		movem.l d1-a6,-(a7)
 
-		RUNPOWERPC	_PowerPCBase,CauseInterrupt
+		move.l EUMBAddr(pc),a2
+		moveq.l #-1,d1
+		move.l d1,IMR0(a2)
 
 		movem.l (a7)+,d1-a6
 		rts

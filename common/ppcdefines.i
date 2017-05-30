@@ -120,6 +120,7 @@
 
 .set sonnet_DosBase,614
 
+.set sonnet_ExternalInt,620
 .set sonnet_AltivecOn,621
 .set sonnet_ExceptionMode,622
 .set DoDFlushAll,623
