@@ -363,7 +363,7 @@ End:		mflr	r4
 		stb	r6,sonnet_EnAlignExc(r3)
 
 		lbz	r6,option_EnDAccessExc(r14)
-		stb	r6,sonnet_EnAlignExc(r3)
+		stb	r6,sonnet_EnDAccessExc(r3)
 
 		lbz	r6,option_DisL2Flush(r14)
 		stb	r6,DoDFlushAll(r3)
@@ -441,8 +441,10 @@ End:		mflr	r4
 
 		bl	Caches				#Setup the L1 and L2 cache
 
+		li	r3,0
 		loadreg	r0,'REDY'			
 		stw	r0,Init(r0)
+		dcbf	r0,r3
 		
 		lwz	r3,PowerPCBase(r0)
 
@@ -878,7 +880,7 @@ mmuSetup:
 		addis	r4,r3,0x10				#end effective address
 		mr	r5,r3					#start physical address
 		loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED	#WIMG
-		li	r7,2					#pp = 2 - Read/Write Access (0 = No Access)
+		li	r7,PP_USER_RW				#pp = 2 - Read/Write Access (0 = No Access)
 
 		bl	.DoTBLs
 
@@ -886,7 +888,7 @@ mmuSetup:
 		lis	r4,0xfff1
 		mr	r5,r3
 		loadreg	r6,PTE_CACHE_INHIBITED
-		li	r7,2
+		li	r7,PP_USER_RW
 
 		bl	.DoTBLs
 
@@ -904,7 +906,7 @@ mmuSetup:
 		addis	r4,r4,0x600
 .Voodoo3:	mr	r24,r4
 		addis	r5,r3,0x5000
-		li	r7,2
+		li	r7,PP_USER_RW
 
 		bl	.DoTBLs
 
@@ -971,37 +973,30 @@ mmuSetup:
 		mr	r4,r3
 		addis	r4,r4,0xe00			#256-32MB max Video RAM (ATI)
 		loadreg	r6,PTE_WRITE_THROUGH
-		li	r7,2
+		li	r7,PP_USER_RW
 
 		bl	.DoTBLs		
 
-.NoATI:		li	r3,0				#Zeropage (4K no cache)
-		li	r4,0x1000			#no cache for shared stuff with 68k
+.NoATI:		li	r3,0				#First 2MB cached - user protected - Directs to CHIP
 		mr	r5,r3
 
 		li	r17,BAT_READ_WRITE
 		li	r18,BAT_BL_2M | BAT_VALID_SUPERVISOR
-		li	r19,BAT_CACHE_INHIBITED | BAT_READ_WRITE
-		li	r20,BAT_BL_2M | BAT_VALID_SUPERVISOR
 
 		or	r17,r17,r5
 		or	r18,r18,r3
-		or	r19,r19,r5
-		or	r20,r20,r3
 
 		mtspr	ibat0l,r17
 		mtspr	ibat0u,r18
-		mtspr	dbat0l,r19
-		mtspr	dbat0u,r20
+		mtspr	dbat0l,r17
+		mtspr	dbat0u,r18
 
 		sync
 		isync
 
-		lis	r3,0x20				#Messages / Idle / Stack (2MB no cache)
-		lis	r4,0x40
+		lis	r3,0x20				#Messages (2MB no data cache)
 		mr	r5,r3
 		add	r3,r3,r27
-		add	r4,r4,r27
 
 		li	r17,BAT_READ_WRITE
 		li	r18,BAT_BL_2M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
@@ -1027,8 +1022,8 @@ mmuSetup:
 		add	r3,r3,r27
 		add	r4,r4,r27
 
-		li	r6,0
-		li	r7,2
+		li	r6,PTE_COPYBACK
+		li	r7,PP_USER_RW
 
 		bl	.DoTBLs
 
@@ -3755,18 +3750,18 @@ EInt:		b	.FPUnav				#0
 		li	r0,EXCF_ALIGN
 		stw	r0,60(r1)
 		lbz	r4,sonnet_EnAlignExc(r3)
-		mr.	r4,r4
-		beq	.AlignWOS2
+		mr.	r4,r4	
+		beq	.AlignWOS
 
 		la	r4,LIST_EXCALIGN(r3)
 		b	.CommonHandler
 
 #****************************************************
 
-.AlignWOS2:	stw	r5,36(r1)
+.AlignWOS:	stw	r5,36(r1)
 		stw	r6,32(r1)
 		
-.AlignWOS:	lwz	r0,48(r1)			#r0
+		lwz	r0,48(r1)			#r0
 		stw	r0,104(r1)
 		lwz	r0,0(r1)			#r1
 		stw	r0,108(r1)
@@ -3924,13 +3919,13 @@ EInt:		b	.FPUnav				#0
 		rlwinm.	r0,r5,24,31,31
 		bne	.stfs
 		b	.lfs
-				
+
 #***********************************************
 
 .HaltAlign:	li	r0,0
 		mtsprg0	r0
 		b	.CommonAlign
-		
+
 .AligExit:	loadreg	r0,'USER'			#Return to user
 		stw	r0,0xf4(r0)
 		li	r0,-1
@@ -4028,9 +4023,9 @@ EInt:		b	.FPUnav				#0
 	
 #***********************************************	
 
-.HaltAlign2:
-		li	r0,EXCF_ALIGN
-		b	.CommonError
+.HaltAlign2:	lwz	r3,PowerPCBase(r0)
+		la	r4,LIST_EXCALIGN(r3)
+		b	.CommonHandler
 
 #********************************************************************************************
 
@@ -4803,8 +4798,6 @@ EInt:		b	.FPUnav				#0
 .DoWOSHandler:	lwz	r5,60(r1)
 		cmpwi	r5,EXCF_PROGRAM
 		beq	.Private			#Needs jump table
-		cmpwi	r5,EXCF_ALIGN
-		beq	.AlignWOS
 		cmpwi	r5,EXCF_DACCESS
 		beq	.DoDSI
 		cmpwi	r5,EXCF_INTERRUPT
