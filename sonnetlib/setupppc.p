@@ -445,7 +445,7 @@ End:		mflr	r4
 		loadreg	r0,'REDY'			
 		stw	r0,Init(r0)
 		dcbf	r0,r3
-		
+
 		lwz	r3,PowerPCBase(r0)
 
 		rfi					#To user code
@@ -1853,6 +1853,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lis	r3,EUMB@h
 		li	r4,IMISR
@@ -1881,28 +1883,21 @@ EInt:		b	.FPUnav				#0
 		lwz	r6,32(r1)
 		lwz	r0,52(r1)
 		mtcr	r0
+		lwz	r0,64(r1)
+		mtxer	r0
 		lwz	r0,48(r1)
 		lwz	r1,0(r1)
 		
 #***********************************************
 
-		mtsprg2	r0				##NEEDS REWORK....SAME WITH DECREMENTER
-		mfsrr1	r0
-		mtsprg1	r0
-		mfsrr0	r0
 		mtsprg0	r0
 
-		mtsprg3	r1				
-		lwz	r0,SonnetBase(r0)		#Store user stack pointer
-		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
-		or	r1,r1,r0
-		mfsprg3 r0
-		stwu	r0,-4(r1)
+		stwu	r1,-288(r1)
+
+		prolog	288,'TOC'
 		
 		mfxer	r0
-		mtsprg3	r0
-
-		prolog	228,'TOC'
+		stwu	r0,-4(r13)
 		
 		bl	.TaskStats
 
@@ -2456,7 +2451,7 @@ EInt:		b	.FPUnav				#0
 		stwu	r1,-1024(r1)		
 		
 		lwz	r6,RunPPCStart(r0)
-		mtsprg0	r6
+		mtsrr0	r6
 
  		lwz	r0,MN_STARTALLOC(r9)
 		stw	r0,TC_SIGALLOC(r8)
@@ -2496,8 +2491,6 @@ EInt:		b	.FPUnav				#0
 
 		loadreg	r0,MACHINESTATE_DEFAULT
 		mtsrr1	r0		
-		mfsprg0	r0
-		mtsrr0	r0
 
 		mfspr	r0,HID0
 		ori	r0,r0,HID0_ICFI
@@ -2578,18 +2571,13 @@ EInt:		b	.FPUnav				#0
 		lwzu	r5,4(r13)
 		lwzu	r4,4(r13)
 		lwzu	r3,4(r13)
+		lwzu	r0,4(r13)
+		mtxer	r0
 		addi	r13,r13,4
 	
 		excepilog 'TOC'
 
 		lwz	r1,0(r1)				#Restore user stack
-
-		mfsprg3	r0
-		mtxer	r0
-		mfsprg1 r0
-		mtsrr1	r0
-		mfsprg0	r0
-		mtsrr0	r0
 
 		loadreg	r0,'USER'
 		stw	r0,0xf4(r0)
@@ -2599,7 +2587,7 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r0
 		isync
 
-		mfsprg2	r0
+		mfsprg0	r0
 
 		rfi
 	
@@ -2913,9 +2901,9 @@ EInt:		b	.FPUnav				#0
 		b	.Dispatch
 		
 .StoreContext:	lwz	r6,TASKPPC_CONTEXTMEM(r5)
-		mfsprg0	r3
+		mfsrr0	r3
 		stw	r3,0(r6)
-		mfsprg1 r3
+		mfsrr1	r3
 		stw	r3,4(r6)
 		lwz	r3,0(r1)			#User stack
 		lwz	r0,8(r3)			#lr
@@ -2924,10 +2912,10 @@ EInt:		b	.FPUnav				#0
 		stw	r0,12(r6)
 		mfctr	r0
 		stw	r0,16(r6)
-		mfsprg3	r0
+		lwz	r0,32(r13)
 		stw	r0,20(r6)			#xer
-		mfsprg2	r0
-		stw	r0,24(r6)
+		mfsprg0	r0
+		stw	r0,24(r6)			#r0
 		lwz	r0,0(r3)
 		stw	r0,28(r6)			#r1
 		stw	r2,32(r6)
@@ -3292,8 +3280,8 @@ EInt:		b	.FPUnav				#0
 		mtsrr0	r0
 
 		loadreg	r1,SysStack-0x20		#System stack in unused mem
-		lwz	r0,SonnetBase(r0)
-		or	r1,r1,r0
+		lwz	r9,SonnetBase(r0)
+		add	r1,r1,r9
 
 		lwz	r9,0xf0(r0)			#Debug counter to check
 		addi	r9,r9,1				#Whether exception is still running
@@ -3340,6 +3328,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lwz	r3,PowerPCBase(r0)
 		lbz	r4,sonnet_ExternalInt(r3)	#From CauseInterrupt
@@ -3359,29 +3349,22 @@ EInt:		b	.FPUnav				#0
 		lwz	r6,32(r1)
 		lwz	r0,52(r1)
 		mtcr	r0
+		lwz	r0,64(r1)
+		mtxer	r0
 		lwz	r0,48(r1)
 		lwz	r1,0(r1)
 
 #***********************************************	
 
-		mtsprg2	r0
-		mfsrr1	r0
-		mtsprg1	r0
-		mfsrr0	r0
 		mtsprg0	r0
 		
-		mtsprg3	r1				#Store user stack pointer
-		lwz	r0,SonnetBase(r0)
-		loadreg	r1,SysStack-0x20		#System stack in unused mem (See sonnet.s)
-		or	r1,r1,r0
-		mfsprg3	r0
-		stwu	r0,-4(r1)
-		
+		stwu	r1,-288(r1)
+
+		prolog	288,'TOC'
+
 		mfxer	r0
-		mtsprg3	r0
-		
-		prolog	228,'TOC'
-		
+		stwu	r0,-4(r13)
+
 		bl	.TaskStats
 
 		stwu	r3,-4(r13)
@@ -3563,6 +3546,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lwz	r3,PowerPCBase(r0)		
 		lis	r0,EXCF_IABR@h
@@ -3589,6 +3574,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lwz	r3,PowerPCBase(r0)		
 		li	r0,EXCF_MCHECK
@@ -3615,6 +3602,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lwz	r3,PowerPCBase(r0)		
 		lis	r0,EXCF_SYSMAN@h
@@ -3641,6 +3630,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lwz	r3,PowerPCBase(r0)
 		lis	r0,EXCF_THERMAN@h
@@ -3667,6 +3658,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lwz	r3,PowerPCBase(r0)
 		li	r0,EXCF_SYSTEMCALL
@@ -3693,6 +3686,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lwz	r3,PowerPCBase(r0)		
 		li	r0,EXCF_TRACE
@@ -3719,6 +3714,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lwz	r3,PowerPCBase(r0)
 		li	r0,EXCF_FPUN
@@ -3745,6 +3742,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lwz	r3,PowerPCBase(r0)		
 		li	r0,EXCF_ALIGN
@@ -4016,6 +4015,8 @@ EInt:		b	.FPUnav				#0
 		lwz	r3,44(r1)
 		lwz	r0,52(r1)
 		mtcr	r0
+		lwz	r0,64(r1)
+		mtxer	r0
 		lwz	r0,48(r1)
 		lwz	r1,0(r1)
 
@@ -4046,6 +4047,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lwz	r3,PowerPCBase(r0)		
 		li	r0,EXCF_IACCESS
@@ -4072,6 +4075,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lwz	r3,PowerPCBase(r0)
 		li	r0,-(EXCF_PERFMON)		##There a better way to load 0x8000?
@@ -4100,6 +4105,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lwz	r3,PowerPCBase(r0)		#No LIST_ implemented yet.		
 		lis	r0,EXCF_VMXUN@h
@@ -4132,6 +4139,8 @@ EInt:		b	.FPUnav				#0
 		lwz	r3,44(r1)
 		lwz	r0,52(r1)
 		mtcr	r0
+		lwz	r0,64(r1)
+		mtxer	r0
 		lwz	r1,0(r1)
 
 		mfspr	r0,HID0
@@ -4167,6 +4176,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lwz	r3,PowerPCBase(r0)		
 		li	r0,EXCF_DACCESS
@@ -4430,6 +4441,8 @@ EInt:		b	.FPUnav				#0
 		lwz	r3,44(r1)
 		lwz	r0,52(r1)
 		mtcr	r0
+		lwz	r0,64(r1)
+		mtxer	r0
 		lwz	r0,48(r1)
 		lwz	r1,0(r1)
 
@@ -4508,6 +4521,8 @@ EInt:		b	.FPUnav				#0
 		stw	r0,48(r1)
 		mfcr	r0
 		stw	r0,52(r1)
+		mfxer	r0
+		stw	r0,64(r1)
 
 		lwz	r3,PowerPCBase(r0)		
 		li	r0,EXCF_PROGRAM
@@ -4564,6 +4579,8 @@ EInt:		b	.FPUnav				#0
 		
 		lwz	r0,52(r1)
 		mtcr	r0
+		lwz	r0,64(r1)
+		mtxer	r0
 		lwz	r0,48(r1)
 		lwz	r4,40(r1)
 		lwz	r5,36(r1)
@@ -4582,7 +4599,9 @@ EInt:		b	.FPUnav				#0
 		stw	r4,40(r1)
 		stw	r5,36(r1)
 		stw	r6,32(r1)
-		
+		mfxer	r0
+		stw	r0,64(r1)
+
 		cmpwi	r3,EXCRETURN_ABORT
 		lwz	r3,108(r1)
 		stw	r3,44(r1)
@@ -4606,8 +4625,8 @@ EInt:		b	.FPUnav				#0
 		mfctr	r0
 		stw	r0,128(r1)
 		stw	r6,132(r1)		#lr
-		mfxer	r0
-		stw	r0,136(r1)
+		lwz	r0,64(r1)
+		stw	r0,136(r1)		#xer
 		stfd	f0,272(r1)
 		mffs	f0
 		stfd	f0,152(r1)
@@ -4705,6 +4724,7 @@ EInt:		b	.FPUnav				#0
 		mtlr	r0
 		lwz	r0,136(r1)
 		mtxer	r0
+		stw	r0,64(r1)
 		lfd	f0,136(r1)
 		mtfsf	0xff,f0
 		lwz	r0,144(r1)
@@ -4839,6 +4859,8 @@ EInt:		b	.FPUnav				#0
 
 		lwz	r0,52(r1)
 		mtcr	r0
+		lwz	r0,64(r1)
+		mtxer	r0
 		lwz	r0,48(r1)
 		lwz	r3,44(r1)
 		lwz	r4,40(r1)
@@ -4905,6 +4927,8 @@ EInt:		b	.FPUnav				#0
 .CEContinue:	mtsprg1	r3
 		lwz	r0,52(r1)
 		mtcr	r0
+		lwz	r0,64(r1)
+		mtxer	r0
 		lwz	r0,48(r1)
 		lwz	r3,44(r1)
 		lwz	r4,40(r1)
@@ -5090,6 +5114,7 @@ EInt:		b	.FPUnav				#0
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r9)
 
+.ddd:		b	.ddd
 		b	.TrySwitch			#Try to salvage the system
 
 #********************************************************************************************

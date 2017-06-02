@@ -39,7 +39,7 @@
 .set DOSBase,12
 .set MCPort,16
 .set Init,20					#Pointer
-.set PowerPCBase,24
+.set PowerPCBase,24				#All within first cacheline!
 
 .set AdListStart,64
 .set AdListEnd,68
@@ -237,8 +237,8 @@
 .set _LVOAllocVec,		-684
 .set _LVOFreeVec,		-690
 
-.set SysStack,			0x400000		#Length max $a0000
-.set IdleTask,			0x380000		#Address of idle task
+.set SysStack,			0x480000		#Length max $80000
+.set IdleTask,			0x400000		#Address of idle task
 
 .set MEMF_PUBLIC,		0x00000001
 .set MEMF_CHIP,			0x00000002
