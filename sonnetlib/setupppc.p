@@ -5114,7 +5114,6 @@ EInt:		b	.FPUnav				#0
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r9)
 
-.ddd:		b	.ddd
 		b	.TrySwitch			#Try to salvage the system
 
 #********************************************************************************************
