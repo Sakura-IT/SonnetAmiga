@@ -62,13 +62,7 @@ Currently the following options are supported through variables in ENVARC:sonnet
 
 # Bugs
 
-We're using GitHub Issues for bug tracking:
-https://github.com/Sakura-IT/SonnetAmiga/issues
-
-If you find any new bugs, please report them. Note that repository on GitHub
-is just a public mirror of CVS development repostiory. Therefore, if you are
-crazy enough to send patches, don't use GitHub Pull Requests, just make a
-unified diff and attach it to the issue. Or mail it.
+See CONTRIBUTING.md file.
 
 # Legal status
 
