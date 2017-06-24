@@ -286,7 +286,7 @@ FoundGfx	move.l d4,GfxMem-Buffer(a4)
 		move.l a2,SonAddr-Buffer(a4)
 		
 		bsr GetENVs
-		
+
 		move.l LExecBase(pc),a6
 		move.l #$20000,d0
 		move.l #MEMF_PUBLIC|MEMF_PPC,d1
@@ -496,7 +496,7 @@ PPCInit		move.l SonnetBase(pc),a1
 		swap d0
 		rol.w #8,d0
 		move.l d0,OTWR(a3)
-		add.b #$50,d0				;Translated to PPC PCI Memory
+		add.b #$60,d0				;Translated to PPC PCI Memory
 		move.l d0,OMBAR(a3)			;Is probably 0x60000000-0x80000000
 		
 		jsr _LVODisable(a6)
@@ -2585,7 +2585,7 @@ POWERDATATABLE:
 	INITLONG	LN_NAME,PowerName
 	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITWORD	LIB_VERSION,17
-	INITWORD	LIB_REVISION,6
+	INITWORD	LIB_REVISION,7
 	INITLONG	LIB_IDSTRING,PowerIDString
 	ds.l	1
 
@@ -2823,7 +2823,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.6 (27.5.17)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.7 (24.6.17)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		

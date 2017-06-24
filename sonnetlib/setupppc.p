@@ -134,19 +134,29 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 .NoMaxRam:	lis	r27,0x8000			#Upper boundary PCI Memory Mediator
 		lwz	r26,base_RTGBase(r29)		#Get gfx mem (RTGBase)
 		cmplw	r26,r27
-		blt	.ZorroX2			#Is Zorro3
+		blt	.CheckJumper			#Is Zorro3
 		lis	r27,0x9000			#Zorro2 plus 256MB ATI
 		cmplw	r26,r27
-		beq	.ZorroX
+		beq	.GotUpperLimit
 		lis	r27,0x9800			#Zorro2 plus 128MB (or less) ATI
-		b	.ZorroX
+		b	.GotUpperLimit
 		
-.ZorroX2:	rlwinm	r26,r26,4,28,30
+.CheckJumper:	rlwinm	r26,r26,4,28,31
 		cmpwi	r26,4		
-		bne	.ZorroX
+		bne	.NextCheck1
 		lis	r27,0x6000			#Config jumper closed
+		b	.GotUpperLimit
 		
-.ZorroX:	mr	r26,r8
+.NextCheck1:	cmpwi	r26,5
+		bne	.NextCheck2
+		lis 	r27,0x5000
+		b	.GotUpperLimit
+		
+.NextCheck2:	cmpwi	r26,7
+		bne	.GotUpperLimit
+		lis	r27,0x7000
+
+.GotUpperLimit:	mr	r26,r8
 
 		li	r28,17
 		mtctr	r28
@@ -895,17 +905,18 @@ mmuSetup:
 		lhz	r3,RTGType(r0)
 		cmpwi	r3,rtgtype_ati
 		bne	.DoInhibit
-		loadreg	r6,PTE_WRITE_THROUGH
-		b	.DoWT
+
+		lwz	r24,RTGBase(r0)
+		b	.No3DFX
 
 .DoInhibit:	loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED		
-.DoWT:		cmpwi	r3,rtgtype_voodoo45
-		lwz	r3,RTGBase(r0)			#32MB Video RAM (ATi) or Config (Avenger)
+		cmpwi	r3,rtgtype_voodoo45
+		lwz	r3,RTGBase(r0)			#Config (Avenger)
 		addis	r4,r3,0x200
 		bne	.Voodoo3
 		addis	r4,r4,0x600
 .Voodoo3:	mr	r24,r4
-		addis	r5,r3,0x5000
+		addis	r5,r3,0x6000
 		li	r7,PP_USER_RW
 
 		bl	.DoTBLs
@@ -919,7 +930,7 @@ mmuSetup:
 		lwz	r3,RTGBase(r0)			#32MB Video RAM (Napalm)
 		addis	r3,r3,0x800
 		addis	r4,r3,0x200
-		addis	r5,r3,0x5000
+		addis	r5,r3,0x6000
 
 		li	r17,BAT_READ_WRITE
 		li	r18,BAT_BL_32M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
@@ -944,7 +955,7 @@ mmuSetup:
 .Is3DFX:	lwz	r3,RTGBase(r0)			#32MB Video RAM (Avenger)
 		addis	r3,r3,0x200
 		addis	r4,r3,0x200
-		addis	r5,r3,0x5000
+		addis	r5,r3,0x6000
 		
 		li	r17,BAT_READ_WRITE
 		li	r18,BAT_BL_32M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
@@ -968,11 +979,32 @@ mmuSetup:
 		cmpwi	r3,rtgtype_ati
 		bne	.NoATI
 		
+		mr	r3,r24				#256MB Video RAM (ATI)
+		addis	r5,r3,0x6000
+
+		li	r17,BAT_READ_WRITE
+		li	r18,BAT_BL_256M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
+		li	r19,BAT_WRITE_THROUGH | BAT_READ_WRITE
+		li	r20,BAT_BL_256M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
+
+		or	r17,r17,r5
+		or	r18,r18,r3
+		or	r19,r19,r5
+		or	r20,r20,r3
+
+		mtspr	ibat1l,r17
+		mtspr	ibat1u,r18
+		mtspr	dbat1l,r19
+		mtspr	dbat1u,r20
+
+		sync
+		isync
+		
 		mr	r3,r24
-		addis	r5,r3,0x5000
+		addis	r5,r3,0x7000
 		mr	r4,r3
-		addis	r4,r4,0xe00			#256-32MB max Video RAM (ATI)
-		loadreg	r6,PTE_WRITE_THROUGH
+		addis	r4,r4,0x1			#64k config RAM (ATI)
+		loadreg	r6,PTE_CACHE_INHIBITED
 		li	r7,PP_USER_RW
 
 		bl	.DoTBLs		
@@ -1046,8 +1078,7 @@ mmuSetup:
 
 #********************************************************************************************	
 
-.SetupPT:	mflr	r22
-		mr	r23,r8				#Save sonnet memory size
+.SetupPT:	mr	r23,r8				#Save sonnet memory size
 		srwi	r6,r6,7				#Get pt_size
 		rlwinm.	r8,r6,20,12,31			#is pt_size >= 64 KB
 		bne	.Cont
@@ -1083,8 +1114,7 @@ mmuSetup:
 		
 .zero_out:	stwu	r8,4(r7)
 		bdnz	.zero_out
-		
-		mtlr	r22
+
 		blr
 		
 #********************************************************************************************		
