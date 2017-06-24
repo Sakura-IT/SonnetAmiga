@@ -314,7 +314,7 @@ GotVGAMem	add.l #$10000,d0
 		move.l #$0000F0FF,OMBAR(a3)		;Processor outbound mem at $FFF00000
 
 		move.l a2,d4
-EndDrty		move.l #$48002f00,(a5)			;PPC branch to code outside exception space (0x3000)
+		move.l #$48002f00,(a5)			;PPC branch to code outside exception space (0x3000)
 		lea $2f00(a5),a5
 		lea PPCCode(pc),a2
 		move.l #PPCLen,d6
@@ -798,12 +798,6 @@ NoXReply	move.l MN_IDENTIFIER(a1),d0
 		beq Crashed
 		bra.s GetLoop
 
-		move.l a1,a0
-		moveq.l #0,d1
-		move.w MN_LENGTH(a2),d1
-		moveq.l #CACHE_DCACHEFLUSH,d0
-		bsr SetCache68K
-
 ;********************************************************************************************		
 
 MsgRXMSG	move.l a1,a2
@@ -1269,7 +1263,7 @@ NoExp		rts
 Expunge:
 		tst.w LIB_OPENCNT(a6)
 ;		beq.s NotOpen
-		nop					;DEBUG Library should not be expunged due to fake powerpc stuff
+		nop					;DEBUG Library should not be expunged due to patches not being released
 		bset #LIBB_DELEXP,LIB_FLAGS(a6)
 		moveq.l #0,d0
 		rts
@@ -1318,8 +1312,10 @@ GetCPU:
 		beq.s G4
 		moveq.l #0,d0
 		bra.s ExCPU
+
 G3		move.l #CPUF_G3,d0
 		bra.s ExCPU
+
 G4		move.l #CPUF_G4,d0
 ExCPU		movem.l (a7)+,d1-a6
 		rts
