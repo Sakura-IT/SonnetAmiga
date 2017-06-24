@@ -1,7 +1,7 @@
 OBJ_GETINFO=getinfo.o
 GETINFO_EXE=getinfo
 
-OBJ_GETINFOPPC=getinfo_ppc.o template_68k.o
+OBJ_GETINFOPPC=template_68k.o getinfo_ppc.o
 GETINFOPPC_EXE=getinfo_ppc
 
 OBJ_TEMPLATE=template_68k.o template_ppc.o
