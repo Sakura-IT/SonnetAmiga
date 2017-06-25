@@ -278,6 +278,8 @@ NoATI		lea VGAError(pc),a2
 ATIs		dc.l	DEVICE_RV280PRO,DEVICE_RV280MOB,DEVICE_RV280SE,0		
 
 GotATI		move.l d0,a2
+		move.l PCI_SPACE2(a2),d4
+		move.l d4,GfxConfig-Buffer(a4)
 		move.l PCI_SPACE0(a2),d4
 
 FoundGfx	move.l d4,GfxMem-Buffer(a4)
@@ -329,9 +331,10 @@ loop2		move.l (a2)+,(a5)+			;Copy code to 0x3000
 		move.l #$abcdabcd,$300c(a1)		;Sonnet Mem Len
 		move.l GfxMem(pc),$3010(a1)
 		move.l GfxType(pc),$3014(a1)
-		move.l ENVOptions(pc),$3018(a1)
-		move.l ENVOptions+4(pc),$301c(a1)
-		move.l ENVOptions+8(pc),$3020(a1)
+		move.l GfxConfig(pc),$3018(a1)
+		move.l ENVOptions(pc),$301c(a1)
+		move.l ENVOptions+4(pc),$3020(a1)
+		move.l ENVOptions+8(pc),$3024(a1)
 
 		jsr _LVOCacheClearU(a6)
 
@@ -491,13 +494,14 @@ PPCInit		move.l SonnetBase(pc),a1
 		move.l GfxMem(pc),d0			;Amiga PCI Memory
 		move.l SonAddr(pc),a2
 		move.l PCI_SPACE1(a2),a3		;PCSRBAR Sonnet
-		or.b #27,d0				;256MB
+		or.b #28,d0				;512MB
 		rol.w #8,d0
 		swap d0
 		rol.w #8,d0
-		move.l d0,OTWR(a3)
+		and.b #$fe,d0
+		move.l d0,OTWR(a3)			;0x40000000 or 0x60000000
 		add.b #$60,d0				;Translated to PPC PCI Memory
-		move.l d0,OMBAR(a3)			;Is probably 0x60000000-0x80000000
+		move.l d0,OMBAR(a3)			;0xa0000000-0xc0000000
 		
 		jsr _LVODisable(a6)
 		
@@ -2552,6 +2556,7 @@ LExecBase		ds.l	1
 ROMMem			ds.l	1
 GfxMem			ds.l	1
 GfxType			ds.l	1
+GfxConfig		ds.l	1
 ComProc			ds.l	1
 SonAddr			ds.l	1
 EUMBAddr		ds.l	1

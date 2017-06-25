@@ -31,7 +31,8 @@
 .set	base_MemLen,8
 .set	base_RTGBase,12
 .set	base_RTGType,16
-.set	base_Options,20
+.set	base_RTGConfig,20
+.set	base_Options,24
 
 .set	rtgtype_ati,0x1002
 .set	rtgtype_voodoo3,0x121a
@@ -48,6 +49,7 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 .long		0					#MemLen
 .long		0					#RTGBase
 .long		0					#RTGType
+.long		0					#RTGConfig
 .long		0					#Options1
 .long		0					#Options2
 .long		0					#Options3
@@ -194,12 +196,7 @@ SetLen:		mr	r30,r28
 .Clear0:	stwu	r0,4(r3)
 		bdnz+	.Clear0				#Clear first part of zero page
 
-		lwz	r3,base_RTGBase(r29)		#RTGBase
-		stw	r3,RTGBase(r0)
-		lhz	r3,base_RTGType(r29)		#RTGType
-		sth	r3,RTGType(r0)		
 		stw	r8,MemSize(r0)		
-
 		stw	r27,base_MemStart(r29)		#MemStart
 		stw	r8,base_MemLen(r29)		#MemLen
 
@@ -902,16 +899,16 @@ mmuSetup:
 
 		bl	.DoTBLs
 
-		lhz	r3,RTGType(r0)
+		lhz	r3,base_RTGType(r29)
 		cmpwi	r3,rtgtype_ati
 		bne	.DoInhibit
 
-		lwz	r24,RTGBase(r0)
+		lwz	r24,base_RTGBase(r29)
 		b	.No3DFX
 
 .DoInhibit:	loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED		
-		cmpwi	r3,rtgtype_voodoo45
-		lwz	r3,RTGBase(r0)			#Config (Avenger)
+		cmpwi	r3,rtgtype_voodoo45		#Config (Avenger)
+		lwz	r3,base_RTGBase(r29)
 		addis	r4,r3,0x200
 		bne	.Voodoo3
 		addis	r4,r4,0x600
@@ -921,13 +918,13 @@ mmuSetup:
 
 		bl	.DoTBLs
 
-		lhz	r3,RTGType(r0)
+		lhz	r3,base_RTGType(r29)
 		cmpwi	r3,rtgtype_voodoo3
 		beq	.Is3DFX
 		cmpwi	r3,rtgtype_voodoo45
 		bne	.No3DFX
 
-		lwz	r3,RTGBase(r0)			#32MB Video RAM (Napalm)
+		lwz	r3,base_RTGBase(r29)		#32MB Video RAM (Napalm)
 		addis	r3,r3,0x800
 		addis	r4,r3,0x200
 		addis	r5,r3,0x6000
@@ -952,7 +949,7 @@ mmuSetup:
 
 		b	.No3DFX
 		
-.Is3DFX:	lwz	r3,RTGBase(r0)			#32MB Video RAM (Avenger)
+.Is3DFX:	lwz	r3,base_RTGBase(r29)		#32MB Video RAM (Avenger)
 		addis	r3,r3,0x200
 		addis	r4,r3,0x200
 		addis	r5,r3,0x6000
@@ -975,7 +972,7 @@ mmuSetup:
 		sync
 		isync
 
-.No3DFX:	lhz	r3,RTGType(r0)
+.No3DFX:	lhz	r3,base_RTGType(r29)
 		cmpwi	r3,rtgtype_ati
 		bne	.NoATI
 		
@@ -1000,10 +997,9 @@ mmuSetup:
 		sync
 		isync
 		
-		mr	r3,r24
-		addis	r5,r3,0x7000
-		mr	r4,r3
-		addis	r4,r4,0x1			#64k config RAM (ATI)
+		lwz	r3,base_RTGConfig(r29)
+		addis	r5,r3,0x6000
+		addis	r4,r3,0x1			#64k config RAM (ATI)
 		loadreg	r6,PTE_CACHE_INHIBITED
 		li	r7,PP_USER_RW
 

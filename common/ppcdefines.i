@@ -43,11 +43,9 @@
 
 .set AdListStart,64
 .set AdListEnd,68
-.set RTGType,72
-.set RTGBase,76
-.set RunPPCStart,80
-.set ViolationAddress,84			#Pointer
-.set MemSize,88
+.set RunPPCStart,72
+.set ViolationAddress,76			#Pointer
+.set MemSize,80
 
 .set option_EnEDOMem,0
 .set option_EnDebug,1
