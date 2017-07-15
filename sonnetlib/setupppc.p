@@ -975,14 +975,26 @@ mmuSetup:
 .No3DFX:	lhz	r3,base_RTGType(r29)
 		cmpwi	r3,rtgtype_ati
 		bne	.NoATI
-		
-		mr	r3,r24				#256MB Video RAM (ATI)
+
+		lwz	r3,base_RTGConfig(r29)
 		addis	r5,r3,0x6000
+		addis	r4,r3,0x1			#64k config RAM (ATI)
+		loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED
+		li	r7,PP_USER_RW
+
+		bl	.DoTBLs
+
+		lwz	r3,base_RTGConfig(r29)
+		rlwinm.	r0,r3,5,31,31			#Test for split memory
+		bne	.Split128
 
 		li	r17,BAT_READ_WRITE
 		li	r18,BAT_BL_256M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
 		li	r19,BAT_WRITE_THROUGH | BAT_READ_WRITE
 		li	r20,BAT_BL_256M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
+
+.ReUseSetup:	mr	r3,r24				#256MB (or 2x128MB) Video RAM (ATI)
+		addis	r5,r3,0x6000
 
 		or	r17,r17,r5
 		or	r18,r18,r3
@@ -996,14 +1008,15 @@ mmuSetup:
 
 		sync
 		isync
-		
-		lwz	r3,base_RTGConfig(r29)
-		addis	r5,r3,0x6000
-		addis	r4,r3,0x1			#64k config RAM (ATI)
-		loadreg	r6,PTE_CACHE_INHIBITED
-		li	r7,PP_USER_RW
 
-		bl	.DoTBLs		
+		b	.NoATI
+
+.Split128:	li	r17,BAT_READ_WRITE
+		li	r18,BAT_BL_128M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
+		li	r19,BAT_WRITE_THROUGH | BAT_READ_WRITE
+		li	r20,BAT_BL_128M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
+
+		b	.ReUseSetup			#NEED TO SETUP 2nd 128MB STILL WHEN APPLICABLE
 
 .NoATI:		li	r3,0				#First 2MB cached - user protected - Directs to CHIP
 		mr	r5,r3
