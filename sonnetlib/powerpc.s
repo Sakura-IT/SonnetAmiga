@@ -1565,10 +1565,18 @@ NewOldLoadSeg	move.l LoadSegAddress(pc),-(a7)
 
 Loader		movem.l d2-a6,-(a7)
 		move.l d1,d5
+		move.l a6,-(a7)
+		move.l LExecBase(pc),a6
+		move.l ThisTask(a6),a3
+		move.l (a7)+,a6
+		move.l LN_NAME(a3),a3
+		cmp.l #"DefI",(a3)				;Dirty DefIcons Fix
+		beq NoInternal
+
 		move.l #MODE_OLDFILE,d2
 		jsr _LVOOpen(a6)
 		move.l d0,d4
-		beq ExitSeg
+		beq NoInternal
 
 		moveq.l #0,d2
 		moveq.l #DOS_FIB,d1
