@@ -738,8 +738,6 @@ ClearInts:	lwz	r27,0xa0(r26)			#IACKR
 #********************************************************************************************
 
 Caches:				
-#		blr					#REMOVE ME FOR L1 CACHE
-
 		mfspr	r4,HID0
 		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
 		sync
@@ -988,6 +986,8 @@ mmuSetup:
 		rlwinm.	r0,r3,5,31,31			#Test for split memory
 		bne	.Split128
 
+		stw	r3,0xa0(r0)
+		
 		li	r17,BAT_READ_WRITE
 		li	r18,BAT_BL_256M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
 		li	r19,BAT_WRITE_THROUGH | BAT_READ_WRITE
