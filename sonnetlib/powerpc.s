@@ -1564,11 +1564,10 @@ NoFast		move.l AllocMemAddress(pc),-(a7)
 NewOldLoadSeg	move.l LoadSegAddress(pc),-(a7)
 
 Loader		movem.l d2-a6,-(a7)
+
 		move.l d1,d5
-		move.l a6,-(a7)
-		move.l LExecBase(pc),a6
-		move.l ThisTask(a6),a3
-		move.l (a7)+,a6
+		move.l LExecBase(pc),a3
+		move.l ThisTask(a3),a3
 		move.l LN_NAME(a3),a3
 		cmp.l #"DefI",(a3)				;Dirty DefIcons Fix
 		beq NoInternal
@@ -1576,7 +1575,7 @@ Loader		movem.l d2-a6,-(a7)
 		move.l #MODE_OLDFILE,d2
 		jsr _LVOOpen(a6)
 		move.l d0,d4
-		beq NoInternal
+		beq ExitSeg
 
 		moveq.l #0,d2
 		moveq.l #DOS_FIB,d1
@@ -2836,7 +2835,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.7 (24.6.17)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.7 (12.8.17)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
