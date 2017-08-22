@@ -713,7 +713,11 @@ NoEnPageSetup	lea EnDAccessExc(pc),a1
 		bsr DoENV
 		bmi.s NoEnDAccessExc
 		move.b (a3),6(a5)
-NoEnDAccessExc	lea DisHunkPatch(pc),a1
+NoEnDAccessExc	lea SetCMemDiv(pc),a1
+		bsr DoENV
+		bmi.s NoSetCMemDiv
+		move.b (a3),7(a5)
+NoSetCMemDiv	lea DisHunkPatch(pc),a1
 		bsr DoENV
 		bmi.s NoDisHunkPatch
 		lea Options68K(pc),a5
@@ -730,7 +734,7 @@ DoENV		move.l a1,d1
 		tst.l d0
 		bpl.s GotENV
 		move.b #0,(a3)
-GotENV		and.b #$03,(a3)
+GotENV		and.b #$07,(a3)
 		tst.l d0
 		rts
 
@@ -2870,6 +2874,7 @@ DisL2Flush	dc.b	"sonnet/DisL2Flush",0			;4
 EnPageSetup	dc.b	"sonnet/EnPageSetup",0			;5
 EnDAccessExc	dc.b	"sonnet/EnDAccessExc",0			;6
 DisHunkPatch	dc.b	"sonnet/DisHunkPatch",0			;7
+SetCMemDiv	dc.b	"sonnet/SetCMemDiv",0			;8
 
 		cnop	0,4
 		

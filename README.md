@@ -50,7 +50,7 @@ The included library **IS NOT COMPATIBLE** with the powerpc.library from the War
 Currently the following options are supported through variables in ENVARC:sonnet
 
 - EnEDOMem (0 or 1): Enable if you have EDO RAM installed. Default = 0.
-- Debug (0-3): set the level of debug messages. 0 = no messages (default).
+- Debug (0-3): Set the level of debug messages. 0 = no messages (default).
 - EnAlignExc (0 or 1): Enable the Alignment Exception (or in other words disable
   the unaligned access emulation). Default = 0.
 - DisL2Cache (0 or 1): Disable the L2 cache. Default = 0.
@@ -59,6 +59,10 @@ Currently the following options are supported through variables in ENVARC:sonnet
 - EnDAccessExc: See EnAlignExc, but now for the Data Access Exception (DSI).
 - DisHunkPatch (0 or 1): Disable automatic pushing first code hunk to FAST RAM.
   Default = 0.
+- SetCMemDiv (0-5): Sets the speed divider of the L2 Cache memory.
+  5 = 3, 4 = 2.5, 3 = 2, 2 = 1.5, 1 = 1, 0 = Handled by library. Default = 0.
+  For example: A Sonnet with speed 500 MHz and setting 5 will run the L2 cache
+  at 166 MHz (500/3). **USE AT OWN RISK!!!**
 
 # Bugs
 

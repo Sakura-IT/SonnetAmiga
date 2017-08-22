@@ -54,6 +54,7 @@
 .set option_DisL2Flush,4
 .set option_EnPageSetup,5
 .set option_EnDAccessExc,6
+.set option_SetCMemDiv,7
 
 #LibBase:					All this stuff is PPC only! No access allowed from 68k!
 

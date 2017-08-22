@@ -745,14 +745,13 @@ Caches:
 		sync
 		 
 		la	r4,base_Options(r29)
+		mr	r11,r4
 		lbz	r5,option_DisL2Cache(r4)
 		mr.	r5,r5
 		li	r30,0
 		bne	.L2SizeDone
 
-#		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS|L2CR_DO
-		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS
-		
+		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS		
 		mtl2cr	r4				# Set up on chip L2 cache controller.
 		sync
 		
@@ -846,7 +845,30 @@ Wait2:		mfl2cr	r3
 		
 .GotMHz:	lwz	r9,4(r6)
 .StoreSpeed:	stw	r9,sonnet_CPUSpeed(r4)
+		lbz	r8,option_SetCMemDiv(r11)
+		mr.	r8,r8
+		beq	.DoDefSpeed
 
+		cmpwi	r8,5
+		beq	.DefL2Speed
+		
+		cmpwi	r8,4
+		lis	r12,L2CR_L2CLK_2_5@h
+		beq	.DoSpeed2
+		
+		cmpwi	r8,3
+		lis	r12,L2CR_L2CLK_2@h
+		beq	.DoSpeed2
+		
+		cmpwi	r8,2
+		lis	r12,L2CR_L2CLK_1_5@h
+		beq	.DoSpeed2
+
+		lis	r12,L2CR_L2CLK_1@h
+		cmpwi	r8,1
+		beq	.DoSpeed2
+
+.DoDefSpeed:	lis	r12,L2CR_L2CLK_2@h
 		loadreg	r8,400000000
 		cmpw	r8,r9
 		bne	.DefL2Speed
@@ -855,9 +877,9 @@ Wait2:		mfl2cr	r3
 		cmpw	r8,r7
 		bne	.DefL2Speed
 		
-		mfl2cr	r4
+.DoSpeed2:	mfl2cr	r4
 		xoris	r4,r4,L2CR_L2CLK_3@h
-		oris	r4,r4,L2CR_L2CLK_2@h
+		or	r4,r4,r12
 		mtl2cr	r4
 		sync
 		isync
