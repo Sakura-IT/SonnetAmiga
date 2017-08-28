@@ -1568,7 +1568,6 @@ NoFast		move.l AllocMemAddress(pc),-(a7)
 NewOldLoadSeg	move.l LoadSegAddress(pc),-(a7)
 
 Loader		movem.l d2-a6,-(a7)
-
 		move.l d1,d5
 		move.l LExecBase(pc),a3
 		move.l ThisTask(a3),a3
@@ -2244,15 +2243,27 @@ AllocVec32:
 		move.l a6,-(a7)
 		add.l #$38,d0
 		move.l LExecBase(pc),a6
+		lea Options68K(pc),a0
+		tst.b (a0)
+		bne.s NoHunkPatch2
+
+		move.l ThisTask(a6),a0
+		bclr #TB_PPC,TC_FLAGS(a0)
 		cmp.l #MEMF_PUBLIC|MEMF_FAST,d1
 		beq.s DoNormMem						;force marked hunks into Amiga mem
 		cmp.l #MEMF_PUBLIC|MEMF_CHIP,d1
 		beq.s DoNormMem
-		and.l #MEMF_CLEAR,d1
-		or.l #MEMF_PUBLIC|MEMF_PPC,d1					;attributes are FIXED to Sonnet mem
+		bset #TB_PPC,TC_FLAGS(a0)
+
+NoHunkPatch2	and.l #MEMF_CLEAR,d1
+		or.l #MEMF_PUBLIC|MEMF_PPC,d1				;attributes are FIXED to Sonnet mem
+
 DoNormMem	jsr _LVOAllocVec(a6)
+		move.l ThisTask(a6),a0
+		bset #TB_PPC,TC_FLAGS(a0)
 		move.l d0,d1
 		beq.s MemErr
+
 		add.l #$27,d0
 		and.l #$ffffffe0,d0
 		move.l d0,a0
@@ -2839,7 +2850,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.7 (12.8.17)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.7 (28.8.17)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
