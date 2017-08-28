@@ -1498,18 +1498,15 @@ Best		movem.l d6-d7/a2-a3,-(a7)
 		moveq.l #1,d6
 		bset #TB_PPC,TC_FLAGS(a3)
 		bra GoCheck					;bra DoBit
-		
+
 NotAPPCMemTask	moveq.l #0,d6
-		btst #TB_PPC,TC_FLAGS(a3)			;Check if task was tagged by sonnet.library
-		bne DoBit					;If yes, then redirect to PPC memory
-				
 GoCheck		cmp.b #NT_PROCESS,LN_TYPE(a3)			;Is it a DOS process?
 		bne.s IsTask
 		move.l pr_CLI(a3),d7				;Was this task started by CLI?
 		bne.s IsHell					;If yes, go there
 		
 IsTask		move.l LN_NAME(a3),d7				;Has the task a name?
-		beq.s NoBit					;If no then exit
+		beq NoBit					;If no then exit
 		move.l d7,a2
 
 FindEnd		move.b (a2)+,d7
@@ -1525,12 +1522,14 @@ Checkers	cmp.l #"2005",d7				;Task has name with 2005 at end?
 		beq.s DoBit
 		cmp.l #"sk_1",d7
 		beq.s DoBit
-		tst.l d6
+		cmp.l #"peed",d7
 		beq.s NoBit
+		tst.l d6
+		beq.s NotPPCTask
 		cmp.l #".exe",d7
 		beq.s FreeBit
-		btst #TB_PPC,TC_FLAGS(a3)
-ToSpace		bne.s DoBit
+NotPPCTask	btst #TB_PPC,TC_FLAGS(a3)			;Check if task was tagged by sonnet.library
+ToSpace		bne.s DoBit					;If yes, then redirect to PPC memory
 		bra.s NoBit
 
 FreeBit		move.l -9(a2),d7				;Checking for FreeSpace
