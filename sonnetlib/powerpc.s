@@ -1689,11 +1689,23 @@ InternalRead	jsr _LVORead(a6)
 		sub.l d1,d0
 		subq.l #1,d0
 		bne.s NoHunkPatch
-		btst #6,20(a2)
+		cmp.l #$71E,20(a2)
+		beq.s TestCyber1
+		cmp.l #$84E,20(a2)
+		beq.s TestCyber2
+		
+NoCyber		btst #6,20(a2)
 		bne.s NoHunkPatch
 		bset #7,20(a2)
 NoHunkPatch	movem.l (a7)+,d0-a6
 		rts
+
+TestCyber1	cmp.l #$710,24(a2)		;Exceptions to moving hunks to FastRAM (dirty)
+Testing		beq.s NoHunkPatch
+		bra.s NoCyber
+
+TestCyber2	cmp.l #$EE,24(a2)
+		bra.s Testing
 
 ;********************************************************************************************
 ;
