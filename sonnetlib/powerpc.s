@@ -727,6 +727,7 @@ NoDisHunkPatch	rts
 DoENV		move.l a1,d1
 		lea ENVBuff(pc),a1
 		move.l a1,a3
+		move.b #0,(a3)
 		move.l a1,d2
 		moveq.l #4,d3
 		move.l #GVF_GLOBAL_ONLY,d4

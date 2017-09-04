@@ -880,18 +880,16 @@ Wait2:		mfl2cr	r3
 .DoSpeed2:	mfl2cr	r4
 		xoris	r4,r4,L2CR_L2CLK_3@h
 		or	r4,r4,r12
-		mtl2cr	r4
-		sync
-		isync
+		b	.DoRestL2
 
-.DefL2Speed:	mtlr	r10
-		
-		mfl2cr	r4
-		xoris	r4,r4,L2CR_SIZE_1MB|L2CR_TS_OFF
+.DefL2Speed:	mfl2cr	r4
+.DoRestL2:	xoris	r4,r4,L2CR_SIZE_1MB|L2CR_TS_OFF
 		or	r4,r4,r7		
 		mtl2cr	r4				#Set correct size and switch Test off
 		sync
 		isync
+		
+		mtlr	r10
 		
 		blr
 
@@ -1824,6 +1822,10 @@ loc_4184:
 		setpcireg MEEAR2			#9C
 		mr	r25,r19
 		bl	ConfigWrite32
+
+		setpcireg PGMAX				#A3
+		li	r25,0x32
+		bl	ConfigWrite8
 
 		setpcireg MBEN				#A0
 		mr	r25,r14
