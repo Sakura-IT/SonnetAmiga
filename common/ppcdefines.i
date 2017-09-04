@@ -434,6 +434,7 @@
 .set MEEAR1,0x98		#Memory Extended End Address Register 1
 .set MEEAR2,0x9C		#Memory Extended End Address Register 2
 .set MBEN,0xA0			#Memory Bank Enable
+.set PGMAX,0xA3
 
 .set IFHPR,0x120		#Inbound Free_FIFO Head Pointer Register
 .set IFTPR,0x128		#Inbound Free_FIFO Tail Pointer Register
