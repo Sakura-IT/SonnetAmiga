@@ -1026,22 +1026,16 @@ AllocVec68K:	prolog 228,'TOC'
 		andc	r5,r5,r30
 		ori	r5,r5,MEMF_PPC
 
-		addi	r8,r4,0x38					#d0
+		mr	r8,r4						#d0
 		mr	r9,r5						#d1
-		lwz	r4,sonnet_SysBase(r29)
-		li	r5,_LVOAllocVec
 		mr	r3,r29
+		mr	r4,r29
+		li	r5,_LVOAllocVec32
 			
 		bl Run68KLowLevel
 										
 		mr.	r4,r3
 		beq	.AllocErr
-
-		addi	r3,r3,0x27
-		loadreg	r5,-32
-		and.	r3,r3,r5
-		
-		stw	r4,-4(r3)
 		
 		li	r4,CACHE_DCACHEINV
 		mr	r5,r3
@@ -1072,9 +1066,9 @@ FreeVec68K:	prolog 228,'TOC'
 
 		stwu	r7,-4(r13)
 
-		lwz	r7,-4(r4)					#a1
-		lwz	r4,sonnet_SysBase(r3)
-		li	r5,_LVOFreeVec
+		mr	r7,r4
+		mr	r4,r3
+		li	r5,_LVOFreeVec32
 
 		bl Run68KLowLevel
 
@@ -5897,7 +5891,7 @@ SetExceptPPC:
 EndTaskPPC:
 		bl Super
 		
-		lwz	r31,PowerPCBase(r0)		#zero page will be soon privileged
+		lwz	r31,PowerPCBase(r0)		#zero page is privileged
 		mr	r4,r3
 		
 		bl User
@@ -9476,7 +9470,7 @@ StartSystem:	blr							#Dummy function
 
 .GoToWait:	mr	r3,r31
 		li	r4,0
-		lis	r5,0x1e					#slight less than 2s
+		lis	r5,0x4c					#slight less than 5s
 
 		bl WaitTime
 
@@ -9500,25 +9494,32 @@ StartSystem:	blr							#Dummy function
 		bl DeletePoolPPC
 
 		b	.NextTaskPool
-		
+
 .CheckMemEntry:	la	r4,TC_MEMENTRY(r30)
 
 		bl RemHeadPPC
-		
+
 		mr.	r29,r3
-		beq	.NextRemTask
-		
+		beq	.RemoveTaskMem
+
 		lwz	r4,ML_SIZE+ME_ADDR(r29)
 		mr	r3,r31
-		
+
 		bl FreeVec68K
 
 		mr	r4,r29
 		mr	r3,r31
-		
+
 		bl FreeVec68K
-		
+
 		b	.CheckMemEntry
+
+.RemoveTaskMem:	mr	r3,r31
+		mr	r4,r30
+
+		bl FreeVec68K
+
+		b	.NextRemTask
 
 #********************************************************************************************
 #
