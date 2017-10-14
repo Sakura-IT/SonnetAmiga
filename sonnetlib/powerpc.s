@@ -1569,6 +1569,7 @@ NewOldLoadSeg	move.l LoadSegAddress(pc),-(a7)
 
 Loader		movem.l d2-a6,-(a7)
 		move.l d1,d5
+		beq NoInternal
 		move.l LExecBase(pc),a3
 		move.l ThisTask(a3),a3
 		move.l LN_NAME(a3),a3
@@ -1602,7 +1603,7 @@ Loader		movem.l d2-a6,-(a7)
 		and.b #3,d3
 		beq.s DoInternalSeg		;Not marked at all
 		cmp.b #2,d3
-		beq.s DoNormalSeg		;Marked normal file
+		beq DoNormalSeg			;Marked normal file
 
 DoInternalSeg	sub.l a0,a0
 		pea FreeVec32(pc)
@@ -1618,14 +1619,22 @@ DoInternalSeg	sub.l a0,a0
 		jsr _LVOInternalLoadSeg(a6)
 
 		lea 16(a7),a7
-		move.l d0,d7		
+		move.l d0,d7
+		bmi.s UhOhverlay
+				
 CloseError	move.l d4,d1
 		jsr _LVOClose(a6)
 		
 		move.l d7,d0
 		move.l d7,d1
+		beq ExitSeg			;There was no seglist returned
+		bra.s IsNormalSeg
 
-		move.l d6,d3
+UhOhverlay	move.l d7,d1
+		neg.l d1
+		bra.s DontDoOverlay		;Overlay files are not supported at the moment
+
+IsNormalSeg	move.l d6,d3
 		and.b #3,d3
 		bne.s ExitSeg			;Marked PPC file. No need to search.
 
@@ -1654,7 +1663,7 @@ NextName	subq.l #1,d2
 EndSeg		move.l (a1),d2
 		bne NextSeg
 
-		jsr _LVOUnLoadSeg(a6)
+DontDoOverlay	jsr _LVOUnLoadSeg(a6)
 DoNormalSeg	move.l LExecBase(pc),a1
 		move.l ThisTask(a1),a1
 		bclr #TB_PPC,TC_FLAGS(a1)	;clear bit
@@ -2862,7 +2871,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.7 (13.10.17)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.7 (14.10.17)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
