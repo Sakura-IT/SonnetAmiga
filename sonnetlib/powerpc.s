@@ -777,7 +777,7 @@ GetLoop		move.l d6,a0
 		bne.s CheckMsg
 		
 		move.l d6,a0
-		clr.l MP_MSGLIST+MLH_TAIL(a0)				;SoftCinema bug/quirk?
+		clr.l MP_MSGLIST+MLH_TAIL(a0)		;SoftCinema bug/quirk?
 		bra.s NextMsg
 							
 CheckMsg	move.l d0,a1	
@@ -1605,15 +1605,15 @@ Loader		movem.l d2-a6,-(a7)
 		cmp.b #2,d3
 		beq DoNormalSeg			;Marked normal file
 
-DoInternalSeg	sub.l a0,a0
-		pea FreeVec32(pc)
-		pea AllocVec32(pc)
+DoInternalSeg	move.l LExecBase(pc),a3
+		sub.l a0,a0
+		pea _LVOFreeMem(a3)
+		pea AllocFunc(pc)
 		pea InternalRead(pc)
 		move.l a7,a1
 		clr.l -(a7)
 		move.l a7,a2
 		move.l d4,d0		
-		move.l LExecBase(pc),a3
 		move.l ThisTask(a3),a3
 		bset #TB_PPC,TC_FLAGS(a3)	;set bit				
 		jsr _LVOInternalLoadSeg(a6)
@@ -1682,6 +1682,8 @@ ExitSeg		movem.l (a7)+,d2-a6
 NoInternal	movem.l (a7)+,d2-a6
 		rts
 
+;**********************************************
+
 InternalRead	jsr _LVORead(a6)
 		movem.l d0-a6,-(a7)
 		move.b Options68K(pc),d0
@@ -1715,6 +1717,28 @@ Testing		beq.s NoHunkPatch
 
 TestCyber2	cmp.l #$EE,24(a2)
 		bra.s Testing
+
+;**********************************************
+
+AllocFunc:	lea Options68K(pc),a0			;InternalLoadSeg() Memory allocation function
+		tst.b (a0)
+		bne.s NoHunkPatch2
+
+		move.l ThisTask(a6),a0
+		bclr #TB_PPC,TC_FLAGS(a0)
+		cmp.l #MEMF_PUBLIC|MEMF_FAST,d1
+		beq.s DoNormMem				;force marked hunks into Amiga mem
+		cmp.l #MEMF_PUBLIC|MEMF_CHIP,d1
+		beq.s DoNormMem
+		bset #TB_PPC,TC_FLAGS(a0)
+
+NoHunkPatch2	and.l #MEMF_CLEAR,d1
+		or.l #MEMF_PUBLIC|MEMF_PPC,d1		;attributes are FIXED to Sonnet mem
+
+DoNormMem	jsr _LVOAllocMem(a6)
+		move.l ThisTask(a6),a0
+		bset #TB_PPC,TC_FLAGS(a0)
+		rts
 
 ;********************************************************************************************
 ;
@@ -1995,8 +2019,8 @@ DidAsync	moveq.l #0,d0
 Stacker		move.l ThisTask(a6),a1
 		cmp.b #0,LN_PRI(a1)
 		blt.s NoAdjustPri
-		move.b #0,LN_PRI(a1)				;Kludge to prevent high pri stuff blocking
-								;the system like Heretic II.
+		move.b #0,LN_PRI(a1)			;Kludge to prevent high pri stuff blocking
+							;the system like Heretic II.
 NoAdjustPri	move.l TC_SIGALLOC(a1),d0		
 		and.l #$fffff000,d0
 		
@@ -2264,22 +2288,11 @@ AllocVec32:
 		move.l a6,-(a7)
 		add.l #$38,d0
 		move.l LExecBase(pc),a6
-		lea Options68K(pc),a0
-		tst.b (a0)
-		bne.s NoHunkPatch2
 
-		move.l ThisTask(a6),a0
-		bclr #TB_PPC,TC_FLAGS(a0)
-		cmp.l #MEMF_PUBLIC|MEMF_FAST,d1
-		beq.s DoNormMem						;force marked hunks into Amiga mem
-		cmp.l #MEMF_PUBLIC|MEMF_CHIP,d1
-		beq.s DoNormMem
-		bset #TB_PPC,TC_FLAGS(a0)
+		and.l #MEMF_CLEAR,d1
+		or.l #MEMF_PUBLIC|MEMF_PPC,d1		;attributes are FIXED to Sonnet mem
 
-NoHunkPatch2	and.l #MEMF_CLEAR,d1
-		or.l #MEMF_PUBLIC|MEMF_PPC,d1				;attributes are FIXED to Sonnet mem
-
-DoNormMem	jsr _LVOAllocVec(a6)
+		jsr _LVOAllocVec(a6)
 		move.l ThisTask(a6),a0
 		bset #TB_PPC,TC_FLAGS(a0)
 		move.l d0,d1
@@ -2633,7 +2646,7 @@ POWERDATATABLE:
 	INITLONG	LN_NAME,PowerName
 	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITWORD	LIB_VERSION,17
-	INITWORD	LIB_REVISION,7
+	INITWORD	LIB_REVISION,8
 	INITLONG	LIB_IDSTRING,PowerIDString
 	ds.l	1
 
@@ -2871,7 +2884,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.7 (14.10.17)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.8 (04.11.17)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
