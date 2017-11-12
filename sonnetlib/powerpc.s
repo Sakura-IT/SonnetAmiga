@@ -219,7 +219,7 @@ FndPCI		jsr _LVODisable(a6)
 		lea MemList(a6),a0
 		move.l d7,a1
 		jsr _LVOAddTail(a6)			;Move gfx memory to back to prevent
-		jsr _LVOEnable(a6)			;mem list corruption if LE
+		jsr _LVOEnable(a6)			;mem list corruption if LE screenmode switch
 
 		move.l PCIBase(pc),d0
 		bra.s CheckVGA
@@ -456,7 +456,14 @@ GotLibMade	move.l SonnetBase(pc),a1
 		moveq.l #124,d0
 		moveq.l #0,d1
 		jsr _LVOMakeLibrary(a6)
-		move.l d0,a1
+		
+		tst.l d0
+		bne.s GotWarp
+		
+		lea NoWarpLibError(pc),a2
+		bra PrintError
+		
+GotWarp		move.l d0,a1
 		jsr _LVOAddLibrary(a6)
 
 		lea MyInterrupt(pc),a1
@@ -483,13 +490,28 @@ GotLibMade	move.l SonnetBase(pc),a1
 		move.l DosBase(pc),a6
 		jsr _LVOCreateNewProc(a6)		;Start up Master Control
 							;It will start phase 2 of PPC setup
+		move.l d0,d7
+
 		move.l LExecBase(pc),a6
 		jsr _LVOEnable(a6)
 
-PPCInit		move.l SonnetBase(pc),a1
+		tst.l d7
+		bne.s PPCInit
+
+		lea MasterError(pc),a2
+		bra PrintError
+
+PPCInit		move.l	#$EC0000,d7			;Simple Time-out timer		
+DoTimer		subq.l #1,d7
+		bne.s ContTimer
+
+		lea PPCCrash(pc),a2
+		bra PrintError
+		
+ContTimer	move.l SonnetBase(pc),a1
 		move.l Init(a1),d0
 		cmp.l #"REDY",d0			;Phase 2 of PPC setup completed?
-		bne.s PPCInit
+		bne.s DoTimer
 
 		move.l GfxMem(pc),d0			;Amiga PCI Memory
 		move.l SonAddr(pc),a2
@@ -572,16 +594,32 @@ PPCInit		move.l SonnetBase(pc),a1
 		move.l a6,20(a0)
 		bsr CreatePPCTask
 
-		move.l LExecBase(pc),a6
-		moveq.l #0,d0
+		tst.l d0
+		bne.s GotPPCControl
+		
+		lea PPCTaskError(pc),a2
+		bra PrintError
+
+GotPPCControl	move.l LExecBase(pc),a6
+		moveq.l #46,d0
 		lea ppclib(pc),a1
 		jsr _LVOOpenLibrary(a6)			;Open ppc.library for LoadSeg() patch
+
+		tst.l d0
+		beq Clean
+
+		move.l d0,a2
+		move.w LIB_REVISION(a2),d0
+		cmp.w #41,d0				;everything before 46.41 is probably P5. 
+		bge Clean
 		
-		bra Clean
+		lea LDOSError(pc),a2
 
 ;********************************************************************************************
 
 PrintError	bsr.s PrintError2
+		moveq.l #0,d0
+		move.l d0,_PowerPCBase(pc)
 		bra Clean
 
 PrintError2	move.l LExecBase(pc),a6			;Put up a requester and give out
@@ -589,8 +627,11 @@ PrintError2	move.l LExecBase(pc),a6			;Put up a requester and give out
 		moveq.l #33,d0
 		jsr _LVOOpenLibrary(a6)
 		tst.l d0
-		beq Clean
-		move.l d0,a6
+		bne.s DoPrErr
+		move.l #$84010000,d7			;Halt the system
+		jmp _LVOAlert(a6)
+
+DoPrErr		move.l d0,a6
 		lea PowerName(pc),a0
 		lea Requester(pc),a1
 		move.l a0,8(a1)
@@ -2135,7 +2176,7 @@ NoFPU3		move.l a1,a5
 		lea 24(a0),a0				;See above about offset
 		move.l PP_STACKSIZE(a5),d0
 		addq.l #3,d0
-		and.l #$fffffffc,d0			;Make is 4 aligned
+		and.l #$fffffffc,d0			;Make it 4 aligned
 		move.l a7,a1
 		sub.l d0,a1
 		move.l a1,a7
@@ -2593,7 +2634,6 @@ DoStackMagic	move.l d6,d0
 		move.l d0,pr_StackBase(a3)
 		move.l d6,pr_StackSize(a3)
 NotAProc	move.l d3,a7				;Set new stack pointer
-;		jsr _LVOCacheClearU(a6)
 PatchError	rts
 
 ;********************************************************************************************
@@ -2884,7 +2924,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.8 (04.11.17)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.8 (12.11.17)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
@@ -2900,6 +2940,7 @@ MemVGAError	dc.b	"Could not allocate VGA memory",0
 PPCMMUError	dc.b	"Error during MMU setup of PPC",0
 GenMemError	dc.b	"General memory allocation error",0
 LSetupError	dc.b	"Error during library function setup",0
+NoWarpLibError	dc.b	"Could not set up fake warp.library",0
 SonnetMemError	dc.b	"No memory detected on the Sonnet card",0
 SonnetUnstable	dc.b	"Memory corruption detected during setup",0
 PPCCrash	dc.b	"PowerPC CPU possibly crashed during setup",0
@@ -2907,6 +2948,9 @@ NoPPCFound	dc.b	"PowerPC CPU not responding",0
 StackRunError	dc.b	"RunPPC Stack transfer error",0
 MedWindowJ	dc.b	"Mediator WindowSize jumper incorrectly configured",0
 IllegalMsg	dc.b	"Illegal message received by MasterControl",0
+WrongPPCLib	dc.b	"Phase 5 ppc.library detected. Please remove it",0
+MasterError	dc.b	"Error setting up 68K MasterControl process",0
+PPCTaskError	dc.b	"Error setting up Kryten PPC process",0
 
 ConWindow	dc.b	"CON:0/20/680/250/Sonnet - PowerPC Exception/AUTO/CLOSE/WAIT/"
 		dc.b	"INACTIVE",0		
