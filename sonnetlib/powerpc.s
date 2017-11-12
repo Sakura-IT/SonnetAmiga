@@ -619,7 +619,7 @@ GotPPCControl	move.l LExecBase(pc),a6
 
 PrintError	bsr.s PrintError2
 		moveq.l #0,d0
-		move.l d0,_PowerPCBase(pc)
+		move.l d0,_PowerPCBase-Buffer(a4)
 		bra Clean
 
 PrintError2	move.l LExecBase(pc),a6			;Put up a requester and give out
