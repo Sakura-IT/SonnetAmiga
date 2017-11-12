@@ -613,7 +613,7 @@ GotPPCControl	move.l LExecBase(pc),a6
 		cmp.w #41,d0				;everything before 46.41 is probably P5. 
 		bge Clean
 		
-		lea LDOSError(pc),a2
+		lea WrongPPCLib(pc),a2
 
 ;********************************************************************************************
 
