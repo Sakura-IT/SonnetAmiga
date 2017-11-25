@@ -150,8 +150,8 @@
 .set sonnet_ExceptionBATs,1184
 .set sonnet_StoredBATs,1248
 .set sonnet_SystemBATs,1312
-
-.set sonnet_PosSize,1376			#Library PosSize
+.set sonnet_ErrorStrings,1376
+.set sonnet_PosSize,1380			#Library PosSize
 
 .set EXCDATA_TYPE,8				#Always NT_INTERRUPT
 .set EXCDATA_PRI,9				#This
@@ -197,11 +197,10 @@
 .set BASE_STOREBAT1,sonnet_StoredBATs+16
 .set BASE_STOREBAT2,sonnet_StoredBATs+32
 .set BASE_STOREBAT3,sonnet_StoredBATs+48
+.set BASE_INVALBATS,sonnet_SystemBATs
 
 .set CHMMU_STANDARD,1
 .set CHMMU_BAT,2
-
-.set BASE_INVALBATS,546
 
 .set CONTEXT_CODE,		0
 .set CONTEXT_SRR1,		4
@@ -221,7 +220,7 @@
 .set CONTEXT_R9,		60
 .set CONTEXT_R10,		64
 .set CONTEXT_FREGS,		152		#256 bytes long
-.set CONTEXT_BATS,		412		#64 bytes long
+.set CONTEXT_BATS,		416		#64 bytes long
 .set CONTEXT_SEGMENTS,		480		#64 bytes long		
 .set CONTEXT_LENGTH,		1076		#544		#End of context
 
@@ -346,7 +345,6 @@
 .set FPF_ENABLEALL,		0x0000001f		#enable all FP exceptions
 .set FPF_DISABLEALL,		0x000003e0		#disable all FP exceptions
 
-.set SDR1,25
 .set VRSAVE,256
 .set IABR,1010
 .set DABR,1013
@@ -774,7 +772,8 @@
 .set TASKPPC_ALLTASK,1476				#932
 .set TASKPPC_SSPPC_RESERVE2,1504			#960
 .set TASKPPC_INTPORT,1536				#992
-.set TASKPPC_NAME,1636					#1092
+.set TASKPPC_BATSTORE,1636
+.set TASKPPC_NAME,1720					#1092
 
 .set SYS_SIGALLOC,0xFFFF
 
@@ -882,6 +881,10 @@
 .set SNOOP_TYPE,0x80103002
 .set SNOOP_START,1
 .set SNOOP_EXIT,2
+
+.set SNOOPLIST_CODE,14
+.set SNOOPLIST_DATA,18
+.set SNOOPLIST_TYPE,22
 
 .set SSM_SEMAPHORE,20
 

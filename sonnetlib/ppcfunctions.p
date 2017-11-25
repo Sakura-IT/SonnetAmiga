@@ -1105,7 +1105,7 @@ GetInfo:
 
 		mfspr	r3,HID0
 		stw	r3,sonnet_CPUHID0(r30)
-		mfspr	r3,SDR1
+		mfsdr1	r3
 		stw	r3,sonnet_CPUSDR1(r30)
 		mfl2cr	r3
 		stw	r3,sonnet_L2STATE(r30)
@@ -4590,7 +4590,7 @@ CreateTaskPPC:
  
  		bl GetTagDataPPC
  
-		addi	r4,r26,CONTEXT_BATS 
+		addi	r4,r26,CONTEXT_BATS-4 
 		li	r0,16 
 		mtctr	r0 
  
@@ -4912,6 +4912,7 @@ CreateTaskPPC:
 
  		bl AtomicDone
  		
+ 							##SNOOP HERE 		
  		mr	r3,r23
 
 		bl CauseDECInterrupt
@@ -5384,7 +5385,7 @@ SnoopTask:
 		mr.	r3,r3
 		beq-	.NoSnoop
 
-		stw	r3,14(r31)
+		stw	r3,SNOOPLIST_CODE(r31)
 
 		loadreg	r4,SNOOP_DATA
 		li	r5,0
@@ -5392,7 +5393,7 @@ SnoopTask:
 		
 		bl GetTagDataPPC
 
-		stw	r3,18(r31)
+		stw	r3,SNOOPLIST_DATA(r31)
 
 		loadreg r4,SNOOP_TYPE
 		li	r5,0
@@ -5409,7 +5410,7 @@ SnoopTask:
 		cmplwi	r3,SNOOP_EXIT
 		bne-	.NoSnoop
 
-.SnoopStart:	stw	r3,22(r31)
+.SnoopStart:	stw	r3,SNOOPLIST_TYPE(r31)
 
 		lwz	r4,sonnet_SnoopSem(r29)
 		mr	r3,r29
@@ -5943,13 +5944,14 @@ DeleteTaskPPC:
 		mr.	r27,r27
 		beq-	.EmptySnoopLst
 
-		lwz	r4,22(r28)			#Snoop type (START or EXIT)
+		lwz	r4,SNOOPLIST_TYPE(r28)		#Snoop type (START or EXIT)
 		cmplwi	r4,SNOOP_EXIT
 		bne-	.Link100
-		lwz	r3,14(r28)			#SNOOP_CODE
+		lwz	r3,SNOOPLIST_CODE(r28)		#SNOOP_CODE
 		mtlr	r3
 		mr	r26,r2
-		lwz	r2,18(r28)			#SNOOP_DATA
+		lwz	r2,SNOOPLIST_DATA(r28)		#SNOOP_DATA
+		
 		mr	r3,r31
 		blrl					#Jump to snoop exit code
 
@@ -10039,6 +10041,36 @@ ExitCode:	lwz	r14,0(r1)
 		mr	r4,r30
 
 		bl FreeMsgFramePPC
+
+		lwz	r4,sonnet_SnoopSem(r25)
+		mr	r3,r25
+		
+		bl ObtainSemaphorePPC
+
+		lwz	r28,LIST_SNOOP(r25)
+.LoopSnoop:	lwz	r27,0(r28)
+		mr.	r27,r27
+		beq-	.EmptySnpLst
+
+		lwz	r4,22(r28)			#Snoop type (START or EXIT)
+		cmplwi	r4,SNOOP_EXIT
+		bne-	.LinkSnoop
+		lwz	r3,14(r28)			#SNOOP_CODE
+		mtlr	r3
+		mr	r26,r2
+		lwz	r2,18(r28)			#SNOOP_DATA
+		
+		mr	r3,r31
+		blrl					#Jump to snoop exit code
+
+		mr	r2,r26
+.LinkSnoop:	mr	r28,r27
+		b	.LoopSnoop
+
+.EmptySnpLst:	lwz	r4,sonnet_SnoopSem(r25)
+		mr	r3,r25
+		
+		bl ReleaseSemaphorePPC
 
 		la	r4,NumAllTasks(r25)			#Tasks -1
 		lwz	r3,0(r4)

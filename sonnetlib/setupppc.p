@@ -1131,7 +1131,7 @@ mmuSetup:
 		
 .Exithtab:	or	r15,r15,r9
 		sync
-		mtspr	SDR1,r15			#set SDR1	
+		mtsdr1	r15				#set SDR1	
 		isync
 
 		rlwinm	r6,r6,30,0,31			#r6 = pt_size, r7 = pt_loc
@@ -1193,7 +1193,7 @@ mmuSetup:
 		rlwinm	r15,r13,0,13,31
 		xor	r14,r14,r15			#Calculate Hash1
 		
-		mfspr	r15,SDR1			#Calculate PTEG address
+		mfsdr1	r15				#Calculate PTEG address
 .calc_PTEG:	rlwinm	r16,r14,22,23,31
 		and	r16,r16,r15
 		rlwinm	r8,r15,16,23,31
@@ -2482,6 +2482,8 @@ EInt:		b	.FPUnav				#0
 		stb	r4,LN_TYPE(r8)
 		la	r4,TASKPPC_CTMEM(r8)
 		stw	r4,TASKPPC_CONTEXTMEM(r8)
+		la	r4,TASKPPC_BATSTORE(r8)
+		stw	r4,TASKPPC_BATSTORAGE(r8)
 		stw	r8,TASKLINK_TASK(r8)
 		li	r31,0xfff
 		stw	r31,TASKLINK_SIG(r8)
@@ -5116,7 +5118,7 @@ EInt:		b	.FPUnav				#0
 		stwu	r0,4(r31)
 		mfdsisr	r0
 		stwu	r0,4(r31)
-		mfspr	r0,SDR1
+		mfsdr1	r0
 		stwu	r0,4(r31)
 		mfdec	r0
 		stwu	r0,4(r31)
