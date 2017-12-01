@@ -4284,7 +4284,9 @@ CreateTaskPPC:
 		stwu	r19,-4(r13) 
 		stwu	r18,-4(r13) 
 		stwu	r17,-4(r13) 
-		stwu	r16,-4(r13) 
+		stwu	r16,-4(r13)
+		stwu	r15,-4(r13)
+		stwu	r14,-4(r13) 
 
 		li	r31,FCreateTaskPPC-FRun68K
 		bl	DebugStartFunction
@@ -4912,7 +4914,40 @@ CreateTaskPPC:
 
  		bl AtomicDone
  		
- 							##SNOOP HERE 		
+ 		lwz	r4,sonnet_SnoopSem(r23)
+		mr	r3,r23
+		
+		bl ObtainSemaphorePPC
+
+		lwz	r15,LIST_SNOOP(r23)
+.LoopSoop:	lwz	r14,0(r15)
+		mr.	r14,r14
+		beq-	.EmptySoopLst
+
+		lwz	r4,SNOOPLIST_TYPE(r15)		#Snoop type (START or EXIT)
+		cmplwi	r4,SNOOP_START
+		bne-	.LinkSoop
+		lwz	r3,SNOOPLIST_CODE(r15)		#SNOOP_CODE
+		mtlr	r3
+		mr	r17,r2
+		lwz	r2,SNOOPLIST_DATA(r15)		#SNOOP_DATA
+		
+		mr	r3,r31				#PPCTask
+		mr	r4,r25				#EntryCode
+		lwz	r5,ThisPPCProc(r23)		#CreatorTask
+		li	r6,CREATOR_PPC			#CreatorCPU
+		
+		blrl					#Jump to snoop start code
+
+		mr	r2,r17
+.LinkSoop:	mr	r15,r14
+		b	.LoopSoop
+
+.EmptySoopLst:	lwz	r4,sonnet_SnoopSem(r23)
+		mr	r3,r23
+		
+		bl ReleaseSemaphorePPC
+
  		mr	r3,r23
 
 		bl CauseDECInterrupt
@@ -4996,23 +5031,25 @@ CreateTaskPPC:
 		li	r31,FCreateTaskPPC-FRun68K
 		bl	DebugEndFunction
 
-		lwz	r16,0(r13) 
-		lwz	r17,4(r13) 
-		lwz	r18,8(r13) 
-		lwz	r19,12(r13) 
-		lwz	r20,16(r13) 
-		lwz	r21,20(r13) 
-		lwz	r22,24(r13) 
-		lwz	r23,28(r13) 
-		lwz	r24,32(r13) 
-		lwz	r25,36(r13) 
-		lwz	r26,40(r13) 
-		lwz	r27,44(r13) 
-		lwz	r28,48(r13) 
-		lwz	r29,52(r13) 
-		lwz	r30,56(r13) 
-		lwz	r31,60(r13) 
-		addi	r13,r13,64 
+		lwz	r14,0(r13)
+		lwz	r15,4(r13)
+		lwz	r16,8(r13) 
+		lwz	r17,12(r13) 
+		lwz	r18,16(r13) 
+		lwz	r19,20(r13) 
+		lwz	r20,24(r13) 
+		lwz	r21,28(r13) 
+		lwz	r22,32(r13) 
+		lwz	r23,36(r13) 
+		lwz	r24,40(r13) 
+		lwz	r25,44(r13) 
+		lwz	r26,48(r13) 
+		lwz	r27,52(r13) 
+		lwz	r28,56(r13) 
+		lwz	r29,60(r13) 
+		lwz	r30,64(r13) 
+		lwz	r31,68(r13) 
+		addi	r13,r13,72
 
 		epilog 'TOC'
 
@@ -9780,6 +9817,48 @@ StartCode:	bl	.StartRunPPC
 		stfdu	f31,-8(r1)
 
 		mr	r31,r3
+		
+ 		lwz	r4,sonnet_SnoopSem(r31)
+		
+		bl ObtainSemaphorePPC
+
+		lwz	r15,LIST_SNOOP(r31)
+.LopSop:	lwz	r14,0(r15)
+		mr.	r14,r14
+		beq-	.EmptySopLst
+
+		lwz	r4,SNOOPLIST_TYPE(r15)		#Snoop type (START or EXIT)
+		cmplwi	r4,SNOOP_START
+		bne-	.LnkSop
+		lwz	r3,SNOOPLIST_CODE(r15)		#SNOOP_CODE
+		mtlr	r3
+		mr	r17,r2
+		lwz	r2,SNOOPLIST_DATA(r15)		#SNOOP_DATA
+		
+		lwz	r3,ThisPPCProc(r31)		#PPCTask
+		lwz	r5,PP_OFFSET(r30)
+		lwz	r4,PP_CODE(r30)
+		add	r4,r4,r5
+		mr.	r5,r5
+		beq	.NoLibCal
+		
+		lwz	r4,2(r4)			#EntryCode
+
+.NoLibCal:	lwz	r5,MN_ARG2(r30)			#CreatorTask
+		li	r6,CREATOR_68K			#CreatorCPU
+		
+		blrl					#Jump to snoop start code
+
+		mr	r2,r17
+.LnkSop:	mr	r15,r14
+		b	.LopSop
+
+.EmptySopLst:	lwz	r4,sonnet_SnoopSem(r31)
+		mr	r3,r31
+		
+		bl ReleaseSemaphorePPC
+		
+		mr	r3,r31
 		mr	r8,r30
 		
 		lwz	r5,PP_STACKPTR(r30)
@@ -10037,7 +10116,7 @@ ExitCode:	lwz	r14,0(r1)
 		
 #********************************************************************************************		
 
-.KillRunPPC:	lwz	r31,ThisPPCProc(r25)			#r25 = PowerPCBase
+.KillRunPPC:	lwz	r31,ThisPPCProc(r25)		#r25 = PowerPCBase
 		mr	r4,r30
 
 		bl FreeMsgFramePPC
@@ -10052,15 +10131,15 @@ ExitCode:	lwz	r14,0(r1)
 		mr.	r27,r27
 		beq-	.EmptySnpLst
 
-		lwz	r4,22(r28)			#Snoop type (START or EXIT)
+		lwz	r4,SNOOPLIST_TYPE(r28)		#Snoop type (START or EXIT)
 		cmplwi	r4,SNOOP_EXIT
 		bne-	.LinkSnoop
-		lwz	r3,14(r28)			#SNOOP_CODE
+		lwz	r3,SNOOPLIST_CODE(r28)		#SNOOP_CODE
 		mtlr	r3
 		mr	r26,r2
-		lwz	r2,18(r28)			#SNOOP_DATA
+		lwz	r2,SNOOPLIST_DATA(r28)		#SNOOP_DATA
 		
-		mr	r3,r31
+		mr	r3,r31				#PPCTask
 		blrl					#Jump to snoop exit code
 
 		mr	r2,r26
@@ -10072,7 +10151,7 @@ ExitCode:	lwz	r14,0(r1)
 		
 		bl ReleaseSemaphorePPC
 
-		la	r4,NumAllTasks(r25)			#Tasks -1
+		la	r4,NumAllTasks(r25)		#Tasks -1
 		lwz	r3,0(r4)
 		subi	r3,r3,1
 		stw	r3,0(r4)
