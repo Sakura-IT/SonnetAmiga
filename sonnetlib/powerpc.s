@@ -524,8 +524,7 @@ GotWarp		move.l d0,a1
 		bra PrintError
 
 PPCInit		move.l	#$EC0000,d7			;Simple Time-out timer		
-DoTimer		tst.l d7
-;		subq.l #1,d7
+DoTimer		subq.l #1,d7
 		bne.s ContTimer
 
 		lea PPCCrash(pc),a2

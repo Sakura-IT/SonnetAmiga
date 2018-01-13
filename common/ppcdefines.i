@@ -667,11 +667,6 @@
 .set L2CR_L2OH_INV,		0x00020000 		# bits 14-15 Output Hold time = 1.0ns*/
 .set L2CR_L2IP,			0x00000001
 
-#.set L2CR_SIZE_1MB,		0x3000
-#.set L2CR_SIZE_512KB,		0x2000
-#.set L2CR_SIZE_256KB,		0x1000
-#.set L2CR_TS_OFF,		0x0004
-
 .set L2_ADR_INCR,		0x100
 .set L2_SIZE_2M,		0x2000
 .set L2_SIZE_1M,		0x1000
