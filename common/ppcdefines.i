@@ -46,6 +46,7 @@
 .set RunPPCStart,72
 .set ViolationAddress,76			#Pointer
 .set MemSize,80
+.set Quantum,84
 
 .set option_EnEDOMem,0
 .set option_EnDebug,1
@@ -55,6 +56,7 @@
 .set option_EnPageSetup,5
 .set option_EnDAccessExc,6
 .set option_SetCMemDiv,7
+.set option_VersionNB,11
 
 #LibBase:					All this stuff is PPC only! No access allowed from 68k!
 
@@ -116,7 +118,6 @@
 .set DataExcHigh,602
 .set DataExcLow,606
 .set CurrentPort,610
-
 .set sonnet_DosBase,614
 
 .set sonnet_ExternalInt,620
@@ -151,7 +152,8 @@
 .set sonnet_StoredBATs,1248
 .set sonnet_SystemBATs,1312
 .set sonnet_ErrorStrings,1376
-.set sonnet_PosSize,1380			#Library PosSize
+.set sonnet_BusClock,1380
+.set sonnet_PosSize,1384			#Library PosSize
 
 .set EXCDATA_TYPE,8				#Always NT_INTERRUPT
 .set EXCDATA_PRI,9				#This
@@ -248,9 +250,9 @@
 .set MEMB_CHIP,			0x1
 
 .set SonnetBusClock,66666666			#66.6 MHz
-.set DecTimerFreq,(SonnetBusClock/4)		#Dec goes at 1/4 of Bus clock
-.set SwitchFreq,50				#
-.set Quantum,(DecTimerFreq/SwitchFreq)		#
+.set RaptureBusClock,100000000			#100 MHz
+.set SonnetQuantum,333333			#Bus clock divided by 4 (decrementer speed) divided
+.set RaptureQuantum,500000			#by 50 (= switched per seconds so 20ms)
 .set QuickQuantum,50
 
 .set EXCATTR_CODE,		0x80101000		#
@@ -654,6 +656,7 @@
 .set L2CR_L2CLK_2,		0x08000000 		# bits 4-6 Clock Ratio div 2
 .set L2CR_L2CLK_2_5,		0x0a000000 		# bits 4-6 Clock Ratio div 2.5
 .set L2CR_L2CLK_3,		0x0c000000 		# bits 4-6 Clock Ratio div 3
+.set L2CR_L2CLK_4,		0x0e000000		# bits 4-6 Clock Ratio div 4
 .set L2CR_L2RAM_BURST,		0x01000000 		# bits 7-8 burst SRAM
 .set L2CR_DO,			0x00400000 		# bit 9 Disable caching of instr. in L2
 .set L2CR_L2I,			0x00200000 		# bit 10 Global invalidate bit
@@ -664,17 +667,20 @@
 .set L2CR_L2OH_INV,		0x00020000 		# bits 14-15 Output Hold time = 1.0ns*/
 .set L2CR_L2IP,			0x00000001
 
-.set L2CR_SIZE_1MB,		0x3000
-.set L2CR_SIZE_512KB,		0x2000
-.set L2CR_SIZE_256KB,		0x1000
-.set L2CR_TS_OFF,		0x0004
+#.set L2CR_SIZE_1MB,		0x3000
+#.set L2CR_SIZE_512KB,		0x2000
+#.set L2CR_SIZE_256KB,		0x1000
+#.set L2CR_TS_OFF,		0x0004
 
 .set L2_ADR_INCR,		0x100
+.set L2_SIZE_2M,		0x2000
 .set L2_SIZE_1M,		0x1000
 .set L2_SIZE_HM,		0x800
 .set L2_SIZE_QM,		0x400
 
 .set L2_SIZE_1M_U,		0x0010
+.set L2_SIZE_2M_U,		0x0020
+
 .set L1_CACHE_LINE_SIZE,32
 
 # Node defines

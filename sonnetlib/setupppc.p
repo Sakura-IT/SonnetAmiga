@@ -77,9 +77,18 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 		setpcireg EUMBBAR
 		lis	r25,EUMB@h
 		bl	ConfigWrite32
+		
+		la	r14,base_Options(r29)
+		lbz	r8,option_VersionNB(r14)
+		cmpwi	r8,0x13
+		bne	.NoForce
+		bl	.DoForceMem
+		loadreg	r0,'Boon'
+		stw	r0,0(r0)			
+		b	.DoForce
 
-		bl	ConfigMem			#Result = Sonnet Mem Len in r8
-		bl	InstallExceptions		#Put exceptions in place
+.NoForce:	bl	ConfigMem			#Result = Sonnet Mem Len in r8
+.DoForce:	bl	InstallExceptions		#Put exceptions in place
 
 		mr.	r8,r8
 		beq	.ErrorRam
@@ -200,8 +209,8 @@ SetLen:		mr	r30,r28
 		stw	r27,base_MemStart(r29)		#MemStart
 		stw	r8,base_MemLen(r29)		#MemLen
 
-		bl	mmuSetup			#Setup the Memory Management Unit	
-		bl	Epic				#Setup the EPIC controller
+		bl	mmuSetup			#Setup the Memory Management Unit
+		bl	Epic				#Setup the EPIC controller		
 		bl	End
 
 #*********************************************************
@@ -375,6 +384,16 @@ End:		mflr	r4
 		lbz	r6,option_DisL2Flush(r14)
 		stb	r6,DoDFlushAll(r3)
 		
+		lbz	r6,option_VersionNB(r14)
+		loadreg	r0,SonnetQuantum
+		loadreg	r4,SonnetBusClock
+		cmpwi	r6,0x13
+		bne	.IsSonnet
+		loadreg	r0,RaptureQuantum
+		loadreg	r4,RaptureBusClock
+
+.IsSonnet:	stw	r0,Quantum(r0)
+		stw	r4,sonnet_BusClock(r3)
 		mr	r14,r3
 		la	r6,SemMemory(r14)
 		la	r3,TaskListSem(r14)
@@ -447,7 +466,7 @@ End:		mflr	r4
 		stw	r6,sonnet_TaskExitCode(r14)
 
 		bl	Caches				#Setup the L1 and L2 cache
-
+		
 		li	r3,0
 		loadreg	r0,'REDY'			
 		stw	r0,Init(r0)
@@ -751,7 +770,8 @@ Caches:
 		li	r30,0
 		bne	.L2SizeDone
 
-		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS		
+		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS
+
 		mtl2cr	r4				# Set up on chip L2 cache controller.
 		sync
 		
@@ -799,16 +819,20 @@ Wait2:		mfl2cr	r3
 		addi	r4,r4,L2_ADR_INCR
 		cmpw	r4,r5
 		blt	.L2SzReadLoop
-		
-		lis	r7,L2CR_SIZE_1MB
+
+#		lis	r7,L2CR_L2SIZ_2M@h
+#		cmpwi	r30,L2_SIZE_2M
+#		beq	.L2SizeDone
+
+		lis	r7,L2CR_L2SIZ_1M@h
 		cmpwi	r30,L2_SIZE_1M
 		beq	.L2SizeDone
 		
-		lis	r7,L2CR_SIZE_512KB
+		lis	r7,L2CR_L2SIZ_HM@h
 		cmpwi	r30,L2_SIZE_HM
 		beq	.L2SizeDone
 		
-		lis	r7,L2CR_SIZE_256KB
+		lis	r7,L2CR_L2SIZ_QM@h
 		cmpwi	r30,L2_SIZE_QM
 		beq	.L2SizeDone
 		
@@ -829,7 +853,7 @@ Wait2:		mfl2cr	r3
 		.long	0,0						#For the Modders
 .PLL_CFG:	.long	0b1101,400000000,0b0001,500000000
 		.long	0b0101,433333333,0b0010,466666666
-		.long	0b1100,533333333
+		.long	0b1100,533333333,0b0111,450000000
 .END_CFG:
 
 		mflr	r6
@@ -867,13 +891,13 @@ Wait2:		mfl2cr	r3
 		lis	r12,L2CR_L2CLK_1@h
 		cmpwi	r8,1
 		beq	.DoSpeed2
-
+		
 .DoDefSpeed:	lis	r12,L2CR_L2CLK_2@h
 		loadreg	r8,400000000
 		cmpw	r8,r9
 		bne	.DefL2Speed
 		
-		lis	r8,L2CR_SIZE_1MB		#check for 400/1MB (= 200MHz cache)
+		lis	r8,L2CR_L2SIZ_1M@h		#check for 400/1MB (= 200MHz cache)
 		cmpw	r8,r7
 		bne	.DefL2Speed
 		
@@ -883,9 +907,11 @@ Wait2:		mfl2cr	r3
 		b	.DoRestL2
 
 .DefL2Speed:	mfl2cr	r4
-.DoRestL2:	xoris	r4,r4,L2CR_SIZE_1MB|L2CR_TS_OFF
+.DoRestL2:	xoris	r4,r4,L2CR_TS@h
+		xoris	r4,r4,L2CR_L2SIZ_1M@h
 		or	r4,r4,r7		
 		mtl2cr	r4				#Set correct size and switch Test off
+		
 		sync
 		isync
 		
@@ -1276,6 +1302,39 @@ DirtyMemCheck:
 		blr
 
 #********************************************************************************************	
+
+.DoForceMem:	mflr	r15
+
+		setpcireg MCCR4
+#		loadreg	r25,0x35323239		#from examples on internet
+		loadreg	r25,0x35303232
+		bl	ConfigWrite32
+
+		setpcireg MCCR3
+		lis	r25,0x7840
+		bl	ConfigWrite32
+
+		setpcireg MCCR2
+#		loadreg	r25,0x044004cc		#33MHz
+		loadreg	r25,0x04400700		#Fastest & stable?
+#		loadreg r25,0x0440150c		#100MHz
+		bl	ConfigWrite32
+
+		li	r14,1			#Only 1 bank (bank 0: 4x512Mb)
+		li	r16,0			#no extended memory ranges (>0x10000000)
+		li	r17,0			#	"
+		li	r18,0			#	"
+		li	r19,0			#	"
+
+		li	r9,0			#start addresses memory (bank 0 = 0x0
+		li	r10,0			#all other banks (1-7) not used
+		li	r11,0xff		#end addresses memory (bank 0 = 0x0fffffff
+		li	r12,0			#all other banks (1-7) not used
+		loadreg	r13,0x7588aaaa		#MCCR1 -> aaaa = all banks 13x4
+
+		lis	r8,0x1000
+
+		b	.EndForce
 
 ConfigMem:	mflr	r15			#Code lifted from the Sonnet Driver
 		setpcireg MCCR4			#by Mastatabs from A1k fame
@@ -1783,11 +1842,9 @@ loc_4114:
 loc_4184:
 		slwi	r5,r5,1
 		cmplwi	r5,0x100
-		bne	loc_3BD8
-		
-		
+		bne	loc_3BD8		
 
-		setpcireg MSAR1				#80
+.EndForce:	setpcireg MSAR1				#80
 		mr	r25,r9		
 		bl	ConfigWrite32			#store found values to registers
 
@@ -1801,10 +1858,6 @@ loc_4184:
 
 		setpcireg MEAR2				#94
 		mr	r25,r12
-		bl	ConfigWrite32
-
-		setpcireg MCCR1				#F0		
-		mr	r25,r13
 		bl	ConfigWrite32
 
 		setpcireg MESAR1			#88		
@@ -1826,6 +1879,10 @@ loc_4184:
 		setpcireg PGMAX				#A3
 		li	r25,0x32
 		bl	ConfigWrite8
+
+		setpcireg MCCR1				#F0		
+		mr	r25,r13
+		bl	ConfigWrite32
 
 		setpcireg MBEN				#A0
 		mr	r25,r14
@@ -2562,7 +2619,7 @@ EInt:		b	.FPUnav				#0
 
 		mr	r30,r9
 
-		loadreg	r0,Quantum
+		lwz	r0,Quantum(r0)
 		mtdec	r0
 		
 		nop
@@ -2616,7 +2673,7 @@ EInt:		b	.FPUnav				#0
 		mtdec	r0
 		b	.ExitToUser
 		
-.SlowReturn:	loadreg	r0,Quantum
+.SlowReturn:	lwz	r0,Quantum(r0)
 		mtdec	r0
 		
 .ExitToUser:	lwz	r9,0xf0(r0)				#Debug counter to check
@@ -3308,7 +3365,7 @@ EInt:		b	.FPUnav				#0
 		addi	r9,r9,1				#Whether exception is still running
 		stw	r9,0xf0(r0)
 
-		loadreg	r9,Quantum
+		lwz	r9,Quantum(r0)
 		mtdec	r9
 		
 		mfsprg3	r9
@@ -3365,7 +3422,7 @@ EInt:		b	.FPUnav				#0
 		mtspr	HID0,r0
 		isync
 
-		loadreg	r0,Quantum
+		lwz	r0,Quantum(r0)
 		mtdec	r0
 		
 		loadreg	r0,'IDLE'

@@ -163,7 +163,22 @@ GotExp		move.l d0,a6
 WeirdMed	lea MedError(pc),a2
 		bra PrintError
 
-FoundMed	sub.l a0,a0
+FoundMed	move.l d0,a0
+		move.l cd_BoardAddr(a0),d0
+		add.l #$800000,d0
+		move.l d0,a0
+		moveq.l #5,d0
+		
+NextCard	cmp.l #$57100400,(a0)
+		beq.s FoundCfg
+		lea $800(a0),a0				;each $800 hold a card
+		dbf d0,NextCard
+
+		lea NBridgeError(pc),a2
+		bra PrintError	
+		
+FoundCfg	move.l a0,pciconfig_addr-Buffer(a4)	;location of PCI configs
+		sub.l a0,a0
 		move.l #VENDOR_ELBOX,d0			;ELBOX
 		move.l #MEDIATOR_LOGIC,d1		;Mediator Logic board for A3/4000
 		jsr _LVOFindConfigDev(a6)
@@ -338,8 +353,15 @@ loop2		move.l (a2)+,(a5)+			;Copy code to 0x3000
 
 		jsr _LVOCacheClearU(a6)
 
+		move.l pciconfig_addr(pc),a2
+		move.w COMMAND(a2),d7
+		or.w #BUS_MASTER_ENABLE,d7
+		move.w d7,COMMAND(a2)			;Start MPC107. Does not work on Sonnet.
+
 		move.l #WP_TRIG01,WP_CONTROL(a3)	;Negate HRESET. Now code gets executed
-							;at 0xfff00100 which jumps to 0xfff03000							
+							;at 0xfff00100 which jumps to 0xfff03000
+							;Only available on Sonnet
+
 		move.l	#$EC0000,d7			;Simple Time-out timer
 		
 Wait		subq.l #1,d7
@@ -502,7 +524,8 @@ GotWarp		move.l d0,a1
 		bra PrintError
 
 PPCInit		move.l	#$EC0000,d7			;Simple Time-out timer		
-DoTimer		subq.l #1,d7
+DoTimer		tst.l d7
+;		subq.l #1,d7
 		bne.s ContTimer
 
 		lea PPCCrash(pc),a2
@@ -758,7 +781,9 @@ NoEnDAccessExc	lea SetCMemDiv(pc),a1
 		bsr DoENV
 		bmi.s NoSetCMemDiv
 		move.b (a3),7(a5)
-NoSetCMemDiv	lea DisHunkPatch(pc),a1
+NoSetCMemDiv	move.l SonAddr(pc),a3
+		move.b PCI_REVISION(a3),11(a5)		;Check for Sonnet or Nortel (12 or 13)
+		lea DisHunkPatch(pc),a1
 		bsr DoENV
 		bmi.s NoDisHunkPatch
 		lea Options68K(pc),a5
@@ -2662,6 +2687,7 @@ OpenLibAddress		ds.l	1
 AllocMemAddress		ds.l	1
 LoadSegAddress		ds.l	1
 NewLoadSegAddress	ds.l	1
+pciconfig_addr		ds.l	1
 MirrorList		ds.l	3
 RemSysTask		ds.l	1
 Previous		ds.l	1
@@ -2924,7 +2950,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.8 (12.11.17)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.8 (13.01.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
@@ -2935,6 +2961,7 @@ LPCIError	dc.b	"Could not open pci.library V11+",0
 MedError	dc.b	"Could not find a supported Mediator board",0
 MemMedError	dc.b	"No system VGA memory detected (pcidma)",0
 SonnetError	dc.b	"No Sonnet card detected",0
+NBridgeError	dc.b	"No North Bridge (MPC107) detected",0
 VGAError	dc.b	"No supported VGA card detected",0
 MemVGAError	dc.b	"Could not allocate VGA memory",0
 PPCMMUError	dc.b	"Error during MMU setup of PPC",0

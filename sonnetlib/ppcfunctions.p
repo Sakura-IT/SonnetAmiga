@@ -1227,7 +1227,7 @@ GetInfo:
 		rlwnm	r7,r7,r8,0,31		
 		b	.StoreTag
 		
-.INFO_BUSCLOCK:	loadreg	r7,SonnetBusClock
+.INFO_BUSCLOCK:	lwz	r7,sonnet_BusClock(r30)
 .StoreTag:	stw	r7,4(r4)
 		b	.NextInList
 		
@@ -1262,7 +1262,7 @@ GetSysTimePPC:
 		bl	DebugStartFunction
 		
 		mr	r6,r4
-		loadreg	r5,SonnetBusClock
+		lwz	r5,sonnet_BusClock(r3)
 		rlwinm	r5,r5,30,2,31
 .Loop5:		mftbu	r3
 		mftbl	r4
@@ -9009,9 +9009,9 @@ WaitTime:
 		stw	r13,-4(r1)
 		subi	r13,r1,4
 		stwu	r1,-44(r1)
-		
-		loadreg	r5,SonnetBusClock
-		
+
+		lwz	r5,sonnet_BusClock(r29)
+
 		mr	r6,r4
 		mulhw	r3,r5,r6
 		mullw	r4,r5,r6
