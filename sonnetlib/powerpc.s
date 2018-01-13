@@ -2957,7 +2957,7 @@ DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 PowerPCError	dc.b	"Other PPC library already active (WarpOS/Sonnet)",0
 LDOSError	dc.b	"Could not open dos.library V37+",0
 LExpError	dc.b	"Could not open expansion.library V37+",0
-LPCIError	dc.b	"Could not open pci.library V11+",0
+LPCIError	dc.b	"Could not open pci.library V13+",0
 MedError	dc.b	"Could not find a supported Mediator board",0
 MemMedError	dc.b	"No system VGA memory detected (pcidma)",0
 SonnetError	dc.b	"No Sonnet card detected",0
