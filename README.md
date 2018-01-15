@@ -24,6 +24,17 @@ SonnetAmiga has the following hardware requirements:
 - 5V 168 pins FPM DIMMs 2K Refresh (up to 256MB with Voodoo3; 128MB with other
   supported video cards). 128 MB and 256 MB DIMMs are currently not supported.
   Please use up to 3x64 MB.
+  
+# Now also supporting
+
+- Force PowerPMC-250 MPC7410 card. Tested with 256MB SDRAM on-board.
+  Needs a PMC to PCI card with 3.3V regulator.  
+
+
+# Software
+
+- Elbox' pci.library 13+ required. For Force PowerPMC-250 support 13.1+ required.
+- THOR's mmulib package recommended.
 
 # Building
 
