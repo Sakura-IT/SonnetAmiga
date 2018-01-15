@@ -1315,8 +1315,8 @@ DirtyMemCheck:
 		bl	ConfigWrite32
 
 		setpcireg MCCR2
-#		loadreg	r25,0x044004cc		#33MHz
-		loadreg	r25,0x04400700		#Fastest & stable?
+		loadreg	r25,0x044004cc		#33MHz
+#		loadreg	r25,0x04400700		#Fastest & stable?
 #		loadreg r25,0x0440150c		#100MHz
 		bl	ConfigWrite32
 
