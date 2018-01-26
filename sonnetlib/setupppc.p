@@ -1315,8 +1315,8 @@ DirtyMemCheck:
 		bl	ConfigWrite32
 
 		setpcireg MCCR2
-		loadreg	r25,0x044004cc		#33MHz
-#		loadreg	r25,0x04400700		#Fastest & stable?
+#		loadreg	r25,0x044004cc		#33MHz
+		loadreg	r25,0x04400700		#Fastest & stable?
 #		loadreg r25,0x0440150c		#100MHz
 		bl	ConfigWrite32
 
@@ -2436,7 +2436,7 @@ EInt:		b	.FPUnav				#0
 		mr.	r5,r5
 		bne	.TaskException
 
-		lbz	r5,FLAG_WAIT(r10)
+.RTaskExc:	lbz	r5,FLAG_WAIT(r10)
 		mr.	r5,r5
 		bne	.NoWaitTime
 		
@@ -2880,13 +2880,44 @@ EInt:		b	.FPUnav				#0
 #********************************************************************************************
 
 
-.TaskException:	li	r5,0				#Will be starting point for TC_EXCEPTCODE
-		stw	r5,sonnet_TaskExcept(r10)	#Needs implementation
+.TaskException:	lwz	r3,sonnet_TaskExcept(r10)
+		cmpw	r3,r9
+		li	r0,0
+		stw	r0,sonnet_TaskExcept(r10)		
+		bne	.RTaskExc
 		
-		loadreg	r5,'TEXC'
-		stw	r5,0xe0(r0)
+		lwz	r4,TC_EXCEPTDATA(r3)
+		mr.	r4,r4
+		beq-	.RTaskExc
+
+		lwz	r5,TC_SIGRECVD(r3)
+		lwz	r0,TC_SIGEXCEPT(r3)
+		and.	r6,r5,r0
+		beq-	.RTaskExc
+
+		andc.	r4,r5,r6
+		stw	r4,TC_SIGRECVD(r3)
+		andc.	r4,r0,r6
+		stw	r4,TC_SIGEXCEPT(r3)
+
+		stw	r10,-68(r1)
+		stw	r13,-64(r1)
 		
-		b	.SlowReturn
+		subi	r1,r1,128
+		lwz	r2,TC_EXCEPTDATA(r3)
+		lwz	r0,TC_EXCEPTCODE(r3)
+		mr	r3,r6
+		mtlr	r0
+		blrl
+			
+		addi	r1,r1,128
+		lwz	r10,-68(r1)
+		lwz	r13,-64(r1)
+		
+		lwz	r5,TC_SIGEXCEPT(r4)
+		or	r5,r5,r3
+		stw	r5,TC_SIGEXCEPT(r4)
+		b	.RTaskExc
 		
 #********************************************************************************************
 
