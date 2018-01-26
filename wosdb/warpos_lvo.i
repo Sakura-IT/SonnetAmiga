@@ -1,9 +1,11 @@
-## $VER: warpos_lvo.i V0.0 (19.04.99)
+## $VER: warpos_lvo.i V1.0 (03.02.16)
 ##
 ## This file is part of the WarpOS debugger 'wosdb'
-## Copyright (c) 1999  Frank Wille
+## Copyright (c) 1999,2016  Frank Wille
 ##
 ##
+## v1.0  (03.02.16) phx
+##       Adapted macro to vasmppc with std syntax.
 ## v0.0  (19.04.99) phx
 ##       Copied from ppclibemu V0.4, modified CALLWOS macro.
 ##
@@ -99,12 +101,11 @@
 .set	SetNiceValue        ,       -744
 
 
-.macro CALLWOS function, register
-	.ifnb \register
-		mr r3,\register
-	.endif
-	lwz r0,\function+2(r3)
-	mtlr r0
+.macro	CALLWOS	lvo,reg
+.ifnb	\reg
+	mr	r3,\reg
+.endif
+	lwz	r0,\lvo+2(r3)
+	mtlr	r0
 	blrl
 .endm
-

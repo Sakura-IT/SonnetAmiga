@@ -1,9 +1,11 @@
-/* $VER: stdui.c V0.4c (12.02.01)
+/* $VER: stdui.c V0.5 (24.11.17)
  *
  * This file is part of the WarpOS debugger 'wosdb'
- * Copyright (c) 1999-2001  Frank Wille
+ * Copyright (c) 1999-2001,2017  Frank Wille
  *
  *
+ * v0.5  (24.11.17) phx
+ *       New command 'c' to catch any exception.
  * v0.4c (12.02.01) phx
  *       The 'g'-command with an unknown symbol caused a data access
  *       exception.
@@ -24,10 +26,12 @@
  *       File created.
  */
 
-#include <powerpc/powerpc.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#pragma amiga-align
+#include <powerpc/powerpc.h>
+#pragma default-align
 #include "debugger.h"
 
 
@@ -114,7 +118,7 @@ static char *get_option_arg(int argc,char *argv[],int *i)
 
 static void show_version()
 {
-  printf(NAME " V%d.%d%c (c)1999-2001 by Frank Wille\n"
+  printf(NAME " V%d.%d%c (c)1999-2001,2017 by Frank Wille\n"
          "build date: " __DATE__ ", " __TIME__ "\n\n",
          VERSION,REVISION,PLEVEL?('a'+PLEVEL-1):' ');
 }
@@ -200,7 +204,7 @@ static void printinstr(ADDR addr)
   char operands[256];
   char *lab;
 
-  if (wosdb_validaddr(addr) != 0) {
+  if (wosdb_validaddr(addr)!=0 && addr!=(ADDR)4) {
     dp.opcode = opcode;
     dp.operands = operands;
     dp.instr = dp.iaddr = (ppc_word *)addr;
@@ -307,8 +311,7 @@ static void printhelp()
   printf("b <exp>\t\tset breakpoint\n");
   printf("bt <exp>\tset temporary breakpoint\n");
   printf("bc <exp>\tclear breakpoint\n");
-  printf("--press return--");
-  getchar();
+  printf("c\t\tcatch any exception in the system\n");
   printf("d [<exp>]\tdisassemble\n");
   printf("fpr\t\tshow FPU registers\n");
   printf("g\t\trun program\n");
@@ -335,7 +338,7 @@ static void debugger_loop(char *filename,char *start_args)
   struct LoadFile *lf;
 
   printf("\n** " NAME " V%d.%d%c\n"
-         "** (c)1999-2001 by Frank Wille <frank@phoenix.owl.de>\n",
+         "** (c)1999-2001,2017 by Frank Wille <frank@phoenix.owl.de>\n",
          VERSION,REVISION,PLEVEL?('a'+PLEVEL-1):' ');
 
   if (dbcontext = wosdb_init()) {
@@ -503,6 +506,19 @@ static void debugger_loop(char *filename,char *start_args)
           }
           break;
 
+        case 'c':
+          if (taskloaded) {
+            printf("Unloading current task.\n");
+            wosdb_unload();
+            taskloaded = 0;
+          }
+          printf("Waiting for any exception. CTRL-C to break.\n");
+          if (lf = wosdb_catch()) {
+            status(ST_EXC|ST_SPEC|ST_FPR);
+            taskloaded = 2;
+          }
+          break;
+
         case 'd':                              /* disassemble */
           if (cmdbuf[1] == ' ') {
             addr = (ADDR)((ULONG)wosdb_getexp(&cmdbuf[2]) & ~3);
@@ -590,7 +606,7 @@ static void debugger_loop(char *filename,char *start_args)
         case 'n':                              /* next */
           if (!taskloaded)
             break;
-          wosdb_tempbreakpoint((ADDR)dbcontext->ec_UPC.ec_PC + 4);
+          r = wosdb_tempbreakpoint((ADDR)dbcontext->ec_UPC.ec_PC + 4);
           xcid = wosdb_cont(FALSE,FALSE);  /* break at next instruction */
           if (xcid==EXCF_FINISHED)
             finished();
@@ -640,8 +656,10 @@ static void debugger_loop(char *filename,char *start_args)
 
         case 'x':                              /* exit */
           exit = 1;  /* exit debugger */
-          if (taskloaded)
-            wosdb_unload();
+          switch (taskloaded) {
+            case 1: wosdb_unload(); break;
+            case 2: wosdb_release(); break;
+          }
           break;
       }
     }

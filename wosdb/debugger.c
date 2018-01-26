@@ -1,9 +1,11 @@
-/* $VER: debugger.c V0.4a (05.03.00)
+/* $VER: debugger.c V0.5 (24.11.17)
  *
  * This file is part of the WarpOS debugger 'wosdb'
- * Copyright (c) 1999-2001  Frank Wille
+ * Copyright (c) 1999-2001,2017  Frank Wille
  *
  *
+ * v0.5  (24.11.17) phx
+ *       New command 'c' to catch any exception.
  * v0.4a (05.03.00) phx
  *       HUNK_RELOC32SHORT or HUNK_DREL32 hunks are correctly recognized now.
  * v0.4  (26.02.00) phx
@@ -30,6 +32,7 @@
 
 #include <stdio.h>
 #include <ctype.h>
+#pragma amiga-align
 #include <exec/execbase.h>
 #include <exec/memory.h>
 #include <dos/dos.h>
@@ -40,6 +43,7 @@
 #include <proto/exec.h>
 #include <proto/dos.h>
 #include <proto/powerpc.h>
+#pragma default-align
 #include "debugger.h"
 
 
@@ -50,7 +54,8 @@ extern LONG newRunPPC();    /* new RunPPC() function (68k) */
 extern ULONG ExceptionCatch(struct EXCContext *);
 extern ULONG ExceptionLeave(struct EXCContext *);
 extern ULONG ProgramExit(ULONG);  /* notifies debugger */
-extern void ProgramExitEnd();
+extern ULONG SnoopTaskExit(struct TaskPPC *);
+extern void ProgramExitEnd(void);
 extern void clearIABR(void);
 extern ULONG readIABR(void);
 
@@ -68,6 +73,7 @@ BOOL bTrace = FALSE;            /* branch trace mode */
 /* debugged task */
 ULONG initialLR;                /* init. LR (return addr) of debugged task */
 ULONG result;                   /* result code of a finished PPC task */
+ULONG snoopId = 0;              /* SnoopTask on Exit for catched tasks */
 static BOOL taskloaded = FALSE;
 static ULONG stacksize = 0x10000;
 static int priority = 0;
@@ -109,7 +115,7 @@ static char *getvalue(long *val,char *buf)
   if (isdigit((unsigned char)*buf)) {
     /* numerical constant */
     sscanf(buf++,"%li",val);
-    if (*buf=='x' || *buf=='x')
+    if (*buf=='x' || *buf=='X')
       buf++;
     while (isxdigit((unsigned char)*buf))
       buf++;
@@ -411,6 +417,52 @@ static void get_debug_info(char *name)
 }
 
 
+static BOOL set_exc_handlers(void)
+{
+  struct TagItem ti[8];
+
+  /* install local handlers for exception-catch and */
+  /* exception-leave */
+  ti[0].ti_Tag = EXCATTR_CODE;
+  ti[0].ti_Data = (ULONG)ExceptionCatch;
+  ti[1].ti_Tag = EXCATTR_DATA;
+  ti[1].ti_Data = r2();
+  ti[2].ti_Tag = EXCATTR_TASK;
+  ti[2].ti_Data = (ULONG)dbTask;
+  ti[3].ti_Tag = EXCATTR_EXCID;
+  ti[3].ti_Data = EXCF_MCHECK | EXCF_DACCESS | EXCF_IACCESS |
+                  EXCF_ALIGN | EXCF_PROGRAM | EXCF_FPUN |
+                  EXCF_TRACE | EXCF_IABR;
+  ti[4].ti_Tag = EXCATTR_FLAGS;
+  ti[4].ti_Data = EXCF_LOCAL | EXCF_LARGECONTEXT;
+  ti[5].ti_Tag = EXCATTR_PRI;
+  ti[5].ti_Data = 126;
+  ti[6].ti_Tag = TAG_DONE;
+
+  if (xhdlC = SetExcHandler(ti)) {
+    ti[0].ti_Tag = EXCATTR_CODE;
+    ti[0].ti_Data = (ULONG)ExceptionLeave;
+    ti[1].ti_Tag = EXCATTR_DATA;
+    ti[1].ti_Data = r2();
+    ti[2].ti_Tag = EXCATTR_TASK;
+    ti[2].ti_Data = (ULONG)dbTask;
+    ti[3].ti_Tag = EXCATTR_EXCID;
+    ti[3].ti_Data = EXCF_PROGRAM;
+    ti[4].ti_Tag = EXCATTR_FLAGS;
+    ti[4].ti_Data = EXCF_LOCAL | EXCF_LARGECONTEXT;
+    ti[5].ti_Tag = EXCATTR_PRI;
+    ti[5].ti_Data = 127;
+    ti[6].ti_Tag = TAG_DONE;
+
+    if (xhdlL = SetExcHandler(ti))
+      return TRUE;
+    else
+      RemExcHandler(xhdlC);
+  }
+  return FALSE;
+}
+
+
 static BOOL setbreakpt(ADDR addr,BOOL tmp)
 {
   struct Breakpoint *b,*next,*new;
@@ -467,7 +519,7 @@ static BOOL clrbreakpt(ADDR addr,BOOL tmp)
 }
 
 
-static void remallbrkpts()
+static void remallbrkpts(void)
 {
   struct Breakpoint *b,*next;
 
@@ -614,63 +666,29 @@ struct LoadFile *wosdb_load(char *name,char *args)
           SetFunction((struct Library *)PowerPCBase,-30,oldRunPPC);
           RemExcHandler(xhdlC);
 
-          /* install local handlers for exception-catch and */
-          /* exception-leave */
-          ti[0].ti_Tag = EXCATTR_CODE;
-          ti[0].ti_Data = (ULONG)ExceptionCatch;
-          ti[1].ti_Tag = EXCATTR_DATA;
-          ti[1].ti_Data = r2();
-          ti[2].ti_Tag = EXCATTR_TASK;
-          ti[2].ti_Data = (ULONG)dbTask;
-          ti[3].ti_Tag = EXCATTR_EXCID;
-          ti[3].ti_Data = EXCF_MCHECK | EXCF_DACCESS | EXCF_IACCESS |
-                          EXCF_ALIGN | EXCF_PROGRAM | EXCF_FPUN |
-                          EXCF_TRACE | EXCF_IABR;
-          ti[4].ti_Tag = EXCATTR_FLAGS;
-          ti[4].ti_Data = EXCF_LOCAL | EXCF_LARGECONTEXT;
-          ti[5].ti_Tag = EXCATTR_PRI;
-          ti[5].ti_Data = 126;
-          ti[6].ti_Tag = TAG_DONE;
-          if (xhdlC = SetExcHandler(ti)) {
-            ti[0].ti_Tag = EXCATTR_CODE;
-            ti[0].ti_Data = (ULONG)ExceptionLeave;
-            ti[1].ti_Tag = EXCATTR_DATA;
-            ti[1].ti_Data = r2();
-            ti[2].ti_Tag = EXCATTR_TASK;
-            ti[2].ti_Data = (ULONG)dbTask;
-            ti[3].ti_Tag = EXCATTR_EXCID;
-            ti[3].ti_Data = EXCF_PROGRAM;
-            ti[4].ti_Tag = EXCATTR_FLAGS;
-            ti[4].ti_Data = EXCF_LOCAL | EXCF_LARGECONTEXT;
-            ti[5].ti_Tag = EXCATTR_PRI;
-            ti[5].ti_Data = 127;
-            ti[6].ti_Tag = TAG_DONE;
-            if (xhdlL = SetExcHandler(ti)) {
-              taskloaded = TRUE;
-              NewListPPC((struct List *)&breakpoints);
+          if (set_exc_handlers()) {
+            taskloaded = TRUE;
+            NewListPPC((struct List *)&breakpoints);
 
-              /* Set breakpoint to PPC-task start address. */
-              /* WarpOS now calls the task-code by a "blrl", so we can */
-              /* find the start address in the LR register. */
-              wosdb_tempbreakpoint((ADDR)ec.ec_LR);
-              ec.ec_UPC.ec_SRR0 += 4;  /* skip "trap" instruction */
+            /* Set breakpoint to PPC-task start address. */
+            /* WarpOS now calls the task-code by a "blrl", so we can */
+            /* find the start address in the LR register. */
+            wosdb_tempbreakpoint((ADDR)ec.ec_LR);
+            ec.ec_UPC.ec_SRR0 += 4;  /* skip "trap" instruction */
 
-              /* let the task continue to run */
-              SignalPPC(dbTask,1L<<sigRun);
+            /* let the task continue to run */
+            SignalPPC(dbTask,1L<<sigRun);
 
-              /* wait for exception at start-address */
-              WaitPPC(1L<<sigExcept);  /* wait for breakpoint exception */
-              clrbreakpt((ADDR)ec.ec_UPC.ec_PC,TRUE);
+            /* wait for exception at start-address */
+            WaitPPC(1L<<sigExcept);  /* wait for breakpoint exception */
+            clrbreakpt((ADDR)ec.ec_UPC.ec_PC,TRUE);
 
-              /* set our own exit-function to notify the debugger */
-              /* on task's termination */
-              initialLR = ec.ec_LR;
-              ec.ec_LR = (ULONG)ProgramExit;
+            /* set our own exit-function to notify the debugger */
+            /* on task's termination */
+            initialLR = ec.ec_LR;
+            ec.ec_LR = (ULONG)ProgramExit;
 
-              lf = &loadfile;
-            }
-            else
-              RemExcHandler(xhdlC);
+            lf = &loadfile;
           }
         }
         else {
@@ -692,8 +710,10 @@ struct LoadFile *wosdb_load(char *name,char *args)
 }
 
 
-void wosdb_unload()
+void wosdb_unload(void)
 {
+  EndSnoopTask(snoopId);
+  snoopId = 0;
   if (dbTask) {
     remallbrkpts();
     if (xhdlL) {
@@ -704,7 +724,8 @@ void wosdb_unload()
       RemExcHandler(xhdlC);
       xhdlC = NULL;
     }
-    DeleteTaskPPC(dbTask);
+    if (nSecs > 0)
+      DeleteTaskPPC(dbTask);
     dbTask = NULL;
   }
   if (taskpool) {
@@ -712,6 +733,75 @@ void wosdb_unload()
     taskpool = NULL;
   }
   taskloaded = FALSE;
+}
+
+
+struct LoadFile *wosdb_catch(void)
+{
+  static struct LoadFile loadfile;
+  static char dummy_task_name[16];
+  struct TagItem ti[16];
+  ULONG sigmsk;
+
+  /* install a global exception handler to catch any exception */
+  ti[0].ti_Tag = EXCATTR_CODE;
+  ti[0].ti_Data = (ULONG)ExceptionCatch;
+  ti[1].ti_Tag = EXCATTR_DATA;
+  ti[1].ti_Data = r2();
+  ti[2].ti_Tag = EXCATTR_EXCID;
+  ti[2].ti_Data = EXCF_MCHECK | EXCF_DACCESS | EXCF_IACCESS |
+                  EXCF_ALIGN | EXCF_PROGRAM | EXCF_FPUN |
+                  EXCF_TRACE | EXCF_IABR;
+  ti[3].ti_Tag = EXCATTR_FLAGS;
+  ti[3].ti_Data = EXCF_GLOBAL | EXCF_LARGECONTEXT;
+  ti[4].ti_Tag = EXCATTR_PRI;
+  ti[4].ti_Data = 127;
+  ti[5].ti_Tag = TAG_DONE;
+
+  if (xhdlC = SetExcHandler(ti)) {
+    /* Wait for a exception or CTRL-C */
+    sigmsk = WaitPPC(SIGBREAKF_CTRL_C | (1L<<sigExcept));
+    RemExcHandler(xhdlC);
+
+    if (sigmsk & SIGBREAKF_CTRL_C)
+      return NULL;
+
+    if (set_exc_handlers()) {
+      if (taskpool = CreatePoolPPC(0,0x4000,0x2000)) {
+        NewListPPC((struct List *)&breakpoints);
+        taskloaded = TRUE;
+
+        loadfile.name = dbTask->tp_Task.tc_Node.ln_Name;
+        if (loadfile.name == NULL) {
+          sprintf(dummy_task_name,"Task%08lx",(ULONG)dbTask);
+          loadfile.name = dummy_task_name;
+        }
+        loadfile.sections = nSecs = 0;
+        loadfile.symbols = nSyms = 0;
+        loadfile.firstsec = firstSec = NULL;
+        loadfile.breakpoints = &breakpoints;
+        loadfile.specregs = &spr;
+
+        /* set an exit-callback, now since we control that task */
+        ti[0].ti_Tag = SNOOP_TYPE;
+        ti[0].ti_Data = SNOOP_EXIT;
+        ti[1].ti_Tag = SNOOP_CODE;
+        ti[1].ti_Data = (ULONG)SnoopTaskExit;
+        ti[2].ti_Tag = SNOOP_DATA;
+        ti[2].ti_Data = r2();
+        ti[3].ti_Tag = TAG_DONE;
+        snoopId = SnoopTask(ti);
+
+        return &loadfile;
+      }
+      else {
+        RemExcHandler(xhdlL);
+        RemExcHandler(xhdlC);
+      }
+    }
+  }
+
+  return NULL;
 }
 
 
@@ -761,13 +851,25 @@ ULONG wosdb_cont(BOOL strace,BOOL btrace)
 }
 
 
-ULONG wosdb_taskresult()
+void wosdb_release(void)
+/* release a debugged task and let it run uncontrolled */
+{
+  ULONG sigmsk,eid;
+
+  sTrace = bTrace = FALSE;
+  remallbrkpts();
+  SignalPPC(dbTask,1L<<sigRun);  /* let the task run */
+  wosdb_unload();
+}
+
+
+ULONG wosdb_taskresult(void)
 {
   return (result);
 }
 
 
-char *wosdb_exceptinfo()
+char *wosdb_exceptinfo(void)
 {
   switch (ec.ec_ExcID) {
     case EXCF_MCHECK:
@@ -946,13 +1048,13 @@ ULONG wosdb_getexp(char *buf)
 }
 
 
-struct SpecRegs *wosdb_getspecregs()
+struct SpecRegs *wosdb_getspecregs(void)
 {
   return (&spr);
 }
 
 
-struct EXCContext *wosdb_init()
+struct EXCContext *wosdb_init(void)
 {
   if ((sigExcept = AllocSignalPPC(-1)) < 0)
     return (NULL);
@@ -965,7 +1067,7 @@ struct EXCContext *wosdb_init()
 }
 
 
-void wosdb_exit()
+void wosdb_exit(void)
 {
   wosdb_unload();
   FreeSignalPPC(sigFinish);

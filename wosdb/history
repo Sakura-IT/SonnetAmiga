@@ -2,6 +2,15 @@ wosdb history
 =============
 
 
+v0.5    03-Jun-17
+        o New command 'c' to catch any exception in the system. The
+          catched task can be debugged normaly thereafter. Although a
+          PPC task started inside a CLI will not terminate until the
+          CLI is closed (which is a problem in WarpOS).
+        o Fixed TBL and TBU in register display.
+        o Updated to PPC disassembler module V1.6.
+
+
 V0.4c	10-Mar-01
 	o An access to 0x00000004 caused a DSI exception, which has to
 	  be emulated by the WarpUp kernel. An ugly side-effect is, that
@@ -9,6 +18,7 @@ V0.4c	10-Mar-01
 	  be traced and will be skipped in trace-mode.
 	o New PPC disasssembler module 1.3, which fixes float-instructions
 	  with four operands (the last two ones were swapped).
+
 
 V0.4b	09-Nov-00
 	o New PPC disassembler module V1.2, which fixes mffs, mtfsf, mtfsfi.

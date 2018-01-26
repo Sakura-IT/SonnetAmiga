@@ -1,9 +1,11 @@
-/* $VER: debugger.h V0.3a (06.05.99)
+/* $VER: debugger.h V0.5 (03.06.17)
  *
  * This file is part of the WarpOS debugger 'wosdb'
- * Copyright (c) 1999-2001  Frank Wille
+ * Copyright (c) 1999-2001,2017  Frank Wille
  *
  *
+ * v0.5  (03.06.17) phx
+ *       New command 'c' to catch any exception.
  * v0.3a (06.05.99) phx
  *       Removed wosdb_breakpointlist() - struct LoadFile is sufficient.
  *       wosdb_load() supports argument string.
@@ -19,7 +21,10 @@
 #ifndef DEBUGGER_H
 #define DEBUGGER_H
 
+#pragma amiga-align
 #include <exec/lists.h>
+#pragma default-align
+
 #ifndef PPC_DISASM_H
 #include "ppc_disasm.h"
 #endif
@@ -27,8 +32,8 @@
 
 #define NAME "wosdb"
 #define VERSION 0
-#define REVISION 4
-#define PLEVEL 3
+#define REVISION 5
+#define PLEVEL 0
 
 #define TRAP_INS      0x7fe00008  /* trap instruction */
 
@@ -132,7 +137,9 @@ struct Breakpoint *wosdb_hidebreakpoint(ADDR);
 void wosdb_showbreakpoint(struct Breakpoint *);
 struct LoadFile *wosdb_load(char *,char *);
 void wosdb_unload(void);
+struct LoadFile *wosdb_catch(void);
 ULONG wosdb_cont(BOOL,BOOL);
+void wosdb_release(void);
 ULONG wosdb_taskresult(void);
 char *wosdb_exceptinfo(void);
 char *wosdb_symbol(ADDR);

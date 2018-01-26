@@ -1,9 +1,12 @@
-## $VER: exchandler.s V0.4c (17.02.01)
+## $VER: exchandler.s V0.5 (25.11.17)
 ##
 ## This file is part of the WarpOS debugger 'wosdb'
-## Copyright (c) 1999-2001  Frank Wille
+## Copyright (c) 1999-2001,2017  Frank Wille
 ##
 ##
+## v0.5  (25.11.17) phx
+##       Use mftb instead of SPR268,269.
+##       Implemented SnoopTaskExit to terminate catched tasks.
 ## v0.4c (17.02.01) phx
 ##       Data-access to ExecBase at address 4 has to be emulated by
 ##       WarpUp kernel. Currently this has the effect that the following
@@ -87,9 +90,9 @@ _ExceptionCatch:
 	stw	r0,16(r3)	# EAR
 	mfspr	r0,22
 	stw	r0,20(r3)	# DEC
-	mfspr	r0,268
+	mftbu	r0
 	stw	r0,24(r3)	# TBU
-	mfspr	r0,269
+	mftbl	r0
 	stw	r0,28(r3)	# TBL
 
 	li	r4,0
@@ -226,6 +229,41 @@ _ProgramExit:
 	.global	_ProgramExitEnd
 _ProgramExitEnd:
 
+
+	.align	3
+	.globl	_SnoopTaskExit
+_SnoopTaskExit:
+# called by WarpOS when any task exits
+# r3 = PPCTask
+	mflr	r0
+	stw	r0,8(r1)
+	stwu	r1,-32(r1)
+	stw	r2,24(r1)
+	stw	r31,28(r1)
+
+	mr	r31,r3
+	bl	___getr2	# get debugger's TOC pointer
+	lwz	r11,_dbTask(r2)
+	cmpw	r11,r31		# did our debugged task exit?
+	bne+	.return
+
+	lwz	r3,_PowerPCBase(r2)
+	lwz	r4,_thisTask(r2)
+	li	r5,1
+	lwz	r6,_sigFinish(r2)
+	slw	r5,r5,r6
+	CALLWOS	SignalPPC	# tell debugger about task termination
+
+	li	r0,0		# @@@ how do we get this task's return code?
+	stw	r0,_result(r2)
+
+.return:
+	lwz	r2,24(r1)
+	lwz	r31,28(r1)
+	addi	r1,r1,32
+	lwz	r0,8(r1)
+	mtlr	r0
+	blr
 
 
 	.lcomm	excStack,0x1000
