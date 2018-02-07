@@ -2900,20 +2900,24 @@ EInt:		b	.FPUnav				#0
 		andc.	r4,r0,r6
 		stw	r4,TC_SIGEXCEPT(r3)
 
-		stw	r2,-72(r1)
-		stw	r10,-68(r1)
+		stw	r2,-80(r1)
+		stw	r10,-76(r1)
+		stw	r11,-72(r1)
+		stw	r12,-68(r1)
 		stw	r13,-64(r1)
 		
-		subi	r1,r1,132
+		subi	r1,r1,140
 		lwz	r2,TC_EXCEPTDATA(r3)
 		lwz	r0,TC_EXCEPTCODE(r3)
 		mr	r3,r6
 		mtlr	r0
 		blrl
 			
-		addi	r1,r1,132
-		lwz	r2,-72(r1)
-		lwz	r10,-68(r1)
+		addi	r1,r1,140
+		lwz	r2,-80(r1)
+		lwz	r10,-76(r1)
+		lwz	r11,-72(r1)
+		lwz	r12,-68(r1)
 		lwz	r13,-64(r1)
 		
 		lwz	r5,TC_SIGEXCEPT(r4)

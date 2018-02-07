@@ -1445,10 +1445,15 @@ FreeMsgFrame:
 ;********************************************************************************************
 
 GetMsgFrame:
-		move.l a2,-(a7)				;Get next message send from the PPC
-		move.l EUMBAddr(pc),a2			;if available
-		move.l OFQPR(a2),a1		
-		move.l (a7)+,a2
+		movem.l a0/a2,-(a7)			;Get next message send from the PPC
+TooFast4U2	move.l EUMBAddr(pc),a2			;if available
+		move.l OFQPR(a2),a1
+		lea Previous2(pc),a0
+		move.l (a0),a2
+		cmp.l a1,a2
+		beq.s TooFast4U2			;To prevent duplicates (Is there a better way?)
+		move.l a1,(a0)
+		movem.l (a7)+,a0/a2
 		rts
 
 ;********************************************************************************************
@@ -2690,6 +2695,7 @@ pciconfig_addr		ds.l	1
 MirrorList		ds.l	3
 RemSysTask		ds.l	1
 Previous		ds.l	1
+Previous2		ds.l	1
 Options68K		ds.l	1
 ENVBuff			ds.l	1
 ENVOptions		ds.l	3
