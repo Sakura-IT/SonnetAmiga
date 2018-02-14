@@ -58,9 +58,17 @@
 .set option_SetCMemDiv,7
 .set option_VersionNB,11
 
-#LibBase:					All this stuff is PPC only! No access allowed from 68k!
+#LibBase:					68k bit. See powerpc/powerpc.h
 
-.set sonnet_DebugLevel,72
+.set PPC_SysLib,34
+.set PPC_DosLib,38
+.set PPC_SegList,42
+.set PPC_NearBase,46
+.set PPC_Flags,50
+.set PPC_DosVer,51
+.set PPC_PPCLib,52
+
+.set sonnet_DebugLevel,72			#All this stuff is PPC only! No access allowed from 68k!
 .set sonnet_EnAlignExc,73
 .set sonnet_EnDAccessExc,74
 .set sonnet_TaskExitCode,76
