@@ -132,7 +132,18 @@ NoWOS		lea DosLib(pc),a1
 		lea LDOSError(pc),a2
 		bra PrintError
 
-GotDOS		lea MemList(a6),a0
+GotDOS		moveq.l #PCI_VERSION,d0			;Minimal version of pci.library
+		lea pcilib(pc),a1
+		jsr _LVOOpenLibrary(a6)
+
+		move.l d0,PCIBase-Buffer(a4)
+		tst.l d0
+		bne.s FndPCI
+		
+		lea LPCIError(pc),a2
+		bra PrintError
+
+FndPCI		lea MemList(a6),a0
 		lea PCIMem(pc),a1			;Check for PCI DMA (GFX) memory
 		jsr _LVOFindName(a6)
 		move.l d0,d7
@@ -163,21 +174,22 @@ GotExp		move.l d0,a6
 WeirdMed	lea MedError(pc),a2
 		bra PrintError
 
-FoundMed	move.l d0,a0
-		move.l cd_BoardAddr(a0),d0
-		add.l #$800000,d0
-		move.l d0,a0
-		moveq.l #5,d0
-		
-NextCard	cmp.l #$57100400,(a0)
-		beq.s FoundCfg
-		lea $800(a0),a0				;each $800 hold a card
-		dbf d0,NextCard
+FoundMed	moveq.l #MAX_PCI_SLOTS-1,d6
+		move.l PCIBase(pc),a6
+NextCard	move.l d6,d0
+		lsl.l #3,d0
+		moveq.l #PCI_OFFSET_ID,d1
+		jsr _LVOPCIConfigReadLong(a6)
+		cmp.l #DEVICE_MPC107<<16|VENDOR_MOTOROLA,d0
+		beq FoundCfg
+		dbf d6,NextCard
 
 		lea NBridgeError(pc),a2
 		bra PrintError	
 		
-FoundCfg	move.l a0,pciconfig_addr-Buffer(a4)	;location of PCI configs
+FoundCfg	lsl.l #3,d6
+		move.l d6,ConfigDevNum-Buffer(a4)	;Number of the MPC107 card.
+		move.l ExpBase(pc),a6
 		sub.l a0,a0
 		move.l #VENDOR_ELBOX,d0			;ELBOX
 		move.l #MEDIATOR_LOGIC,d1		;Mediator Logic board for A3/4000
@@ -192,18 +204,7 @@ FoundCfg	move.l a0,pciconfig_addr-Buffer(a4)	;location of PCI configs
 		beq CorrectWindowJ			;WindowSize 512MB?
 
 		lea MedWindowJ(pc),a2
-		bra PrintError
-
-CorrectWindowJ	moveq.l #PCI_VERSION,d0			;Minimal version of pci.library
-		lea pcilib(pc),a1
-		jsr _LVOOpenLibrary(a6)
-
-		move.l d0,PCIBase-Buffer(a4)
-		tst.l d0
-		bne.s FndPCI
-		
-		lea LPCIError(pc),a2
-		bra PrintError
+		bra PrintError	
 
 Clean		move.l LExecBase(pc),a6
 		move.l ROMMem(pc),d0
@@ -228,7 +229,7 @@ ClsLib  	move.l d0,a1
 FreeROM		move.l d0,a1
 		jmp _LVOFreeVec(a6)
 
-FndPCI		jsr _LVODisable(a6)
+CorrectWindowJ	jsr _LVODisable(a6)
 		move.l d7,a1
 		jsr _LVORemove(a6)
 		lea MemList(a6),a0
@@ -350,20 +351,27 @@ loop2		move.l (a2)+,(a5)+			;Copy code to 0x3000
 		move.l ENVOptions(pc),$301c(a1)
 		move.l ENVOptions+4(pc),$3020(a1)
 		move.l ENVOptions+8(pc),$3024(a1)
-
+		move.l a1,-(a7)
 		jsr _LVOCacheClearU(a6)
 
-		move.l pciconfig_addr(pc),a2
-		move.w COMMAND(a2),d7
-		or.w #BUS_MASTER_ENABLE,d7
-		move.w d7,COMMAND(a2)			;Start MPC107. Does not work on Sonnet.
+		move.l PCIBase(pc),a6
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCI_OFFSET_COMMAND,d1
+		jsr _LVOPCIConfigReadWord(a6)
 
+		move.l d0,d2
+		or.w #BUS_MASTER_ENABLE,d2
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCI_OFFSET_COMMAND,d1
+		jsr _LVOPCIConfigWriteWord(a6)		;Start MPC107. Does not work on Sonnet.
+
+		move.l LExecBase(pc),a6
+		move.l (a7)+,a1		
 		move.l #WP_TRIG01,WP_CONTROL(a3)	;Negate HRESET. Now code gets executed
 							;at 0xfff00100 which jumps to 0xfff03000
 							;Only available on Sonnet
-
 		move.l	#$EC0000,d7			;Simple Time-out timer
-		
+
 Wait		subq.l #1,d7
 		beq.s TimeOut
 		move.l $3004(a1),d5
@@ -2691,7 +2699,7 @@ OpenLibAddress		ds.l	1
 AllocMemAddress		ds.l	1
 LoadSegAddress		ds.l	1
 NewLoadSegAddress	ds.l	1
-pciconfig_addr		ds.l	1
+ConfigDevNum		ds.l	1
 MirrorList		ds.l	3
 RemSysTask		ds.l	1
 Previous		ds.l	1
