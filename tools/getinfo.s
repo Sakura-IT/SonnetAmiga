@@ -34,6 +34,7 @@ PPCINFO_L2CACHE	EQU	$8010200A		;State of L2 Cache (on/off)
 PPCINFO_L2STATE	EQU	$8010200B		;L2 in copyback or writethrough?
 PPCINFO_L2SIZE	EQU	$8010200C
 HINFO_DSEXC_LOW EQU	$80103003
+CPUF_7410	EQU	$00800000
 
 ;************************************************************************************************
 
@@ -81,19 +82,21 @@ HINFO_DSEXC_LOW EQU	$80103003
 		cmp.l #CPUF_G3,d2
 		bne.s NoG3
 		lea CPU_750-infotext(a4),a3
-		move.l a3,0(a1)
-		bra.s GoPVR
-		
-NoG3		cmp.l #CPUF_G4,d2
-		bne.s NoG4
+		bra.s StoreCPU
+
+NoG3		move.l d2,d3
+		and.l #CPUF_G4,d2
+		beq.s NoG4
 		lea CPU_7400-infotext(a4),a3
-		move.l a3,0(a1)
-		bra.s GoPVR
+		and.l #CPUF_7410,d3
+		beq.s StoreCPU
+		lea CPU_7410-infotext(a4),a3
+		bra.s StoreCPU
 
 NoG4		lea CPU_Unknown-infotext(a4),a3
-		move.l a3,0(a1)
-		
-GoPVR		move.l 12(a2),4(a1)
+
+StoreCPU	move.l a3,0(a1)		
+		move.l 12(a2),4(a1)
 		move.l 20(a2),d2
 		move.l #1000000,d3
 		divu.l d3,d2
@@ -236,6 +239,7 @@ CPU_604E        dc.b    "PPC 604E",0
 CPU_620         dc.b    "PPC 620",0
 CPU_750		dc.b	"PPC 750",0
 CPU_7400	dc.b	"PPC 7400",0
+XPU_7410	dc.b	"PPC 7410",0
 CPU_Unknown     dc.b    "UNKNOWN",0
 CACHE_ON_U      dc.b    "ON and UNLOCKED",0
 CACHE_OFF_U     dc.b    "OFF and UNLOCKED",0
