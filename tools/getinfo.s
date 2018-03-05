@@ -239,7 +239,7 @@ CPU_604E        dc.b    "PPC 604E",0
 CPU_620         dc.b    "PPC 620",0
 CPU_750		dc.b	"PPC 750",0
 CPU_7400	dc.b	"PPC 7400",0
-XPU_7410	dc.b	"PPC 7410",0
+CPU_7410	dc.b	"PPC 7410",0
 CPU_Unknown     dc.b    "UNKNOWN",0
 CACHE_ON_U      dc.b    "ON and UNLOCKED",0
 CACHE_OFF_U     dc.b    "OFF and UNLOCKED",0
