@@ -297,6 +297,7 @@
 .set CPUF_G4,			0x00400000
 .set CPUF_750,			0x00200000
 .set CPUF_7400,			0x00400000
+.set CPUF_7410,			0x00800000
 
 .set EXC_GLOBAL,0            				#global handler
 .set EXC_LOCAL,1             				#task dependant handler

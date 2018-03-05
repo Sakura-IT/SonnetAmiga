@@ -1177,14 +1177,23 @@ GetInfo:
 		b	.NextInList
 
 .INFO_CPU:	lwz	r7,sonnet_CPUInfo(r30)
-		rlwinm	r7,r7,16,28,31
-		andi.	r7,r7,4
-		beq+	.G3
-		loadreg r7,CPUF_G4
-		b	.GotCPU		
-.G3:		loadreg	r7,CPUF_G3
+		rlwinm	r0,r7,20,24,31
+		cmpwi	r0,0x80
+		beq	.G3
+		cmpwi	r0,0x88
+		beq	.G3
+		lis	r7,CPUF_7400@h
+		cmpwi	r0,0xc0
+		beq	.GotCPU
+		cmpwi	r0,0xc1
+		beq	.GotNitro
+		li	r7,0
 		b	.GotCPU
-		
+.GotNitro:	oris	r7,r7,CPUF_7410@h
+		b	.GotCPU		
+.G3:		lis	r7,CPUF_G3@h
+		b	.GotCPU
+
 .INFO_PVR:	lwz	r7,sonnet_CPUInfo(r30)
 .GotCPU:	stw	r7,4(r4)
 		b	.NextInList
