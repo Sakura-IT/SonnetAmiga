@@ -136,7 +136,7 @@ GotDOS		moveq.l #PCI_VERSION,d0			;Minimal version of pci.library
 		lea pcilib(pc),a1
 		jsr _LVOOpenLibrary(a6)
 
-		move.l d0,PCIBase-Buffer(a4)
+		move.l d0,PCIBase-Buffer(a4)		
 		tst.l d0
 		bne.s FndPCI
 		
@@ -171,10 +171,51 @@ GotExp		move.l d0,a6
 		tst.l d0
 		bne.s FoundMed
 
+		sub.l a0,a0
+		move.l #VENDOR_ELBOX,d0			;ELBOX
+		moveq.l #MEDIATOR_1200TX,d1		;Mediator 1200TX
+		jsr _LVOFindConfigDev(a6)		;Find 1200TX mediator
+		tst.l d0
+		bne.s FoundMed1200
+
 WeirdMed	lea MedError(pc),a2
 		bra PrintError
 
-FoundMed	moveq.l #MAX_PCI_SLOTS-1,d6
+FoundMed1200	sub.l a0,a0
+		move.l #VENDOR_ELBOX,d0			;ELBOX
+		moveq.l #MEDIATOR_1200LOGIC,d1		;Mediator Logic stuff for A1200
+		jsr _LVOFindConfigDev(a6)
+		move.l LExecBase(pc),a6
+		tst.l d0
+		beq.s WeirdMed
+				
+		move.l PCIBase(pc),a1
+		move.w LIB_REVISION(a1),d0
+		cmp.w #3,d0
+		bge.s CorrectRev
+
+		lea LPCIError(pc),a2
+		bra PrintError
+		
+CorrectRev	move.l d0,MediatorType-Buffer(a4)
+		bra.s TestForMPC107
+
+FoundMed	sub.l a0,a0
+		move.l #VENDOR_ELBOX,d0			;ELBOX
+		move.l #MEDIATOR_LOGIC,d1		;Mediator Logic board for A3/4000
+		jsr _LVOFindConfigDev(a6)
+		tst.l d0
+		beq.s WeirdMed
+
+		move.l d0,a1
+		move.l cd_BoardSize(a1),d0		;Start address Configspace Mediator
+		cmp.l #$20000000,d0
+		beq TestForMPC107			;WindowSize 512MB?
+
+		lea MedWindowJ(pc),a2
+		bra PrintError
+
+TestForMPC107	moveq.l #MAX_PCI_SLOTS-1,d6
 		move.l PCIBase(pc),a6
 NextCard	move.l d6,d0
 		lsl.l #3,d0
@@ -189,22 +230,7 @@ NextCard	move.l d6,d0
 		
 FoundCfg	lsl.l #3,d6
 		move.l d6,ConfigDevNum-Buffer(a4)	;Number of the MPC107 card.
-		move.l ExpBase(pc),a6
-		sub.l a0,a0
-		move.l #VENDOR_ELBOX,d0			;ELBOX
-		move.l #MEDIATOR_LOGIC,d1		;Mediator Logic board for A3/4000
-		jsr _LVOFindConfigDev(a6)
-		tst.l d0
-		beq.s WeirdMed
-
-		move.l d0,a1
-		move.l LExecBase(pc),a6
-		move.l cd_BoardSize(a1),d0		;Start address Configspace Mediator
-		cmp.l #$20000000,d0
-		beq CorrectWindowJ			;WindowSize 512MB?
-
-		lea MedWindowJ(pc),a2
-		bra PrintError	
+		bra.s AllCorrect
 
 Clean		move.l LExecBase(pc),a6
 		move.l ROMMem(pc),d0
@@ -229,7 +255,8 @@ ClsLib  	move.l d0,a1
 FreeROM		move.l d0,a1
 		jmp _LVOFreeVec(a6)
 
-CorrectWindowJ	jsr _LVODisable(a6)
+AllCorrect	move.l LExecBase(pc),a6
+		jsr _LVODisable(a6)
 		move.l d7,a1
 		jsr _LVORemove(a6)
 		lea MemList(a6),a0
@@ -496,9 +523,23 @@ GotLibMade	move.l SonnetBase(pc),a1
 GotWarp		move.l d0,a1
 		jsr _LVOAddLibrary(a6)
 
+		move.l #$4000,d0
+		moveq.l #0,d1
+		jsr _LVOAllocVec(a6)			;No Error code yet
+		tst.l d0
+		bne.s GotBuffMem
+	
+		lea GenMemError(pc),a2
+		bra PrintError
+		
+GotBuffMem	move.l d0,FIFOBuffer-Buffer(a4)
 		lea MyInterrupt(pc),a1
 		lea SonInt(pc),a2
-		move.l a2,IS_CODE(a1)
+		move.b Options68K+1(pc),d0
+		beq.s GotMyInt
+		
+		lea SonInt1200(pc),a2
+GotMyInt	move.l a2,IS_CODE(a1)
 		lea IntData(pc),a2
 		move.l a2,IS_DATA(a1)
 		lea IntName(pc),a2
@@ -792,10 +833,17 @@ NoSetCMemDiv	move.l SonAddr(pc),a3
 		move.b PCI_REVISION(a3),11(a5)		;Check for Sonnet or Nortel (12 or 13)
 		lea DisHunkPatch(pc),a1
 		bsr DoENV
-		bmi.s NoDisHunkPatch
 		lea Options68K(pc),a5
+		bmi.s NoDisHunkPatch
 		move.b (a3),(a5)
-NoDisHunkPatch	rts		
+NoDisHunkPatch	lea SetCPUComm(pc),a1
+		bsr DoENV
+		moveq.l #1,d2
+		move.l MediatorType(pc),d1
+		beq.s DoneCPUComm
+		move.b d2,(a3)
+DoneCPUComm	move.b (a3),1(a5)
+DoneENV		rts		
 
 DoENV		move.l a1,d1
 		lea ENVBuff(pc),a1
@@ -835,9 +883,14 @@ MasterControl:
 		tst.l d0
 		beq.s MasterControl
 		move.l d0,MCPort(a4)
+		lea MasterControlPort(pc),a0
+		move.l d0,(a0)
 		move.l d6,Init(a4)			;Start phase 2 of PPC setup
 		move.l d0,d6				;which moves it from fff00000 to 00000000
 		jsr _LVOCacheClearU(a6)			;and sets up all the exception handlers
+		
+		move.b Options68K+1(pc),d0
+		bne NextMsg1200
 
 NextMsg		move.l d6,a0
 
@@ -859,13 +912,97 @@ CheckMsg	move.l d0,a1
 		bne.s NoXReply
 	
 		move.l LN_NAME(a1),d0
-		bne.s MsgRXMSG
+		bne MsgRXMSG
 		
 		lea IllegalMsg(pc),a2
 		bsr PrintError2
 		bra.s GetLoop
 		
 NoXReply	move.l MN_IDENTIFIER(a1),d0
+		cmp.l #"T68K",d0			;Message to 68K
+		beq MsgMir68
+		cmp.l #"LL68",d0			;Low level message to 68K
+		beq MsgLL68
+		cmp.l #"FREE",d0			;Async FreeMem/FreeVec() call. Not implemented in ppcfunctions.p
+		beq MsgFree
+		cmp.l #"DBG!",d0			;Print debug info
+		beq PrintDebug
+		cmp.l #"DBG2",d0			;Print debug info
+		beq PrintDebug2
+		cmp.l #"CRSH",d0			;Print WarpOS like crash window
+		beq Crashed
+		bra.s GetLoop
+
+;********************************************************************************************
+;********************************************************************************************
+
+NextMsg1200	move.l d6,a0
+		moveq.l #0,d0
+		move.l d0,d1
+		move.b MP_SIGBIT(a0),d1
+		bset d1,d0
+		jsr _LVOWait(a6)			;we wait for messages from our 68k interrupt	
+
+GetLoop1200	move.l d6,a0
+		jsr _LVOGetMsg(a6)
+
+		move.l d0,d7
+		bne CheckMsg1200
+		
+		jsr _LVODisable(a6)
+
+CheckFIFO	move.w FIFORead(pc),d0
+		move.w FIFOWrite(pc),d1
+		cmp.w d1,d0
+		beq.s EmptyFIFO		
+		
+		move.l FIFOBuffer(pc),a2
+		move.l (0,a2,d0.w*4),a1
+		addq.w #1,d0
+		and.w #$fff,d0
+		lea FIFORead(pc),a2
+		move.w d0,(a2)
+		
+		move.l MN_IDENTIFIER(a1),d0
+		cmp.l #"T68K",d0
+		beq MsgT68k
+		cmp.l #"END!",d0
+		beq MsgT68k
+		cmp.l #"FPPC",d0
+		beq MsgFPPC
+		cmp.l #"XMSG",d0
+		beq MsgXMSG
+		cmp.l #"SIG!",d0
+		beq MsgSignal68k
+		cmp.l #"RX68",d0
+		beq MsgRetX
+		cmp.l #"GETV",d0
+		beq LoadD
+		and.l #$ffffff00,d0
+		cmp.l #$50555400,d0
+		beq StoreD
+		move.l a1,d0
+		bra.s CheckMsg1200
+
+EmptyFIFO	jsr _LVOEnable(a6)
+
+		move.l d6,a0
+		clr.l MP_MSGLIST+MLH_TAIL(a0)		;SoftCinema bug/quirk?
+		bra NextMsg1200
+							
+CheckMsg1200	move.l d0,a1	
+		move.b LN_TYPE(a1),d0
+		cmp.b #NT_REPLYMSG,d0
+		bne.s NoXReply1200
+	
+		move.l LN_NAME(a1),d0
+		bne.s MsgRXMSG
+		
+		lea IllegalMsg(pc),a2
+		bsr PrintError2
+		bra GetLoop1200
+		
+NoXReply1200	move.l MN_IDENTIFIER(a1),d0
 		cmp.l #"T68K",d0			;Message to 68K
 		beq MsgMir68
 		cmp.l #"LL68",d0			;Low level message to 68K
@@ -878,7 +1015,12 @@ NoXReply	move.l MN_IDENTIFIER(a1),d0
 		beq PrintDebug2
 		cmp.l #"CRSH",d0			;Print WarpOS like crash window
 		beq Crashed
-		bra.s GetLoop
+		bra GetLoop1200
+
+
+ReturnLoop	move.b Options68K+1(pc),d0
+		bne GetLoop1200
+		bra GetLoop
 
 ;********************************************************************************************		
 
@@ -897,7 +1039,7 @@ MsgRXMSG	move.l a1,a2
 		move.l LN_NAME(a2),MN_REPLYPORT(a2)
 
 		bsr SendMsgFrame			;Send response from XMSG back to PPC
-		bra GetLoop
+		bra ReturnLoop
 
 ;********************************************************************************************
 
@@ -917,7 +1059,7 @@ RtnLL		move.l LExecBase(pc),a6
 		move.l (a7)+,a1
 		move.l a1,d5
 		bsr CreateMsgFrame			;Get message for reply
-		
+
 		move.l a0,d7
 		move.l d0,MN_PPSTRUCT+6*4(a0)
 		move.l #"DNLL",MN_IDENTIFIER(a0)
@@ -936,7 +1078,7 @@ RtnLL		move.l LExecBase(pc),a6
 		move.l d5,a0
 		bsr FreeMsgFrame			;Free original LL68 message
 
-		bra GetLoop
+		bra ReturnLoop
 
 ;********************************************************************************************
 
@@ -953,7 +1095,7 @@ MsgFree		move.l MN_PPSTRUCT+0*4(a1),a6		;Asynchronous FreeMem call from the PPC.
 RtnFree		move.l LExecBase(pc),a6
 		move.l (a7)+,a0
 		bsr FreeMsgFrame
-		bra GetLoop
+		bra ReturnLoop
 		
 ;********************************************************************************************
 
@@ -979,7 +1121,8 @@ GetPPCName	addq.l #1,d1
 		sub.l d1,a7
 		move.l a7,a2
 		move.l MN_ARG0(a1),a0
-CopyPPCName	move.b (a0)+,(a2)+
+CopyPPCName	move.b (a0)+,d2
+		move.b d2,(a2)+
 		dbf d2,CopyPPCName
 
 		move.l #"_68K",(a2)+			;add _68K to PPC mirror task name
@@ -1005,7 +1148,7 @@ CopyPPCName	move.b (a0)+,(a2)+
 		lea pr_MsgPort(a0),a0
 		jsr _LVOPutMsg(a6)
 
-		bra GetLoop
+		bra ReturnLoop
 
 ;********************************************************************************************
 
@@ -1020,23 +1163,33 @@ DebugEnd	move.l a1,a3
 		move.l a3,a0
 		bsr FreeMsgFrame
 		move.l LExecBase(pc),a6
-		bra GetLoop
+		bra ReturnLoop
 		
 ;********************************************************************************************		
 ;********************************************************************************************
 
 MirrorTask	move.l LExecBase(pc),a6			;Mirror task for PPC task
-		move.l ThisTask(a6),a0			;set up by MsgMir68
-		
-		or.b #TF_PPC,TC_FLAGS(a0)
-		lea pr_MsgPort(a0),a0
+		move.l ThisTask(a6),a3			;set up by MsgMir68
+
+		lea pr_MsgPort(a3),a0
 		move.l a0,d6
 		jsr _LVOWaitPort(a6)
 
-Error		jsr _LVOCreateMsgPort(a6)		;Make a seperate msgport to prevent
+		bclr #TB_PPC,TC_FLAGS(a3)
+
+		jsr _LVOCreateMsgPort(a6)		;Make a seperate msgport to prevent
+		
+		bset #TB_PPC,TC_FLAGS(a3)
+
 		tst.l d0				;DOS packet gurus
-		beq.s Error
-		move.l d0,-(a7)
+		bne GotMirMsgPort
+
+		lea GenMemError(pc),a2
+		bsr PrintError2
+
+HaltMirror	bra.s HaltMirror	
+		
+GotMirMsgPort	move.l d0,-(a7)
 		
 CleanUp		move.l d6,a0
 		jsr _LVOGetMsg(a6)			;Make sure the original msgport is empty
@@ -1169,11 +1322,11 @@ IntMsgLoop	moveq.l #11,d4
 		beq LoadD
 		and.l #$ffffff00,d0
 		cmp.l #$50555400,d0
-		beq.s StoreD		
+		beq StoreD		
 		
 CommandMaster	move.l d3,a1
 		move.l MN_MCPORT(a1),a0
-DoPutMsg	jsr _LVOPutMsg(a6)
+		jsr _LVOPutMsg(a6)
 		bra.s NxtMsg
 
 DidInt		move.l d5,d0
@@ -1187,6 +1340,92 @@ InvMsg		cinvl dc,(a1)				;040+
 		rts
 
 IntData		dc.l 0
+
+;********************************************************************************************
+
+SonInt1200:	movem.l d1-a6,-(a7)			;68K interrupt which distributes
+		moveq.l #0,d5				;messages send by the PPC
+
+		move.l LExecBase(pc),a6
+		jsr _LVODisable(a6)
+
+		move.l MediatorType(pc),d0
+		beq.s NoWindowShift1
+
+		move.l PCIBase(pc),a6
+		jsr _LVOPCIGetZorroWindow(a6)
+
+		move.l d0,d7
+NoWindowShift1	move.l EUMBAddr(pc),a2
+		move.l a2,d6
+		
+		move.l MediatorType(pc),d0
+		beq.s NoWindowShift2
+		
+		move.l a2,d0
+		and.l #$7fffff,d6
+		add.l #$200000,d6
+
+		jsr _LVOPCISetZorroWindow(a6)
+
+		move.l d6,a2
+NoWindowShift2	move.l OMISR(a2),d3
+		and.l #OPQI,d3
+		beq.s DoNothingYet
+
+NxtMsg1200	move.l d6,a2
+		move.l OFQPR(a2),a1
+		move.l a1,d3
+
+		cmp.l #-1,d3
+		beq EmptyQueue
+
+		lea Previous2(pc),a1
+		move.l (a1),d5
+		cmp.l d5,d3
+		beq.s NxtMsg1200
+		
+		move.l d3,(a1)
+		moveq.l #1,d5
+		move.l FIFOBuffer(pc),a1
+		lea FIFOWrite(pc),a2
+		move.w (a2),d0
+		move.l d3,(0,a1,d0.w*4)
+		addq.w #1,d0
+		and.w #$fff,d0
+		move.w d0,(a2)
+		bra.s NxtMsg1200					
+							
+EmptyQueue	move.l LExecBase(pc),a6			;messages send by the PPC
+		move.l MasterControlPort(pc),a1
+		move.l a1,d0
+		beq.s DoNothingYet
+		
+		moveq.l #0,d0
+		move.l d0,d1
+		move.b MP_SIGBIT(a1),d1
+		bset d1,d0
+		move.l MP_SIGTASK(a1),a1		
+		jsr _LVOSignal(a6)
+				
+DoNothingYet	move.l MediatorType(pc),d0
+		beq.s NoWindowShift3
+
+		move.l PCIBase(pc),a6
+		move.l d7,d0
+		jsr _LVOPCISetZorroWindow(a6)
+		
+		move.l LExecBase(pc),a6
+NoWindowShift3	jsr _LVOEnable(a6)
+		move.l d5,d0
+
+		movem.l (a7)+,d1-a6
+		tst.l d0
+		rts
+
+NxtMsgLoop	move.b Options68K+1(pc),d0
+		beq NxtMsg
+		bra CheckFIFO
 
 ;********************************************************************************************
 
@@ -1206,7 +1445,7 @@ Putted		move.l #"DONE",d7
 		move.l a1,a0
 		bsr FreeMsgFrame
 
-		bra NxtMsg
+		bra NxtMsgLoop
 
 PutB		move.b d0,(a0)
 		bra.s Putted
@@ -1222,7 +1461,7 @@ LoadD		move.l #"DONE",d0
 		move.l a1,a0
 		bsr FreeMsgFrame
 
-		bra NxtMsg
+		bra NxtMsgLoop
 
 ;********************************************************************************************		
 		
@@ -1236,7 +1475,9 @@ MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
 		move.l MP_SIGTASK(a2),a2
 		move.l MN_ARG1(a1),TC_SIGALLOC(a2)
 		move.l MN_ARG2(a1),d0
-		bra DoPutMsg
+		
+DoPutMsg	jsr _LVOPutMsg(a6)
+		bra NxtMsgLoop
 
 ;********************************************************************************************
 
@@ -1245,7 +1486,7 @@ MsgFPPC		move.l MN_ARG1(a1),d0
 		move.l MP_SIGTASK(a2),a2
 		move.l d0,TC_SIGALLOC(a2)
 		jsr _LVOReplyMsg(a6)			;Ends the RunPPC function
-		bra NxtMsg
+		bra NxtMsgLoop
 		
 ;********************************************************************************************		
 
@@ -1291,7 +1532,7 @@ MsgSignal68k	move.l MN_PPSTRUCT+4(a1),d0		;Signal from a PPC task to 68K task
 		jsr _LVOSignal(a6)
 		move.l d7,a0
 		bsr FreeMsgFrame
-		bra NxtMsg
+		bra NxtMsgLoop
 		
 ;********************************************************************************************
 ;********************************************************************************************
@@ -1723,8 +1964,9 @@ NextSeg		lsl.l #2,d2
 		lea 4(a1),a2
 NextByte	lea PowerName(pc),a3
 NextName	subq.l #1,d2
-		bmi.s EndSeg		
-		cmp.b (a2)+,(a3)+		
+		bmi.s EndSeg
+		move.b (a2)+,d1
+		cmp.b (a3)+,d1
 		bne.s NextByte
 		tst.b -1(a3)
 		bne.s NextName
@@ -1858,6 +2100,7 @@ RunPPC:		link a5,#-12
 		move.l a0,PStruct(a5)
 		move.l LExecBase(pc),a6
 		move.l ThisTask(a6),a1
+		bclr #TB_PPC,TC_FLAGS(a1)		;DEBUGDEBUG
 		cmp.b #NT_PROCESS,LN_TYPE(a1)
 		beq.s IsProc
 
@@ -1889,7 +2132,7 @@ GiveASyncErr	moveq.l #PPERR_MISCERR,d7
 		bra EndIt
 
 GotMsgPort	move.l d0,Port(a5)
-		move.l #MEMF_PUBLIC|MEMF_REVERSE|MEMF_CLEAR,d1
+		move.l #MEMF_PUBLIC|MEMF_CLEAR,d1	;WAS MEMF_REVERSE
 		moveq.l #MT_SIZE,d0
 		jsr _LVOAllocVec(a6)
 		tst.l d0
@@ -1963,8 +2206,9 @@ GetCLIName	lsl.l #2,d0
 		bra.s CpName
 
 DoNameCp	move.l #(2043-TASKPPC_NAME),d0		;Name len limit		
-CpName		move.b (a1)+,(a2)
-		tst.b (a2)
+CpName		move.b (a1)+,d1
+		move.b d1,(a2)
+		tst.b d1
 		beq.s EndName
 		addq.l #1,a2
 		dbf d0,CpName
@@ -2047,7 +2291,8 @@ SetupCp		move.l a3,a1
 		lea MN_PPSTRUCT(a0),a2
 		moveq.l #PP_SIZE/4-1,d0
 
-CpMsg2		move.l (a3)+,(a2)+
+CpMsg2		move.l (a3)+,d1
+		move.l d1,(a2)+
 		dbf d0,CpMsg2
 
 		bsr SendMsgFrame
@@ -2101,7 +2346,7 @@ Stacker		move.l ThisTask(a6),a1
 							;the system like Heretic II.
 NoAdjustPri	move.l TC_SIGALLOC(a1),d0		
 		and.l #$fffff000,d0
-		
+
 		jsr _LVOWait(a6)
 
 		move.l Port(a5),a0		
@@ -2145,7 +2390,8 @@ DizDone		move.l a0,a2
 NoFrStackPtr	lea PP_REGS(a1),a1
 		lea MN_PPSTRUCT+PP_REGS(a2),a2
 		moveq.l #(PP_SIZE-PP_REGS)/4-1,d0
-CpBck		move.l (a2)+,(a1)+
+CpBck		move.l (a2)+,d7
+		move.l d7,(a1)+
 		dbf d0,CpBck
 		moveq.l #PPERR_SUCCESS,d7
 		bsr FreeMsgFrame
@@ -2153,6 +2399,9 @@ CpBck		move.l (a2)+,(a1)+
 
 Cannot		moveq.l #-1,d7
 EndIt		move.l d7,d0
+		move.l LExecBase(pc),a6
+		move.l ThisTask(a6),a1
+		bset #TB_PPC,TC_FLAGS(a1)
 		movem.l (a7)+,d1-a6
 		unlk a5
 		rts
@@ -2270,7 +2519,8 @@ NoFPU4		move.l LExecBase(pc),a6
 		
 		move.l a0,a3
 		moveq.l #MSG_LEN/4-1,d1
-DoReslt		move.l (a1)+,(a3)+
+DoReslt		move.l (a1)+,d7
+		move.l d7,(a3)+
 		dbf d1,DoReslt
 		
 		move.l #"DONE",MN_IDENTIFIER(a0)
@@ -2310,7 +2560,9 @@ NoFPU2		move.l a7,a0
 		
 ;********************************************************************************************
 
-CrossSignals	bsr CreateMsgFrame
+CrossSignals	move.l MediatorType(pc),d0	;debugdebug
+		bne DbgExit
+		bsr CreateMsgFrame
 
 		moveq.l #MSG_LEN/4-1,d0
 		move.l a0,a2
@@ -2324,7 +2576,7 @@ ClearMsg	clr.l (a2)+
 		
 		bsr SendMsgFrame
 		
-		rts
+DbgExit		rts				;debugdebug
 
 ;********************************************************************************************
 ;
@@ -2699,7 +2951,12 @@ OpenLibAddress		ds.l	1
 AllocMemAddress		ds.l	1
 LoadSegAddress		ds.l	1
 NewLoadSegAddress	ds.l	1
+MasterControlPort	ds.l	1
+FIFOBuffer		ds.l	1
+FIFORead		ds.w	1
+FIFOWrite		ds.w	1
 ConfigDevNum		ds.l	1
+MediatorType		ds.l	1
 MirrorList		ds.l	3
 RemSysTask		ds.l	1
 Previous		ds.l	1
@@ -2970,7 +3227,7 @@ DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 PowerPCError	dc.b	"Other PPC library already active (WarpOS/Sonnet)",0
 LDOSError	dc.b	"Could not open dos.library V37+",0
 LExpError	dc.b	"Could not open expansion.library V37+",0
-LPCIError	dc.b	"Could not open pci.library V13+",0
+LPCIError	dc.b	"Could not open pci.library V13.3+",0
 MedError	dc.b	"Could not find a supported Mediator board",0
 MemMedError	dc.b	"No system VGA memory detected (pcidma)",0
 SonnetError	dc.b	"No Sonnet card detected",0
@@ -3004,6 +3261,7 @@ EnPageSetup	dc.b	"sonnet/EnPageSetup",0			;5
 EnDAccessExc	dc.b	"sonnet/EnDAccessExc",0			;6
 DisHunkPatch	dc.b	"sonnet/DisHunkPatch",0			;7
 SetCMemDiv	dc.b	"sonnet/SetCMemDiv",0			;8
+SetCPUComm	dc.b	"sonnet/SetCPUComm",0			;9
 
 		cnop	0,4
 		
@@ -3028,8 +3286,17 @@ CrashMessage	dc.b	"Task name: '%s'  Task address: %08lx  Exception: %s",10
 		dc.b	"F16-F19:  %s   %s   %s   %s",10
 		dc.b	"F20-F23:  %s   %s   %s   %s",10
 		dc.b	"F24-F27:  %s   %s   %s   %s",10
-		dc.b	"F28-F31:  %s   %s   %s   %s",10,0
-				
+		dc.b	"F28-F31:  %s   %s   %s   %s",10,10,0
+		
+		dc.b	"V0-V3:    %s   %s   %s   %s",10		;Unused at the moment
+		dc.b	"V4-V7:    %s   %s   %s   %s",10
+		dc.b	"V8-V11:   %s   %s   %s   %s",10
+		dc.b	"V12-V15:  %s   %s   %s   %s",10
+		dc.b	"V16-V19:  %s   %s   %s   %s",10
+		dc.b	"V20-V23:  %s   %s   %s   %s",10
+		dc.b	"V24-V27:  %s   %s   %s   %s",10
+		dc.b	"V28-V31:  %s   %s   %s   %s",10,10,0
+
 RContinue	dc.b	"Continue",0
 
 		cnop	0,4

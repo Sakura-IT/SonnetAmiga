@@ -140,12 +140,14 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 		cmplw	r8,r4
 		ble	.NoMaxRam
 
+		mr	r28,r8
 		mr	r8,r4	
 
 .NoMaxRam:	lis	r27,0x8000			#Upper boundary PCI Memory Mediator
 		lwz	r26,base_RTGBase(r29)		#Get gfx mem (RTGBase)
 		cmplw	r26,r27
 		blt	.CheckJumper			#Is Zorro3
+		mr	r8,r28				#Restore full memory range
 		lis	r27,0x9000			#Zorro2 plus 256MB ATI
 		cmplw	r26,r27
 		beq	.GotUpperLimit
@@ -188,7 +190,13 @@ SetLen:		mr	r30,r28
 		slw	r30,r30,r25
 		slw	r30,r30,r28
 		subf	r27,r30,r27
-		lis	r26,EUMB@h
+
+		rlwinm.	r0,r27,1,31,31
+		beq	.UpperPCI
+
+		lis	r27,0x1000
+
+.UpperPCI:	lis	r26,EUMB@h
 		ori	r26,r26,ITWR
 		stwbrx	r25,0,r26			#Set size of Inbound Translate Window
 		sync
@@ -2371,7 +2379,7 @@ EInt:		b	.FPUnav				#0
 .IsRunning:	stb	r3,TC_STATE(r4)		
 		mr	r3,r4				
 		lwz	r4,TASKPPC_MSGPORT(r3)
-		
+
 .PutMsgIt:	lbz	r6,MP_SIGBIT(r4)
 		li	r8,1
 		slw	r8,r8,r6		
@@ -5270,7 +5278,6 @@ EInt:		b	.FPUnav				#0
 		lwz	r9,ThisPPCProc(r10)
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r9)
-
 		b	.TrySwitch			#Try to salvage the system
 
 #********************************************************************************************

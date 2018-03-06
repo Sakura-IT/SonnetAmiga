@@ -1031,20 +1031,19 @@ AllocVec68K:	prolog 228,'TOC'
 		mr	r3,r29
 		mr	r4,r29
 		li	r5,_LVOAllocVec32
-			
+
 		bl Run68KLowLevel
-										
-		mr.	r4,r3
+
+		mr.	r5,r3
 		beq	.AllocErr
-		
+
 		li	r4,CACHE_DCACHEINV
-		mr	r5,r3
 		mr	r30,r3
 		mr	r6,r31
 		mr	r3,r29
 		
 		bl SetCache
-		
+
 		mr	r3,r30
 		
 .AllocErr:	lwz	r8,0(r13)
@@ -1179,21 +1178,21 @@ GetInfo:
 .INFO_CPU:	lwz	r7,sonnet_CPUInfo(r30)
 		rlwinm	r0,r7,20,24,31
 		cmpwi	r0,0x80
-		beq	.G3
+		beq+	.G3
 		cmpwi	r0,0x88
-		beq	.G3
+		beq+	.G3
 		lis	r7,CPUF_7400@h
 		cmpwi	r0,0xc0
-		beq	.GotCPU
+		beq+	.GotCPU
 		cmpwi	r0,0xc1
-		beq	.GotNitro
+		beq+	.GotNitro
 		li	r7,0
 		b	.GotCPU
 .GotNitro:	oris	r7,r7,CPUF_7410@h
 		b	.GotCPU		
 .G3:		lis	r7,CPUF_G3@h
 		b	.GotCPU
-
+		
 .INFO_PVR:	lwz	r7,sonnet_CPUInfo(r30)
 .GotCPU:	stw	r7,4(r4)
 		b	.NextInList
@@ -4323,7 +4322,7 @@ CreateTaskPPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0				#default alignment
 		mr	r3,r23
- 
+
  		bl AllocVec68K
  
 		mr.	r3,r3 
@@ -4348,9 +4347,9 @@ CreateTaskPPC:
 		loadreg	r5,MEMF_PUBLIC|MEMF_CLEAR|MEMF_PPC
 		li	r6,0
 		mr	r3,r23
- 
+
  		bl AllocVec68K
- 
+
 		mr.	r3,r3 
 		beq-	.Error02			#Error NoMem 
  
@@ -4430,7 +4429,7 @@ CreateTaskPPC:
 		stw	r4,LN_NAME(r31)
  
 		bl CopyStr
- 
+
  		loadreg r4,TASKATTR_SYSTEM
 		li	r5,0 
 		mr	r6,r30 
@@ -4922,7 +4921,7 @@ CreateTaskPPC:
  		la	r4,sonnet_Atomic(r23)
 
  		bl AtomicDone
- 		
+
  		lwz	r4,sonnet_SnoopSem(r23)
 		mr	r3,r23
 		
