@@ -1300,7 +1300,7 @@ NxtMsg		bsr GetMsgFrame
 		beq DidInt
 		moveq.l #-1,d5
 
-IntMsgLoop	moveq.l #11,d4
+		moveq.l #11,d4
 		bsr.s InvMsg				;PCI memory is cache inhibited for 68k?
 		move.l d3,a1
 		
@@ -1323,10 +1323,9 @@ IntMsgLoop	moveq.l #11,d4
 		cmp.l #$50555400,d0
 		beq StoreD		
 		
-CommandMaster	move.l d3,a1
-		move.l MN_MCPORT(a1),a0
+CommandMaster	move.l MN_MCPORT(a1),a0
 		jsr _LVOPutMsg(a6)
-		bra.s NxtMsg
+		bra NxtMsgLoop
 
 DidInt		move.l d5,d0
 		movem.l (a7)+,d1-a6
@@ -1437,7 +1436,7 @@ StoreD		move.l MN_IDENTIFIER(a1),d7		;Handles indirect access from PPC
 		cmp.l #"PUTH",d7
 		beq.s PutH
 		cmp.l #"PUTW",d7
-		bne NxtMsg
+		bne NxtMsgLoop
 		move.l d0,(a0)
 Putted		move.l #"DONE",d7
 		move.l d7,MN_IDENTIFIER(a1)
@@ -3219,7 +3218,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.8 (26.01.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.8 (10.03.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
