@@ -136,7 +136,7 @@ GotDOS		moveq.l #PCI_VERSION,d0			;Minimal version of pci.library
 		lea pcilib(pc),a1
 		jsr _LVOOpenLibrary(a6)
 
-		move.l d0,PCIBase-Buffer(a4)		
+		move.l d0,PCIBase-Buffer(a4)
 		tst.l d0
 		bne.s FndPCI
 		
@@ -1017,7 +1017,6 @@ NoXReply1200	move.l MN_IDENTIFIER(a1),d0
 		beq Crashed
 		bra GetLoop1200
 
-
 ReturnLoop	move.b Options68K+1(pc),d0
 		bne GetLoop1200
 		bra GetLoop
@@ -1121,8 +1120,8 @@ GetPPCName	addq.l #1,d1
 		sub.l d1,a7
 		move.l a7,a2
 		move.l MN_ARG0(a1),a0
-CopyPPCName	move.b (a0)+,d2
-		move.b d2,(a2)+
+CopyPPCName	move.b (a0)+,d0
+		move.b d0,(a2)+
 		dbf d2,CopyPPCName
 
 		move.l #"_68K",(a2)+			;add _68K to PPC mirror task name
@@ -2573,9 +2572,9 @@ ClearMsg	clr.l (a2)+
 		move.l d1,MN_ARG0(a0)
 		move.l ThisTask(a6),a3
 		move.l a3,MN_ARG1(a0)
-		
+
 		bsr SendMsgFrame
-		
+
 DbgExit		rts				;debugdebug
 
 ;********************************************************************************************
