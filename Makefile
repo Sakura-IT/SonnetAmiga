@@ -23,10 +23,11 @@ TOOLS_INITPPC=InitPPC
 TOOLS_BOGOMIPS=bogomips
 WOSDB_N=wosdb
 WOSDB_WOSDB=wosdb
+VDA_VDAPPC=vdappc
 
 export
 
-all :  $(SONNETLIB_N) $(TOOLS_N) $(WOSDB_N)
+all :  $(SONNETLIB_N) $(TOOLS_N) $(WOSDB_N) $(VDA_VDAPPC)
 
 $(SONNETLIB_N) :
 	$(MAKE) -C $(SONNETLIB_N)
@@ -37,16 +38,20 @@ $(TOOLS_N) :
 $(WOSDB_N) :
 	$(MAKE) -C $(WOSDB_N)
 
+$(VDA_VDAPPC) :
+	$(MAKE) -C $(VDA_VDAPPC)
+
 clean :
 	$(MAKE) -C $(SONNETLIB_N) clean
 	$(MAKE) -C $(TOOLS_N) clean
 	$(MAKE) -C $(WOSDB_N) clean
+	$(MAKE) -C $(VDA_VDAPPC) clean
 	$(RM) $(DISTRIBUTION)
 
 distribution :
 	$(LHA) ao5 $(DISTRIBUTION) $(SONNETLIB_N)/$(POWERLIB_LIB) $(TOOLS_N)/$(TOOLS_GETINFO) $(TOOLS_N)/$(TOOLS_GETINFOPPC) $(TOOLS_N)/$(TOOLS_INITPPC) $(WOSDB_N)/$(WOSDB_WOSDB) $(TOOLS_N)/$(TOOLS_BOGOMIPS) README.md
 
-.PHONY: $(SONNETLIB_N) $(SONNETRUN_N) $(TOOLS_N) $(WOSDB_N)
+.PHONY: $(SONNETLIB_N) $(SONNETRUN_N) $(TOOLS_N) $(WOSDB_N) $(VDA_VDAPPC)
 
 include Makefile.inc.$(HOST)
 

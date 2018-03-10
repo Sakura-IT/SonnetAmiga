@@ -7,8 +7,7 @@ This project is an attempt at reimplementation of WarpOS for Sonnet Crescendo
 The main part of the project is a library, which aims at API and ABI
 compatibility with WarpOS powerpc.library.
 
-This project is in an early stage of development. Don't expect it to do
-anything useful (yet).
+This project is in an early beta stage of development.
 
 # Hardware
 
@@ -28,7 +27,7 @@ SonnetAmiga has the following hardware requirements:
 # Now also supporting
 
 - Force PowerPMC-250 MPC7410 card. Tested with 256MB SDRAM on-board.
-  Needs a PMC to PCI card with 3.3V regulator.  
+  Needs a PMC to PCI card with 3.3V regulator.
 
 
 # Software
@@ -87,7 +86,7 @@ SonnetAmiga project is licensed under MIT License, with some notable exceptions.
 The following components are *not* licensed under MIT:
 
 - Parts of `ppcfunctions.p` contain code reassembled from original WarpOS. This is the only file that contains offending code. Even though Sam Jordan agreed on code reuse, copyright on this code is held by Haage & Partner. This file should be rewritten to avoid potential legal disputes. See issue #2 on GitHub.
-- The low level WarpOS debugger (all files in `wosdb` directory) is copyright Frank Wille. The author has granted permission for inclusion in SonnetAmiga project, but anyone willing to further modify or use wosdb code (especially for commercial purposes) should contact the author first.
+- The low level WarpOS debugger and the disassembler vdappc (all files in `wosdb` and `vda` directories) are copyright Frank Wille. The author has granted permission for inclusion in SonnetAmiga project, but anyone willing to further modify or use the code (especially for commercial purposes) should contact the author first.
 - The bogomips program by Jeff Tranter is based on a Linux kernel code, therefore we assume it is covered by GNU GPL license.
 
 # Disclaimers
