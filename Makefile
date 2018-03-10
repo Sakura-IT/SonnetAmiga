@@ -23,7 +23,7 @@ TOOLS_INITPPC=InitPPC
 TOOLS_BOGOMIPS=bogomips
 WOSDB_N=wosdb
 WOSDB_WOSDB=wosdb
-VDA_VDAPPC=vdappc
+VDA_VDAPPC=vda
 
 export
 
