@@ -69,9 +69,9 @@
 		stw	r13,-4(r1)
 		subi	r13,r1,4
 	.if	\stacksize = ""
-		stwu	r1,-1080(r1)
+		stwu	r1,-1024(r1)
 	.else
-		stwu	r1,-(\stacksize+56)(r1)
+		stwu	r1,-(\stacksize+60)(r1)
 	.endif
 .endm
 

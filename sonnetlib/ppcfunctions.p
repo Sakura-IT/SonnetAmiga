@@ -9894,7 +9894,7 @@ StartCode:	bl	.StartRunPPC
 		mr	r3,r31
 		b	.DoneStack
 
-.NoStack:	stwu	r1,-60(r1)
+.NoStack:	stwu	r1,-68(r1)				#make sure stack is aligned on 32.
 .DoneStack:	lwz	r2,ThisPPCProc(r3)
 		stw	r30,TASKPPC_STARTMSG(r2)
 		lwz	r3,MN_ARG1(r8)
