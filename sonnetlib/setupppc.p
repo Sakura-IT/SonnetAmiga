@@ -164,8 +164,14 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 		bne	.NextCheck2
 		lis 	r27,0x5000
 		b	.GotUpperLimit
-		
-.NextCheck2:	cmpwi	r26,7
+
+.NextCheck2:	cmpwi	r26,3
+		bne	.NextCheck3
+		lis	r27,0x3000
+		mr	r8,r28
+		b	.GotUpperLimit
+
+.NextCheck3:	cmpwi	r26,7
 		bne	.GotUpperLimit
 		lis	r27,0x7000
 
