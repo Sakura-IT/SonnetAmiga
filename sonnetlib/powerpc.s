@@ -593,7 +593,7 @@ ContTimer	move.l SonnetBase(pc),a1
 		rol.w #8,d0
 		and.b #$fe,d0
 		move.l d0,OTWR(a3)			;0x40000000 or 0x60000000
-		add.b #$60,d0				;Translated to PPC PCI Memory
+		add.b #$60,d0
 		move.l d0,OMBAR(a3)			;0xa0000000-0xc0000000
 		
 		jsr _LVODisable(a6)
@@ -1980,6 +1980,8 @@ NextName	subq.l #1,d2
 
 EndSeg		move.l (a1),d2
 		bne NextSeg
+
+		move.l d7,d1
 
 DontDoOverlay	jsr _LVOUnLoadSeg(a6)
 DoNormalSeg	move.l LExecBase(pc),a1
