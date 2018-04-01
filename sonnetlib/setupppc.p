@@ -284,7 +284,7 @@ End:		mflr	r4
 		
 		stw	r13,-4(r1)
 		subi	r13,r1,4
-		stwu	r1,-284(r1)		
+		stwu	r1,-288(r1)		
 				
 		lwz	r3,PowerPCBase(r0)
 		
@@ -1979,7 +1979,7 @@ EInt:		b	.FPUnav				#0
 
 		mfsprg0	r0
 
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r4,40(r1)
 		stw	r3,44(r1)
 		stw	r0,48(r1)
@@ -2026,7 +2026,7 @@ EInt:		b	.FPUnav				#0
 
 		stwu	r1,-288(r1)
 
-		prolog	288,'TOC'
+		prolog	228,'TOC'
 		
 		mfxer	r0
 		stwu	r0,-4(r13)
@@ -3463,7 +3463,7 @@ EInt:		b	.FPUnav				#0
 
 		stw	r13,-4(r1)
 		subi	r13,r1,4
-		stwu	r1,-284(r1)
+		stwu	r1,-288(r1)
 		
 		loadreg	r0,MACHINESTATE_DEFAULT
 		mtsrr1	r0
@@ -3493,7 +3493,7 @@ EInt:		b	.FPUnav				#0
 
 		mfsprg0	r0
 
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r4,40(r1)
 		stw	r3,44(r1)
 		stw	r0,48(r1)
@@ -3531,7 +3531,7 @@ EInt:		b	.FPUnav				#0
 		
 		stwu	r1,-288(r1)
 
-		prolog	288,'TOC'
+		prolog	228,'TOC'
 
 		mfxer	r0
 		stwu	r0,-4(r13)
@@ -3711,7 +3711,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfsprg0	r0
 
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r4,40(r1)
 		stw	r3,44(r1)
 		stw	r0,48(r1)
@@ -3739,7 +3739,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfsprg0	r0
 
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r4,40(r1)
 		stw	r3,44(r1)
 		stw	r0,48(r1)
@@ -3767,7 +3767,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfsprg0	r0
 
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r4,40(r1)
 		stw	r3,44(r1)
 		stw	r0,48(r1)
@@ -3795,7 +3795,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfsprg0	r0
 
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r4,40(r1)
 		stw	r3,44(r1)
 		stw	r0,48(r1)
@@ -3823,7 +3823,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfsprg0	r0
 
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r4,40(r1)
 		stw	r3,44(r1)
 		stw	r0,48(r1)
@@ -3851,7 +3851,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfsprg0	r0
 
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r4,40(r1)
 		stw	r3,44(r1)
 		stw	r0,48(r1)
@@ -3879,7 +3879,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfsprg0	r0
 
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r4,40(r1)
 		stw	r3,44(r1)
 		stw	r0,48(r1)
@@ -3907,7 +3907,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfsprg0	r0
 		
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r4,40(r1)
 		stw	r3,44(r1)
 		stw	r0,48(r1)
@@ -4212,7 +4212,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfsprg0	r0
 
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r4,40(r1)
 		stw	r3,44(r1)
 		stw	r0,48(r1)
@@ -4240,7 +4240,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfsprg0	r0
 
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r4,40(r1)
 		stw	r3,44(r1)
 		stw	r0,48(r1)
@@ -4268,7 +4268,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfsprg0	r0
 
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r6,32(r1)
 		stw	r5,36(r1)
 		stw	r4,40(r1)
@@ -4341,7 +4341,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfsprg0	r0
 
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r4,40(r1)
 		stw	r3,44(r1)
 		stw	r0,48(r1)
@@ -4686,7 +4686,7 @@ EInt:		b	.FPUnav				#0
 		
 		mfsprg0	r0
 		
-		stwu	r1,-1080(r1)
+		stwu	r1,-1088(r1)
 		stw	r4,40(r1)
 		stw	r3,44(r1)
 		stw	r0,48(r1)
@@ -4873,8 +4873,84 @@ EInt:		b	.FPUnav				#0
 		stfd	f29,504(r1)
 		stfd	f30,512(r1)
 		stfd	f31,520(r1)
+		
+		lwz	r3,112(r1)
+		andis.	r3,r3,PSL_VEC@h
+		beq	.NoContextVMX
+		
+		li	r3,528+16
+		stvx	v0,r1,r3
+		
+		li	r3,528
+		mfvscr	v0
+		stvx	v0,r1,r3
+		addi	r3,r3,32
+		stvx	v1,r1,r3
+		addi	r3,r3,16
+		stvx	v2,r1,r3
+		addi	r3,r3,16
+		stvx	v3,r1,r3
+		addi	r3,r3,16
+		stvx	v4,r1,r3
+		addi	r3,r3,16
+		stvx	v5,r1,r3
+		addi	r3,r3,16
+		stvx	v6,r1,r3
+		addi	r3,r3,16
+		stvx	v7,r1,r3
+		addi	r3,r3,16
+		stvx	v8,r1,r3
+		addi	r3,r3,16
+		stvx	v9,r1,r3
+		addi	r3,r3,16
+		stvx	v10,r1,r3
+		addi	r3,r3,16
+		stvx	v11,r1,r3
+		addi	r3,r3,16
+		stvx	v12,r1,r3
+		addi	r3,r3,16
+		stvx	v13,r1,r3
+		addi	r3,r3,16
+		stvx	v14,r1,r3
+		addi	r3,r3,16
+		stvx	v15,r1,r3
+		addi	r3,r3,16
+		stvx	v16,r1,r3
+		addi	r3,r3,16
+		stvx	v17,r1,r3
+		addi	r3,r3,16
+		stvx	v18,r1,r3
+		addi	r3,r3,16
+		stvx	v19,r1,r3
+		addi	r3,r3,16
+		stvx	v20,r1,r3
+		addi	r3,r3,16
+		stvx	v21,r1,r3
+		addi	r3,r3,16
+		stvx	v22,r1,r3
+		addi	r3,r3,16
+		stvx	v23,r1,r3
+		addi	r3,r3,16
+		stvx	v24,r1,r3
+		addi	r3,r3,16
+		stvx	v25,r1,r3
+		addi	r3,r3,16
+		stvx	v26,r1,r3
+		addi	r3,r3,16
+		stvx	v27,r1,r3
+		addi	r3,r3,16
+		stvx	v28,r1,r3
+		addi	r3,r3,16
+		stvx	v29,r1,r3
+		addi	r3,r3,16
+		stvx	v30,r1,r3
+		addi	r3,r3,16
+		stvx	v31,r1,r3
+		
+		mfspr	r3,VRSAVE
+		stw	r3,1056(r1)
 
-		lwz	r2,EXCDATA_DATA(r4)
+.NoContextVMX:	lwz	r2,EXCDATA_DATA(r4)
 		la	r3,104(r1)
 
 		blrl
