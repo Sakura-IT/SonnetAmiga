@@ -1350,6 +1350,8 @@ DirtyMemCheck:
 
 		b	.EndForce
 
+#********************************************************************************************
+
 ConfigMem:	mflr	r15			#Code lifted from the Sonnet Driver
 		setpcireg MCCR4			#by Mastatabs from A1k fame
 
@@ -1454,7 +1456,7 @@ ConfigMem:	mflr	r15			#Code lifted from the Sonnet Driver
 
 loc_3BD8:	setpcireg MBEN			#Memory Bank Enable Register
 		mr	r25,r5
-		bl	ConfigWrite8		#enable Bank 0
+		bl	ConfigWrite8		#enable Bank as given in r5
 
 		stw	r4,0(r3)		#try to store "Boon" at address 0x0
 		eieio
@@ -1894,13 +1896,25 @@ loc_4184:
 		li	r25,0x32
 		bl	ConfigWrite8
 
+		setpcireg MBEN				#A0
+		mr	r25,r14
+		bl	ConfigWrite8
+
+		lis	r7,1
+		mtctr	r7
+		
+.MPC107Wait200us:
+		bdnz	.MPC107Wait200us
+
 		setpcireg MCCR1				#F0		
 		mr	r25,r13
 		bl	ConfigWrite32
 
-		setpcireg MBEN				#A0
-		mr	r25,r14
-		bl	ConfigWrite8
+		loadreg	r7,0x2ffff
+		mtctr	r7
+.MPC107Wait8Ref:
+		bdnz	.MPC107Wait8Ref
+
 	
 		mtlr	r15
 		
