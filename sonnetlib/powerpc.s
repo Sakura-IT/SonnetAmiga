@@ -191,7 +191,7 @@ FoundMed1200	sub.l a0,a0
 				
 		move.l PCIBase(pc),a1
 		move.w LIB_REVISION(a1),d0
-		cmp.w #3,d0
+		cmp.w #5,d0
 		bge.s CorrectRev
 
 		lea LPCIError(pc),a2
@@ -644,7 +644,42 @@ ContTimer	move.l SonnetBase(pc),a1
 		lea AllocMemAddress(pc),a3
 		move.l d0,(a3)
 
-		jsr _LVOCacheClearU(a6)
+		move.b Options68K+2(pc),d0
+		beq NoStackPatch
+
+		move.l #_LVOCreateProc,a0
+		lea CP1200(pc),a3
+		move.l a3,d0
+		move.l DosBase(pc),a1
+		jsr _LVOSetFunction(a6)			;To force memory allocations to MEMF_PPC
+		lea CPAddress(pc),a3
+		move.l d0,(a3)		
+		
+		move.l #_LVOCreateNewProc,a0
+		lea CNP1200(pc),a3
+		move.l a3,d0
+		move.l DosBase(pc),a1
+		jsr _LVOSetFunction(a6)			;To force memory allocations to MEMF_PPC
+		lea CNPAddress(pc),a3
+		move.l d0,(a3)		
+		
+		move.l #_LVORunCommand,a0
+		lea RC1200(pc),a3
+		move.l a3,d0
+		move.l DosBase(pc),a1
+		jsr _LVOSetFunction(a6)			;To force memory allocations to MEMF_PPC
+		lea RCAddress(pc),a3
+		move.l d0,(a3)		
+		
+		move.l #_LVOSystemTagList,a0
+		lea STL1200(pc),a3
+		move.l a3,d0
+		move.l DosBase(pc),a1
+		jsr _LVOSetFunction(a6)			;To force memory allocations to MEMF_PPC
+		lea STLAddress(pc),a3
+		move.l d0,(a3)
+		
+NoStackPatch	jsr _LVOCacheClearU(a6)
 
 		lea MirrorList(pc),a3			;Make a list for PPC Mirror Tasks
 		move.l a3,LH_TAILPRED(a3)
@@ -843,7 +878,16 @@ NoDisHunkPatch	lea SetCPUComm(pc),a1
 		beq.s DoneCPUComm
 		move.b d2,(a3)
 DoneCPUComm	move.b (a3),1(a5)
-DoneENV		rts		
+		lea EnStackPatch(pc),a1
+		bsr DoENV
+		moveq.l #1,d2
+		move.l MediatorType(pc),d1
+		beq.s DoneStackP
+		move.b d2,(a3)
+DoneStackP	move.b (a3),2(a5)
+		rts
+
+;*********************************************
 
 DoENV		move.l a1,d1
 		lea ENVBuff(pc),a1
@@ -906,7 +950,9 @@ GetLoop		move.l d6,a0
 		clr.l MP_MSGLIST+MLH_TAIL(a0)		;SoftCinema bug/quirk?
 		bra.s NextMsg
 							
-CheckMsg	move.l d0,a1	
+CheckMsg	move.l ThisTask(a6),a1
+		bset #TB_PPC,TC_FLAGS(a1)
+		move.l d0,a1	
 		move.b LN_TYPE(a1),d0
 		cmp.b #NT_REPLYMSG,d0
 		bne.s NoXReply
@@ -951,7 +997,9 @@ GetLoop1200	move.l d6,a0
 		
 		jsr _LVODisable(a6)
 
-CheckFIFO	move.w FIFORead(pc),d0
+CheckFIFO	move.l ThisTask(a6),a2
+		bset #TB_PPC,TC_FLAGS(a2)
+		move.w FIFORead(pc),d0
 		move.w FIFOWrite(pc),d1
 		cmp.w d1,d0
 		beq.s EmptyFIFO		
@@ -1126,9 +1174,9 @@ CopyPPCName	move.b (a0)+,d0
 
 		move.l #"_68K",(a2)+			;add _68K to PPC mirror task name
 		clr.b (a2)
-		move.l d1,d2		
+		move.l d1,d2
 		move.l ThisTask(a6),a1
-		bclr #TB_PPC,TC_FLAGS(a1)
+		bclr #TB_PPC,TC_FLAGS(a1)		
 		move.l DosBase(pc),a6
 		lea Prc2Tags(pc),a1
 		move.l a7,12(a1)
@@ -1790,11 +1838,64 @@ ExitTrue	movem.l (a7)+,d0/a1
 
 ;********************************************************************************************
 ;
+;		Patches to re-direct stack memory
+;
+;********************************************************************************************
+		
+CP1200		move.l a3,-(a7)
+		pea ReturnPatch2(pc)
+		move.l CPAddress(pc),-(a7)
+		bra.s CommonPatch
+
+CNP1200		move.l a3,-(a7)
+		pea ReturnPatch2(pc)
+		move.l CNPAddress(pc),-(a7)
+		bra.s CommonPatch
+
+STL1200		move.l a3,-(a7)
+		pea ReturnPatch(pc)
+		move.l STLAddress(pc),-(a7)
+		bra.s CommonPatch
+
+RC1200		move.l a3,-(a7)
+		pea ReturnPatch(pc)
+		move.l RCAddress(pc),-(a7)
+		move.l LExecBase(pc),a3
+		move.l ThisTask(a3),a3
+		bclr #TB_PPC,TC_FLAGS(a3)
+		bra.s DiffRunComm
+
+CommonPatch	move.l LExecBase(pc),a3
+		move.l ThisTask(a3),a3
+		bset #TB_WARN,TC_FLAGS(a3)
+DiffRunComm	move.l 8(a7),a3
+		rts
+
+ReturnPatch	move.l a3,(a7)
+		move.l LExecBase(pc),a3
+		move.l ThisTask(a3),a3
+		bclr #TB_WARN,TC_FLAGS(a3)
+		move.l (a7)+,a3
+		rts
+
+ReturnPatch2	move.l a3,(a7)
+		move.l LExecBase(pc),a3
+		move.l ThisTask(a3),a3
+		btst #TB_PPC,TC_FLAGS(a3)
+		beq.s DontFlagPPC
+		move.l d0,a3
+		bset #TB_PPC,TC_FLAGS(a3)
+DontFlagPPC	move.l (a7)+,a3
+		rts
+		
+;********************************************************************************************
+;
 ;		AllocMem() Patch
 ;
 ;********************************************************************************************
 
-NewAlloc	tst.w d1					;Patch code - Test for attribute $0000 (Any)
+NewAlloc	move.l AllocMemAddress(pc),-(a7)		
+		tst.w d1					;Patch code - Test for attribute $0000 (Any)
 		beq.s Best
 		btst #2,d1					;If FAST requested, redirect
 		bne.s Best					
@@ -1806,6 +1907,10 @@ NewAlloc	tst.w d1					;Patch code - Test for attribute $0000 (Any)
 		
 Best		movem.l d6-d7/a2-a3,-(a7)
 		move.l ThisTask(a6),a3
+		
+		btst #TB_WARN,TC_FLAGS(a3)
+		bne NoBit
+		
 		move.b ThisTask(a6),d7
 		move.b SonnetBase(pc),d6
 		and.b #$f0,d6
@@ -1821,7 +1926,7 @@ NotAPPCMemTask	moveq.l #0,d6
 GoCheck		cmp.b #NT_PROCESS,LN_TYPE(a3)			;Is it a DOS process?
 		bne.s IsTask
 		move.l pr_CLI(a3),d7				;Was this task started by CLI?
-		bne.s IsHell					;If yes, go there
+		bne IsHell					;If yes, go there
 		
 IsTask		move.l LN_NAME(a3),d7				;Has the task a name?
 		beq NoBit					;If no then exit
@@ -1871,10 +1976,9 @@ IsHell		lsl.l #2,d7
 		addq.l #5,a2
 		bra.s Checkers
 
-DoBit		bset #13,d1					;Set attribute MEMF_PPC
+DoBit		bset #MEMB_PPC,d1				;Set attribute MEMF_PPC
 NoBit		movem.l (a7)+,d6-d7/a2-a3
-NoFast		move.l AllocMemAddress(pc),-(a7)
-		rts
+NoFast		rts
 		
 ;********************************************************************************************
 ;
@@ -2949,6 +3053,10 @@ AddTaskAddress		ds.l	1
 RemTaskAddress		ds.l	1
 OpenLibAddress		ds.l	1
 AllocMemAddress		ds.l	1
+CPAddress		ds.l	1
+CNPAddress		ds.l	1
+RCAddress		ds.l	1
+STLAddress		ds.l	1
 LoadSegAddress		ds.l	1
 NewLoadSegAddress	ds.l	1
 MasterControlPort	ds.l	1
@@ -3220,7 +3328,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.8 (01.04.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.8 (14.04.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
@@ -3262,6 +3370,7 @@ EnDAccessExc	dc.b	"sonnet/EnDAccessExc",0			;6
 DisHunkPatch	dc.b	"sonnet/DisHunkPatch",0			;7
 SetCMemDiv	dc.b	"sonnet/SetCMemDiv",0			;8
 SetCPUComm	dc.b	"sonnet/SetCPUComm",0			;9
+EnStackPatch	dc.b	"sonnet/EnStackPatch",0			;10
 
 		cnop	0,4
 		
