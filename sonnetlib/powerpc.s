@@ -2068,13 +2068,16 @@ NextSeg		lsl.l #2,d2
 NextByte	lea PowerName(pc),a3
 NextName	subq.l #1,d2
 		bmi.s EndSeg
+		cmp.l #"RACE",(a2)
+		beq.s WarpRaceMod
+		
 		move.b (a2)+,d1
 		cmp.b (a3)+,d1
 		bne.s NextByte
 		tst.b -1(a3)
 		bne.s NextName
 		
-		bset #0,d6
+WarpRaceMod	bset #0,d6
 		move.l d6,d2
 		move.l d5,d1
 		swap d2
