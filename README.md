@@ -70,6 +70,8 @@ Currently the following options are supported through variables in ENVARC:sonnet
 - EnDAccessExc: See EnAlignExc, but now for the Data Access Exception (DSI).
 - DisHunkPatch (0 or 1): Disable automatic pushing first code hunk to FAST RAM.
   Default = 0.
+- EnStackPatch (0 or 1): Enable if you want the library to push more 68K data to
+  68K memory like stack and task structures. **EXPERIMENTAL**
 - SetCMemDiv (0-5): Sets the speed divider of the L2 Cache memory.
   5 = 3, 4 = 2.5, 3 = 2, 2 = 1.5, 1 = 1, 0 = Handled by library. Default = 0.
   For example: A Sonnet with speed 500 MHz and setting 5 will run the L2 cache
