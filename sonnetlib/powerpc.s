@@ -1881,6 +1881,7 @@ ReturnPatch	move.l a3,(a7)
 ReturnPatch2	move.l a3,(a7)
 		move.l LExecBase(pc),a3
 		move.l ThisTask(a3),a3
+		bclr #TB_WARN,TC_FLAGS(a3)
 		btst #TB_PPC,TC_FLAGS(a3)
 		beq.s DontFlagPPC
 		move.l d0,a3
@@ -1911,7 +1912,7 @@ Best		movem.l d6-d7/a2-a3,-(a7)
 		btst #TB_WARN,TC_FLAGS(a3)
 		bne NoBit
 		
-		move.b ThisTask(a6),d7
+SkipRamLib	move.b ThisTask(a6),d7
 		move.b SonnetBase(pc),d6
 		and.b #$f0,d6
 		and.b #$f0,d7
@@ -3335,7 +3336,7 @@ DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 PowerPCError	dc.b	"Other PPC library already active (WarpOS/Sonnet)",0
 LDOSError	dc.b	"Could not open dos.library V37+",0
 LExpError	dc.b	"Could not open expansion.library V37+",0
-LPCIError	dc.b	"Could not open pci.library V13.3+",0
+LPCIError	dc.b	"Could not open pci.library V13.5+",0
 MedError	dc.b	"Could not find a supported Mediator board",0
 MemMedError	dc.b	"No system VGA memory detected (pcidma)",0
 SonnetError	dc.b	"No Sonnet card detected",0
