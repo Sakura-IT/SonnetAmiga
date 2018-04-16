@@ -1287,6 +1287,7 @@ GtLoop2		move.l (a7),a0
 DoRunk86	move.l (a7),MN_MIRROR(a0)
 
 		bsr Runk86
+		
 		bra.s GtLoop2
 		
 ;********************************************************************************************
@@ -1912,7 +1913,7 @@ Best		movem.l d6-d7/a2-a3,-(a7)
 		btst #TB_WARN,TC_FLAGS(a3)
 		bne NoBit
 		
-SkipRamLib	move.b ThisTask(a6),d7
+		move.b ThisTask(a6),d7
 		move.b SonnetBase(pc),d6
 		and.b #$f0,d6
 		and.b #$f0,d7
@@ -2208,7 +2209,7 @@ RunPPC:		link a5,#-12
 		move.l a0,PStruct(a5)
 		move.l LExecBase(pc),a6
 		move.l ThisTask(a6),a1
-		bclr #TB_PPC,TC_FLAGS(a1)		;DEBUGDEBUG
+		bclr #TB_PPC,TC_FLAGS(a1)
 		cmp.b #NT_PROCESS,LN_TYPE(a1)
 		beq.s IsProc
 
@@ -2240,7 +2241,7 @@ GiveASyncErr	moveq.l #PPERR_MISCERR,d7
 		bra EndIt
 
 GotMsgPort	move.l d0,Port(a5)
-		move.l #MEMF_PUBLIC|MEMF_CLEAR,d1	;WAS MEMF_REVERSE
+		move.l #MEMF_PUBLIC|MEMF_CLEAR,d1
 		moveq.l #MT_SIZE,d0
 		jsr _LVOAllocVec(a6)
 		tst.l d0
@@ -2582,6 +2583,7 @@ NoStckPtr	pea xBack(pc)
 StckPtr		move.l PP_CODE(a5),a0
 		add.l PP_OFFSET(a5),a0
 		move.l a0,-(a7)
+		
 		lea PP_REGS(a5),a6
 		movem.l (a6)+,d0-a5
 		move.l (a6),a6
@@ -2668,9 +2670,7 @@ NoFPU2		move.l a7,a0
 		
 ;********************************************************************************************
 
-CrossSignals	move.l MediatorType(pc),d0	;debugdebug
-		bne DbgExit
-		bsr CreateMsgFrame
+CrossSignals	bsr CreateMsgFrame
 
 		moveq.l #MSG_LEN/4-1,d0
 		move.l a0,a2
@@ -2682,9 +2682,7 @@ ClearMsg	clr.l (a2)+
 		move.l ThisTask(a6),a3
 		move.l a3,MN_ARG1(a0)
 
-		bsr SendMsgFrame
-
-DbgExit		rts				;debugdebug
+		bra SendMsgFrame
 
 ;********************************************************************************************
 ;
@@ -3332,7 +3330,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.8 (14.04.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.8 (16.04.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		

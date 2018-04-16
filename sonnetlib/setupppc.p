@@ -83,8 +83,6 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 		cmpwi	r8,0x13
 		bne	.NoForce
 		bl	.DoForceMem
-		loadreg	r0,'Boon'
-		stw	r0,0(r0)			
 		b	.DoForce
 
 .NoForce:	bl	ConfigMem			#Result = Sonnet Mem Len in r8
@@ -93,7 +91,13 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 		mr.	r8,r8
 		beq	.ErrorRam
 		
-		li	r7,0
+		lis	r4,0x1000
+		cmplw	r8,r4
+		ble	.NoMaxRam2
+	
+		mr	r8,r4				#Limitations of Mediator without bank-switching
+		
+.NoMaxRam2:	li	r7,0
 		
 		bl	DirtyMemCheck
 
@@ -1334,19 +1338,10 @@ DirtyMemCheck:
 #		loadreg r25,0x0440150c		#100MHz
 		bl	ConfigWrite32
 
-		li	r14,1			#Only 1 bank (bank 0: 4x512Mb)
-		li	r16,0			#no extended memory ranges (>0x10000000)
-		li	r17,0			#	"
-		li	r18,0			#	"
-		li	r19,0			#	"
-
-		li	r9,0			#start addresses memory (bank 0 = 0x0
-		li	r10,0			#all other banks (1-7) not used
-		li	r11,0xff		#end addresses memory (bank 0 = 0x0fffffff
-		li	r12,0			#all other banks (1-7) not used
-		loadreg	r13,0x7588aaaa		#MCCR1 -> aaaa = all banks 13x4
-
-		lis	r8,0x1000
+		lis	r26,0x7588
+		loadreg	r28,0xaaaa		#13x4
+		li	r30,0x5555		#13x2/12x2
+		li	r31,0x0000		#12x4/11x4
 
 		b	.EndForce
 
@@ -1401,6 +1396,77 @@ ConfigMem:	mflr	r15			#Code lifted from the Sonnet Driver
 		bl	ConfigWrite32		#Set MCCR1 to FFE20000	RAM_TYPE = 1 -> DRAM/EDO, 
 						#SREN = 0 disable selfref, MEMGO = 0, 
 						#BURST = 0, all banks 9 row bits
+						
+		lis	r26,0xffea
+		loadreg	r28,0xffff		#13
+		loadreg	r30,0xaaaa		#11
+		li	r31,0x5555		#11
+
+						
+.EndForce:	bl	.DetectMemSize
+
+		setpcireg MSAR1				#80
+		mr	r25,r9		
+		bl	ConfigWrite32			#store found values to registers
+
+		setpcireg MSAR2				#84
+		mr	r25,r10
+		bl	ConfigWrite32
+
+		setpcireg MEAR1				#90		
+		mr	r25,r11		
+		bl	ConfigWrite32
+
+		setpcireg MEAR2				#94
+		mr	r25,r12
+		bl	ConfigWrite32
+
+		setpcireg MESAR1			#88		
+		mr	r25,r16
+		bl	ConfigWrite32
+
+		setpcireg MESAR2			#8c
+		mr	r25,r17
+		bl	ConfigWrite32
+
+		setpcireg MEEAR1			#98
+		mr	r25,r18
+		bl	ConfigWrite32
+
+		setpcireg MEEAR2			#9C
+		mr	r25,r19
+		bl	ConfigWrite32
+
+		setpcireg PGMAX				#A3
+		li	r25,0x32
+		bl	ConfigWrite8
+
+		setpcireg MBEN				#A0
+		mr	r25,r14
+		bl	ConfigWrite8
+
+		lis	r7,1
+		mtctr	r7
+		
+.MPC107Wait200us:
+		bdnz	.MPC107Wait200us
+
+		setpcireg MCCR1				#F0		
+		mr	r25,r13
+		bl	ConfigWrite32
+
+		loadreg	r7,0x2ffff
+		mtctr	r7
+.MPC107Wait8Ref:
+		bdnz	.MPC107Wait8Ref
+
+		mtlr	r15
+		
+		blr
+
+#********************************************************************************************
+
+.DetectMemSize:	mflr	r27
 
 		setpcireg MSAR1
 		clearreg r25
@@ -1419,23 +1485,23 @@ ConfigMem:	mflr	r15			#Code lifted from the Sonnet Driver
 		bl	ConfigWrite32		#clear EMASR2
 
 		setpcireg MEAR1
-		loadreg r25,0x7F7F7F7F
-		bl	ConfigWrite32		#set MEAR1 to 7f7f7f7f
+		loadreg	r25,0xffffffff
+		bl	ConfigWrite32		#set MEAR1 to ffffffff
 
 		setpcireg MEEAR1
 		clearreg r25
 		bl	ConfigWrite32		#clear EMEAR1
 
 		setpcireg MEAR2
-		loadreg r25,0x7F7F7F7F
-		bl	ConfigWrite32		#set MEAR2 to 7f7f7f7f
+		loadreg	r25,0xffffffff
+		bl	ConfigWrite32		#set MEAR2 to ffffffff
 
 		setpcireg MEEAR2
 		clearreg r25
 		bl	ConfigWrite32		#clear EMEAR2
 
 		setpcireg MCCR1
-		lis	r25,0xffea
+		mr	r25,r26
 		mr	r25,r25
 		bl	ConfigWrite32		#set MCCR1 to ffea0000  set MEMGO!
 
@@ -1447,7 +1513,7 @@ ConfigMem:	mflr	r15			#Code lifted from the Sonnet Driver
 		li	r10,0
 		li	r11,0
 		li	r12,0
-		lis	r13,0xffea		#ffea0000
+		mr	r13,r26
 		li	r14,0
 		li	r16,0
 		li	r17,0
@@ -1470,7 +1536,7 @@ loc_3BD8:	setpcireg MBEN			#Memory Bank Enable Register
 		or	r14,r14,r5		#continue if found
 	
 		setpcireg MCCR1			#0x800000f0
-		loadreg r25,0xffeaffff
+		or	r25,r26,r28
 		bl	ConfigWrite32		#set all banks to 12 or 13 row bits
 
 		lis	r6,0x40
@@ -1512,11 +1578,14 @@ loc_3BD8:	setpcireg MBEN			#Memory Bank Enable Register
 		lwz	r7,0(r6)		#read from 0x8000000
 		cmplw	r4,r7
 		beq	loc_3E24		#if its "Boon" goto loc_3E24
+		lis	r6,0x1000
+		cmpwi	r7,0
+		beq	loc_3E24
 		b	loc_4184		#goto loc_4184
 
 #********************************************************************************************
 loc_3CBC:					#CODE XREF: findSetMem+1D0
-		loadreg r25,0xFFEAAAAA		#set row bits to 11 row bits
+		or	r25,r26,r30
 		bl	ConfigWrite32
 		lis	r6,0x20			#continue tests
 		stw	r3,0(r6)
@@ -1555,7 +1624,7 @@ loc_3CBC:					#CODE XREF: findSetMem+1D0
 
 #********************************************************************************************
 loc_3D50:					#CODE XREF: findSetMem+274
-		loadreg r25,0xFFEA5555		#set row bits to 10 row bits
+		or	r25,r26,r31
 		bl	ConfigWrite32
 		lis	r6,0x10			#continue tests
 		stw	r3,0(r6)
@@ -1745,8 +1814,6 @@ loc_3FD4:					#CODE XREF: findSetMem+4D4
 		andi.	r7,r7,3
 		or	r17,r17,r7
 		add	r8,r8,r6
-
-loc_4000:
 		mr	r7,r8
 		addi	r7,r7,-1
 		srwi	r7,r7,20
@@ -1855,68 +1922,13 @@ loc_4114:
 		or	r13,r13,r25
 		b	loc_4184
 
-loc_4184:
+#********************************************************************************************
+loc_4184:	
 		slwi	r5,r5,1
 		cmplwi	r5,0x100
-		bne	loc_3BD8		
-
-.EndForce:	setpcireg MSAR1				#80
-		mr	r25,r9		
-		bl	ConfigWrite32			#store found values to registers
-
-		setpcireg MSAR2				#84
-		mr	r25,r10
-		bl	ConfigWrite32
-
-		setpcireg MEAR1				#90		
-		mr	r25,r11		
-		bl	ConfigWrite32
-
-		setpcireg MEAR2				#94
-		mr	r25,r12
-		bl	ConfigWrite32
-
-		setpcireg MESAR1			#88		
-		mr	r25,r16
-		bl	ConfigWrite32
-
-		setpcireg MESAR2			#8c
-		mr	r25,r17
-		bl	ConfigWrite32
-
-		setpcireg MEEAR1			#98
-		mr	r25,r18
-		bl	ConfigWrite32
-
-		setpcireg MEEAR2			#9C
-		mr	r25,r19
-		bl	ConfigWrite32
-
-		setpcireg PGMAX				#A3
-		li	r25,0x32
-		bl	ConfigWrite8
-
-		setpcireg MBEN				#A0
-		mr	r25,r14
-		bl	ConfigWrite8
-
-		lis	r7,1
-		mtctr	r7
+		bne	loc_3BD8
 		
-.MPC107Wait200us:
-		bdnz	.MPC107Wait200us
-
-		setpcireg MCCR1				#F0		
-		mr	r25,r13
-		bl	ConfigWrite32
-
-		loadreg	r7,0x2ffff
-		mtctr	r7
-.MPC107Wait8Ref:
-		bdnz	.MPC107Wait8Ref
-
-	
-		mtlr	r15
+		mtlr	r27
 		
 		blr
 
