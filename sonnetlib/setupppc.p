@@ -866,16 +866,31 @@ Wait2:		mfl2cr	r3
 		rlwinm	r9,r9,4,28,31
 		mflr	r10
 
-		bl	.END_CFG
+		la	r14,base_Options(r29)
+		lbz	r6,option_VersionNB(r14)
+		cmpwi	r6,0x13
+		bne	.Bus66MHz
+		bl	.END_CFG_100
+
+		.long	0,0						#For the Modders
+.PLL_CFG_100:	.long	0b0111,450000000,0b1011,500000000
+
+.END_CFG_100:
+		mflr	r6
+		li	r8,(.END_CFG_100-.PLL_CFG_100)/8
+		mtctr	r8
+		b	.NextPLL
+
+.Bus66MHz:	bl	.END_CFG_66
 		
 		.long	0,0						#For the Modders
-.PLL_CFG:	.long	0b1101,400000000,0b0001,500000000
+.PLL_CFG_66:	.long	0b1101,400000000,0b0001,500000000
 		.long	0b0101,433333333,0b0010,466666666
-		.long	0b1100,533333333,0b0111,450000000
-.END_CFG:
+		.long	0b1100,533333333
+.END_CFG_66:
 
 		mflr	r6
-		li	r8,(.END_CFG-.PLL_CFG)/8
+		li	r8,(.END_CFG_66-.PLL_CFG_66)/8
 		mtctr	r8
 		
 .NextPLL:	lwzu	r8,8(r6)
