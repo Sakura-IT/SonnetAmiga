@@ -46,6 +46,8 @@ _LVOPCIEnablePPCInterrupt	=	-126			;Uncertain. Checks ppc.library and f60020
 _LVOPCIDisablePPCInterrupt	=	-132			;Uncertain. Checks ppc.library and f60020
 _LVOPCIShutDown			=	-138			;Only works on TX (ID 60) and SX (ID 40)
 _LVOPCIInstallVGARAM		=	-144
+_LVOPCIAllocMem			=	-150
+_LVOPCIFreeMem			=	-154
 
  STRUCTURE  	PCI,LN_SIZE
     UWORD   	PCI_VENDORID		;Vendor ID		(14)

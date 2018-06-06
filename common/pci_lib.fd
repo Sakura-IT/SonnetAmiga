@@ -40,7 +40,7 @@ PCIEnablePPCInterrupt()					##?? depends on ppc.library (does f60020)
 PCIDisablePPCInterrupt()				##??
 PCIShutDown()						##Only 60 (TX) and 40 (SX)
 PCIInstallVGARAM(address,length)(a0,d0)
-Reserved()
-Reserved()
+PCIAllocMem(d0,d1,a0)
+PCIFreeMem(d0)
 ##end
 
