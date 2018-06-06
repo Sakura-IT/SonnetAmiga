@@ -23,9 +23,9 @@
 #0x00003000	Exceptions/Scheduler			0x005000	20480
 #0x00100000	Message FIFOs				0x010000	65536	Must be 0x100000 aligned
 #0x00200000	Message Frames 2x4096xPP_SIZE+48	0x180000
-#0x00380000	Idle Task				0x000c00	3072
-#0x00381000	System Stack				0x0EF000	32768
-#0x00400000	Free memory
+#0x00400000	Idle Task				0x000c00	3072
+#0x00480000	System Stack				0x0EF000	32768
+#0x00480000	Free memory
 #0x7xf00000	Room for the page table			0x100000	1048576 (for 128MB addressing)
 
 
@@ -914,3 +914,35 @@
 .set PPCSTATEF_POWERSAVE,1	    	# PPC is in power save mode
 .set PPCSTATEF_APPACTIVE,2    		# PPC application tasks are active
 .set PPCSTATEF_APPRUNNING,4		# PPC apllication task is running
+
+#Harrier Stuff
+
+.set PPC_XCSR_BASE,			0xFEFF0000
+.set XCSR_MICT_QSZ_16K,			0x00030000
+.set XCSR_MICT_ENA,			0x01000000
+.set XCSR_FEEN_MIP,			0x20000000
+.set XCSR_FEEN_MIM0,			0x08000000
+.set XCSR_FEMA_MIPM0,			0xD7000000
+
+.set XCSR_FEEN,				0x40
+.set XCSR_FEMA,				0x48
+.set XCSR_PIAC,				0x210
+.set XCSR_MIOFH,			0x2C0
+.set XCSR_MIOFT,			0x2C4
+.set XCSR_MIOPH,			0x2C8
+.set XCSR_MIOPT,			0x2CC
+.set XCSR_MIIFH,			0x2D0
+.set XCSR_MIIFT,			0x2D4
+.set XCSR_MIIPH,			0x2D8
+.set XCSR_MIIPT,			0x2DC
+.set XCSR_MICT,				0x2E0
+.set XCSR_MIQB,				0x2E4
+
+.set XMPI_FREP,				0x1000
+.set XMPI_GLBC,				0x1020
+.set XMPI_EXVP0,			0x10000
+.set XMPI_P0CTP,			0x20080
+.set XMPI_P0EOI,			0x200B0
+.set XMPI_GLBC_RESET,			0x80000000
+.set XMPI_GLBC_M,			0x20000000
+
