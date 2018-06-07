@@ -47,6 +47,7 @@
 .set ViolationAddress,76			#Pointer
 .set MemSize,80
 .set Quantum,84
+.set XMPIBase,88
 
 .set option_EnEDOMem,0
 .set option_EnDebug,1
@@ -920,13 +921,19 @@
 .set PPC_XCSR_BASE,			0xFEFF0000
 .set XCSR_MICT_QSZ_16K,			0x00030000
 .set XCSR_MICT_ENA,			0x01000000
-.set XCSR_FEEN_MIP,			0x20000000
-.set XCSR_FEEN_MIM0,			0x08000000
+.set XCSR_FEEN_MIP,			0x08000000
+.set XCSR_FEEN_MIM0,			0x20000000
 .set XCSR_FEMA_MIPM0,			0xD7000000
+.set XCSR_FEST_MIM0,			0x20000000
+.set XCSR_FEST_MIP,			0x08000000	
+.set XCSR_FECL_MIM0,			0x20000000
+.set XCSR_MCSR_OPI,			0x40000000
 
 .set XCSR_FEEN,				0x40
+.set XCSR_FEST,				0x44
 .set XCSR_FEMA,				0x48
-.set XCSR_PIAC,				0x210
+.set XCSR_FECL,				0x4C
+.set XCSR_MCSR,				0xE4
 .set XCSR_MIOFH,			0x2C0
 .set XCSR_MIOFT,			0x2C4
 .set XCSR_MIOPH,			0x2C8
@@ -940,9 +947,11 @@
 
 .set XMPI_FREP,				0x1000
 .set XMPI_GLBC,				0x1020
-.set XMPI_EXVP0,			0x10000
+.set XMPI_IFEVP,			0x10200
+.set XMPI_IFEDE,			0x10210
 .set XMPI_P0CTP,			0x20080
+.set XMPI_P0IAC,			0x200A0
 .set XMPI_P0EOI,			0x200B0
 .set XMPI_GLBC_RESET,			0x80000000
 .set XMPI_GLBC_M,			0x20000000
-
+.set XMPI_IFEDE_P0,			0x00000001
