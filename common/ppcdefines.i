@@ -675,6 +675,7 @@
 .set L2CR_L2OH_5,		0x00000000 		# bits 14-15 Output Hold time = 0.5ns*/
 .set L2CR_L2OH_1,		0x00010000 		# bits 14-15 Output Hold time = 1.0ns*/
 .set L2CR_L2OH_INV,		0x00020000 		# bits 14-15 Output Hold time = 1.0ns*/
+.set L2CR_L2HWF,		0x00000800
 .set L2CR_L2IP,			0x00000001
 
 .set L2_ADR_INCR,		0x100

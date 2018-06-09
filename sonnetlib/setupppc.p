@@ -33,6 +33,7 @@
 .set	base_RTGType,16
 .set	base_RTGConfig,20
 .set	base_Options,24
+.set	base_XMPI,36
 
 .set	rtgtype_ati,0x1002
 .set	rtgtype_voodoo3,0x121a
@@ -53,16 +54,53 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 .long		0					#Options1
 .long		0					#Options2
 .long		0					#Options3
+.long		0					#XMPI Address
 
 .SkipCom:	mflr	r29				#For initial communication with 68k
 		lis	r22,CMD_BASE@h			#Used in setpcireg macro
-
+		
 		loadreg	r0,'Init'
 		stw	r0,base_Comm(r29)
 
 		bl	Reset
 
-		setpcireg PICR1				#Setup various PCI registers of the Sonnet
+		lwz	r25,base_XMPI(r29)
+		mr.	r25,r25
+		beq	.SonnetStart
+
+		li	r3,0
+		li	r4,63
+		mtctr	r4
+		li	r0,0
+.ClearH:	stwu	r0,4(r3)
+		bdnz+	.ClearH
+		
+		stw	r25,XMPIBase(r0)
+		
+		la	r14,base_Options(r29)
+		li	r8,0x13
+		stb	r8,option_VersionNB(r14)
+
+		lwz	r0,base_MemLen(r29)
+		stw	r0,MemSize(r0)
+		
+		bl	.SetupHarFIFOs
+		bl	Mpic
+		bl	InstallExceptions
+		lwz	r27,base_MemStart(r29)
+		stw	r27,SonnetBase(r0)
+		lwz	r8,base_MemLen(r29)
+		
+		bl	mmuSetup
+
+		loadreg	r0,'Boon'
+		stw	r0,0(r0)
+		
+		b	.SonSkip
+
+#*********************************************************
+
+.SonnetStart:	setpcireg PICR1				#Setup various PCI registers of the Sonnet
 		loadreg r25,VAL_PICR1
 		bl	ConfigWrite32
 
@@ -229,7 +267,7 @@ SetLen:		mr	r30,r28
 
 		bl	mmuSetup			#Setup the Memory Management Unit
 		bl	Epic				#Setup the EPIC controller		
-		bl	End
+.SonSkip:	bl	End
 
 #*********************************************************
 
@@ -257,7 +295,8 @@ Start:							#Dummy task at absolute (see ppcdefines)
 
 #*********************************************************
 
-End:		mflr	r4		
+End:		mflr	r4
+
 		li	r14,0				#Reset
 		mtspr	285,r14				#Time Base Upper,
 		mtspr	284,r14				#Time Base Lower and
@@ -291,7 +330,7 @@ End:		mflr	r4
 		stwu	r1,-288(r1)		
 				
 		lwz	r3,PowerPCBase(r0)
-		
+
 		la	r4,LIST_READYTASKS(r3)		#Set up various used lists
 		bl	.MakeList
 		
@@ -457,10 +496,14 @@ End:		mflr	r4
 		
 		lwz	r4,SonnetBase(r0)
 		stw	r4,sonnet_SonnetBase(r14)
-						
+				
+		lwz	r4,XMPIBase(r0)
+		mr.	r4,r4
+		bne	.DidFIFOs
+		
 		bl	.SetupMsgFIFOs
 
-		mtsrr0	r31
+.DidFIFOs:	mtsrr0	r31
 
 		loadreg	r0,MACHINESTATE_DEFAULT
 		mtsrr1	r0				#load up user MSR. Also clears PSL_IP
@@ -482,14 +525,15 @@ End:		mflr	r4
 
 		addi	r6,r4,TaskExit
 		stw	r6,sonnet_TaskExitCode(r14)
-
+				
 		bl	Caches				#Setup the L1 and L2 cache
-		
+
 		li	r3,0
-		loadreg	r0,'REDY'			
+		loadreg	r0,'REDY'
 		stw	r0,Init(r0)
 		dcbf	r0,r3
-
+		sync
+		
 		lwz	r3,PowerPCBase(r0)
 
 		rfi					#To user code
@@ -597,6 +641,62 @@ End:		mflr	r4
 		stwbrx	r4,r5,r14		
 		sync
 
+		blr
+
+#********************************************************************************************
+
+.SetupHarFIFOs:	
+		lis	r14,PPC_XCSR_BASE@h			#Load Base XCSR
+		lwz	r6,base_MemStart(r29)
+		lis	r4,0x10
+		stw	r4,XCSR_MIQB(r14)			#MIQB on 0x100000
+		
+		subi	r4,r4,4
+		lis	r5,0x20
+		add	r5,r5,r6
+		
+		li	r6,4096
+		mr	r7,r6
+		mtctr	r6
+.FillIBFLH:	stwu	r5,4(r4)
+		addi	r5,r5,192				#Message Frame Length
+		bdnz	.FillIBFLH
+
+		loadreg	r4,(0x180000-4)
+		mtctr	r7
+.FillOBFLH:	stwu	r5,4(r4)
+		addi	r5,r5,192
+		bdnz	.FillOBFLH
+		
+		li	r4,4
+		stw	r4,XCSR_MIIFT(r14)
+
+		li	r4,0
+		stw	r4,XCSR_MIIFH(r14)
+		
+		lis	r4,4
+		stw	r4,XCSR_MIIPT(r14)
+		
+		lis	r4,4
+		stw	r4,XCSR_MIIPH(r14)
+
+		loadreg	r4,0x80004				#Each FIFO (MIIF, MIIP, MIOF, MIOP) sits on a 256k boundary
+		stw	r4,XCSR_MIOFT(r14)
+		
+		lis	r4,8
+		stw	r4,XCSR_MIOFH(r14)
+		
+		lis	r4,12
+		stw	r4,XCSR_MIOPT(r14)
+		
+		lis	r4,12
+		stw	r4,XCSR_MIOPH(r14)
+
+		lis	r4,(XCSR_MICT_ENA|XCSR_MICT_QSZ_16K)@h
+		stw	r4,XCSR_MICT(r14)			#enable 4k entries x 4 bytes address = 16k per FIFO
+
+		sync						#Is it safer to clear the empty FIFOs?
+		
 		blr
 
 #********************************************************************************************
@@ -774,16 +874,67 @@ ClearInts:	lwz	r27,0xa0(r26)			#IACKR
 
 #********************************************************************************************
 
+Mpic:		lwz	r26,base_XMPI(r29)
+		lwz	r27,XMPI_GLBC(r26)
+		oris	r27,r27,XMPI_GLBC_RESET@h
+		stw	r27,XMPI_GLBC(r26)		#Reset MPIC
+
+.ResLoopH:	lwz	r27,XMPI_GLBC(r26)
+		andis.	r27,r27,XMPI_GLBC_RESET@h
+		bne	.ResLoopH			#Wait for reset
+
+		oris	r27,r27,XMPI_GLBC_M@h		#M bit
+		stw	r27,XMPI_GLBC(r26)		#Set Mixed Mode
+
+		loadreg r27,XMPI_IFEVP
+		loadreg	r28,0x00050042			#80050042
+		stwx	r28,r26,r27			#Set Internal Interrupt
+
+		addi	r27,r27,XMPI_IFEDE-XMPI_IFEVP
+		li	r28,XMPI_IFEDE_P0		#Destination processor of interrupt
+		stwx	r28,r26,r27		
+
+		loadreg	r27,XMPI_P0CTP
+		li	r28,0
+		stwx	r28,r26,r27			#P0CTP Set Pri (Task) = 0
+
+		lwz	r27,XMPI_FREP(r26)
+		rlwinm	r28,r27,16,20,31		#Get FREP(NIRQ)
+
+		mtctr	r28				#Doc says clear all possible ints
+		
+ClearIntsH:	loadreg	r27,XMPI_P0IAC			#Processor 0 Interrupt Ack
+		lwzx	r28,r26,r27	
+		loadreg	r27,XMPI_P0EOI			#EOI for processor 0
+		li	r28,0
+		stwx	r28,r26,r27
+		bdnz	ClearIntsH
+
+		lis	r27,PPC_XCSR_BASE@h		#XCSR
+		lis	r28,(XCSR_FEEN_MIP|XCSR_FEEN_MIM0)@h
+		stw	r28,XCSR_FEEN(r27)		#Turn on FIFO and MSG interrupt
+		lis	r28,XCSR_FEMA_MIPM0@h
+		stw	r28,XCSR_FEMA(r27)		#Turn off FIFO and MSG interrupt mask
+
+		lis	r28,XCSR_MCSR_OPI@h
+		stw	r28,XCSR_MCSR(r27)		#Enable OpenPIC (Must be before clearing ints?)
+		
+		sync
+
+		blr
+
+#********************************************************************************************
+
 Caches:				
 		mfspr	r4,HID0
 		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
 		sync
 		mtspr	HID0,r4
 		sync
-		 
+
 		la	r4,base_Options(r29)
 		mr	r11,r4
-		lbz	r5,option_DisL2Cache(r4)
+		lbz	r5,option_DisL2Cache(r4)		
 		mr.	r5,r5
 		li	r30,0
 		bne	.L2SizeDone
@@ -807,7 +958,7 @@ Wait2:		mfl2cr	r3
 		mtl2cr	r4				#Enable L2 cache
 		sync
 		isync
-		
+
 		li	r0,0				#Determine size of L2 Cache
 		mr	r5,r0
 		mr	r30,r0
@@ -818,7 +969,7 @@ Wait2:		mfl2cr	r3
 		lwz	r5,SonnetBase(r0)		
 		add	r6,r6,r5
 		lis	r5,L2_SIZE_1M_U			#Size of memory to write to
-		
+
 .L2SzWriteLoop:	dcbz	r4,r6
 		stwx	r4,r4,r6
 		dcbf	r4,r6
@@ -856,7 +1007,14 @@ Wait2:		mfl2cr	r3
 		
 		lis	r7,0
 		
-.L2SizeDone:	li	r4,8
+.L2SizeDone:	mfl2cr	r4
+		oris	r4,r4,L2CR_TS@h
+		xoris	r4,r4,L2CR_TS@h
+		mtl2cr	r4				#Disable Test Support
+		sync
+		isync
+
+		li	r4,8
 		slw	r30,r30,r4
 		lwz	r4,PowerPCBase(r0)
 		stw	r30,sonnet_L2Size(r4)
@@ -944,10 +1102,9 @@ Wait2:		mfl2cr	r3
 		b	.DoRestL2
 
 .DefL2Speed:	mfl2cr	r4
-.DoRestL2:	xoris	r4,r4,L2CR_TS@h
-		xoris	r4,r4,L2CR_L2SIZ_1M@h
-		or	r4,r4,r7		
-		mtl2cr	r4				#Set correct size and switch Test off
+.DoRestL2:	xoris	r4,r4,L2CR_L2SIZ_1M@h
+		or	r4,r4,r7
+		mtl2cr	r4				#Set correct size, switch Test off and enable
 		
 		sync
 		isync
@@ -964,16 +1121,30 @@ mmuSetup:
 
 		bl	.SetupPT
 
-		lis	r3,EUMB@h				#PCI memory (EUMB) start effective address
-		addis	r4,r3,0x10				#end effective address
+		lwz	r3,base_XMPI(r29)
+		mr.	r3,r3
+		beq	.mmuMPC107
+		
+		addis	r4,r3,0x40
+		mr	r5,r3
+		loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED
+		li	r7,PP_SUPERVISOR_RW
+
+		bl	.DoTBLs
+
+ 		lis	r3,PPC_XCSR_BASE@h
+		b	.mmuHarrier
+
+.mmuMPC107:	lis	r3,EUMB@h				#PCI memory (EUMB) start effective address
+.mmuHarrier:	addis	r4,r3,0x10				#end effective address
 		mr	r5,r3					#start physical address
 		loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED	#WIMG
 		li	r7,PP_USER_RW				#pp = 2 - Read/Write Access (0 = No Access)
 
 		bl	.DoTBLs
 
-		lis	r3,0xfff0			#Fake ROM (64k)
-		lis	r4,0xfff1
+		lis	r3,0xfff0				#Fake ROM (128k)
+		lis	r4,0xfff2
 		mr	r5,r3
 		loadreg	r6,PTE_CACHE_INHIBITED
 		li	r7,PP_USER_RW
@@ -2033,11 +2204,20 @@ EInt:		b	.FPUnav				#0
 		mfxer	r0
 		stw	r0,64(r1)
 
-		lis	r3,EUMB@h
+		lwz	r3,XMPIBase(r0)
+		mr.	r3,r3
+		beq	.HandleSonnI
+
+		lis	r3,PPC_XCSR_BASE@h
+		lwz	r4,XCSR_FEST(r3)
+		andis.	r0,r4,XCSR_FEST_MIM0@h		#From CausePPCInterrupt on Harrier
+		b	.DoneIMH
+
+.HandleSonnI:	lis	r3,EUMB@h
 		li	r4,IMISR
 		lwbrx	r3,r3,r4
-		andi.	r0,r3,IMISR_IM0I		#From CausePPCInterrupt
-		lwz	r3,PowerPCBase(r0)
+		andi.	r0,r3,IMISR_IM0I		#From CausePPCInterrupt MPC107
+.DoneIMH:	lwz	r3,PowerPCBase(r0)
 		beq	.NoEHandler
 
 .EHandler:	li	r0,0
@@ -2089,19 +2269,27 @@ EInt:		b	.FPUnav				#0
 
 		loadreg	r3,'EXEX'
 		stw	r3,0xf4(r0)
-		
+
 		li	r5,-1
 		lwz	r10,PowerPCBase(r0)
 		stb	r5,sonnet_ExceptionMode(r10)
+		
+		lwz	r3,XMPIBase(r0)
+		mr.	r3,r3
+		beq	.SonnAck
 
-		lis	r3,EUMBEPICPROC@h
+		loadreg	r4,XMPI_P0IAC
+		lwzx	r5,r3,r4		
+		b	.HarrAck
+
+.SonnAck:	lis	r3,EUMBEPICPROC@h
 		lwz	r5,EPIC_IACK(r3)		#Read IACKR to acknowledge interrupt
 
 		rlwinm	r5,r5,8,0,31
 		cmpwi	r5,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
 		beq	.SlowReturn
 		
-.IntReturn:	lis	r3,EUMB@h
+		lis	r3,EUMB@h
 		li	r4,IMISR
 		lwbrx	r5,r4,r3
 		andi.	r9,r5,IMISR_IM0I
@@ -2163,6 +2351,56 @@ EInt:		b	.FPUnav				#0
 		lis	r3,EUMBEPICPROC@h
 		stw	r5,EPIC_EOI(r3)			#Write 0 to EOI to End Interrupt
 		sync
+		b	.StartQ
+
+#**********************************************************
+
+.HarrAck:	cmpwi	r5,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
+		beq	.SlowReturn
+
+		lis	r3,PPC_XCSR_BASE@h
+		lwz	r4,XCSR_FEST(r3)
+		andis.	r0,r4,XCSR_FEST_MIM0@h		#From CausePPCInterrupt on Harrier
+		beq	.NoMsgClearIH
+
+		lis	r9,XCSR_FECL_MIM0@h
+		stw	r9,XCSR_FECL(r3)		#Clear CausePPCInterrupt on Harrier
+
+.NoMsgClearIH:	andis.	r0,r4,XCSR_FEST_MIP@h
+		beq	.EndQueueH
+
+		lwz	r9,XCSR_MIIPH(r3)
+		lwz	r5,XCSR_MIIPT(r3)
+		cmpw	r5,r9
+		beq	.EndQueueH			#FIFO Empty? Shouldn't be on Harrier.
+
+.QNotEmptyH:	addi	r9,r5,4				#Increase FIFO pointer
+		loadreg	r4,0xffff3fff
+		and	r9,r9,r4			#Keep it below 0x4000
+		lwz	r5,0(r5)
+
+		la	r4,LIST_MSGQUEUE(r10)
+		addi	r4,r4,4				#PutMsg r5 to queue
+		lwz	r3,4(r4)			#AddTailPPC
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
+				
+		lis	r3,PPC_XCSR_BASE@h
+		lwz	r5,XCSR_MIIPH(r3)		#Check if header is equal to tail. If so, queue is empty
+		cmpw	r5,r9
+		beq	.QEmptyH
+		
+		mr	r5,r9
+		b	.QNotEmptyH
+
+.QEmptyH:	stw	r9,XCSR_MIIPT(r3)
+		
+.EndQueueH:	lwz	r3,XMPIBase(r0)
+		clearreg r5
+		loadreg	r4,XMPI_P0EOI			#Write 0 to EOI to End Interrupt
+		stwx	r5,r3,r4
 
 #**********************************************************
 
@@ -2275,7 +2513,19 @@ EInt:		b	.FPUnav				#0
 		stw	r4,4(r3)
 		stw	r3,0(r4)
 	
-		lis	r3,EUMB@h			#Free the message
+		lwz	r4,XMPIBase(r0)
+		mr.	r4,r4
+		beq	.RelFrameS
+	
+		lis	r3,PPC_XCSR_BASE@h
+		lwz	r6,XCSR_MIIFH(r3)
+		stw	r5,0(r6)
+		addi	r8,r6,4
+		andi.	r8,r8,0x3fff
+		stw	r8,XCSR_MIIFH(r3)
+		b	.RelledH
+	
+.RelFrameS:	lis	r3,EUMB@h			#Free the message
 		li	r4,IFHPR
 		lwbrx	r6,r4,r3		
 		stw	r5,0(r6)		
@@ -2283,7 +2533,7 @@ EInt:		b	.FPUnav				#0
 		li	r7,0x3fff
 		and	r8,r8,r7			#Keep it 0000-3FFE
 		stwbrx	r8,r4,r3
-		sync
+.RelledH:	sync
 
 .Oopsie:	mr	r5,r9
 		b	.NxtInQ
@@ -2328,7 +2578,19 @@ EInt:		b	.FPUnav				#0
 		stw	r4,4(r3)
 		stw	r3,0(r4)
 
-		lis	r3,EUMB@h			#Free the message
+		lwz	r4,XMPIBase(r0)
+		mr.	r4,r4
+		beq	.RelRxMsgS
+	
+		lis	r3,PPC_XCSR_BASE@h
+		lwz	r6,XCSR_MIIFH(r3)
+		stw	r5,0(r6)
+		addi	r8,r6,4
+		andi.	r8,r8,0x3fff
+		stw	r8,XCSR_MIIFH(r3)
+		b	.ContRXMsg
+
+.RelRxMsgS:	lis	r3,EUMB@h			#Free the message
 		li	r4,IFHPR
 		lwbrx	r6,r4,r3		
 		stw	r5,0(r6)		
@@ -2336,8 +2598,8 @@ EInt:		b	.FPUnav				#0
 		li	r6,0x3fff
 		and	r8,r8,r6			#Keep it 0000-3FFE
 		stwbrx	r8,r4,r3
-		sync
 		
+.ContRXMsg:	sync	
 		lwz	r4,MN_REPLYPORT(r7)
 		mr	r5,r7
 		lwz	r3,MP_SIGTASK(r4)
@@ -2387,7 +2649,19 @@ EInt:		b	.FPUnav				#0
 
 		lwz	r7,MN_ARG2(r5)
 
-		lis	r3,EUMB@h			#Free the message
+		lwz	r4,XMPIBase(r0)
+		mr.	r4,r4
+		beq	.RelInvXMsgS
+	
+		lis	r3,PPC_XCSR_BASE@h
+		lwz	r6,XCSR_MIIFH(r3)
+		stw	r5,0(r6)
+		addi	r8,r6,4
+		andi.	r8,r8,0x3fff
+		stw	r8,XCSR_MIIFH(r3)
+		b	.ContInvXMsg
+
+.RelInvXMsgS:	lis	r3,EUMB@h			#Free the message
 		li	r4,IFHPR
 		lwbrx	r6,r4,r3		
 		stw	r5,0(r6)		
@@ -2395,8 +2669,8 @@ EInt:		b	.FPUnav				#0
 		li	r6,0x3fff
 		and	r8,r8,r6			#Keep it 0000-3FFE
 		stwbrx	r8,r4,r3
-		sync
-
+		
+.ContInvXMsg:	sync
 		mr	r5,r7
 		mflr	r4
 		lwz	r3,MP_SIGTASK(r4)
@@ -4248,7 +4522,7 @@ EInt:		b	.FPUnav				#0
 
 .ISI:							#Instruction Storage Exception
 		mtsprg0	r0
-		
+
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable FPU & MMU
 		mtmsr	r0
@@ -4377,7 +4651,7 @@ EInt:		b	.FPUnav				#0
 
 .DSI:							#Data Storage Exception
 		mtsprg0	r0
-		
+
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable FPU & MMU
 		mtmsr	r0
@@ -4456,7 +4730,7 @@ EInt:		b	.FPUnav				#0
 		la	r30,104(r1)			#Start of reg table in r30
 		
 		loadreg	r0,'DSI?'
-		stw	r0,0xf4(r0)
+		stw	r0,0xf4(r0)		
 
 		lwz	r7,PowerPCBase(r0)		#For GetHALInfo
 		lwz	r6,DataExcLow(r7)		#Counts number of Amiga RAM
@@ -4672,7 +4946,18 @@ EInt:		b	.FPUnav				#0
 
 #*************************************************
 
-.DoSixtyEight:	lis	r28,EUMB@h
+.DoSixtyEight:	lwz	r25,XMPIBase(r0)
+		mr.	r25,r25
+		beq	.DoS68
+	
+		lis	r28,PPC_XCSR_BASE@h
+		lwz	r25,XCSR_MIOFT(r28)
+		addi	r23,r25,4
+		andi.	r23,r23,0x3fff
+		stw	r23,XCSR_MIOFT(r28)
+		b	.Cont68H
+
+.DoS68:		lis	r28,EUMB@h
 		li	r24,OFTPR
 		lwbrx	r25,r24,r28			
 		addi	r23,r25,4
@@ -4681,7 +4966,8 @@ EInt:		b	.FPUnav				#0
 		loadreg r20,0xffff
 		and	r23,r23,r20			#Keep it C000-FFFE		
 		stwbrx	r23,r24,r28
-		sync
+
+.Cont68H:	sync
 		lwz	r25,0(r25)
 
 .Loading:	stw	r9,MN_IDENTIFIER(r25)
@@ -4697,7 +4983,19 @@ EInt:		b	.FPUnav				#0
 
 		sync
 
-		lis	r28,EUMB@h
+		lwz	r24,XMPIBase(r0)
+		mr.	r24,r24
+		beq	.DoS68Write
+	
+		lis	r28,PPC_XCSR_BASE@h
+		lwz	r22,XCSR_MIOPH(r28)
+		stw	r25,0(r22)
+		addi	r23,r22,4
+		andi.	r23,r23,0x3fff
+		stw	r23,XCSR_MIOPH(r28)
+		b	.Done68WH
+
+.DoS68Write:	lis	r28,EUMB@h
 		li	r24,OPHPR
 		lwbrx	r22,r24,r28		
 		stw	r25,0(r22)		
@@ -4705,8 +5003,8 @@ EInt:		b	.FPUnav				#0
 		loadreg	r20,0xbfff
 		and	r23,r23,r20			#Keep it 8000-BFFE
 		stwbrx	r23,r24,r28			#triggers Interrupt
-		sync
 
+.Done68WH:	sync
 		mr.	r7,r7
 		bne	.NoWaitSE
 		loadreg	r9,'DONE'
@@ -5366,7 +5664,18 @@ EInt:		b	.FPUnav				#0
 		mfctr	r0
 		stwu	r0,4(r31)
 
-		lis	r6,EUMB@h
+		lwz	r4,XMPIBase(r0)
+		mr.	r4,r4
+		beq	.DoCrashS
+	
+		lis	r6,PPC_XCSR_BASE@h
+		lwz	r5,XCSR_MIOFT(r6)
+		addi	r3,r5,4
+		andi.	r3,r3,0x3fff
+		stw	r3,XCSR_MIOFT(r6)
+		b	.ContCrasH
+
+.DoCrashS:	lis	r6,EUMB@h
 		li	r4,OFTPR
 		lwbrx	r5,r4,r6
 		addi	r3,r5,4
@@ -5375,13 +5684,11 @@ EInt:		b	.FPUnav				#0
 		loadreg r7,0xffff
 		and	r3,r3,r7			#Keep it C000-FFFE		
 		stwbrx	r3,r4,r6
-		sync
+
+.ContCrasH:	sync
 		lwz	r5,0(r5)
-
 		loadreg	r7,'CRSH'
-
 		stw	r7,MN_IDENTIFIER(r5)
-
 		lwz	r7,MCPort(r0)
 		stw	r7,MN_MCPORT(r5)
 		li	r7,NT_MESSAGE
@@ -5391,7 +5698,19 @@ EInt:		b	.FPUnav				#0
 
 		sync
 
-		lis	r6,EUMB@h
+		lwz	r4,XMPIBase(r0)
+		mr.	r4,r4
+		beq	.FinishCrashS
+		
+		lis	r6,PPC_XCSR_BASE@h
+		lwz	r7,XCSR_MIOPH(r6)
+		stw	r5,0(r7)
+		addi	r3,r7,4
+		andi.	r3,r3,0x3fff
+		stw	r3,XCSR_MIOPH(r6)
+		b	.FinishCrasH
+
+.FinishCrashS:	lis	r6,EUMB@h
 		li	r4,OPHPR
 		lwbrx	r7,r4,r6
 		stw	r5,0(r7)		
@@ -5399,8 +5718,8 @@ EInt:		b	.FPUnav				#0
 		loadreg	r7,0xbfff
 		and	r3,r3,r7			#Keep it 8000-BFFE
 		stwbrx	r3,r4,r6			#triggers Interrupt
-		sync
-
+		
+.FinishCrasH:	sync
 		lwz	r10,PowerPCBase(r0)
 		lwz	r9,ThisPPCProc(r10)
 		li	r0,TS_REMOVED

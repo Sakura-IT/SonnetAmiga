@@ -103,8 +103,14 @@ LIBINIT		movem.l d1-a6,-(a7)
 		lea Buffer(pc),a4
 		move.l a0,(a4)				;SegList
 		move.l a6,LExecBase-Buffer(a4)
+		move.w AttnFlags(a6),d0
+		and.w #AFF_68040|AFF_68060,d0
+		bne.s CorrectCPU
+		
+		lea CPUReqError(pc),a2
+		bra PrintError
 
-		lea MemList(a6),a0
+CorrectCPU	lea MemList(a6),a0
 		lea MemName(pc),a1
 		jsr _LVOFindName(a6)			;Check for sonnet memory (old sonnet.library)
 		tst.l d0
@@ -143,16 +149,7 @@ GotDOS		moveq.l #PCI_VERSION,d0			;Minimal version of pci.library
 		lea LPCIError(pc),a2
 		bra PrintError
 
-FndPCI		lea MemList(a6),a0
-		lea PCIMem(pc),a1			;Check for PCI DMA (GFX) memory
-		jsr _LVOFindName(a6)
-		move.l d0,d7
-		bne.s FndMem
-
-		lea MemMedError(pc),a2
-		bra PrintError
-
-FndMem		lea ExpLib(pc),a1
+FndPCI		lea ExpLib(pc),a1
 		moveq.l #37,d0
 		jsr _LVOOpenLibrary(a6)			;Open expansion.library
 
@@ -223,6 +220,8 @@ NextCard	move.l d6,d0
 		jsr _LVOPCIConfigReadLong(a6)
 		cmp.l #DEVICE_MPC107<<16|VENDOR_MOTOROLA,d0
 		beq FoundCfg
+		cmp.l #DEVICE_HARRIER<<16|VENDOR_MOTOROLA,d0
+		beq FoundCfg
 		dbf d6,NextCard
 
 		lea NBridgeError(pc),a2
@@ -255,16 +254,7 @@ ClsLib  	move.l d0,a1
 FreeROM		move.l d0,a1
 		jmp _LVOFreeVec(a6)
 
-AllCorrect	move.l LExecBase(pc),a6
-		jsr _LVODisable(a6)
-		move.l d7,a1
-		jsr _LVORemove(a6)
-		lea MemList(a6),a0
-		move.l d7,a1
-		jsr _LVOAddTail(a6)			;Move gfx memory to back to prevent
-		jsr _LVOEnable(a6)			;mem list corruption if LE screenmode switch
-
-		move.l PCIBase(pc),d0
+AllCorrect	move.l PCIBase(pc),d0
 		bra.s CheckVGA
 		
 CheckATI	move.w #VENDOR_ATI,d0
@@ -279,7 +269,14 @@ CheckVGA	move.l d0,a6
 		jsr _LVOPCIFindCard(a6)			;Check for Sonnet card
 		move.l d0,d6
 		bne.s GotSonnetCard
-	
+
+		move.w #VENDOR_MOTOROLA,d0
+		move.w #DEVICE_HARRIER,d1
+		moveq.l #0,d2
+		jsr _LVOPCIFindCard(a6)			;Check for Sonnet card
+		move.l d0,d6
+		bne.s GotSonnetCard
+
 		lea SonnetError(pc),a2
 		bra PrintError		
 		
@@ -327,12 +324,36 @@ GotATI		move.l d0,a2
 
 FoundGfx	move.l d4,GfxMem-Buffer(a4)
 		move.w d5,GfxType-Buffer(a4)
-		move.l d6,a2
-		move.l a2,SonAddr-Buffer(a4)
+		move.l d6,SonAddr-Buffer(a4)
 		
 		bsr GetENVs
 
 		move.l LExecBase(pc),a6
+		lea MemList(a6),a0
+		lea PCIMem(pc),a1			;Check for PCI DMA (GFX) memory
+		jsr _LVOFindName(a6)
+		move.l d0,d7
+		bne.s FndMem
+		
+		move.l SonAddr(pc),a2
+		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
+		beq SetupHarrier
+
+		lea MemMedError(pc),a2
+		bra PrintError
+
+FndMem		jsr _LVODisable(a6)
+		move.l d7,a1
+		jsr _LVORemove(a6)
+		lea MemList(a6),a0
+		move.l d7,a1
+		jsr _LVOAddTail(a6)			;Move gfx memory to back to prevent
+		jsr _LVOEnable(a6)			;mem list corruption if BE screenmode switch
+
+		move.l SonAddr(pc),a2
+		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
+		beq SetupHarrier
+
 		move.l #$20000,d0
 		move.l #MEMF_PUBLIC|MEMF_PPC,d1
 		jsr _LVOAllocVec(a6)
@@ -379,6 +400,7 @@ loop2		move.l (a2)+,(a5)+			;Copy code to 0x3000
 		move.l ENVOptions+4(pc),$3020(a1)
 		move.l ENVOptions+8(pc),$3024(a1)
 		move.l a1,-(a7)
+		
 		jsr _LVOCacheClearU(a6)
 
 		move.l PCIBase(pc),a6
@@ -393,11 +415,11 @@ loop2		move.l (a2)+,(a5)+			;Copy code to 0x3000
 		jsr _LVOPCIConfigWriteWord(a6)		;Start MPC107. Does not work on Sonnet.
 
 		move.l LExecBase(pc),a6
-		move.l (a7)+,a1		
+		move.l (a7)+,a1			
 		move.l #WP_TRIG01,WP_CONTROL(a3)	;Negate HRESET. Now code gets executed
 							;at 0xfff00100 which jumps to 0xfff03000
 							;Only available on Sonnet
-		move.l	#$EC0000,d7			;Simple Time-out timer
+ReturnHar	move.l	#$EC0000,d7			;Simple Time-out timer
 
 Wait		subq.l #1,d7
 		beq.s TimeOut
@@ -720,6 +742,192 @@ GotPPCControl	move.l LExecBase(pc),a6
 		bge Clean
 		
 		lea WrongPPCLib(pc),a2
+
+;********************************************************************************************
+
+SetupHarrier	move.l PCIBase(pc),a6
+
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCI_OFFSET_COMMAND,d1
+		jsr _LVOPCIConfigReadWord(a6)
+
+		move.l d0,d2
+		or.w #MEMORY_SPACE_ENABLE,d2
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCI_OFFSET_COMMAND,d1
+		jsr _LVOPCIConfigWriteWord(a6)		;Enable Read/Write to PCI space
+		
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_MPAT,d1	
+		jsr _LVOPCIConfigReadLong(a6)		;Read PCFS_MPAT
+		
+		move.l d0,d2
+		or.l #PCFS_MPAT_GBL|PCFS_MPAT_ENA,d2	;Enables PCSF_MPBAR for reading/writing
+
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_MPAT,d1
+		jsr _LVOPCIConfigWriteLong(a6)		;Write PCFS_MPAT
+
+		move.l #$00f0ffff,d0			;Set 4K PCI Memory (swapped and negged)
+		moveq.l #0,d1				;Dummy bar 0
+		move.l SonAddr(pc),a0
+		jsr _LVOPCIAllocMem(a6)			;Get space for PMEP
+
+		move.l d0,d2
+		bne.s PCIMemHar1
+		
+		lea PCIMemError(pc),a2
+		bra PrintError
+		
+PCIMemHar1	move.l d2,PMEPAddr-Buffer(a4)
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_MBAR,d1
+		jsr _LVOPCIConfigWriteLong(a6)		;Set PCFS_MPBAR to location of PMEP (ie I2O etc)
+
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_ITAT0,d1
+		jsr _LVOPCIConfigReadLong(a6)		;Read PCFS_ITAT0 (Address Translation)
+		
+		move.l d0,d2
+		or.l #PCFS_ITAT0_GBL|PCFS_ITAT0_ENA,d2		;Enable PCFS_ITAT0 for reading/writing
+								;and enable snooping of transactions		
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_ITAT0,d1
+		jsr _LVOPCIConfigWriteLong(a6)		;Write PCFS_ITAT0
+
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_ITAT1,d1
+		jsr _LVOPCIConfigReadLong(a6)		;Read PCFS_ITAT1 (Another address translation unit)
+		
+		move.l d0,d2
+		or.l #PCFS_ITAT1_GBL|PCFS_ITAT1_ENA|PCFS_ITAT1_WPE|PCFS_ITAT1_RAE,d2		
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_ITAT1,d1
+		jsr _LVOPCIConfigWriteLong(a6)		;Enable PCFS_ITAT1, Snooping, Write-Post and Read-Ahead
+
+		move.l #$00f0ffff,d0			;Set 4K PCI Memory (swapped and negged)
+		moveq.l #1,d1				;Dummy bar 1
+		move.l SonAddr(pc),a0
+		jsr _LVOPCIAllocMem(a6)			;Get space for XCSR
+
+		move.l d0,d2
+		bne.s PCIMemHar2
+		
+		lea PCIMemError(pc),a2
+		bra PrintError
+		
+PCIMemHar2	move.l d2,XCSRAddr-Buffer(a4)
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_ITBAR0,d1
+		jsr _LVOPCIConfigWriteLong(a6)		;Set PCFS_ITBAR0 with inbound PCI address (XCSR)
+
+		move.l #PPC_XCSR_BASE|PCFS_ITSZ_4K,d2
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_ITOFSZ0,d1		;Relocate to PCI XCSRAddr
+		jsr _LVOPCIConfigWriteLong(a6)		;Set size & offset for inbound PCI address
+
+		move.l #$000000f0,d0			;Set 256MB PCI Memory (swapped and negged)
+		moveq.l #2,d1				;Dummy bar 2
+		move.l SonAddr(pc),a0
+		jsr _LVOPCIAllocMem(a6)			;Get space for PPC RAM
+
+		move.l d0,d2				;TODO: Should then try 128MB (Will happen in case of Radeon)
+		bne.s PCIMemHar3
+		
+		lea PCIMemError(pc),a2
+		bra PrintError
+		
+PCIMemHar3	move.l d2,SonnetBase-Buffer(a4)
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_ITBAR1,d1
+		jsr _LVOPCIConfigWriteLong(a6)		;Set PCFS_ITBAR1 with inbound PCI address (PPC RAM)
+
+		move.l #PPC_RAM_BASE|PCFS_ITSZ_256MB,d2
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_ITOFSZ1,d1
+		jsr _LVOPCIConfigWriteLong(a6)		;Set size & offset for RAM ($0 256MB)
+
+		move.l XCSRAddr(pc),a3
+		move.l #XCSR_XPAT_BAM_ENA|XCSR_XPAT_AD_DELAY15,d2
+		move.l d2,XCSR_XPAT0(a3)				;Clear XCSR_XPAT0_REN/WEN
+		move.l d2,XCSR_XPAT1(a3)				;And XPAT1 to disable on-board ROM startup
+
+		move.l #$0000fcff,d0					;Set 256kb PCI Memory (swapped and negged)
+		moveq.l #3,d1						;Dummy bar 3
+		move.l SonAddr(pc),a0
+		jsr _LVOPCIAllocMem(a6)					;Get space for PPC MPIC (Just a dummy, not accessable)
+
+		move.l d0,d2
+		bne.s PCIMemHar4
+		
+		lea PCIMemError(pc),a2
+		bra PrintError
+
+PCIMemHar4	move.l d2,MPICAddr-Buffer(a4)
+		or.l #XCSR_MBAR_ENA,d2
+		move.l d2,XCSR_MBAR(a3)					;Set location of MPIC (256kb boundary) plus MBAR_ENA
+
+		moveq.l #0,d0
+		moveq.l #0,d2
+		move.w GfxMem(pc),d0
+		sub.w #$6000,d2						;Calculate offset
+		move.l d0,d1
+		add.w #$6000,d1	
+		move.l d1,d0
+		swap d1
+		add.w #$1000,d0						;Set range (256MB)
+		or.w d0,d1				
+		swap d2
+		or.b #XCSR_OTAT0_ENA|XCSR_OTAT0_WPE|XCSR_OTAT0_SGE|XCSR_OTAT0_RAE|XCSR_OTAT0_MEM,d2
+
+		move.l d2,XCSR_OTAT0(a3)
+		move.l d1,XCSR_OTAD0(a3)
+
+		move.l #XCSR_SDBA_32M8|XCSR_SDBA_ENA,XCSR_SDBAA(a3)	;Set SDRAM bank A to 32Mx8 / 256MBytes
+		move.l XCSR_SDGC(a3),d2					;Read General Control Register SDGC
+		or.l #XCSR_SDGC_MXRR_7|XCSR_SDGC_ENRV_ENA,d2		;Set MXRR to 7us Refresh Rate
+		move.l d2,XCSR_SDGC(a3)					;and remap using ENRV from $fff00000 to $0
+
+		move.l SonnetBase(pc),a3
+		lea $10000(a3),a1
+		lea $3000(a1),a5
+		move.l #$48012f00,$100(a3)				;Start vector PPC
+
+		lea PPCCode(pc),a2
+		move.l #PPCLen,d6
+		lsr.l #2,d6
+		subq.l #1,d6
+loopHarrier	move.l (a2)+,(a5)+					;Copy code to 0x13000
+		dbf d6,loopHarrier
+
+		move.l #$abcdabcd,$3004(a1)				;Code Word
+		move.l GfxMem(pc),$3010(a1)
+		move.l GfxType(pc),$3014(a1)
+		move.l GfxConfig(pc),$3018(a1)
+		move.l ENVOptions(pc),$301c(a1)
+		move.l ENVOptions+4(pc),$3020(a1)
+		move.l ENVOptions+8(pc),$3024(a1)
+		move.l a1,-(a7)
+
+		move.l SonnetBase(pc),$3008(a1)
+		move.l #$10000000,$300c(a1)				;Fixed at the moment
+		move.l MPICAddr,$3028(a1)				;XPMI (MPIC)
+
+		move.l LExecBase(pc),a6
+		jsr _LVOCacheClearU(a6)
+
+		move.l XCSRAddr(pc),a3
+		move.l XCSR_BXCS(a3),d2
+		eor.l #XCSR_BXCS_P0H_ENA,d2				;Clear Processor 0 Hold off and start running PPC
+		move.l d2,XCSR_BXCS(a3)
+
+		move.l PMEPAddr(pc),a3
+		moveq.l #0,d2
+		move.l d2,PMEP_MIMS(a3)					;Clear OPIM to generate PCI interrupts
+
+		move.l (a7)+,a1	
+		
+		bra ReturnHar
 
 ;********************************************************************************************
 
@@ -1337,7 +1545,17 @@ VeryBad		movem.l (a7)+,d0-a6
 
 SonInt:		movem.l d1-a6,-(a7)			;68K interrupt which distributes
 		move.l LExecBase(pc),a6			;messages send by the PPC
-		move.l EUMBAddr(pc),a2
+		move.l SonAddr(pc),a2
+		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
+		bne NoIntH
+		
+		move.l PMEPAddr(pc),a2
+		moveq.l #0,d5
+		move.l PMEP_MIST(a2),d3
+		beq DidInt
+		bra.s NxtMsg
+		
+NoIntH		move.l EUMBAddr(pc),a2
 		move.l OMISR(a2),d3
 		moveq.l #0,d5
 		and.l #OPQI,d3
@@ -1392,7 +1610,6 @@ IntData		dc.l 0
 
 SonInt1200:	movem.l d1-a6,-(a7)			;68K interrupt which distributes
 		moveq.l #0,d5				;messages send by the PPC
-
 		move.l LExecBase(pc),a6
 		jsr _LVODisable(a6)
 
@@ -1402,10 +1619,17 @@ SonInt1200:	movem.l d1-a6,-(a7)			;68K interrupt which distributes
 		move.l PCIBase(pc),a6
 		jsr _LVOPCIGetZorroWindow(a6)
 
+		moveq.l #0,d4
 		move.l d0,d7
-NoWindowShift1	move.l EUMBAddr(pc),a2
-		move.l a2,d6
-		
+NoWindowShift1	move.l SonAddr(pc),a2
+		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
+		bne.s No1200H
+		move.l PMEPAddr(pc),a2
+		moveq.l #1,d4
+		bra.s Got1200H
+
+No1200H		move.l EUMBAddr(pc),a2
+Got1200H	move.l a2,d6		
 		move.l MediatorType(pc),d0
 		beq.s NoWindowShift2
 		
@@ -1416,13 +1640,25 @@ NoWindowShift1	move.l EUMBAddr(pc),a2
 		jsr _LVOPCISetZorroWindow(a6)
 
 		move.l d6,a2
-NoWindowShift2	move.l OMISR(a2),d3
+NoWindowShift2	tst.l d4
+		beq.s NoInt1200H
+
+		move.l PMEP_MIST(a2),d3
+		beq.s DoNothingYet
+		bra.s NxtMsg1200
+
+NoInt1200H	move.l OMISR(a2),d3
 		and.l #OPQI,d3
 		beq.s DoNothingYet
 
 NxtMsg1200	move.l d6,a2
-		move.l OFQPR(a2),a1
-		move.l a1,d3
+		tst.l d4
+		beq.s NoGetMsg1200H
+		move.l PMEP_MIOQ(a2),a1
+		bra.s GotMsg1200H
+		
+NoGetMsg1200H	move.l OFQPR(a2),a1
+GotMsg1200H	move.l a1,d3
 
 		cmp.l #-1,d3
 		beq EmptyQueue
@@ -1698,9 +1934,18 @@ ExCPU		movem.l (a7)+,d1-a6
 
 CreateMsgFrame:						;Fetch a free 192 bytes long message
 		movem.l a1/a2,-(a7)
-TooFast4U	move.l EUMBAddr(pc),a2
+TooFast4U	move.l SonAddr(pc),a2
+		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
+		bne.s DoNotCreateH
+		
+		move.l PMEPAddr(pc),a2
+		move.l PMEP_MIIQ(a2),a0
+		bra.s CreatedMsgH
+	
+DoNotCreateH	move.l EUMBAddr(pc),a2
 		move.l IFQPR(a2),a0
-		lea Previous(pc),a2
+		
+CreatedMsgH	lea Previous(pc),a2
 		move.l (a2),a1
 		cmp.l a1,a0
 		beq.s TooFast4U				;To prevent duplicates (Is there a better way?)
@@ -1715,10 +1960,19 @@ TooFast4U	move.l EUMBAddr(pc),a2
 ;********************************************************************************************
 
 SendMsgFrame:
-		move.l a2,-(a7)				;Send the message to the PPC
-		move.l EUMBAddr(pc),a2
-		move.l a0,IFQPR(a2)		
-		move.l (a7)+,a2
+		move.l a2,-(a7)
+		move.l SonAddr(pc),a2
+		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
+		bne.s DoNotSendH
+
+		move.l PMEPAddr(pc),a2
+		move.l a0,PMEP_MIIQ(a2)	
+		bra.s SendMsgH
+		
+DoNotSendH	move.l EUMBAddr(pc),a2
+		move.l a0,IFQPR(a2)			;Send the message to the PPC
+
+SendMsgH	move.l (a7)+,a2
 		rts
 
 ;********************************************************************************************
@@ -1729,9 +1983,18 @@ SendMsgFrame:
 		
 FreeMsgFrame:
 		move.l a2,-(a7)				;Return a PPC message to the free
-		move.l EUMBAddr(pc),a2			;messages pool
+		
+		move.l SonAddr(pc),a2
+		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
+		bne.s DoNotFreeH
+
+		move.l PMEPAddr(pc),a2
+		move.l a0,PMEP_MIOQ(a2)
+		bra.s FreeMsgH
+
+DoNotFreeH	move.l EUMBAddr(pc),a2			;messages pool
 		move.l a0,OFQPR(a2)		
-		move.l (a7)+,a2
+FreeMsgH	move.l (a7)+,a2
 		rts
 		
 ;********************************************************************************************
@@ -1742,9 +2005,18 @@ FreeMsgFrame:
 
 GetMsgFrame:
 		movem.l a0/a2,-(a7)			;Get next message send from the PPC
-TooFast4U2	move.l EUMBAddr(pc),a2			;if available
+TooFast4U2	move.l SonAddr(pc),a2
+		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
+		bne.s DoNotGetH
+		
+		move.l PMEPAddr(pc),a2
+		move.l PMEP_MIOQ(a2),a1
+		bra.s GotMsgH
+
+DoNotGetH	move.l EUMBAddr(pc),a2			;if available
 		move.l OFQPR(a2),a1
-		lea Previous2(pc),a0
+
+GotMsgH		lea Previous2(pc),a0
 		move.l (a0),a2
 		cmp.l a1,a2
 		beq.s TooFast4U2			;To prevent duplicates (Is there a better way?)
@@ -2952,12 +3224,19 @@ ClrXMsg		clr.l (a2)+
 
 CausePPCInterrupt:
 		movem.l d1-a6,-(a7)
-
-		move.l EUMBAddr(pc),a2
+		move.l SonAddr(pc),a2
 		moveq.l #-1,d1
+		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
+		bne.s NoCauseH
+		
+		move.l PMEPAddr(pc),a2
+		move.l d1,PMEP_MGIM0(a2)
+		bra.s CausedH
+
+NoCauseH	move.l EUMBAddr(pc),a2
 		move.l d1,IMR0(a2)
 
-		movem.l (a7)+,d1-a6
+CausedH		movem.l (a7)+,d1-a6
 		rts
 
 ;********************************************************************************************
@@ -3051,6 +3330,9 @@ GfxConfig		ds.l	1
 ComProc			ds.l	1
 SonAddr			ds.l	1
 EUMBAddr		ds.l	1
+PMEPAddr		ds.l	1
+XCSRAddr		ds.l	1
+MPICAddr		ds.l	1
 AddTaskAddress		ds.l	1
 RemTaskAddress		ds.l	1
 OpenLibAddress		ds.l	1
@@ -3092,7 +3374,7 @@ POWERDATATABLE:
 	INITLONG	LN_NAME,PowerName
 	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITWORD	LIB_VERSION,17
-	INITWORD	LIB_REVISION,8
+	INITWORD	LIB_REVISION,9
 	INITLONG	LIB_IDSTRING,PowerIDString
 	ds.l	1
 
@@ -3330,7 +3612,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.8 (16.04.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.9 (06.06.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
@@ -3358,6 +3640,8 @@ IllegalMsg	dc.b	"Illegal message received by MasterControl",0
 WrongPPCLib	dc.b	"Phase 5 ppc.library detected. Please remove it",0
 MasterError	dc.b	"Error setting up 68K MasterControl process",0
 PPCTaskError	dc.b	"Error setting up Kryten PPC process",0
+PCIMemError	dc.b	"Could not allocate sufficient PCI memory",0
+CPUReqError	dc.b	"This library requires a 68LC040 or better",0
 
 ConWindow	dc.b	"CON:0/20/680/250/Sonnet - PowerPC Exception/AUTO/CLOSE/WAIT/"
 		dc.b	"INACTIVE",0		

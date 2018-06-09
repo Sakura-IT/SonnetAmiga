@@ -508,7 +508,7 @@ ClearExcMMU:
 
 #********************************************************************************************
 #
-#	void ConfirmInterrupt(void)
+#	void ConfirmInterrupt(void)			//STUB
 #
 #********************************************************************************************
 
@@ -1446,9 +1446,11 @@ FlushDCache:
 		stwu	r28,-4(r13)
 		stwu	r27,-4(r13)
 		stwu	r26,-4(r13)
+		stwu	r25,-4(r13)
 		
 		mfctr	r28
 		mr	r30,r3
+		li	r25,0
 
 .WLFlush:	la	r4,sonnet_Atomic(r30)
 		bl 	AtomicTest
@@ -1470,9 +1472,19 @@ FlushDCache:
 		lbz	r4,DoDFlushAll(r30)
 		mr.	r4,r4
 		beq	.CompleteFlush
-		li	r27,0		
+
+		li	r27,0
+		b	.NoHWFlush		
 		
-.CompleteFlush:	li	r4,5
+.CompleteFlush:	mfpvr	r4
+		rlwinm	r4,r4,20,24,31
+		cmpwi	r4,0xc1
+		bne	.NoHWFlush
+
+		li	r25,1
+		li	r27,0
+		
+.NoHWFlush:	li	r4,5
 		srw	r27,r27,r4
 		add	r29,r29,r27			#Add with the L2 Cache size/Cache line size
 		mr	r27,r29
@@ -1497,8 +1509,15 @@ FlushDCache:
 		bdnz+	.FlushCache
 		
 		sync
+		mr.	r25,r25
+		beq	.NoHWFlush2
 		
-		mtdec	r26
+		mfl2cr	r4
+		ori	r4,r4,L2CR_L2HWF
+		mtl2cr	r4
+		sync
+		
+.NoHWFlush2:	mtdec	r26
 
 		bl EnableIntPPC
 
@@ -1511,13 +1530,14 @@ FlushDCache:
 		
 		bl AtomicDone
 		
-		lwz	r26,0(r13)
-		lwz	r27,4(r13)
-		lwz	r28,8(r13)
-		lwz	r29,12(r13)
-		lwz	r30,16(r13)
-		lwz	r31,20(r13)
-		addi	r13,r13,24
+		lwz	r25,0(r13)
+		lwz	r26,4(r13)
+		lwz	r27,8(r13)
+		lwz	r28,12(r13)
+		lwz	r29,16(r13)
+		lwz	r30,20(r13)
+		lwz	r31,24(r13)
+		addi	r13,r13,28
 		
 		epilog 'TOC'
 
@@ -2419,6 +2439,8 @@ ReleaseSemaphorePPC:
 		bl AtomicDone
 
 		loadreg	r0,'DBUG'
+		lwz	r2,0(r1)
+		lwz	r2,8(r2)			#Original LR
 		
 		illegal					#Not Yet Implemented
 
@@ -2938,7 +2960,18 @@ CreateMsgFramePPC:
 
 		bl DisableIntPPC
 
-		lis	r3,EUMB@h
+		lwz	r27,XMPIBase(r0)
+		mr.	r27,r27
+		beq	.CreateMS
+
+		lis	r3,PPC_XCSR_BASE@h
+		lwz	r30,XCSR_MIOFT(r3)
+		addi	r28,r30,4
+		andi.	r28,r28,0x3fff
+		stw	r28,XCSR_MIOFT(r3)
+		b	.ContCreateH
+
+.CreateMS:	lis	r3,EUMB@h
 		li	r27,OFTPR
 		lwbrx	r30,r27,r3			
 		addi	r28,r30,4
@@ -2947,7 +2980,8 @@ CreateMsgFramePPC:
 		loadreg r29,0xffff
 		and	r28,r28,r29			#Keep it C000-FFFE		
 		stwbrx	r28,r27,r3
-		sync
+
+.ContCreateH:	sync
 		lwz	r30,0(r30)			
 
 		bl EnableIntPPC
@@ -2991,7 +3025,19 @@ SendMsgFramePPC:
 
 		bl DisableIntPPC
 
-		lis	r3,EUMB@h
+		lwz	r27,XMPIBase(r0)
+		mr.	r27,r27
+		beq	.SendMS
+
+		lis	r3,PPC_XCSR_BASE@h
+		lwz	r28,XCSR_MIOPH(r3)
+		stw	r30,0(r28)
+		addi	r29,r28,4
+		andi.	r29,r29,0x3fff
+		stw	r29,XCSR_MIOPH(r3)
+		b	.ContSendH
+
+.SendMS:	lis	r3,EUMB@h
 		li	r27,OPHPR
 		lwbrx	r28,r27,r3		
 		stw	r30,0(r28)		
@@ -2999,7 +3045,8 @@ SendMsgFramePPC:
 		loadreg	r4,0xbfff
 		and	r29,r29,r4			#Keep it 8000-BFFE
 		stwbrx	r29,r27,r3			#triggers Interrupt
-		sync
+		
+.ContSendH:	sync
 		
 		bl EnableIntPPC
 
@@ -3039,7 +3086,19 @@ FreeMsgFramePPC:
 
 		bl DisableIntPPC
 
-		lis	r3,EUMB@h			#Free the message
+		lwz	r27,XMPIBase(r0)
+		mr.	r27,r27
+		beq	.FreeMS
+
+		lis	r3,PPC_XCSR_BASE@h
+		lwz	r29,XCSR_MIIFH(r3)
+		stw	r30,0(r29)
+		addi	r28,r29,4
+		andi.	r28,r28,0x3fff
+		stw	r28,XCSR_MIIFH(r3)
+		b	.ContFreeH
+
+.FreeMS:	lis	r3,EUMB@h			#Free the message
 		li	r27,IFHPR
 		lwbrx	r29,r27,r3		
 		stw	r30,0(r29)		
@@ -3047,7 +3106,8 @@ FreeMsgFramePPC:
 		li	r29,0x3fff
 		and	r28,r28,r29			#Keep it 0000-3FFE
 		stwbrx	r28,r27,r3
-		sync
+
+.ContFreeH:	sync
 
 		bl EnableIntPPC
 
