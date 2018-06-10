@@ -744,6 +744,7 @@ GotPPCControl	move.l LExecBase(pc),a6
 		bge Clean
 		
 		lea WrongPPCLib(pc),a2
+		bra PrintError
 
 ;********************************************************************************************
 
