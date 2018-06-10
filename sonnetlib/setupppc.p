@@ -172,7 +172,8 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 .Unstable:	stw	r0,base_Comm(r29)
 		b	.ErrorRam
 
-.GotRam:	lhz	r3,base_RTGType(r29)		#RTGType
+.GotRam:	mr	r28,r8
+		lhz	r3,base_RTGType(r29)		#RTGType
 		cmpwi	r3,rtgtype_ati			#Check for ATI Gfx Card
 		beq	.MaxRam
 		cmpwi	r3,rtgtype_voodoo45		#Check for VooDoo4/5
@@ -182,7 +183,6 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 		cmplw	r8,r4
 		ble	.NoMaxRam
 
-		mr	r28,r8
 		mr	r8,r4	
 
 .NoMaxRam:	lis	r27,0x8000			#Upper boundary PCI Memory Mediator
@@ -201,7 +201,7 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 		bne	.NextCheck1
 		lis	r27,0x6000			#Config jumper closed
 		b	.GotUpperLimit
-		
+
 .NextCheck1:	cmpwi	r26,5
 		bne	.NextCheck2
 		lis 	r27,0x5000
@@ -210,7 +210,7 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 .NextCheck2:	cmpwi	r26,3
 		bne	.NextCheck3
 		lis	r27,0x3000
-		mr	r8,r28
+		mr	r8,r28		
 		b	.GotUpperLimit
 
 .NextCheck3:	cmpwi	r26,7

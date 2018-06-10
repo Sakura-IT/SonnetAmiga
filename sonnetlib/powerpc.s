@@ -218,11 +218,13 @@ NextCard	move.l d6,d0
 		lsl.l #3,d0
 		moveq.l #PCI_OFFSET_ID,d1
 		jsr _LVOPCIConfigReadLong(a6)
+		cmp.l #-1,d0
+		beq.s NoCard
 		cmp.l #DEVICE_MPC107<<16|VENDOR_MOTOROLA,d0
 		beq FoundCfg
 		cmp.l #DEVICE_HARRIER<<16|VENDOR_MOTOROLA,d0
 		beq FoundCfg
-		dbf d6,NextCard
+NoCard		dbf d6,NextCard
 
 		lea NBridgeError(pc),a2
 		bra PrintError	
