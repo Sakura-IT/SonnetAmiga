@@ -766,7 +766,6 @@ SetupHarrier	move.l PCIBase(pc),a6
 		
 		move.l d0,d2
 		or.l #PCFS_MPAT_GBL|PCFS_MPAT_ENA,d2	;Enables PCSF_MPBAR for reading/writing
-
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_MPAT,d1
 		jsr _LVOPCIConfigWriteLong(a6)		;Write PCFS_MPAT
@@ -1462,8 +1461,9 @@ CleanUp		move.l d6,a0
 GoWaitPort	move.l (a7),a0
 		move.l ThisTask(a6),a1
 		
-		move.l TC_SIGALLOC(a1),d0		
+		move.l TC_SIGALLOC(a1),d0
 		and.l #$fffff000,d0			;Do not act on system signals except the CTRL ones
+		or.w #$400,d0				;Special signal to prevent bouncing between CPUs
 		
 		jsr _LVOWait(a6)
 		
@@ -1548,32 +1548,31 @@ VeryBad		movem.l (a7)+,d0-a6
 
 SonInt:		movem.l d1-a6,-(a7)			;68K interrupt which distributes
 		move.l LExecBase(pc),a6			;messages send by the PPC
-		move.l SonAddr(pc),a2
+		moveq.l #0,d5
+ReChek		move.l SonAddr(pc),a2
 		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
 		bne NoIntH
-		
+
 		move.l PMEPAddr(pc),a2
-		moveq.l #0,d5
 		move.l PMEP_MIST(a2),d3
 		beq DidInt
 		bra.s NxtMsg
 		
 NoIntH		move.l EUMBAddr(pc),a2
 		move.l OMISR(a2),d3
-		moveq.l #0,d5
 		and.l #OPQI,d3
 		beq DidInt
 
 NxtMsg		bsr GetMsgFrame
 		move.l a1,d3
 		cmp.l #-1,d3
-		beq DidInt
+		beq ReChek
 		moveq.l #-1,d5
 
 		moveq.l #11,d4
 		bsr.s InvMsg				;PCI memory is cache inhibited for 68k?
 		move.l d3,a1
-		
+
 		move.l MN_IDENTIFIER(a1),d0
 		cmp.l #"T68K",d0
 		beq MsgT68k
@@ -1814,6 +1813,7 @@ MsgRetX		move.l a1,a2
 
 MsgSignal68k	move.l MN_PPSTRUCT+4(a1),d0		;Signal from a PPC task to 68K task
 		move.l a1,d7
+		or.w #$400,d0				;Mark it as being from PPC to prevent bouncing
 		move.l MN_PPSTRUCT(a1),a1
 		jsr _LVOSignal(a6)
 		move.l d7,a0
@@ -2730,6 +2730,7 @@ Stacker		move.l ThisTask(a6),a1
 							;the system like Heretic II.
 NoAdjustPri	move.l TC_SIGALLOC(a1),d0		
 		and.l #$fffff000,d0
+		or.w #$400,d0				;Special signal to prevent bouncing
 
 		jsr _LVOWait(a6)
 
@@ -2945,7 +2946,11 @@ NoFPU2		move.l a7,a0
 		
 ;********************************************************************************************
 
-CrossSignals	bsr CreateMsgFrame
+CrossSignals	btst #10,d0				;Test on special signal ($400)
+		beq.s SigBouncing
+		rts
+
+SigBouncing	bsr CreateMsgFrame
 
 		moveq.l #MSG_LEN/4-1,d0
 		move.l a0,a2

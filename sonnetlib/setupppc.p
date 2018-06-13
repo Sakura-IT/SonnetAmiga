@@ -653,20 +653,22 @@ End:		mflr	r4
 		
 		subi	r4,r4,4
 		lis	r5,0x20
-		add	r5,r5,r6
-		
+		add	r5,r5,r6		
 		li	r6,4096
-		mr	r7,r6
+		loadreg	r20,(0x180000-4)
 		mtctr	r6
-.FillIBFLH:	stwu	r5,4(r4)
+		loadreg	r21,(0x140000-4)
+		addis	r7,r5,0xc
+		loadreg	r22,(0x1c0000-4)
+		li	r23,0
+		
+.FillFIFO:	stwu	r5,4(r4)
+		stwu	r7,4(r20)
+		stwu	r23,4(r21)
+		stwu	r23,4(r22)
 		addi	r5,r5,192				#Message Frame Length
-		bdnz	.FillIBFLH
-
-		loadreg	r4,(0x180000-4)
-		mtctr	r7
-.FillOBFLH:	stwu	r5,4(r4)
-		addi	r5,r5,192
-		bdnz	.FillOBFLH
+		addi	r7,r7,192
+		bdnz	.FillFIFO
 		
 		li	r4,4
 		stw	r4,XCSR_MIIFT(r14)
@@ -1273,7 +1275,7 @@ mmuSetup:
 .NoATI:		li	r3,0				#First 2MB cached - user protected - Directs to CHIP
 		mr	r5,r3
 
-		li	r17,BAT_READ_WRITE
+		li	r17,BAT_CACHE_INHIBITED | BAT_READ_WRITE
 		li	r18,BAT_BL_2M | BAT_VALID_SUPERVISOR
 
 		or	r17,r17,r5
@@ -2476,6 +2478,7 @@ EInt:		b	.FPUnav				#0
 .ReUseLoop:	lwz	r3,MN_ARG0(r5)			#Signals received by the 68K task
 		lwz	r8,TC_SIGRECVD(r4)		#Copy to PPC task
 		or	r8,r8,r3
+		ori	r8,r8,0x200			#Special flag (also used for WaitTime)
 		stw	r8,TC_SIGRECVD(r4)
 		b	.RelFrame
 		
@@ -5008,12 +5011,17 @@ EInt:		b	.FPUnav				#0
 		mr.	r7,r7
 		bne	.NoWaitSE
 		loadreg	r9,'DONE'
+		lis	r7,0x40
+		mtctr	r7
 .WaitPFIFO:	lwz	r21,MN_IDENTIFIER(r25)
+		sync
 		cmpw	r21,r9
-		bne	.WaitPFIFO
-		
-		lwz	r10,MN_IDENTIFIER+4(r25)	#Returned value for load in r10
-		
+		beq	.DonePFIFO
+		bdnz	.WaitPFIFO
+		b	.HaltDSI
+
+.DonePFIFO:	lwz	r10,MN_IDENTIFIER+4(r25)	#Returned value for load in r10
+
 .NoWaitSE:	blr
 
 #********************************************************************************************

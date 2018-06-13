@@ -2982,7 +2982,10 @@ CreateMsgFramePPC:
 		stwbrx	r28,r27,r3
 
 .ContCreateH:	sync
-		lwz	r30,0(r30)			
+		li	r28,0
+		lwz	r29,0(r30)
+		stw	r28,0(r30)
+		mr	r30,r29
 
 		bl EnableIntPPC
 
@@ -3208,16 +3211,19 @@ WaitFor68K:
 
 .WasNoMsg:	lwz	r27,ThisPPCProc(r25)
 		lwz	r4,TC_SIGALLOC(r27)
-		loadreg	r28,0xfffff100
+		loadreg	r28,0xfffff300
 		and.	r4,r4,r28
+		ori	r4,r4,0x200
 		mr	r3,r25
 
 		bl WaitPPC
 
-		mr	r5,r3
 		li	r28,SIGF_DOS				#Standard msg port wait bit
-		andc.	r5,r5,r28
+		andc.	r5,r3,r28
 		beq	.NextMsg
+
+		andi.	r0,r3,0x200
+		bne	.NextMsg
 
 		lwz	r4,TASKPPC_MIRRORPORT(r27)
 		lwz	r4,MP_SIGTASK(r4)
@@ -9776,16 +9782,19 @@ StartCode:	bl	.StartRunPPC
 
 .WasNoEMsg:	lwz	r31,ThisPPCProc(r25)
 		lwz	r4,TC_SIGALLOC(r31)
-		loadreg	r28,0xfffff100
+		loadreg	r28,0xfffff300
 		and.	r4,r4,r28
+		ori	r4,r4,0x200
 		mr	r3,r25
 
 		bl WaitPPC
 
-		mr	r5,r3
 		li	r28,SIGF_DOS				#Standard msg port wait bit
-		andc.	r5,r5,r28
+		andc.	r5,r3,r28
 		beq	.NextEMsg
+
+		andi.	r0,r3,0x200
+		bne	.NextEMsg
 
 		lwz	r4,TASKPPC_MIRRORPORT(r31)
 		lwz	r4,MP_SIGTASK(r4)
