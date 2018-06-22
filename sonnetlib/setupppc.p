@@ -2478,7 +2478,7 @@ EInt:		b	.FPUnav				#0
 .ReUseLoop:	lwz	r3,MN_ARG0(r5)			#Signals received by the 68K task
 		lwz	r8,TC_SIGRECVD(r4)		#Copy to PPC task
 		or	r8,r8,r3
-		ori	r8,r8,0x200			#Special flag (also used for WaitTime)
+#		ori	r8,r8,0x200			#Special flag to mark as bounced signal (DISABLED)
 		stw	r8,TC_SIGRECVD(r4)
 		b	.RelFrame
 		

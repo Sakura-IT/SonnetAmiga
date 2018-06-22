@@ -889,8 +889,10 @@ PCIMemHar4	move.l d2,MPICAddr-Buffer(a4)
 		move.l XCSR_SDGC(a3),d2					;Read General Control Register SDGC
 		or.l #XCSR_SDGC_MXRR_7|XCSR_SDGC_ENRV_ENA,d2		;Set MXRR to 7us Refresh Rate
 		move.l d2,XCSR_SDGC(a3)					;and remap using ENRV from $fff00000 to $0
+		move.l #XCSR_SDTC_DEFAULT,XCSR_SDTC(a3)			;Set RAM settings.
 
 		move.l SonnetBase(pc),a3
+
 		lea $10000(a3),a1
 		lea $3000(a1),a5
 		move.l #$48012f00,$100(a3)				;Start vector PPC
@@ -1813,7 +1815,7 @@ MsgRetX		move.l a1,a2
 
 MsgSignal68k	move.l MN_PPSTRUCT+4(a1),d0		;Signal from a PPC task to 68K task
 		move.l a1,d7
-		or.w #$400,d0				;Mark it as being from PPC to prevent bouncing
+;		or.w #$400,d0				;Mark it as being from PPC to prevent bouncing (DISABLED)
 		move.l MN_PPSTRUCT(a1),a1
 		jsr _LVOSignal(a6)
 		move.l d7,a0
@@ -1985,19 +1987,26 @@ SendMsgH	move.l (a7)+,a2
 ;********************************************************************************************
 		
 FreeMsgFrame:
-		move.l a2,-(a7)				;Return a PPC message to the free
-		
-		move.l SonAddr(pc),a2
+		movem.l d1-d3/a2-a3,-(a7)		;Return a PPC message to the free		
+		move.l SonAddr(pc),a2			;messages pool
 		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
 		bne.s DoNotFreeH
 
-		move.l PMEPAddr(pc),a2
-		move.l a0,PMEP_MIOQ(a2)
+		move.l XCSRAddr(pc),a2
+		move.l XCSR_MIOFH(a2),d1		;Get from Outgoing Free Header
+		move.l d1,d2
+		addq.l #4,d1
+		and.w #$3fff,d1				;Wrap the queue to 16K (4K entries)
+		move.l SonnetBase(pc),d3
+		add.l d2,d3
+		move.l d3,a3
+		move.l a0,(a3)				;Free the PPC message
+		move.l d1,XCSR_MIOFH(a2)		;Update Outgoing Free Header
 		bra.s FreeMsgH
 
-DoNotFreeH	move.l EUMBAddr(pc),a2			;messages pool
+DoNotFreeH	move.l EUMBAddr(pc),a2			
 		move.l a0,OFQPR(a2)		
-FreeMsgH	move.l (a7)+,a2
+FreeMsgH	movem.l (a7)+,d1-d3/a2-a3
 		rts
 		
 ;********************************************************************************************
@@ -2007,24 +2016,44 @@ FreeMsgH	move.l (a7)+,a2
 ;********************************************************************************************
 
 GetMsgFrame:
-		movem.l a0/a2,-(a7)			;Get next message send from the PPC
-TooFast4U2	move.l SonAddr(pc),a2
+		movem.l d1-d3/a0/a2-a3,-(a7)		;Get next message send from the PPC
+TooFast4U2	move.l SonAddr(pc),a2			;if available
+
 		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
 		bne.s DoNotGetH
+
+		move.l XCSRAddr(pc),a2
+		move.l XCSR_MIOPT(a2),d1		;Compare Outgoing Post Tail with
+		move.l XCSR_MIOPH(a2),d2		;Outgoing Post Header. Equal means empty
+		cmp.l d1,d2
+		bne.s DoQueue
+		moveq.l #-1,d3				;Give -1 when empty.
+		move.l d3,a1
+		bra.s GotMsgH
 		
-		move.l PMEPAddr(pc),a2
-		move.l PMEP_MIOQ(a2),a1
+DoQueue		move.l d1,d2
+		addq.l #4,d1
+		and.w #$3fff,d1				;Wrap queue to 16K (4K entries)
+		move.l SonnetBase(pc),d3
+		add.l d2,d3
+		move.l d3,a3
+		move.l (a3),a1				;Get PPC message.
+		move.l d1,XCSR_MIOPT(a2)		;Update Outgoing Post Tail;
 		bra.s GotMsgH
 
-DoNotGetH	move.l EUMBAddr(pc),a2			;if available
+DoNotGetH	move.l EUMBAddr(pc),a2	
 		move.l OFQPR(a2),a1
 
-GotMsgH		lea Previous2(pc),a0
+GotMsgH		moveq.l #-1,d1
+		cmp.l a1,d1
+		beq.s NoPrev
+
+		lea Previous2(pc),a0
 		move.l (a0),a2
 		cmp.l a1,a2
 		beq.s TooFast4U2			;To prevent duplicates (Is there a better way?)
 		move.l a1,(a0)
-		movem.l (a7)+,a0/a2
+NoPrev		movem.l (a7)+,d1-d3/a0/a2-a3
 		rts
 
 ;********************************************************************************************
@@ -3620,7 +3649,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.9 (06.06.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.9 (21.06.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
