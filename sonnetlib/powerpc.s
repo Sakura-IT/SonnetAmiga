@@ -833,16 +833,27 @@ PCIMemHar2	move.l d2,XCSRAddr-Buffer(a4)
 		btst #20,d2
 		bne.s NoReset
 		
-		eor.l #XCSR_BXCS_P0H_ENA,d2		;Clear Processor 0 Hold off and start running PPC
+		eor.l #XCSR_BXCS_P0H_ENA,d2		;Reset Processor 0 when already running.
 		move.l d2,XCSR_BXCS(a3)
 
 NoReset		move.l #$000000f0,d0			;Set 256MB PCI Memory (swapped and negged)
 		moveq.l #2,d1				;Dummy bar 2
 		move.l SonAddr(pc),a0
 		jsr _LVOPCIAllocMem(a6)			;Get space for PPC RAM
-
+		
+		move.l #$10000000,d7
 		move.l d0,d2				;TODO: Should then try 128MB (Will happen in case of Radeon)
 		bne.s PCIMemHar3
+		
+;		move.l #$000000f8,d0			;Retry with 128MB RAM
+;		moveq.l #2,d1
+;		move.l SonAddr(pc),a0
+;		jsr _LVOPCIAllocMem(a6)
+;		move.l #$58000000,d0
+		
+;		move.l #$08000000,d7
+;		move.l d0,d2
+;		bne.s PCIMemHar3
 		
 		lea PCIMemError(pc),a2
 		bra PrintError
@@ -853,7 +864,11 @@ PCIMemHar3	move.l d2,SonnetBase-Buffer(a4)
 		jsr _LVOPCIConfigWriteLong(a6)		;Set PCFS_ITBAR1 with inbound PCI address (PPC RAM)
 
 		move.l #PPC_RAM_BASE|PCFS_ITSZ_256MB,d2
-		move.l ConfigDevNum(pc),d0
+		btst #28,d7
+		bne.s Got256MB
+
+		move.l #PPC_RAM_BASE|PCFS_ITSZ_128MB,d2
+Got256MB	move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_ITOFSZ1,d1
 		jsr _LVOPCIConfigWriteLong(a6)		;Set size & offset for RAM ($0 256MB)
 
@@ -924,7 +939,7 @@ loopHarrier	move.l (a2)+,(a5)+					;Copy code to 0x13000
 		move.l a1,-(a7)
 
 		move.l SonnetBase(pc),$3008(a1)
-		move.l #$10000000,$300c(a1)				;Fixed at the moment
+		move.l d7,$300c(a1)					;Set available memory.
 		move.l MPICAddr,$3028(a1)				;XPMI (MPIC)
 
 		move.l LExecBase(pc),a6
@@ -1475,10 +1490,9 @@ GoWaitPort	move.l (a7),a0
 		
 		move.l TC_SIGALLOC(a1),d0
 		and.l #$fffff000,d0			;Do not act on system signals except the CTRL ones
-		or.w #$400,d0				;Special signal to prevent bouncing between CPUs
-		
+
 		jsr _LVOWait(a6)
-		
+
 		move.l (a7),a0		
 		move.b MP_SIGBIT(a0),d1
 		moveq.l #0,d2
@@ -1825,7 +1839,6 @@ MsgRetX		move.l a1,a2
 
 MsgSignal68k	move.l MN_PPSTRUCT+4(a1),d0		;Signal from a PPC task to 68K task
 		move.l a1,d7
-;		or.w #$400,d0				;Mark it as being from PPC to prevent bouncing (DISABLED)
 		move.l MN_PPSTRUCT(a1),a1
 		jsr _LVOSignal(a6)
 		move.l d7,a0
@@ -2769,7 +2782,6 @@ Stacker		move.l ThisTask(a6),a1
 							;the system like Heretic II.
 NoAdjustPri	move.l TC_SIGALLOC(a1),d0		
 		and.l #$fffff000,d0
-		or.w #$400,d0				;Special signal to prevent bouncing
 
 		jsr _LVOWait(a6)
 
@@ -2985,11 +2997,7 @@ NoFPU2		move.l a7,a0
 		
 ;********************************************************************************************
 
-CrossSignals	btst #10,d0				;Test on special signal ($400)
-		beq.s SigBouncing
-		rts
-
-SigBouncing	bsr CreateMsgFrame
+CrossSignals	bsr CreateMsgFrame
 
 		moveq.l #MSG_LEN/4-1,d0
 		move.l a0,a2

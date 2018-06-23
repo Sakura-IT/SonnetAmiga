@@ -791,7 +791,30 @@ ifpdr_value:	mflr	r3
 		mtspr	dbat1l,r1
 		mtspr	dbat2l,r1
 		mtspr	dbat3l,r1
-		isync
+		
+		mfpvr	r4
+		rlwinm	r4,r4,8,24,31
+		cmpwi	r4,0x70
+		bne	.SkipExtraBats
+
+		mtspr	ibat4u,r1
+		mtspr	ibat5u,r1
+		mtspr	ibat6u,r1
+		mtspr	ibat7u,r1
+		mtspr	ibat4l,r1
+		mtspr	ibat5l,r1
+		mtspr	ibat6l,r1
+		mtspr	ibat7l,r1
+		mtspr	dbat4u,r1
+		mtspr	dbat5u,r1
+		mtspr	dbat6u,r1
+		mtspr	dbat7u,r1
+		mtspr	dbat4l,r1
+		mtspr	dbat5l,r1
+		mtspr	dbat6l,r1
+		mtspr	dbat7l,r1
+		
+.SkipExtraBats:	isync
 		sync
 		sync
 	
@@ -2478,7 +2501,6 @@ EInt:		b	.FPUnav				#0
 .ReUseLoop:	lwz	r3,MN_ARG0(r5)			#Signals received by the 68K task
 		lwz	r8,TC_SIGRECVD(r4)		#Copy to PPC task
 		or	r8,r8,r3
-#		ori	r8,r8,0x200			#Special flag to mark as bounced signal (DISABLED)
 		stw	r8,TC_SIGRECVD(r4)
 		b	.RelFrame
 		
@@ -5010,6 +5032,7 @@ EInt:		b	.FPUnav				#0
 .Done68WH:	sync
 		mr.	r7,r7
 		bne	.NoWaitSE
+		mfctr	r0
 		loadreg	r9,'DONE'
 		lis	r7,0x40
 		mtctr	r7
@@ -5018,9 +5041,11 @@ EInt:		b	.FPUnav				#0
 		cmpw	r21,r9
 		beq	.DonePFIFO
 		bdnz	.WaitPFIFO
+
 		b	.HaltDSI
 
-.DonePFIFO:	lwz	r10,MN_IDENTIFIER+4(r25)	#Returned value for load in r10
+.DonePFIFO:	mtctr	r0
+		lwz	r10,MN_IDENTIFIER+4(r25)	#Returned value for load in r10
 
 .NoWaitSE:	blr
 

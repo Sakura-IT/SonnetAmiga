@@ -484,6 +484,22 @@
 .set dbat2l,541
 .set dbat3u,542
 .set dbat3l,543
+.set ibat4u,560
+.set ibat4l,561
+.set ibat5u,562
+.set ibat5l,563
+.set ibat6u,564
+.set ibat6l,565
+.set ibat7u,566
+.set ibat7l,567
+.set dbat4u,568
+.set dbat4l,569
+.set dbat5u,570
+.set dbat5l,571
+.set dbat6u,572
+.set dbat6l,573
+.set dbat7u,574
+.set dbat7l,575
 .set l2cr,1017
 
 .set EPIC_GCR,0x41020		#Global Configuration Register
