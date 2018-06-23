@@ -828,7 +828,15 @@ PCIMemHar2	move.l d2,XCSRAddr-Buffer(a4)
 		moveq.l #PCFS_ITOFSZ0,d1		;Relocate to PCI XCSRAddr
 		jsr _LVOPCIConfigWriteLong(a6)		;Set size & offset for inbound PCI address
 
-		move.l #$000000f0,d0			;Set 256MB PCI Memory (swapped and negged)
+		move.l XCSRAddr(pc),a3
+		move.l XCSR_BXCS(a3),d2
+		btst #20,d2
+		bne.s NoReset
+		
+		eor.l #XCSR_BXCS_P0H_ENA,d2		;Clear Processor 0 Hold off and start running PPC
+		move.l d2,XCSR_BXCS(a3)
+
+NoReset		move.l #$000000f0,d0			;Set 256MB PCI Memory (swapped and negged)
 		moveq.l #2,d1				;Dummy bar 2
 		move.l SonAddr(pc),a0
 		jsr _LVOPCIAllocMem(a6)			;Get space for PPC RAM
@@ -853,6 +861,8 @@ PCIMemHar3	move.l d2,SonnetBase-Buffer(a4)
 		move.l #XCSR_XPAT_BAM_ENA|XCSR_XPAT_AD_DELAY15,d2
 		move.l d2,XCSR_XPAT0(a3)				;Clear XCSR_XPAT0_REN/WEN
 		move.l d2,XCSR_XPAT1(a3)				;And XPAT1 to disable on-board ROM startup
+		move.l d2,XCSR_XPAT2(a3)
+		move.l d2,XCSR_XPAT3(a3)				;Let's just do them all...
 
 		move.l #$0000fcff,d0					;Set 256kb PCI Memory (swapped and negged)
 		moveq.l #3,d1						;Dummy bar 3
