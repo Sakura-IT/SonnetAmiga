@@ -759,11 +759,11 @@ SetupHarrier	move.l PCIBase(pc),a6
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCI_OFFSET_COMMAND,d1
 		jsr _LVOPCIConfigWriteWord(a6)		;Enable Read/Write to PCI space
-		
+
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_MPAT,d1	
 		jsr _LVOPCIConfigReadLong(a6)		;Read PCFS_MPAT
-		
+
 		move.l d0,d2
 		or.l #PCFS_MPAT_GBL|PCFS_MPAT_ENA,d2	;Enables PCSF_MPBAR for reading/writing
 		move.l ConfigDevNum(pc),d0
@@ -777,10 +777,10 @@ SetupHarrier	move.l PCIBase(pc),a6
 
 		move.l d0,d2
 		bne.s PCIMemHar1
-		
+
 		lea PCIMemError(pc),a2
 		bra PrintError
-		
+
 PCIMemHar1	move.l d2,PMEPAddr-Buffer(a4)
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_MBAR,d1
@@ -789,10 +789,10 @@ PCIMemHar1	move.l d2,PMEPAddr-Buffer(a4)
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_ITAT0,d1
 		jsr _LVOPCIConfigReadLong(a6)		;Read PCFS_ITAT0 (Address Translation)
-		
+
 		move.l d0,d2
 		or.l #PCFS_ITAT0_GBL|PCFS_ITAT0_ENA,d2		;Enable PCFS_ITAT0 for reading/writing
-								;and enable snooping of transactions		
+								;and enable snooping of transactions
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_ITAT0,d1
 		jsr _LVOPCIConfigWriteLong(a6)		;Write PCFS_ITAT0
@@ -800,7 +800,7 @@ PCIMemHar1	move.l d2,PMEPAddr-Buffer(a4)
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_ITAT1,d1
 		jsr _LVOPCIConfigReadLong(a6)		;Read PCFS_ITAT1 (Another address translation unit)
-		
+
 		move.l d0,d2
 		or.l #PCFS_ITAT1_GBL|PCFS_ITAT1_ENA|PCFS_ITAT1_WPE|PCFS_ITAT1_RAE,d2		
 		move.l ConfigDevNum(pc),d0
@@ -814,10 +814,10 @@ PCIMemHar1	move.l d2,PMEPAddr-Buffer(a4)
 
 		move.l d0,d2
 		bne.s PCIMemHar2
-		
+
 		lea PCIMemError(pc),a2
 		bra PrintError
-		
+
 PCIMemHar2	move.l d2,XCSRAddr-Buffer(a4)
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_ITBAR0,d1
@@ -829,10 +829,16 @@ PCIMemHar2	move.l d2,XCSRAddr-Buffer(a4)
 		jsr _LVOPCIConfigWriteLong(a6)		;Set size & offset for inbound PCI address
 
 		move.l XCSRAddr(pc),a3
+		move.l #XCSR_XPAT_BAM_ENA|XCSR_XPAT_AD_DELAY15,d2
+		move.l d2,XCSR_XPAT0(a3)				;Clear XCSR_XPAT0_REN/WEN
+		move.l d2,XCSR_XPAT1(a3)				;And XPAT1 to disable on-board ROM startup
+		move.l d2,XCSR_XPAT2(a3)
+		move.l d2,XCSR_XPAT3(a3)				;Let's just do them all..
+
 		move.l XCSR_BXCS(a3),d2
 		btst #20,d2
 		bne.s NoReset
-		
+
 		eor.l #XCSR_BXCS_P0H_ENA,d2		;Reset Processor 0 when already running.
 		move.l d2,XCSR_BXCS(a3)
 
@@ -840,24 +846,23 @@ NoReset		move.l #$000000f0,d0			;Set 256MB PCI Memory (swapped and negged)
 		moveq.l #2,d1				;Dummy bar 2
 		move.l SonAddr(pc),a0
 		jsr _LVOPCIAllocMem(a6)			;Get space for PPC RAM
-		
+
 		move.l #$10000000,d7
 		move.l d0,d2				;TODO: Should then try 128MB (Will happen in case of Radeon)
 		bne.s PCIMemHar3
-		
+
 ;		move.l #$000000f8,d0			;Retry with 128MB RAM
 ;		moveq.l #2,d1
 ;		move.l SonAddr(pc),a0
 ;		jsr _LVOPCIAllocMem(a6)
-;		move.l #$58000000,d0
-		
+
 ;		move.l #$08000000,d7
 ;		move.l d0,d2
 ;		bne.s PCIMemHar3
-		
+
 		lea PCIMemError(pc),a2
 		bra PrintError
-		
+
 PCIMemHar3	move.l d2,SonnetBase-Buffer(a4)
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_ITBAR1,d1
@@ -872,13 +877,6 @@ Got256MB	move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_ITOFSZ1,d1
 		jsr _LVOPCIConfigWriteLong(a6)		;Set size & offset for RAM ($0 256MB)
 
-		move.l XCSRAddr(pc),a3
-		move.l #XCSR_XPAT_BAM_ENA|XCSR_XPAT_AD_DELAY15,d2
-		move.l d2,XCSR_XPAT0(a3)				;Clear XCSR_XPAT0_REN/WEN
-		move.l d2,XCSR_XPAT1(a3)				;And XPAT1 to disable on-board ROM startup
-		move.l d2,XCSR_XPAT2(a3)
-		move.l d2,XCSR_XPAT3(a3)				;Let's just do them all...
-
 		move.l #$0000fcff,d0					;Set 256kb PCI Memory (swapped and negged)
 		moveq.l #3,d1						;Dummy bar 3
 		move.l SonAddr(pc),a0
@@ -886,7 +884,7 @@ Got256MB	move.l ConfigDevNum(pc),d0
 
 		move.l d0,d2
 		bne.s PCIMemHar4
-		
+
 		lea PCIMemError(pc),a2
 		bra PrintError
 
@@ -917,7 +915,6 @@ PCIMemHar4	move.l d2,MPICAddr-Buffer(a4)
 		move.l #XCSR_SDTC_DEFAULT,XCSR_SDTC(a3)			;Set RAM settings.
 
 		move.l SonnetBase(pc),a3
-
 		lea $10000(a3),a1
 		lea $3000(a1),a5
 		move.l #$48012f00,$100(a3)				;Start vector PPC
@@ -955,7 +952,7 @@ loopHarrier	move.l (a2)+,(a5)+					;Copy code to 0x13000
 		move.l d2,PMEP_MIMS(a3)					;Clear OPIM to generate PCI interrupts
 
 		move.l (a7)+,a1	
-		
+
 		bra ReturnHar
 
 ;********************************************************************************************
