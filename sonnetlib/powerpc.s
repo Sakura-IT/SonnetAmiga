@@ -1122,7 +1122,11 @@ DoneCPUComm	move.b (a3),1(a5)
 		beq.s DoneStackP
 		move.b d2,(a3)
 DoneStackP	move.b (a3),2(a5)
-		rts
+		lea DisSigBounce(pc),a1
+		bsr DoENV
+		bmi.s NoDisSigBounce
+		move.b (a3),3(a5)
+NoDisSigBounce	rts
 
 ;*********************************************
 
@@ -1490,6 +1494,7 @@ GoWaitPort	move.l (a7),a0
 		
 		move.l TC_SIGALLOC(a1),d0
 		and.l #$fffff000,d0			;Do not act on system signals except the CTRL ones
+		or.w #$10,d0				;Special signal to prevent bouncing between CPUs
 
 		jsr _LVOWait(a6)
 
@@ -1839,6 +1844,7 @@ MsgRetX		move.l a1,a2
 
 MsgSignal68k	move.l MN_PPSTRUCT+4(a1),d0		;Signal from a PPC task to 68K task
 		move.l a1,d7
+		or.w #$10,d0				;Mark it as being from PPC to prevent bouncing
 		move.l MN_PPSTRUCT(a1),a1
 		jsr _LVOSignal(a6)
 		move.l d7,a0
@@ -2209,7 +2215,7 @@ ReturnPatch	move.l a3,(a7)
 ReturnPatch2	move.l a3,(a7)
 		move.l LExecBase(pc),a3
 		move.l ThisTask(a3),a3
-		bclr #TB_WARN,TC_FLAGS(a3)
+		bclr #TB_WARN,TC_FLAGS(a3)		;When EnStackPatch = 1 makes FreeSpace movies slow.
 		btst #TB_PPC,TC_FLAGS(a3)
 		beq.s DontFlagPPC
 		move.l d0,a3
@@ -2285,7 +2291,7 @@ ToSpace		bne.s DoBit					;If yes, then redirect to PPC memory
 		bra.s NoBit
 
 FreeBit		move.l -9(a2),d7				;Checking for FreeSpace
-		cmp.l #"pace",d7
+		cmp.l #"pace",d7		
 		bra.s ToSpace
 
 IsHell		lsl.l #2,d7
@@ -2782,6 +2788,7 @@ Stacker		move.l ThisTask(a6),a1
 							;the system like Heretic II.
 NoAdjustPri	move.l TC_SIGALLOC(a1),d0		
 		and.l #$fffff000,d0
+		or.w #$10,d0				;Special signal to prevent bouncing
 
 		jsr _LVOWait(a6)
 
@@ -2997,7 +3004,13 @@ NoFPU2		move.l a7,a0
 		
 ;********************************************************************************************
 
-CrossSignals	bsr CreateMsgFrame
+CrossSignals	btst #4,d0				;Test on special signal ($10)
+		beq.s SigBouncing
+		move.b Options68K+3(pc),d0
+		beq.s SigBouncing
+		rts
+
+SigBouncing	bsr CreateMsgFrame
 
 		moveq.l #MSG_LEN/4-1,d0
 		move.l a0,a2
@@ -3712,6 +3725,7 @@ DisHunkPatch	dc.b	"sonnet/DisHunkPatch",0			;7
 SetCMemDiv	dc.b	"sonnet/SetCMemDiv",0			;8
 SetCPUComm	dc.b	"sonnet/SetCPUComm",0			;9
 EnStackPatch	dc.b	"sonnet/EnStackPatch",0			;10
+DisSigBounce	dc.b	"sonnet/DisSigBounce",0			;11
 
 		cnop	0,4
 		
