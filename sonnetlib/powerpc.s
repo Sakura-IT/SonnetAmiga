@@ -914,6 +914,8 @@ PCIMemHar4	move.l d2,MPICAddr-Buffer(a4)
 		move.l d2,XCSR_SDGC(a3)					;and remap using ENRV from $fff00000 to $0
 		move.l #XCSR_SDTC_DEFAULT,XCSR_SDTC(a3)			;Set RAM settings.
 
+		move.w #XCSR_XARB_PRKCPU0|XCSR_XARB_ENA,XCSR_XARB(a3)	;Set external arbiter to park on CPU 0.
+
 		move.l SonnetBase(pc),a3
 		lea $10000(a3),a1
 		lea $3000(a1),a5

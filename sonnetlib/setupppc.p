@@ -1045,8 +1045,29 @@ Wait2:		mfl2cr	r3
 		stw	r30,sonnet_L2Size(r4)
 		stw	r30,sonnet_CurrentL2Size(r4)
 
+		mfpvr	r9
+		rlwinm	r10,r9,8,24,31
+		cmpwi	r10,0x70
 		mfspr	r9,HID1
-		rlwinm	r9,r9,4,28,31
+		bne	.NoFX
+
+		rlwinm	r9,r9,5,27,31
+		mflr	r10
+		bl	.END_CFG_FX
+
+		.long	0,0						#For the Modders
+.PLL_CFG_FX:	.long	0b01110,700000000,0b01111,750000000
+		.long	0b10000,800000000,0b10001,850000000
+		.long	0b10010,900000000,0b10011,950000000
+		.long	0b10100,1000000000
+
+.END_CFG_FX:	
+		mflr	r6
+		li	r8,(.END_CFG_FX-.PLL_CFG_FX)/8
+		mtctr	r8
+		b	.NextPLL
+		
+.NoFX:		rlwinm	r9,r9,4,28,31
 		mflr	r10
 
 		la	r14,base_Options(r29)
@@ -1074,8 +1095,8 @@ Wait2:		mfl2cr	r3
 .PLL_CFG_66:	.long	0b1101,400000000,0b0001,500000000
 		.long	0b0101,433333333,0b0010,466666666
 		.long	0b1100,533333333
-.END_CFG_66:
 
+.END_CFG_66:
 		mflr	r6
 		li	r8,(.END_CFG_66-.PLL_CFG_66)/8
 		mtctr	r8
