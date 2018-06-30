@@ -964,9 +964,18 @@ Caches:
 		li	r30,0
 		bne	.L2SizeDone
 
-		loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS
+		mfpvr	r4
+		rlwinm	r0,r4,8,24,31
+		cmpwi	r4,0x70
+		bne	.NoPPCFX
 
-		mtl2cr	r4				# Set up on chip L2 cache controller.
+		li	r30,L2_SIZE_HM
+		li	r4,0
+		b	.DoFX
+
+.NoPPCFX:	loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS
+
+.DoFX:		mtl2cr	r4				# Set up on chip L2 cache controller.
 		sync
 		
 		mfl2cr	r5
@@ -983,6 +992,9 @@ Wait2:		mfl2cr	r3
 		mtl2cr	r4				#Enable L2 cache
 		sync
 		isync
+
+		mr.	r30,r30
+		bne	.FixedSizeFX
 
 		li	r0,0				#Determine size of L2 Cache
 		mr	r5,r0
@@ -1039,7 +1051,7 @@ Wait2:		mfl2cr	r3
 		sync
 		isync
 
-		li	r4,8
+.FixedSizeFX:	li	r4,8
 		slw	r30,r30,r4
 		lwz	r4,PowerPCBase(r0)
 		stw	r30,sonnet_L2Size(r4)

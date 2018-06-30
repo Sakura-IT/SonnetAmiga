@@ -1176,6 +1176,9 @@ GetInfo:
 		b	.NextInList
 
 .INFO_CPU:	lwz	r7,sonnet_CPUInfo(r30)
+		rlwinm	r0,r7,8,24,31
+		cmpwi	r0,0x70
+		beq	.G3
 		rlwinm	r0,r7,20,24,31
 		cmpwi	r0,0x80
 		beq	.G3
