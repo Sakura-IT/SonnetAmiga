@@ -966,7 +966,7 @@ Caches:
 
 		mfpvr	r4
 		rlwinm	r0,r4,8,24,31
-		cmpwi	r4,0x70
+		cmpwi	r0,0x70
 		bne	.NoPPCFX
 
 		li	r30,L2_SIZE_HM
