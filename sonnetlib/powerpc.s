@@ -608,8 +608,11 @@ ContTimer	move.l SonnetBase(pc),a1
 		cmp.l #"REDY",d0			;Phase 2 of PPC setup completed?
 		bne.s DoTimer
 
-		move.l GfxMem(pc),d0			;Amiga PCI Memory
 		move.l SonAddr(pc),a2
+		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
+		beq.s NoOutBound107
+
+		move.l GfxMem(pc),d0			;Amiga PCI Memory
 		move.l PCI_SPACE1(a2),a3		;PCSRBAR Sonnet
 		or.b #28,d0				;512MB
 		rol.w #8,d0
@@ -620,7 +623,7 @@ ContTimer	move.l SonnetBase(pc),a1
 		add.b #$60,d0
 		move.l d0,OMBAR(a3)			;0xa0000000-0xc0000000
 		
-		jsr _LVODisable(a6)
+NoOutBound107	jsr _LVODisable(a6)
 		
 		moveq.l #MEMF_PUBLIC,d1
 		move.l #$4000,d2
@@ -842,12 +845,16 @@ PCIMemHar2	move.l d2,XCSRAddr-Buffer(a4)
 		eor.l #XCSR_BXCS_P0H_ENA,d2		;Reset Processor 0 when already running.
 		move.l d2,XCSR_BXCS(a3)
 
-NoReset		move.l #$000000f0,d0			;Set 256MB PCI Memory (swapped and negged)
+NoReset		move.l #$20000000,d0
+		move.l MediatorType(pc),d1
+		bne.s AllocPCI1200
+
+		move.l #$000000f0,d0			;Set 256MB PCI Memory (swapped and negged)
 		moveq.l #2,d1				;Dummy bar 2
 		move.l SonAddr(pc),a0
 		jsr _LVOPCIAllocMem(a6)			;Get space for PPC RAM
 
-		move.l #$10000000,d7
+AllocPCI1200	move.l #$10000000,d7
 		move.l d0,d2				;TODO: Should then try 128MB (Will happen in case of Radeon)
 		bne.s PCIMemHar3
 
@@ -1177,7 +1184,6 @@ MasterControl:
 		bne NextMsg1200
 
 NextMsg		move.l d6,a0
-
 		jsr _LVOWaitPort(a6)			;we wait for messages from our 68k interrupt
 		
 GetLoop		move.l d6,a0
@@ -1228,6 +1234,8 @@ NextMsg1200	move.l d6,a0
 		move.b MP_SIGBIT(a0),d1
 		bset d1,d0
 		jsr _LVOWait(a6)			;we wait for messages from our 68k interrupt	
+
+;		ILLEGAL
 
 GetLoop1200	move.l d6,a0
 		jsr _LVOGetMsg(a6)
@@ -1645,13 +1653,13 @@ SonInt1200:	movem.l d1-a6,-(a7)			;68K interrupt which distributes
 		move.l LExecBase(pc),a6
 		jsr _LVODisable(a6)
 
+		moveq.l #0,d4
 		move.l MediatorType(pc),d0
 		beq.s NoWindowShift1
 
 		move.l PCIBase(pc),a6
 		jsr _LVOPCIGetZorroWindow(a6)
 
-		moveq.l #0,d4
 		move.l d0,d7
 NoWindowShift1	move.l SonAddr(pc),a2
 		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
@@ -1665,13 +1673,8 @@ Got1200H	move.l a2,d6
 		move.l MediatorType(pc),d0
 		beq.s NoWindowShift2
 		
-		move.l a2,d0
-		and.l #$7fffff,d6
-		add.l #$200000,d6
+		bsr ShiftWindow
 
-		jsr _LVOPCISetZorroWindow(a6)
-
-		move.l d6,a2
 NoWindowShift2	tst.l d4
 		beq.s NoInt1200H
 
@@ -1686,22 +1689,26 @@ NoInt1200H	move.l OMISR(a2),d3
 NxtMsg1200	move.l d6,a2
 		tst.l d4
 		beq.s NoGetMsg1200H
-		move.l PMEP_MIOQ(a2),a1
+
+		bsr GetMsgFrameHar
 		bra.s GotMsg1200H
 		
-NoGetMsg1200H	move.l OFQPR(a2),a1
+NoGetMsg1200H	move.l OFQPR(a2),a1				;GetMsgFrame? Prev?
 GotMsg1200H	move.l a1,d3
-
+		move.l d3,d5
 		cmp.l #-1,d3
 		beq EmptyQueue
 
+		tst.l d4
+		bne.s PrevDone
+		
 		lea Previous2(pc),a1
 		move.l (a1),d5
 		cmp.l d5,d3
-		beq.s NxtMsg1200
-		
+		beq.s NxtMsg1200		
 		move.l d3,(a1)
-		moveq.l #1,d5
+
+PrevDone	moveq.l #1,d5
 		move.l FIFOBuffer(pc),a1
 		lea FIFOWrite(pc),a2
 		move.w (a2),d0
@@ -2084,6 +2091,57 @@ GotMsgH		moveq.l #-1,d1
 		beq.s TooFast4U2			;To prevent duplicates (Is there a better way?)
 		move.l a1,(a0)
 NoPrev		movem.l (a7)+,d1-d3/a0/a2-a3
+		rts
+;********************************************************************************************
+
+GetMsgFrameHar:
+		movem.l d1-d3/a0/a2-a3,-(a7)		;Get next message send from the PPC
+
+TooFast4Har	move.l XCSRAddr(pc),a2
+
+		bsr ShiftWindow
+
+		move.l XCSR_MIOPT(a2),d1		;Compare Outgoing Post Tail with
+		move.l XCSR_MIOPH(a2),d2		;Outgoing Post Header. Equal means empty
+		cmp.l d1,d2
+		bne.s DoQueueHar
+		moveq.l #-1,d3				;Give -1 when empty.
+		bra.s GotMsgHar
+		
+DoQueueHar	move.l d1,d2
+		addq.l #4,d1
+		and.w #$3fff,d1				;Wrap queue to 16K (4K entries)
+		move.l SonnetBase(pc),d3
+		add.l d2,d3
+		move.l d3,a2
+		
+		bsr ShiftWindow
+		
+		move.l (a2),d3				;Get PPC message.
+		move.l XCSRAddr(pc),a2
+		
+		bsr ShiftWindow
+		
+		move.l d1,XCSR_MIOPT(a2)		;Update Outgoing Post Tail;
+GotMsgHar	moveq.l #-1,d1
+		move.l d3,a1
+		cmp.l a1,d1
+		beq.s NoPrevHar
+
+		lea Previous2(pc),a0
+		move.l (a0),a2
+		cmp.l a1,a2
+		beq.s TooFast4Har			;To prevent duplicates (Is there a better way?)
+		move.l a1,(a0)
+NoPrevHar	movem.l (a7)+,d1-d3/a0/a2-a3
+		rts
+
+ShiftWindow	move.l a2,d0
+		move.l a2,d6
+		and.l #$3fffff,d6
+		add.l #$200000,d6
+		jsr _LVOPCISetZorroWindow(a6)
+		move.l d6,a2
 		rts
 
 ;********************************************************************************************
@@ -3443,7 +3501,7 @@ POWERDATATABLE:
 	INITLONG	LN_NAME,PowerName
 	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITWORD	LIB_VERSION,17
-	INITWORD	LIB_REVISION,9
+	INITWORD	LIB_REVISION,10
 	INITLONG	LIB_IDSTRING,PowerIDString
 	ds.l	1
 
@@ -3681,7 +3739,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.9 (30.06.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.10 (11.07.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
