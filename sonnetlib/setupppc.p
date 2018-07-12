@@ -4803,7 +4803,14 @@ EInt:		b	.FPUnav				#0
 		cmpwi	r31,0x7f00			#Called from other exception
 		blt	.NotSupported			#NOT GOOD!
 		
-		lwz	r31,0(r31)			#get offending instruction in r31		
+		mfdar	r29
+		cmpwi	r29,4				#Accessing Execbase is OK.
+		beq	.Execbase
+	
+		cmpwi	r29,0x100
+		blt	.NotSupported			#68K zero page access NOT GOOD!
+		
+.Execbase:	lwz	r31,0(r31)			#get offending instruction in r31		
 		li	r29,0
 		lis	r0,0xc000			#check for load or store instruction
 		and.	r0,r31,r0

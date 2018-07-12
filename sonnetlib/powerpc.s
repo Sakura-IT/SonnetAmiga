@@ -1235,8 +1235,6 @@ NextMsg1200	move.l d6,a0
 		bset d1,d0
 		jsr _LVOWait(a6)			;we wait for messages from our 68k interrupt	
 
-;		ILLEGAL
-
 GetLoop1200	move.l d6,a0
 		jsr _LVOGetMsg(a6)
 
@@ -1693,7 +1691,7 @@ NxtMsg1200	move.l d6,a2
 		bsr GetMsgFrameHar
 		bra.s GotMsg1200H
 		
-NoGetMsg1200H	move.l OFQPR(a2),a1				;GetMsgFrame? Prev?
+NoGetMsg1200H	move.l OFQPR(a2),a1
 GotMsg1200H	move.l a1,d3
 		move.l d3,d5
 		cmp.l #-1,d3
@@ -2974,10 +2972,42 @@ NoFPU3		move.l a1,a5
 
 NoStckPtr	pea xBack(pc)
 StckPtr		move.l PP_CODE(a5),a0
-		add.l PP_OFFSET(a5),a0
-		move.l a0,-(a7)
+		move.l MediatorType(pc),d0
+		beq.s DoNormalFunc
+	
+		move.l PP_OFFSET(a5),d0
+		cmp.l #-42,d0
+		beq.s DoRead1200
 		
+DoNormalFunc	add.l PP_OFFSET(a5),a0
+		move.l a0,-(a7)		
 		lea PP_REGS(a5),a6
+		movem.l (a6)+,d0-a5
+		move.l (a6),a6
+		rts
+
+DoRead1200	add.l PP_OFFSET(a5),a0
+		move.l a0,-(a7)		
+		lea PP_REGS(a5),a6
+		movem.l (a6),d0-a4
+
+		move.l LExecBase(pc),a6
+		move.l ThisTask(a6),a3
+		bset #TB_WARN,TC_FLAGS(a3)
+		move.l d3,d0
+		moveq.l #0,d1
+		jsr _LVOAllocVec(a6)
+		
+		move.l ThisTask(a6),a3
+		bclr #TB_WARN,TC_FLAGS(a3)
+
+		lea BufCopySrc(pc),a1
+		move.l d0,(a1)
+		move.l d2,BufCopyDst-BufCopySrc(a1)
+		move.l d3,BufCopySz-BufCopySrc(a1)
+
+		lea PP_REGS(a5),a6
+		move.l d0,8(a6)				;Replace buffer destination		
 		movem.l (a6)+,d0-a5
 		move.l (a6),a6
 		rts
@@ -3003,7 +3033,20 @@ xBack		move.l a6,-(a7)
 		move.l (a7)+,a6
 		move.l a6,(a0)
 		move.l LExecBase(pc),a6
-		btst #AFB_FPU40,AttnFlags+1(a6)
+		move.l BufCopySrc(pc),d1
+		beq.s NoBufCopy
+
+		move.l d1,a0
+		move.l BufCopyDst(pc),a1
+		move.l BufCopySz(pc),d0
+		jsr _LVOCopyMem(a6)
+		move.l BufCopySrc(pc),a1
+		jsr _LVOFreeVec(a6)
+		lea BufCopySrc(pc),a1
+		moveq.l #0,d1
+		move.l d1,(a1)
+
+NoBufCopy	btst #AFB_FPU40,AttnFlags+1(a6)
 		beq.s NoFPU4
 		move.l (a7),a6
 		lea MN_PPSTRUCT+PP_FREGS(a6),a6
@@ -3478,6 +3521,9 @@ ConfigDevNum		ds.l	1
 MediatorType		ds.l	1
 MirrorList		ds.l	3
 RemSysTask		ds.l	1
+BufCopySrc		ds.l	1
+BufCopyDst		ds.l	1
+BufCopySz		ds.l	1
 Previous		ds.l	1
 Previous2		ds.l	1
 Options68K		ds.l	1
