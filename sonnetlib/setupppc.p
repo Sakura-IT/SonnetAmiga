@@ -228,7 +228,7 @@ Loop1:		slw.	r26,r26,r28
 		blt	Fndbit
 		addi	r25,r25,-1
 		bdnz	Loop1
-		b	.IdleLoop
+		b	Start				#Error
 
 Fndbit:		slw.	r26,r26,r28
 		beq	SetLen
@@ -272,26 +272,10 @@ SetLen:		mr	r30,r28
 #*********************************************************
 
 Start:							#Dummy task at absolute (see ppcdefines)
-		bl	.SkipNiceTable
-		
-		.long	0x01000000,0x011c0cbf,0x013b2c48,0x015db4d0
-		.long	0x01840600,0x01ae89fa,0x01ddb680,0x02120e3e
-		.long	0x024c2231,0x028c9336,0x02d413cd,0x03236a04
-		.long	0x037b719b,0x03dd1e6a,0x04497efc,0x04c1bf83
-		.long	0x05472d15,0x05db3948,0x067f7e2f,0x0735c2ce
-		.long	0x08000000,0x08e065f6,0x09d9623e,0x0aeda684
-		.long	0x0c203002,0x0d744fcd,0x0eedb401,0x109071f4
-		.long	0x12611187,0x146499af,0x16a09e67,0x191b501c
-		.long	0x1bdb8cdb,0x1ee8f34e,0x224bf7dc,0x260dfc14
-		.long	0x2a3968a7,0x2ed9ca3f,0x33fbf17a,0x39ae166c
-		.long	0x40000000
-		
-.SkipNiceTable:	mflr	r4
-		stw	r4,Table_NICE(r3)		#NICE values are not used (yet).
-
-.IdleLoop:	nop
 		nop
-		b	.IdleLoop
+		nop
+		nop
+		b Start
 
 #*********************************************************
 
@@ -525,7 +509,10 @@ End:		mflr	r4
 
 		addi	r6,r4,TaskExit
 		stw	r6,sonnet_TaskExitCode(r14)
-				
+		
+		addi	r6,r4,NiceTable
+		stw	r6,Table_NICE(r14)		#NICE values are not used (yet).
+
 		bl	Caches				#Setup the L1 and L2 cache
 
 		li	r3,0
@@ -970,7 +957,7 @@ Caches:
 		bne	.NoPPCFX
 
 		li	r30,L2_SIZE_HM
-		li	r4,0
+		loadreg r4,L2CR_L2SIZ_HM|L2CR_L2CLK_3|L2CR_L2RAM_BURST
 		b	.DoFX
 
 .NoPPCFX:	loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS
@@ -3822,7 +3809,7 @@ EInt:		b	.FPUnav				#0
 
 #********************************************************************************************		
 		
-.DoIdle:	loadreg	r0,IdleTask+(.IdleLoop-Start)	#Switch to idle task
+.DoIdle:	loadreg	r0,IdleTask			#Switch to idle task
 		lwz	r1,SonnetBase(r0)
 		or	r0,r1,r0
 		mtsrr0	r0

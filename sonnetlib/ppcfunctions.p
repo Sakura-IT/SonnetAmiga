@@ -8,6 +8,7 @@
 .set TaskStart,(StartCode-SetCache)
 .set ListStart,(InsertPPC-SetCache)			#All functions between InsertPPC and FindNamePPC
 .set ListEnd,(FindNamePPC-SetCache)			#are protected from task switching through this.
+.set NiceTable,(Nice_Table-SetCache)
 
 .global FunctionsLen
 .global ViolationOS
@@ -17,6 +18,7 @@
 .global TaskStart
 .global	ListStart
 .global	ListEnd
+.global NiceTable
 
 .global SetExcMMU,ClearExcMMU,ConfirmInterrupt,InsertPPC,AddHeadPPC,AddTailPPC
 .global RemovePPC,RemHeadPPC,RemTailPPC,EnqueuePPC,FindNamePPC,ResetPPC,NewListPPC
@@ -454,6 +456,25 @@ SetCache:
 		addi	r13,r13,16
 		
 		epilog 'TOC'
+
+#********************************************************************************************
+#
+#	NICE values. Currently not in use. Tasks use priorities instead.
+#
+#********************************************************************************************
+
+Nice_Table:		
+		.long	0x01000000,0x011c0cbf,0x013b2c48,0x015db4d0
+		.long	0x01840600,0x01ae89fa,0x01ddb680,0x02120e3e
+		.long	0x024c2231,0x028c9336,0x02d413cd,0x03236a04
+		.long	0x037b719b,0x03dd1e6a,0x04497efc,0x04c1bf83
+		.long	0x05472d15,0x05db3948,0x067f7e2f,0x0735c2ce
+		.long	0x08000000,0x08e065f6,0x09d9623e,0x0aeda684
+		.long	0x0c203002,0x0d744fcd,0x0eedb401,0x109071f4
+		.long	0x12611187,0x146499af,0x16a09e67,0x191b501c
+		.long	0x1bdb8cdb,0x1ee8f34e,0x224bf7dc,0x260dfc14
+		.long	0x2a3968a7,0x2ed9ca3f,0x33fbf17a,0x39ae166c
+		.long	0x40000000
 
 #********************************************************************************************
 #
