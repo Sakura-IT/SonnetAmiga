@@ -35,6 +35,7 @@ PPCINFO_L2STATE	EQU	$8010200B		;L2 in copyback or writethrough?
 PPCINFO_L2SIZE	EQU	$8010200C
 HINFO_DSEXC_LOW EQU	$80103003
 CPUF_7410	EQU	$00800000
+CPUF_7441	EQU	$01000000
 
 ;************************************************************************************************
 
@@ -85,12 +86,22 @@ CPUF_7410	EQU	$00800000
 		bra.s StoreCPU
 
 NoG3		move.l d2,d3
-		and.l #CPUF_G4,d2
+		and.l #CPUF_G4,d3
 		beq.s NoG4
+
+		move.l d2,d3
 		lea CPU_7400-infotext(a4),a3
 		and.l #CPUF_7410,d3
+		bne.s Store7410
+
+		move.l d2,d3
+		and.l #CPUF_7441,d3
 		beq.s StoreCPU
-		lea CPU_7410-infotext(a4),a3
+
+		lea CPU_7441-infotext(a4),a3
+		bra.s StoreCPU
+		
+Store7410	lea CPU_7410-infotext(a4),a3
 		bra.s StoreCPU
 
 NoG4		lea CPU_Unknown-infotext(a4),a3
@@ -240,6 +251,7 @@ CPU_620         dc.b    "PPC 620",0
 CPU_750		dc.b	"PPC 750",0
 CPU_7400	dc.b	"PPC 7400",0
 CPU_7410	dc.b	"PPC 7410",0
+CPU_7441	dc.b	"PPC 7441",0
 CPU_Unknown     dc.b    "UNKNOWN",0
 CACHE_ON_U      dc.b    "ON and UNLOCKED",0
 CACHE_OFF_U     dc.b    "OFF and UNLOCKED",0
