@@ -299,6 +299,7 @@
 .set CPUF_750,			0x00200000
 .set CPUF_7400,			0x00400000
 .set CPUF_7410,			0x00800000
+.set CPUF_7441,			0x01000000
 
 .set EXC_GLOBAL,0            				#global handler
 .set EXC_LOCAL,1             				#task dependant handler
@@ -362,6 +363,7 @@
 .set DABR,1013
 
 .set HID0,1008
+.set HID0_TBEN,			0x04000000
 .set HID0_NHR,			0x00010000
 .set HID0_ICFI,			0x00000800
 .set HID0_DCFI,			0x00000400
@@ -391,6 +393,7 @@
 
 .set PICR2,0xAC			#Processor Interface Configuration Register 2
 .set PICR2_CF_LBCLAIM_WS,	0x00000600
+.set PICR2_NO_SNOOP_EN,		0x08000000
 .set VAL_PICR2,			PICR2_CF_LBCLAIM_WS
 
 .set PMCR1,0x70			#Peripheral Logic Power Management Configuration Register 1
