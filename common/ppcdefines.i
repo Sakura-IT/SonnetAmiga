@@ -687,14 +687,16 @@
 .set L2CR_L2CLK_3,		0x0c000000 		# bits 4-6 Clock Ratio div 3
 .set L2CR_L2CLK_4,		0x0e000000		# bits 4-6 Clock Ratio div 4
 .set L2CR_L2RAM_BURST,		0x01000000 		# bits 7-8 burst SRAM
-.set L2CR_DO,			0x00400000 		# bit 9 Disable caching of instr. in L2
+.set L2CR_DO,			0x00400000 		# bit 9 Disable caching of instr. in L2 (Not 7450)
 .set L2CR_L2I,			0x00200000 		# bit 10 Global invalidate bit
-.set L2CR_TS,			0x00040000 		# bit 13 Test support on 
+.set L2CR_L2IO,			0x00100000		# bit 11 L2 Instruction only (disables data cache)
 .set L2CR_L2WT,			0x00080000		# bit 12 write-through
+.set L2CR_TS,			0x00040000 		# bit 13 Test support on 
+.set L2CR_L2DO,			0x00010000		# bit 15 L2 Data only (disables instruction cache)
+.set L2CR_L2HWF,		0x00000800		# bit 20 L2 Hardware Flush (not 7400/750)
 .set L2CR_L2OH_5,		0x00000000 		# bits 14-15 Output Hold time = 0.5ns*/
 .set L2CR_L2OH_1,		0x00010000 		# bits 14-15 Output Hold time = 1.0ns*/
 .set L2CR_L2OH_INV,		0x00020000 		# bits 14-15 Output Hold time = 1.0ns*/
-.set L2CR_L2HWF,		0x00000800
 .set L2CR_L2IP,			0x00000001
 
 .set L2_ADR_INCR,		0x100

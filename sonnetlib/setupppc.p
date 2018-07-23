@@ -59,6 +59,14 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 .SkipCom:	mflr	r29				#For initial communication with 68k
 		lis	r22,CMD_BASE@h			#Used in setpcireg macro
 		
+#		mfspr	r25,HID1			#DEBUGDEBUG
+#		ori	r25,r25,0xc00
+#		mtspr	HID1,r25
+		
+		mfspr	r25,1014
+		oris	r25,r25,0x0100
+		mtspr	1014,r25
+		
 		loadreg	r0,'Init'
 		stw	r0,base_Comm(r29)
 
@@ -294,8 +302,8 @@ End:		mflr	r4
 .WInit:		lwz	r28,Init(r0)
 		cmplw	r28,r6
 		bne	.WInit
-		
 		isync					#Wait for 68k to set up library
+
 		loadreg	r3,IdleTask			#Start hardcoded at 0x8000
 		lwz	r31,SonnetBase(r0)
 		add	r3,r3,r31
@@ -308,7 +316,7 @@ End:		mflr	r4
 		subf	r5,r4,r5
 		li	r6,0
 		bl	copy_and_flush			#Put program in Sonnet Mem instead of PCI Mem
-		
+
 		stw	r13,-4(r1)
 		subi	r13,r1,4
 		stwu	r1,-288(r1)		
@@ -484,7 +492,7 @@ End:		mflr	r4
 		lwz	r4,XMPIBase(r0)
 		mr.	r4,r4
 		bne	.DidFIFOs
-		
+
 		bl	.SetupMsgFIFOs
 
 .DidFIFOs:	mtsrr0	r31
@@ -515,7 +523,17 @@ End:		mflr	r4
 
 		bl	Caches				#Setup the L1 and L2 cache
 
-		li	r3,0
+		mfpvr	r3
+		rlwinm	r3,r3,16,16,31
+		oris	r3,r3,0xffff
+		cmpwi	r3,-32768
+		bne	.AutoDec
+		
+		mfspr	r3,HID0
+		oris	r3,r3,HID0_TBEN@h		#Enable TimeBase and Decrementer
+		mtspr	HID0,r3
+
+.AutoDec:	li	r3,0
 		loadreg	r0,'REDY'
 		stw	r0,Init(r0)
 		dcbf	r0,r3
@@ -954,10 +972,19 @@ Caches:
 		mfpvr	r4
 		rlwinm	r0,r4,8,24,31
 		cmpwi	r0,0x70
+		beq	.OnDieL2
+		rlwinm	r0,r4,16,16,31
+		oris	r0,r0,0xffff
+		cmpwi	r0,-32768			#Vger 0x8000
 		bne	.NoPPCFX
+		
+		li	r30,L2_SIZE_QM
+		li	r4,0
+		b	.DoFX
 
-		li	r30,L2_SIZE_HM
-		loadreg r4,L2CR_L2SIZ_HM|L2CR_L2CLK_3|L2CR_L2RAM_BURST
+.OnDieL2:	li	r30,L2_SIZE_HM
+#		loadreg r4,L2CR_L2SIZ_HM|L2CR_L2CLK_3|L2CR_L2RAM_BURST
+		li	r4,0
 		b	.DoFX
 
 .NoPPCFX:	loadreg r4,L2CR_L2SIZ_1M|L2CR_L2CLK_3|L2CR_L2RAM_BURST|L2CR_TS
@@ -980,7 +1007,7 @@ Wait2:		mfl2cr	r3
 		sync
 		isync
 
-		mr.	r30,r30
+.xxxx:		mr.	r30,r30
 		bne	.FixedSizeFX
 
 		li	r0,0				#Determine size of L2 Cache
@@ -1044,13 +1071,34 @@ Wait2:		mfl2cr	r3
 		stw	r30,sonnet_L2Size(r4)
 		stw	r30,sonnet_CurrentL2Size(r4)
 
-		mfpvr	r9
-		rlwinm	r10,r9,8,24,31
+		mfpvr	r6
+		rlwinm	r10,r6,8,24,31
 		cmpwi	r10,0x70
 		mfspr	r9,HID1
+		beq	.DoFX2
+
+		rlwinm	r10,r6,16,16,31
+		oris	r10,r10,0xffff
+		cmpwi	r10,-32768
 		bne	.NoFX
 
-		rlwinm	r9,r9,5,27,31
+		rlwinm	r9,r9,20,27,31
+		mflr	r10
+		bl	.END_CFG_VGER
+
+		.long	0,0						#For the Modders
+.PLL_CFG_VGER:	.long	0b11010,600000000,0b01010,650000000
+		.long	0b00100,700000000,0b00010,750000000
+		.long	0b11000,800000000,0b01100,850000000
+		.long	0b01111,900000000
+
+.END_CFG_VGER:	
+		mflr	r6
+		li	r8,(.END_CFG_VGER-.PLL_CFG_VGER)/8
+		mtctr	r8
+		b	.NextPLL
+
+.DoFX2:		rlwinm	r9,r9,5,27,31
 		mflr	r10
 		bl	.END_CFG_FX
 

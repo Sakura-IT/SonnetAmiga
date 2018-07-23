@@ -1200,17 +1200,25 @@ GetInfo:
 		rlwinm	r0,r7,8,24,31
 		cmpwi	r0,0x70
 		beq	.G3
+		rlwinm	r0,r7,16,16,31
+		oris	r0,r0,0xffff
+		cmpwi	r0,-32768
+		beq	.GotVGer
 		rlwinm	r0,r7,20,24,31
 		cmpwi	r0,0x80
 		beq	.G3
 		cmpwi	r0,0x88
 		beq	.G3
+
 		lis	r7,CPUF_7400@h
 		cmpwi	r0,0xc0
 		beq	.GotCPU
 		cmpwi	r0,0xc1
 		beq	.GotNitro
 		li	r7,0
+		b	.GotCPU
+		
+.GotVGer:	lis	r7,(CPUF_7400|CPUF_7441)@h
 		b	.GotCPU
 .GotNitro:	oris	r7,r7,CPUF_7410@h
 		b	.GotCPU		
@@ -1310,6 +1318,8 @@ GetSysTimePPC:
 		mulhw	r3,r0,r7
 		bl	.Link17
 		stw	r3,TV_MICRO(r6)
+		
+#		dcbf	r0,r6					#DEBUGDEBUG
 		
 		lwz	r31,0(r13)
 		lwzu	r6,4(r13)
@@ -1501,11 +1511,22 @@ FlushDCache:
 		b	.NoHWFlush		
 		
 .CompleteFlush:	mfpvr	r4
-		rlwinm	r4,r4,20,24,31
-		cmpwi	r4,0xc1
-		bne	.NoHWFlush
+		rlwinm	r31,r4,20,24,31			#Test for 7410
+		cmpwi	r31,0xc1
+		beq	.HWFlush
 
-		li	r25,1
+		rlwinm	r31,r4,16,16,31			#Test for 7450
+		oris	r31,r31,0xffff
+		cmpwi	r31,-32768
+		bne	.NoHWFlush
+		
+		mr	r3,r30
+		
+		bl	FlushVGerCache
+
+		b	.NoHWFlush2
+
+.HWFlush:	li	r25,1
 		li	r27,0
 		
 .NoHWFlush:	li	r4,5
@@ -1562,6 +1583,50 @@ FlushDCache:
 		lwz	r30,20(r13)
 		lwz	r31,24(r13)
 		addi	r13,r13,28
+		
+		epilog 'TOC'
+
+#********************************************************************************************
+#
+#	Support: void FlushVGerCache(PowerPCBase) // r3
+#
+#********************************************************************************************
+
+FlushVGerCache:
+		prolog 228,'TOC'
+			
+		stwu	r31,-4(r13)
+		stwu	r27,-4(r13)
+		stwu	r25,-4(r13)
+			
+		lwz	r31,sonnet_SonnetBase(r3)
+		addis	r31,r31,0x40			#Unused memory space for system (idle task, exception stack)
+		subi	r31,r31,L1_CACHE_LINE_SIZE
+		li	r4,L1_CACHE_LINE_SIZE		
+		li	r25,0x400
+		mtctr	r25
+		
+.ExpFillCache:	lwzux	r27,r31,r4			#Filling L1 cache, pushing 32k out.
+		bdnz+	.ExpFillCache			#no flush needed when reading from unused space
+		
+		mfl2cr	r4
+		oris	r4,r4,(L2CR_L2IO|L2CR_L2DO)@h	#Lock L2 cache
+		mtl2cr	r4
+		ori	r4,r4,L2CR_L2HWF		#Perform hardware flush
+		mtl2cr	r4
+		
+.Wait4Flush:	mfl2cr	r4
+		andi.	r0,r4,L2CR_L2HWF		#Check if finished
+		bne	.Wait4Flush
+		sync
+		
+		xoris	r4,r4,(L2CR_L2IO|L2CR_L2DO)@h	#Unlock L2 cache
+		mtl2cr	r4
+		
+		lwz	r25,0(r13)
+		lwz	r27,4(r13)
+		lwz	r31,8(r13)
+		addi	r13,r13,12
 		
 		epilog 'TOC'
 
@@ -3049,7 +3114,17 @@ SendMsgFramePPC:
 
 		bl DisableIntPPC
 
-		lwz	r27,XMPIBase(r0)
+		mfpvr	r3
+		rlwinm	r27,r3,16,16,31
+		oris	r28,r27,0xffff
+		cmpwi	r28,-32768
+		bne	.NoVGerFlush
+
+		lwz	r3,PowerPCBase(r0)
+		
+		bl	FlushVGerCache
+
+.NoVGerFlush:	lwz	r27,XMPIBase(r0)
 		mr.	r27,r27
 		beq	.SendMS
 

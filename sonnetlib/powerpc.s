@@ -1952,6 +1952,8 @@ GetCPU:
 		swap d0
 		cmp.w #$7000,d0
 		beq.s G3
+		cmp.w #$8000,d0
+		beq.s G4
 		and.w #$0fff,d0
 		subq.l #8,d0
 		beq.s G3
@@ -3786,7 +3788,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.10 (15.07.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.10 (23.07.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
