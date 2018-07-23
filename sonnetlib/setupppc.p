@@ -59,15 +59,16 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 .SkipCom:	mflr	r29				#For initial communication with 68k
 		lis	r22,CMD_BASE@h			#Used in setpcireg macro
 		
-#		mfspr	r25,HID1			#DEBUGDEBUG
-#		ori	r25,r25,0xc00
-#		mtspr	HID1,r25
-		
-		mfspr	r25,1014
-		oris	r25,r25,0x0100
-		mtspr	1014,r25
-		
-		loadreg	r0,'Init'
+		mfpvr	r25
+		rlwinm	r25,r25,16,16,31
+		cmplwi	r25,0x8000
+		bne	.NoEIDIS
+				
+		mfspr	r25,MSSCR0
+		oris	r25,r25,MSSCR0_EIDIS@h
+		mtspr	MSSCR0,r25
+
+.NoEIDIS:	loadreg	r0,'Init'
 		stw	r0,base_Comm(r29)
 
 		bl	Reset
@@ -525,8 +526,7 @@ End:		mflr	r4
 
 		mfpvr	r3
 		rlwinm	r3,r3,16,16,31
-		oris	r3,r3,0xffff
-		cmpwi	r3,-32768
+		cmplwi	r3,0x8000
 		bne	.AutoDec
 		
 		mfspr	r3,HID0
@@ -974,8 +974,7 @@ Caches:
 		cmpwi	r0,0x70
 		beq	.OnDieL2
 		rlwinm	r0,r4,16,16,31
-		oris	r0,r0,0xffff
-		cmpwi	r0,-32768			#Vger 0x8000
+		cmplwi	r0,0x8000			#Vger 0x8000
 		bne	.NoPPCFX
 		
 		li	r30,L2_SIZE_QM
@@ -1078,8 +1077,7 @@ Wait2:		mfl2cr	r3
 		beq	.DoFX2
 
 		rlwinm	r10,r6,16,16,31
-		oris	r10,r10,0xffff
-		cmpwi	r10,-32768
+		cmplwi	r10,0x8000
 		bne	.NoFX
 
 		rlwinm	r9,r9,20,27,31
@@ -4954,17 +4952,16 @@ EInt:		b	.FPUnav				#0
 		
 		rlwinm	r9,r31,16,16,31
 		andi.	r9,r9,0xa800
-		oris	r9,r9,0xffff
-		cmpwi	r9,-32768			#lwz/lwzu 0x8000
+		cmplwi	r9,0x8000			#lwz/lwzu 0x8000
 		beq	.FixedValue
 		rlwinm	r10,r10,16,16,31
-		cmpwi	r9,-24576			#lhz/lhzu 0xa000
+		cmplwi	r9,0xa000			#lhz/lhzu 0xa000
 		beq	.FixedValue
 		extsh	r10,r10
-		cmpwi	r9,-22528			#lha/lhau 0xa800
+		cmplwi	r9,0xa800			#lha/lhau 0xa800
 		beq	.FixedValue
 		rlwinm	r10,r10,24,24,31
-		cmpwi	r9,-30720			#lbz/lbzu
+		cmplwi	r9,0x8800			#lbz/lbzu 0x8800
 		bne	.NotSupported			#Not Supported
 
 .FixedValue:	stwx	r10,r30,r6			#Store gotten value in correct register

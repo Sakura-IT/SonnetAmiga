@@ -1201,8 +1201,7 @@ GetInfo:
 		cmpwi	r0,0x70
 		beq	.G3
 		rlwinm	r0,r7,16,16,31
-		oris	r0,r0,0xffff
-		cmpwi	r0,-32768
+		cmplwi	r0,0x8000
 		beq	.GotVGer
 		rlwinm	r0,r7,20,24,31
 		cmpwi	r0,0x80
@@ -1293,14 +1292,14 @@ GetInfo:
 
 GetSysTimePPC:	
 		prolog 228,'TOC'
-		
+
 		stwu	r7,-4(r13)
 		stwu	r6,-4(r13)
 		stwu	r31,-4(r13)
-		
+
 		li	r31,FGetSysTimePPC-FRun68K
 		bl	DebugStartFunction
-		
+
 		mr	r6,r4
 		lwz	r5,sonnet_BusClock(r3)
 		rlwinm	r5,r5,30,2,31
@@ -1310,6 +1309,7 @@ GetSysTimePPC:
 		cmplw	r7,r3
 		bne+	.Loop5
 		bl	.Link17
+
 		stw	r3,TV_SECS(r6)
 		mullw	r7,r5,r3
 		sub	r7,r4,r7
@@ -1317,17 +1317,15 @@ GetSysTimePPC:
 		mullw	r4,r0,r7
 		mulhw	r3,r0,r7
 		bl	.Link17
+
 		stw	r3,TV_MICRO(r6)
-		
-#		dcbf	r0,r6					#DEBUGDEBUG
-		
 		lwz	r31,0(r13)
 		lwzu	r6,4(r13)
 		lwzu	r7,4(r13)
 		addi	r13,r13,4
-		
+
 		epilog 'TOC'
-		
+
 #********************************************************************************************
 
 .Link17:	mfctr	r0
@@ -1516,8 +1514,7 @@ FlushDCache:
 		beq	.HWFlush
 
 		rlwinm	r31,r4,16,16,31			#Test for 7450
-		oris	r31,r31,0xffff
-		cmpwi	r31,-32768
+		cmplwi	r31,0x8000
 		bne	.NoHWFlush
 		
 		mr	r3,r30
@@ -3116,8 +3113,7 @@ SendMsgFramePPC:
 
 		mfpvr	r3
 		rlwinm	r27,r3,16,16,31
-		oris	r28,r27,0xffff
-		cmpwi	r28,-32768
+		cmplwi	r27,0x8000
 		bne	.NoVGerFlush
 
 		lwz	r3,PowerPCBase(r0)
