@@ -80,8 +80,15 @@ CPUF_7441	EQU	$01000000
 		move.l a4,d1
 		lea Args-infotext(a4),a1
 		move.l	4(a2),d2
-		cmp.l #CPUF_G3,d2
+		cmp.l #CPUF_603E,d2
+		bne.s NoG2
+		
+		lea CPU_603E-infotext(a4),a3
+		bra.s StoreCPU
+
+NoG2		cmp.l #CPUF_G3,d2
 		bne.s NoG3
+
 		lea CPU_750-infotext(a4),a3
 		bra.s StoreCPU
 
