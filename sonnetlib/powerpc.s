@@ -1499,7 +1499,7 @@ GoWaitPort	move.l (a7),a0
 		
 		move.l TC_SIGALLOC(a1),d0
 		and.l #$fffff000,d0			;Do not act on system signals except the CTRL ones
-		or.w #$200,d0				;Special signal to prevent bouncing between CPUs
+		or.w #1<<SIGB_BOUNCE,d0			;Special signal to prevent bouncing between CPUs
 
 		jsr _LVOWait(a6)
 
@@ -1848,7 +1848,7 @@ MsgRetX		move.l a1,a2
 
 MsgSignal68k	move.l MN_PPSTRUCT+4(a1),d0		;Signal from a PPC task to 68K task
 		move.l a1,d7
-		or.w #$200,d0				;Mark it as being from PPC to prevent bouncing
+		or.w #1<<SIGB_BOUNCE,d0			;Mark it as being from PPC to prevent bouncing
 		move.l MN_PPSTRUCT(a1),a1
 		jsr _LVOSignal(a6)
 		move.l d7,a0
@@ -2851,7 +2851,7 @@ Stacker		move.l ThisTask(a6),a1
 							;the system like Heretic II.
 NoAdjustPri	move.l TC_SIGALLOC(a1),d0		
 		and.l #$fffff000,d0
-		or.w #$200,d0				;Special signal to prevent bouncing
+		or.w #1<<SIGB_BOUNCE,d0				;Special signal to prevent bouncing
 
 		jsr _LVOWait(a6)
 
@@ -3109,7 +3109,7 @@ NoFPU2		move.l a7,a0
 		
 ;********************************************************************************************
 
-CrossSignals	btst #4,d0				;Test on special signal ($10)
+CrossSignals	btst #SIGB_BOUNCE,d0			;Test on special signal ($10)
 		beq.s SigBouncing
 		move.b Options68K+3(pc),d0
 		beq.s SigBouncing
