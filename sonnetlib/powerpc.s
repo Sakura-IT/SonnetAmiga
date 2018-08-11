@@ -1499,7 +1499,7 @@ GoWaitPort	move.l (a7),a0
 		
 		move.l TC_SIGALLOC(a1),d0
 		and.l #$fffff000,d0			;Do not act on system signals except the CTRL ones
-		or.w #$10,d0				;Special signal to prevent bouncing between CPUs
+		or.w #$200,d0				;Special signal to prevent bouncing between CPUs
 
 		jsr _LVOWait(a6)
 
@@ -1848,7 +1848,7 @@ MsgRetX		move.l a1,a2
 
 MsgSignal68k	move.l MN_PPSTRUCT+4(a1),d0		;Signal from a PPC task to 68K task
 		move.l a1,d7
-		or.w #$10,d0				;Mark it as being from PPC to prevent bouncing
+		or.w #$200,d0				;Mark it as being from PPC to prevent bouncing
 		move.l MN_PPSTRUCT(a1),a1
 		jsr _LVOSignal(a6)
 		move.l d7,a0
@@ -2640,6 +2640,8 @@ GotMsgPort	move.l d0,Port(a5)
 		jsr _LVOAllocVec(a6)
 		tst.l d0
 		beq GtLoop
+		move.l d6,a1
+		bset #TB_PPC,TC_FLAGS(a1)
 		move.l d0,a1
 		move.l ThisTask(a6),MT_TASK(a1)
 		move.l Port(a5),MT_PORT(a1)
@@ -2849,7 +2851,7 @@ Stacker		move.l ThisTask(a6),a1
 							;the system like Heretic II.
 NoAdjustPri	move.l TC_SIGALLOC(a1),d0		
 		and.l #$fffff000,d0
-		or.w #$10,d0				;Special signal to prevent bouncing
+		or.w #$200,d0				;Special signal to prevent bouncing
 
 		jsr _LVOWait(a6)
 
@@ -2903,9 +2905,6 @@ CpBck		move.l (a2)+,d7
 
 Cannot		moveq.l #-1,d7
 EndIt		move.l d7,d0
-		move.l LExecBase(pc),a6
-		move.l ThisTask(a6),a1
-		bset #TB_PPC,TC_FLAGS(a1)
 		movem.l (a7)+,d1-a6
 		unlk a5
 		rts
