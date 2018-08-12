@@ -30,11 +30,11 @@ SonnetAmiga has the following hardware requirements:
   Needs a PMC to PCI card with 3.3V regulator.
 - Motorola PrPMC800 card with Harrier chip-set and 256MB SDRAM on-board.
   Also needs a PMC to PCI card with 3.3V regulator and enough Amps.
-
+- BigFoot Killer NIC M1 with 400MHz e300 core and 64MB on-board
 
 # Software
 
-- Elbox' pci.library 13.5+ required.
+- Elbox' pci.library 13.6+ required.
 - THOR's mmulib package recommended.
 
 # Building

@@ -385,7 +385,7 @@ SetCache:
 		mtspr	HID0,r0
 		xori	r0,r0,HID0_ICFI
 		mtspr	HID0,r0
-		isync	
+		sync	
 		b 	.Mojo3
 
 .Mojo1:		b 	.Mojo2
@@ -1203,6 +1203,8 @@ GetInfo:
 		rlwinm	r0,r7,16,16,31
 		cmplwi	r0,0x8000
 		beq	.GotVGer
+		cmplwi	r0,ID_MPC834X
+		beq	.GotKiller
 		rlwinm	r0,r7,20,24,31
 		cmpwi	r0,0x80
 		beq	.G3
@@ -1217,6 +1219,8 @@ GetInfo:
 		li	r7,0
 		b	.GotCPU
 		
+.GotKiller:	li	r7,CPUF_603E
+		b	.GotCPU		
 .GotVGer:	lis	r7,(CPUF_7400|CPUF_7441)@h
 		b	.GotCPU
 .GotNitro:	oris	r7,r7,CPUF_7410@h
@@ -3046,7 +3050,21 @@ CreateMsgFramePPC:
 
 		bl DisableIntPPC
 
-		lwz	r27,XMPIBase(r0)
+		mfpvr	r30
+		rlwinm	r28,r30,16,16,31
+		cmplwi	r28,ID_MPC834X
+		bne	.CreateMH
+
+		lwz	r27,SonnetBase(r0)
+		addis	r3,r27,FIFO_BASE
+		lwz	r30,FIFO_MIOFT(r3)
+		addi	r28,r30,4
+		loadreg	r27,0xffff3fff
+		and	r28,r28,r27
+		stw	r28,FIFO_MIOFT(r3)		
+		b	.ContCreateH
+
+.CreateMH:	lwz	r27,XMPIBase(r0)
 		mr.	r27,r27
 		beq	.CreateMS
 
@@ -3113,7 +3131,23 @@ SendMsgFramePPC:
 
 		mfpvr	r3
 		rlwinm	r27,r3,16,16,31
-		cmplwi	r27,0x8000
+		cmplwi	r27,ID_MPC834X
+		bne	.SendMH
+
+		lwz	r3,SonnetBase(r0)
+		addis	r3,r3,FIFO_BASE
+		lwz	r28,FIFO_MIOPH(r3)
+		stw	r30,0(r28)
+		addi	r29,r28,4
+		loadreg	r27,0xffff3fff
+		and	r29,r29,r27
+		stw	r29,FIFO_MIOPH(r3)
+		lis	r27,IMMR_ADDR_DEFAULT
+		ori	r27,r27,IMMR_OMR0
+		stw	r29,0(r27)
+		b	.ContSendH
+		
+.SendMH:	cmplwi	r27,0x8000
 		bne	.NoVGerFlush
 
 		lwz	r3,PowerPCBase(r0)
@@ -3181,7 +3215,25 @@ FreeMsgFramePPC:
 
 		bl DisableIntPPC
 
-		lwz	r27,XMPIBase(r0)
+		loadreg	r3,'FREE'
+		stw	r3,MN_IDENTIFIER(r30)
+
+		mfpvr	r27
+		rlwinm	r29,r27,16,16,31
+		cmplwi	r29,ID_MPC834X
+		bne	.FreeMH
+
+		lwz	r3,SonnetBase(r0)
+		addis	r3,r3,FIFO_BASE
+		lwz	r29,FIFO_MIIFH(r3)
+		stw	r30,0(r29)
+		addi	r28,r29,4
+		loadreg	r27,0xffff3fff
+		and	r28,r28,r27
+		stw	r28,FIFO_MIIFH(r3)
+		b	.ContFreeH	
+
+.FreeMH:	lwz	r27,XMPIBase(r0)
 		mr.	r27,r27
 		beq	.FreeMS
 
@@ -3792,12 +3844,9 @@ TrySemaphorePPC:
 		xori	r4,r4,SIGF_SINGLE
 		stw	r4,TC_SIGRECVD(r3)
 		addi	r4,r30,SS_WAITQUEUE
-		addi	r4,r4,4					#AddTailPPC
-		lwz	r3,4(r4)
-		stw	r5,4(r4)
-		stw	r4,0(r5)
-		stw	r3,4(r5)
-		stw	r5,0(r3)		
+
+		bl AddTailPPC
+
 		lwz	r4,SSPPC_RESERVE(r30)
 
 		bl AtomicDone
@@ -4360,9 +4409,13 @@ SetNiceValue:
 		bl	DebugStartFunction
 		
 		mr	r28,r3
-		mr	r31,r4
+		mr.	r31,r4		
+		bne	.GoodTask
+
+		mr	r29,r4
+		b	.EndNice
 		
-		cmpwi	r5,-20
+.GoodTask:	cmpwi	r5,-20
 		bge-	.SetMin
 		li	r5,-20
 .SetMin:	cmpwi	r5,20
@@ -4379,7 +4432,7 @@ SetNiceValue:
 
 		bl UnLockTaskList
 
-		mr	r3,r29
+.EndNice:	mr	r3,r29
 
 		lwz	r28,0(r13)
 		lwz	r29,4(r13)
@@ -5021,7 +5074,7 @@ CreateTaskPPC:
 		mtspr	HID0,r0
 		xori	r0,r0,HID0_ICFI
 		mtspr	HID0,r0
-		isync
+		sync
 		b 	.Mojo6
 
 .Mojo4:		b 	.Mojo5
@@ -5342,6 +5395,7 @@ FindTaskPPC:
 		bne-	.NotOwnTask
 
 		lwz	r3,ThisPPCProc(r30)
+
 		b	.ExitFind
 
 .NotOwnTask:	mr	r31,r3
@@ -5811,10 +5865,9 @@ ObtainSemaphoreSharedPPC:
 		lwz	r29,44(r13)
 		lwz	r30,48(r13)
 		lwz	r31,52(r13)
-		addi	r13,r13,56
-		lwz	r0,0(r13)
-		addi	r13,r13,4
+		lwz	r0,56(r13)
 		mtctr	r0
+		addi	r13,r13,60
 
 		epilog 'TOC'
 
@@ -6636,7 +6689,7 @@ AllocPooledPPC:
 		mr	r25,r3
 		mr	r31,r4
 		mr	r30,r5
-		
+
 		lwz	r4,sonnet_MemSem(r3)
 		
 		bl ObtainSemaphorePPC
@@ -6720,8 +6773,7 @@ AllocPooledPPC:
 		
 		bl AllocVec68K
 		
-		mr.	r5,r3
-		
+		mr.	r5,r3		
 		beq-	.ExitPooledMem
 		
 		addi	r4,r5,MH_SIZE
@@ -6749,7 +6801,7 @@ AllocPooledPPC:
 		
 		bl ReleaseSemaphorePPC
 		
-		mr	r3,r30
+		mr	r3,r30		
 		mr	r30,r25
 		li	r31,FAllocPooledPPC-FRun68K
 		bl	DebugEndFunction
@@ -9979,6 +10031,13 @@ StartCode:	bl	.StartRunPPC
 
 		mr	r31,r3
 		
+		li	r4,CACHE_ICACHEINV
+		li	r5,0
+		li	r6,0
+		
+		bl SetCache
+		
+		mr	r3,r31
  		lwz	r4,sonnet_SnoopSem(r31)
 		
 		bl ObtainSemaphorePPC

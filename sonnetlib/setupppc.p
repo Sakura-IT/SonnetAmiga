@@ -59,7 +59,7 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 .SkipCom:	mflr	r29				#For initial communication with 68k
 		lis	r22,CMD_BASE@h			#Used in setpcireg macro
 		
-		mfpvr	r25
+		mfpvr	r25		
 		rlwinm	r25,r25,16,16,31
 		cmplwi	r25,0x8000
 		bne	.NoEIDIS
@@ -75,15 +75,25 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 
 		lwz	r25,base_XMPI(r29)
 		mr.	r25,r25
-		beq	.SonnetStart
+		bne	.GoToClear
 
-		li	r3,0
+		mfpvr	r25
+		rlwinm	r25,r25,16,16,31
+		cmplwi	r25,ID_MPC834X
+		beq	.GoToClear
+
+		b	.SonnetStart
+
+.GoToClear:	li	r3,0
 		li	r4,63
 		mtctr	r4
 		li	r0,0
 .ClearH:	stwu	r0,4(r3)
 		bdnz+	.ClearH
-		
+
+		cmplwi	r25,ID_MPC834X
+		beq	.KillerStart
+
 		stw	r25,XMPIBase(r0)
 		
 		la	r14,base_Options(r29)
@@ -99,12 +109,32 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 		lwz	r27,base_MemStart(r29)
 		stw	r27,SonnetBase(r0)
 		lwz	r8,base_MemLen(r29)
-		
+
 		bl	mmuSetup
 
 		loadreg	r0,'Boon'
 		stw	r0,0(r0)
 		
+		b	.SonSkip
+
+#*********************************************************
+
+.KillerStart:	lwz	r0,base_MemLen(r29)
+		stw	r0,MemSize(r0)
+		
+		bl	.SetupKillerFIFOs
+		bl	Ipic
+		bl	InstallExceptions
+
+		lwz	r27,base_MemStart(r29)
+		stw	r27,SonnetBase(r0)
+		lwz	r8,base_MemLen(r29)
+
+		bl	mmuSetup
+
+		loadreg	r0,'Boon'
+		stw	r0,0(r0)
+
 		b	.SonSkip
 
 #*********************************************************
@@ -275,7 +305,7 @@ SetLen:		mr	r30,r28
 		stw	r8,base_MemLen(r29)		#MemLen
 
 		bl	mmuSetup			#Setup the Memory Management Unit
-		bl	Epic				#Setup the EPIC controller		
+		bl	Epic				#Setup the EPIC controller
 .SonSkip:	bl	End
 
 #*********************************************************
@@ -284,7 +314,7 @@ Start:							#Dummy task at absolute (see ppcdefines)
 		nop
 		nop
 		nop
-		b Start
+		b	Start
 
 #*********************************************************
 
@@ -433,16 +463,25 @@ End:		mflr	r4
 
 		lbz	r6,option_DisL2Flush(r14)
 		stb	r6,DoDFlushAll(r3)
+	
+		mfpvr	r4
+		rlwinm	r6,r4,16,16,31
+		cmplwi	r6,ID_MPC834X
+		bne	.NoKillerClock
+	
+		loadreg	r0,KillerQuantum
+		loadreg	r4,KillerBusClock
+		b	.PutClocks
 		
-		lbz	r6,option_VersionNB(r14)
+.NoKillerClock:	lbz	r6,option_VersionNB(r14)
 		loadreg	r0,SonnetQuantum
 		loadreg	r4,SonnetBusClock
 		cmpwi	r6,0x13
-		bne	.IsSonnet
+		bne	.PutClocks
 		loadreg	r0,RaptureQuantum
 		loadreg	r4,RaptureBusClock
 
-.IsSonnet:	stw	r0,Quantum(r0)
+.PutClocks:	stw	r0,Quantum(r0)
 		stw	r4,sonnet_BusClock(r3)
 		mr	r14,r3
 		la	r6,SemMemory(r14)
@@ -489,6 +528,11 @@ End:		mflr	r4
 		
 		lwz	r4,SonnetBase(r0)
 		stw	r4,sonnet_SonnetBase(r14)
+			
+		mfpvr	r4
+		rlwinm	r4,r4,16,16,31
+		cmplwi	r4,ID_MPC834X
+		beq	.DidFIFOs
 				
 		lwz	r4,XMPIBase(r0)
 		mr.	r4,r4
@@ -496,12 +540,7 @@ End:		mflr	r4
 
 		bl	.SetupMsgFIFOs
 
-.DidFIFOs:	mtsrr0	r31
-
-		loadreg	r0,MACHINESTATE_DEFAULT
-		mtsrr1	r0				#load up user MSR. Also clears PSL_IP
-
-		lwz	r14,PowerPCBase(r0)				
+.DidFIFOs:	lwz	r14,PowerPCBase(r0)				
 		lwz	r4,_LVOSetCache+2(r14)
 
 		addi	r6,r4,ViolationOS		
@@ -540,6 +579,11 @@ End:		mflr	r4
 		sync
 		
 		lwz	r3,PowerPCBase(r0)
+		
+		mtsrr0	r31
+
+		loadreg	r0,MACHINESTATE_DEFAULT
+		mtsrr1	r0				#load up user MSR. Also clears PSL_IP
 
 		rfi					#To user code
 		
@@ -705,6 +749,57 @@ End:		mflr	r4
 		sync						#Is it safer to clear the empty FIFOs?
 		
 		blr
+#********************************************************************************************
+
+.SetupKillerFIFOs:
+
+		lwz	r6,base_MemStart(r29)
+		lis	r4,0x38		
+		subi	r4,r4,4
+		lis	r5,0x20
+		add	r5,r5,r6				#Sonnetbase + 200000: Messages
+
+		li	r6,4096
+		loadreg	r20,(0x3a0000-4)
+		mtctr	r6
+		loadreg	r21,(0x390000-4)
+		addis	r7,r5,0xc
+		loadreg	r22,(0x3b0000-4)
+		li	r23,0
+		
+.FillKillFIFO:	stwu	r5,4(r4)
+		stwu	r7,4(r20)
+		stwu	r23,4(r21)
+		stwu	r23,4(r22)
+		addi	r5,r5,192				#Message Frame Length
+		addi	r7,r7,192
+		bdnz	.FillKillFIFO
+
+		lwz	r6,base_MemStart(r29)
+		addis	r6,r6,0x38
+
+		lis	r23,FIFO_BASE
+
+		addi	r4,r6,4
+		stw	r4,FIFO_MIIFT(r23)
+
+		mr	r4,r6
+		stw	r4,FIFO_MIIFH(r23)
+
+		addis	r4,r6,1
+		stw	r4,FIFO_MIIPT(r23)
+		stw	r4,FIFO_MIIPH(r23)
+
+		addis	r4,r6,2		
+		stw	r4,FIFO_MIOFH(r23)
+		addi	r4,r4,4
+		stw	r4,FIFO_MIOFT(r23)
+
+		addis	r4,r6,3
+		stw	r4,FIFO_MIOPT(r23)
+		stw	r4,FIFO_MIOPH(r23)
+
+		blr
 
 #********************************************************************************************
 
@@ -798,11 +893,15 @@ ifpdr_value:	mflr	r3
 		mtspr	dbat3l,r1
 		
 		mfpvr	r4
-		rlwinm	r4,r4,8,24,31
-		cmpwi	r4,0x70
+		rlwinm	r3,r4,16,16,31
+		cmplwi	r3,0x8083
+		beq	.ExtraBats
+		
+		rlwinm	r3,r4,8,24,31
+		cmpwi	r3,0x70
 		bne	.SkipExtraBats
 
-		mtspr	ibat4u,r1
+.ExtraBats:	mtspr	ibat4u,r1
 		mtspr	ibat5u,r1
 		mtspr	ibat6u,r1
 		mtspr	ibat7u,r1
@@ -955,6 +1054,10 @@ ClearIntsH:	loadreg	r27,XMPI_P0IAC			#Processor 0 Interrupt Ack
 
 #********************************************************************************************
 
+Ipic:		blr
+
+#********************************************************************************************
+
 Caches:				
 		mfspr	r4,HID0
 		ori	r4,r4,HID0_ICE|HID0_DCE|HID0_SGE|HID0_BTIC|HID0_BHTE
@@ -962,12 +1065,18 @@ Caches:
 		mtspr	HID0,r4
 		sync
 
-		la	r4,base_Options(r29)
-		mr	r11,r4
-		lbz	r5,option_DisL2Cache(r4)		
+		la	r11,base_Options(r29)
+
+		mfpvr	r4
+		rlwinm	r0,r4,16,16,31
+		cmplwi	r0,ID_MPC834X			#MPC8343
+		li	r30,0
+		beq	.ClearOpt
+
+		lbz	r5,option_DisL2Cache(r11)		
 		mr.	r5,r5
 		li	r30,0
-		bne	.L2SizeDone
+		bne	.ClearOpt
 
 		mfpvr	r4
 		rlwinm	r0,r4,8,24,31
@@ -1006,8 +1115,8 @@ Wait2:		mfl2cr	r3
 		sync
 		isync
 
-.xxxx:		mr.	r30,r30
-		bne	.FixedSizeFX
+		mr.	r30,r30
+		bne	.NoClearOpt
 
 		li	r0,0				#Determine size of L2 Cache
 		mr	r5,r0
@@ -1063,8 +1172,11 @@ Wait2:		mfl2cr	r3
 		mtl2cr	r4				#Disable Test Support
 		sync
 		isync
+		b	.NoClearOpt
+		
+.ClearOpt:	stw	r30,option_SetCMemDiv(r11)
 
-.FixedSizeFX:	li	r4,8
+.NoClearOpt:	li	r4,8
 		slw	r30,r30,r4
 		lwz	r4,PowerPCBase(r0)
 		stw	r30,sonnet_L2Size(r4)
@@ -1111,8 +1223,24 @@ Wait2:		mfl2cr	r3
 		li	r8,(.END_CFG_FX-.PLL_CFG_FX)/8
 		mtctr	r8
 		b	.NextPLL
-		
-.NoFX:		rlwinm	r9,r9,4,28,31
+
+.KillerStats:	rlwinm	r9,r9,7,25,31
+		mflr	r10
+		bl	.END_CFG_KILL
+
+		.long	0,0						#For the Modders
+.PLL_CFG_KILL:	.long	0b0100011,400000000,0b01010,333333333
+
+.END_CFG_KILL:	
+		mflr	r6
+		li	r8,(.END_CFG_KILL-.PLL_CFG_KILL)/8
+		mtctr	r8
+		b	.NextPLL
+
+.NoFX:		cmplwi	r10,ID_MPC834X
+		beq	.KillerStats
+
+		rlwinm	r9,r9,4,28,31
 		mflr	r10
 
 		la	r14,base_Options(r29)
@@ -1192,12 +1320,19 @@ Wait2:		mfl2cr	r3
 		or	r4,r4,r12
 		b	.DoRestL2
 
-.DefL2Speed:	mfl2cr	r4
+.DefL2Speed:	mfpvr	r4
+		rlwinm	r0,r4,16,16,31
+		cmplwi	r0,0x8000
+		beq	.NoSetSize
+		cmplwi	r0,ID_MPC834X
+		beq	.NoSetSize
+
+		mfl2cr	r4
 .DoRestL2:	xoris	r4,r4,L2CR_L2SIZ_1M@h
 		or	r4,r4,r7
 		mtl2cr	r4				#Set correct size, switch Test off and enable
 		
-		sync
+.NoSetSize:	sync
 		isync
 		
 		mtlr	r10
@@ -1205,12 +1340,18 @@ Wait2:		mfl2cr	r3
 		blr
 
 #********************************************************************************************
-
+	
 mmuSetup:	
 		mflr	r30
 		lis	r6,0x800				#Amount of memory to virtualize (128MB)
 
 		bl	.SetupPT
+
+		mfpvr	r4
+		rlwinm	r4,r4,16,16,31
+		cmplwi	r4,ID_MPC834X
+		lis	r3,IMMR_ADDR_DEFAULT
+		beq	.mmuDo
 
 		lwz	r3,base_XMPI(r29)
 		mr.	r3,r3
@@ -1224,10 +1365,10 @@ mmuSetup:
 		bl	.DoTBLs
 
  		lis	r3,PPC_XCSR_BASE@h
-		b	.mmuHarrier
+		b	.mmuDo
 
 .mmuMPC107:	lis	r3,EUMB@h				#PCI memory (EUMB) start effective address
-.mmuHarrier:	addis	r4,r3,0x10				#end effective address
+.mmuDo:		addis	r4,r3,0x10				#end effective address
 		mr	r5,r3					#start physical address
 		loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED	#WIMG
 		li	r7,PP_USER_RW				#pp = 2 - Read/Write Access (0 = No Access)
@@ -1364,7 +1505,7 @@ mmuSetup:
 .NoATI:		li	r3,0				#First 2MB cached - user protected - Directs to CHIP
 		mr	r5,r3
 
-		li	r17,BAT_CACHE_INHIBITED | BAT_READ_WRITE
+		li	r17,BAT_READ_WRITE
 		li	r18,BAT_BL_2M | BAT_VALID_SUPERVISOR
 
 		or	r17,r17,r5
@@ -1377,7 +1518,7 @@ mmuSetup:
 
 		sync
 		isync
-
+		
 		lis	r3,0x20				#Messages (2MB no data cache)
 		mr	r5,r3
 		add	r3,r3,r27
@@ -2275,12 +2416,20 @@ EInt:		b	.FPUnav				#0
 		b	.SysMan				#2c
 		b	.TherMan			#30
 		b	.VMXUnav			#34
+		b	.ITLBMiss			#38
+		b	.DLoadTLBMiss			#3c
+		b	.DStoreTLBMiss			#40
 
-		mtsprg0	r0				#38
+		mtsprg0	r0				#44
+
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
 
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
+		mtmsr	r0				#Reenable MMU
 		isync					#Also reenable FPU
 		sync
 
@@ -2295,6 +2444,11 @@ EInt:		b	.FPUnav				#0
 		mfxer	r0
 		stw	r0,64(r1)
 
+		mfpvr	r4
+		rlwinm	r0,r4,16,16,31
+		cmplwi	r0,ID_MPC834X
+		beq	.HandleKiller
+
 		lwz	r3,XMPIBase(r0)
 		mr.	r3,r3
 		beq	.HandleSonnI
@@ -2302,6 +2456,12 @@ EInt:		b	.FPUnav				#0
 		lis	r3,PPC_XCSR_BASE@h
 		lwz	r4,XCSR_FEST(r3)
 		andis.	r0,r4,XCSR_FEST_MIM0@h		#From CausePPCInterrupt on Harrier
+		b	.DoneIMH
+
+.HandleKiller:	lis	r3,IMMR_ADDR_DEFAULT
+		ori	r3,r3,IMMR_IMISR
+		lwbrx	r4,r0,r3		
+		andi.	r4,r4,IMMR_IMISR_IDI			#From CausePPInterrupt on MPC8343E
 		b	.DoneIMH
 
 .HandleSonnI:	lis	r3,EUMB@h
@@ -2364,6 +2524,11 @@ EInt:		b	.FPUnav				#0
 		li	r5,-1
 		lwz	r10,PowerPCBase(r0)
 		stb	r5,sonnet_ExceptionMode(r10)
+		
+		mfpvr	r3
+		rlwinm	r5,r3,16,16,31
+		cmplwi	r5,ID_MPC834X
+		beq	.KillerAck
 		
 		lwz	r3,XMPIBase(r0)
 		mr.	r3,r3
@@ -2446,6 +2611,45 @@ EInt:		b	.FPUnav				#0
 
 #**********************************************************
 
+.KillerAck:	lwz	r3,SonnetBase(r0)
+		addis	r3,r3,FIFO_BASE
+		lwz	r9,FIFO_MIIPH(r3)
+		lwz	r5,FIFO_MIIPT(r3)
+		cmpw	r5,r9
+		beq	.EndQueueK
+		
+.QNotEmptyK:	addi	r9,r5,4				#Increase FIFO pointer
+		loadreg	r4,0xffff3fff
+		and	r9,r9,r4			#Keep it below 0x4000
+		lwz	r5,0(r5)
+
+		la	r4,LIST_MSGQUEUE(r10)
+		addi	r4,r4,4				#PutMsg r5 to queue
+		lwz	r3,4(r4)			#AddTailPPC
+		stw	r5,4(r4)
+		stw	r4,0(r5)
+		stw	r3,4(r5)
+		stw	r5,0(r3)
+
+		lwz	r3,SonnetBase(r0)
+		addis	r3,r3,FIFO_BASE
+		lwz	r5,FIFO_MIIPH(r3)		#Check if header is equal to tail. If so, queue is empty
+		cmpw	r5,r9
+		beq	.QEmptyK
+		
+		mr	r5,r9
+		b	.QNotEmptyK
+
+.QEmptyK:	stw	r9,FIFO_MIIPT(r3)
+		lis	r3,IMMR_ADDR_DEFAULT
+		ori	r3,r3,IMMR_IMISR
+		li	r5,IMMR_IMISR_IM0I
+		stwbrx	r5,r0,r3			#Acknowledge message
+
+.EndQueueK:	b	.StartQ
+
+#**********************************************************
+
 .HarrAck:	cmpwi	r5,0x00ff			#Spurious Vector. Should not do EOI acc Docs.
 		beq	.SlowReturn
 
@@ -2497,7 +2701,7 @@ EInt:		b	.FPUnav				#0
 
 .StartQ:	lwz	r10,PowerPCBase(r0)
 
-		mfsrr0	r9
+		lwz	r9,Exc_srr0(r0)
 		lwz	r4,AdListStart(r0)
 		cmpw	r9,r4
 		blt	.SkipListChk
@@ -2604,7 +2808,25 @@ EInt:		b	.FPUnav				#0
 		stw	r4,4(r3)
 		stw	r3,0(r4)
 	
-		lwz	r4,XMPIBase(r0)
+		loadreg	r3,'FREE'
+		stw	r3,MN_IDENTIFIER(r5)
+	
+		mfpvr	r4
+		rlwinm	r4,r4,16,16,31
+		cmplwi	r4,ID_MPC834X
+		bne	.RelFrameH
+
+		lwz	r3,SonnetBase(r0)
+		addis	r3,r3,FIFO_BASE
+		lwz	r6,FIFO_MIIFH(r3)
+		stw	r5,0(r6)
+		addi	r8,r6,4
+		loadreg	r4,0xffff3fff
+		and	r8,r8,r4
+		stw	r8,FIFO_MIIFH(r3)
+		b	.RelledH
+	
+.RelFrameH:	lwz	r4,XMPIBase(r0)
 		mr.	r4,r4
 		beq	.RelFrameS
 	
@@ -2669,7 +2891,25 @@ EInt:		b	.FPUnav				#0
 		stw	r4,4(r3)
 		stw	r3,0(r4)
 
-		lwz	r4,XMPIBase(r0)
+		loadreg	r3,'FREE'
+		stw	r3,MN_IDENTIFIER(r5)
+
+		mfpvr	r4
+		rlwinm	r4,r4,16,16,31
+		cmplwi	r4,ID_MPC834X
+		bne	.RelRxMsgH
+
+		lwz	r3,SonnetBase(r0)
+		addis	r3,r3,FIFO_BASE
+		lwz	r6,FIFO_MIIFH(r3)
+		stw	r5,0(r6)
+		addi	r8,r6,4
+		loadreg	r4,0xffff3fff
+		and	r8,r8,r4
+		stw	r8,FIFO_MIIFH(r3)
+		b	.ContRXMsg
+
+.RelRxMsgH:	lwz	r4,XMPIBase(r0)
 		mr.	r4,r4
 		beq	.RelRxMsgS
 	
@@ -2739,8 +2979,25 @@ EInt:		b	.FPUnav				#0
 		mtctr	r6
 
 		lwz	r7,MN_ARG2(r5)
+		loadreg	r3,'FREE'
+		stw	r3,MN_IDENTIFIER(r5)
 
-		lwz	r4,XMPIBase(r0)
+		mfpvr	r4
+		rlwinm	r4,r4,16,16,31
+		cmplwi	r4,ID_MPC834X
+		bne	.RelInvXMsgH
+
+		lwz	r3,SonnetBase(r0)
+		addis	r3,r3,FIFO_BASE
+		lwz	r6,FIFO_MIIFH(r3)
+		stw	r5,0(r6)
+		addi	r8,r6,4
+		loadreg	r4,0xffff3fff
+		and	r8,r8,r4
+		stw	r8,FIFO_MIIFH(r3)
+		b	.ContInvXMsg
+
+.RelInvXMsgH:	lwz	r4,XMPIBase(r0)
 		mr.	r4,r4
 		beq	.RelInvXMsgS
 	
@@ -2993,9 +3250,6 @@ EInt:		b	.FPUnav				#0
 		stw	r13,-4(r1)
 		subi	r13,r1,4
 		stwu	r1,-1024(r1)		
-		
-		lwz	r6,RunPPCStart(r0)
-		mtsrr0	r6
 
  		lwz	r0,MN_STARTALLOC(r9)
 		stw	r0,TC_SIGALLOC(r8)
@@ -3033,21 +3287,17 @@ EInt:		b	.FPUnav				#0
 
 		lwz	r3,PowerPCBase(r0)
 
-		loadreg	r0,MACHINESTATE_DEFAULT
-		mtsrr1	r0		
+		lwz	r0,Quantum(r0)
+		mtdec	r0
 
-		mfspr	r0,HID0
-		ori	r0,r0,HID0_ICFI
-		mtspr	HID0,r0
-		isync
+		loadreg	r0,MACHINESTATE_DEFAULT
+		mtsrr1	r0
+
+		lwz	r0,RunPPCStart(r0)
+		mtsrr0	r0
 
 		mr	r30,r9
 
-		lwz	r0,Quantum(r0)
-		mtdec	r0
-		
-		nop
-		
 		rfi
 		
 #********************************************************************************************	
@@ -3126,10 +3376,21 @@ EInt:		b	.FPUnav				#0
 		loadreg	r0,'USER'
 		stw	r0,0xf4(r0)
 		
+		mtsprg1	r30
 		mfspr	r0,HID0
+		mr	r30,r0
 		ori	r0,r0,HID0_ICFI
 		mtspr	HID0,r0
-		isync
+		mtspr	HID0,r30
+		sync
+		
+		mfsprg1	r30
+
+		lwz	r0,Exc_srr0(r0)
+		mtsrr0	r0
+		
+		lwz	r0,Exc_srr1(r0)
+		mtsrr1	r0
 
 		mfsprg0	r0
 
@@ -3137,7 +3398,7 @@ EInt:		b	.FPUnav				#0
 	
 #********************************************************************************************
 
-.TaskStats:		
+.TaskStats:	
 		stwu	r2,-4(r13)
 		stwu	r3,-4(r13)
 		stwu	r4,-4(r13)
@@ -3482,9 +3743,9 @@ EInt:		b	.FPUnav				#0
 		b	.Dispatch
 		
 .StoreContext:	lwz	r6,TASKPPC_CONTEXTMEM(r5)
-		mfsrr0	r3
+		lwz	r3,Exc_srr0(r0)
 		stw	r3,0(r6)
-		mfsrr1	r3
+		lwz	r3,Exc_srr1(r0)
 		stw	r3,4(r6)
 		lwz	r3,0(r1)			#User stack
 		lwz	r0,8(r3)			#lr
@@ -3658,7 +3919,7 @@ EInt:		b	.FPUnav				#0
 		li	r0,0
 		stb	r0,PortInUse(r10)
 		stb	r0,sonnet_ExceptionMode(r10)
-		
+			
 		lwz	r10,4(r9)
 		andis.	r10,r10,PSL_VEC@h
 		beq	.NoLoadVMX
@@ -3735,9 +3996,9 @@ EInt:		b	.FPUnav				#0
 		mtspr	VRSAVE,r10
 		
 .NoLoadVMX:	lwz	r0,0(r9)
-		mtsrr0	r0
+		stw	r0,Exc_srr0(r0)
 		lwz	r0,4(r9)
-		mtsrr1	r0
+		stw	r0,Exc_srr1(r0)
 		lwz	r0,8(r9)
 		mtlr	r0
 		lwz	r0,12(r9)
@@ -3817,10 +4078,15 @@ EInt:		b	.FPUnav				#0
 		loadreg	r9,'USER'
 		stw	r9,0xf4(r0)
 		
+		mtsprg1	r30
 		mfspr	r9,HID0
+		mr	r30,r9
 		ori	r9,r9,HID0_ICFI
 		mtspr	HID0,r9
-		isync
+		mtspr	HID0,r30
+		sync
+		
+		mfsprg1	r30
 
 		lwz	r9,0xf0(r0)			#Debug counter to check
 		addi	r9,r9,1				#Whether exception is still running
@@ -3829,7 +4095,14 @@ EInt:		b	.FPUnav				#0
 		lwz	r9,Quantum(r0)
 		mtdec	r9
 		
+		lwz	r9,Exc_srr0(r0)
+		mtsrr0	r9
+		
+		lwz	r9,Exc_srr1(r0)
+		mtsrr1	r9
+		
 		mfsprg3	r9
+
 		rfi
 		
 #********************************************************************************************
@@ -3858,7 +4131,7 @@ EInt:		b	.FPUnav				#0
 .DoIdle:	loadreg	r0,IdleTask			#Switch to idle task
 		lwz	r1,SonnetBase(r0)
 		or	r0,r1,r0
-		mtsrr0	r0
+		stw	r0,Exc_srr0(r0)
 
 		loadreg	r1,SysStack-0x20		#System stack in unused mem
 		lwz	r9,SonnetBase(r0)
@@ -3874,14 +4147,16 @@ EInt:		b	.FPUnav				#0
 		stw	r13,-4(r1)
 		subi	r13,r1,4
 		stwu	r1,-288(r1)
-		
-		loadreg	r0,MACHINESTATE_DEFAULT
-		mtsrr1	r0
 
+		mtsprg1	r30
 		mfspr	r0,HID0
+		mr	r30,r0
 		ori	r0,r0,HID0_ICFI
 		mtspr	HID0,r0
-		isync
+		mtspr	HID0,r30
+		sync
+		
+		mfsprg1	r30
 
 		lwz	r0,Quantum(r0)
 		mtdec	r0
@@ -3889,15 +4164,26 @@ EInt:		b	.FPUnav				#0
 		loadreg	r0,'IDLE'
 		stw	r0,0xf4(r0)
 
+		lwz	r0,Exc_srr0(r0)
+		mtsrr0	r0
+
+		loadreg	r0,MACHINESTATE_DEFAULT
+		mtsrr1	r0
+
 		rfi
 
 #********************************************************************************************
 
 .DecInt:	mtsprg0	r0
 
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
+
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
-		mtmsr	r0				#Reenable MMU (can affect srr0/srr1 acc Docs)
+		mtmsr	r0				#Reenable MMU
 		isync					#Also reenable FPU
 		sync
 
@@ -4112,7 +4398,12 @@ EInt:		b	.FPUnav				#0
 
 .BreakPoint:						#Breakpoint Exception
 		mtsprg0	r0
-		
+
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
+
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable FPU & MMU
 		mtmsr	r0
@@ -4140,7 +4431,12 @@ EInt:		b	.FPUnav				#0
 
 .MachCheck:						#Machine Check Exception
 		mtsprg0	r0
-		
+
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
+
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable FPU & MMU
 		mtmsr	r0
@@ -4169,6 +4465,11 @@ EInt:		b	.FPUnav				#0
 .SysMan:						#System Management Exception
 		mtsprg0	r0
 		
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
+
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable FPU & MMU
 		mtmsr	r0
@@ -4196,7 +4497,12 @@ EInt:		b	.FPUnav				#0
 
 .TherMan:						#Thermal Management Exception
 		mtsprg0	r0
-		
+
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
+
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable FPU & MMU
 		mtmsr	r0
@@ -4224,7 +4530,12 @@ EInt:		b	.FPUnav				#0
 
 .SysCall:						#System Call Exception
 		mtsprg0	r0
-		
+
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
+
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable FPU & MMU
 		mtmsr	r0
@@ -4252,7 +4563,12 @@ EInt:		b	.FPUnav				#0
 
 .Trace:							#Trace Exception
 		mtsprg0	r0
-		
+
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
+
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable FPU & MMU
 		mtmsr	r0
@@ -4280,7 +4596,12 @@ EInt:		b	.FPUnav				#0
 
 .FPUnav:						#FPU Unavailable Exception
 		mtsprg0	r0
-		
+
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
+
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable FPU & MMU
 		mtmsr	r0
@@ -4308,7 +4629,12 @@ EInt:		b	.FPUnav				#0
 
 .Alignment:						#Alignment Error Exception
 		mtsprg0	r0
-		
+
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
+
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable FPU & MMU
 		mtmsr	r0
@@ -4427,7 +4753,7 @@ EInt:		b	.FPUnav				#0
 		addze	r6,r6
 		stw	r6,AlignmentExcHigh(r5)
 
-		mfsrr0	r5
+		lwz	r5,Exc_srr0(r0)
 		lwz	r5,0(r5)
 
 		rlwinm	r6,r5,14,24,28			#get floating point register offset
@@ -4586,9 +4912,9 @@ EInt:		b	.FPUnav				#0
 		mr.	r0,r0
 		beq	.HaltAlign2
 
-		mfsrr0	r3
+		lwz	r3,Exc_srr0(r0)
 		addi	r3,r3,4				#Exit beyond offending instruction
-		mtsrr0	r3
+		stw	r3,Exc_srr0(r0)
 
 		lwz	r3,PowerPCBase(r0)
 		li	r0,0
@@ -4600,6 +4926,16 @@ EInt:		b	.FPUnav				#0
 		mtxer	r0
 		lwz	r0,48(r1)
 		lwz	r1,0(r1)
+		
+		mtsprg0	r0
+		
+		lwz	r0,Exc_srr0(r0)
+		mtsrr0	r0
+		
+		lwz	r0,Exc_srr1(r0)
+		mtsrr1	r0
+		
+		mfsprg0	r0
 
 		rfi
 	
@@ -4611,8 +4947,187 @@ EInt:		b	.FPUnav				#0
 
 #********************************************************************************************
 
+.ITLBMiss:
+		mfspr	r2,HASH1				#get first pointer
+		li	r1,8					#load 8 for counter
+		mfctr	r0					#save counter
+		mfspr	r3,ICMP					#get first compare value
+		addi	r2,r2,-8				#pre dec the pointer
+im0:		
+		mtctr	r1					#load counter
+im1:		
+		lwzu	r1,8(r2)				#get next pte
+		cmpw	r1,r3 					#see if found pte
+		bdnzf	eq,im1					#dec count br if cmp ne and if count not zero
+		bne	instrSecHash     			#if not found set up second hash or exit
+		lwz	r1,4(r2)				#load tlb entry lower-word
+		andi.	r3,r1,PTE_GUARDED<<3			#check G bit
+		bne	doISIp					#if guarded, take an ISI
+		mtctr	r0 					#restore counter
+		mfspr	r0,IMISS 				#get the miss address for the tlbl
+		mfsrr1	r3     					#get the saved cr0 bits
+		mtcrf	0x80,r3   				#restore CR0
+		mtspr	RPA,r1    				#set the pte
+		ori	r1,r1,PTE_REFERENCED    		#set reference bit
+		srwi	r1,r1,8    				#get byte 7 of pte
+		tlbli	r0    					#load the itlb
+		stb	r1,6(r2) 				#update page table
+		rfi     					#return to executing program
+
+instrSecHash:
+		andi.	r1,r3,PTE_HASHID  			#see if we have done second hash
+		bne	doISI        				#if so, go to ISI interrupt
+		mfspr	r2,HASH2         			#get the second pointer
+		ori	r3,r3,PTE_HASHID      			#change the compare value
+		li	r1,8    				#load 8 for counter
+		addi	r2,r2,-8   				#pre dec for update on load
+		b 	im0    					#try second hash
+
+doISIp:
+		mfsrr1	r3   					#get srr1
+		andi.	r2,r3,0xffff 				#clean upper srr1
+		addis	r2,r2,DSISR_PROTECT@h  			#or in srr<4> = 1 to flag prot violation
+		b 	isi1
+doISI:
+ 		mfsrr1	r3    					#get srr1		
+ 		andi.	r2,r3,0xffff				#clean srr1
+		addis	r2,r2,DSISR_NOTFOUND@h			#or in srr1<1> = 1 to flag not found
+isi1:
+		mtctr	r0 					#restore counter
+		mtsrr1	r2 					#set srr1
+		mfmsr	r0   					#get msr
+		xoris	r0,r0,PSL_TGPR@h  			#flip the msr<tgpr> bit
+		mtcrf	0x80,r3      				#restore CR0
+		mtmsr	r0      				#flip back to the native gprs
+		b	.ISI       				#go to instr. access interrupt
+
+#********************************************************************************************
+
+.DLoadTLBMiss:
+		mfspr	r2,HASH1				#get first pointer
+		li	r1,8   					#load 8 for counter
+		mfctr	r0   					#save counter
+		mfspr	r3,DCMP   				#get first compare value
+		addi	r2,r2,-8  				#pre dec the pointer
+dm0:
+		mtctr	r1  					#load counter
+dm1:
+		lwzu	r1,8(r2)				#get next pte
+		cmpw	r1,r3 					#see if found pte
+		bdnzf	eq,dm1 					#dec count br if cmp ne and if count not zero
+		bne	dataSecHash 				#if not found set up second hash or exit
+		lwz	r1,4(r2) 				#load tlb entry lower-word
+		mtctr	r0   					#restore counter
+		mfspr	r0,DMISS  				#get the miss address for the tlbld
+		mfsrr1	r3   					#get the saved cr0 bits
+		mtcrf	0x80,r3 				#restore CR0
+		mtspr	RPA,r1  				#set the pte
+		ori	r1,r1,PTE_REFERENCED   			#set reference bit
+		srwi	r1,r1,8  				#get byte 7 of pte
+		tlbld	r0    					#load the dtlb
+		stb	r1,6(r2) 				#update page table
+		rfi      					#return to executing program
+
+dataSecHash:
+ 		andi.	r1,r3,PTE_HASHID 			#see if we have done second hash
+		bne	doDSI       				#if so, go to DSI interrupt
+		mfspr	r2,HASH2   				#get the second pointer
+		ori	r3,r3,PTE_HASHID 			#change the compare value
+		li	r1,8   					#load 8 for counter
+		addi	r2,r2,-8  				#pre dec for update on load
+		b	dm0  					#try second hash
+
+#********************************************************************************************
+
+.DStoreTLBMiss:	
+		mfspr	r2,HASH1				#get first pointer
+		li	r1,8 					#load 8 for counter
+		mfctr	r0   					#save counter
+		mfspr	r3,DCMP 				#get first compare value
+		addi	r2,r2,-8				#pre dec the pointer
+ceq0:
+		mtctr	r1					#load counter
+ceq1:
+		lwzu	r1,8(r2)				#get next pte
+		cmpw	r1,r3    				#see if found pte
+		bdnzf	eq,ceq1 				#dec count br if cmp ne and if count not zero
+		bne	cEq0SecHash 				#if not found set up second hash or exit
+		lwz	r1,4(r2)   				#load tlb entry lower-word
+		andi.	r3,r1,PTE_CHANGED 			#check the C-bit
+		beq	cEq0ChkProt 				#if (C==0) go check protection modes
+ceq2:
+		mtctr	r0       				#restore counter
+		mfspr	r0,DMISS 				#get the miss address for the tlbld
+		mfsrr1	r3      				#get the saved cr0 bits
+		mtcrf	0x80,r3   				#restore CR0
+		mtspr	RPA,r1  				#set the pte
+		tlbld	r0     					#load the dtlb
+		rfi     					#return to executing program
+
+cEq0SecHash:
+		andi.	r1,r3,PTE_HASHID			#see if we have done second hash
+		bne	doDSI    				#if so, go to DSI interrupt
+		mfspr	r2,HASH2 				#get the second pointer
+		ori	r3,r3,PTE_HASHID  			#change the compare value
+		li	r1,8					#load 8 for counter
+		addi	r2,r2,-8				#pre dec for update on load
+		b	ceq0  					#try second hash
+
+cEq0ChkProt:
+		rlwinm.	r3,r1,30,0,1 				#test PP
+    		bge-	chk0    				#if (PP == 00 or PP == 01) goto chk0:
+		andi.	r3,r1,1 				#test PP[0]
+		beq+	chk2   					#return if PP[0] == 0
+		b	doDSIp 					#else DSIp
+
+chk0:
+  		mfsrr1	r3      				#get old msr
+		andis.	r3,r3,SRR1_KEY@h 			#test the KEY bit (SRR1-bit 12)
+		beq	chk2      				#if (KEY==0) goto chk2:
+		b	doDSIp   				#else DSIp
+chk2:
+   		ori	r1,r1,(PTE_REFERENCED|PTE_CHANGED)	#set reference and change bit
+		sth	r1,6(r2)				#update page table
+		b	ceq2  					#and back we go
+
+doDSI:
+ 		mfsrr1	r3         				#get srr1
+		rlwinm	r1,r3,9,6,6  				#get srr1<flag> to bit 6
+		addis	r1,r1,DSISR_NOTFOUND@h  		#or in dsisr<1> = 1 to flag not found
+		b	dsi1
+doDSIp:
+    		mfsrr1	r3             				#get srr1
+		rlwinm	r1,r3,9,6,6     			#get srr1<flag> to bit 6
+		addis	r1,r1,DSISR_PROTECT@h    		#or in dsisr<4> = 1 to flag prot violation
+dsi1:
+  		mtctr	r0           				#restore counter
+		andi.	r2,r3,0xffff     			#clear upper bits of srr1
+		mtsrr1	r2              			#set srr1
+		mtdsisr	r1         				#load the dsisr
+		mfspr	r1,DMISS     				#get miss address
+		rlwinm.	r2,r2,0,31,31 				#test LE bit
+		beq	dsi2     				#if little endian then:
+		xori	r1,r1,0x07   				#de-mung the data address
+dsi2:
+  		mtdar	r1       				#put in dar
+		mfmsr	r0               			#get msr
+		xoris	r0,r0,PSL_TGPR@h    			#flip the msr<tgpr> bit
+		mtcrf	0x80,r3     				#restore CR0
+		mtmsr	r0    					#flip back to the native gprs
+		isync
+		sync
+		sync
+		b	.DSI  					#branch to DSI interrupt
+
+#********************************************************************************************
+
 .ISI:							#Instruction Storage Exception
 		mtsprg0	r0
+
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
 
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable FPU & MMU
@@ -4641,6 +5156,11 @@ EInt:		b	.FPUnav				#0
 
 .PerfMon:						#Performance Monitor Exception
 		mtsprg0	r0
+
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
 		
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable FPU & MMU
@@ -4669,6 +5189,11 @@ EInt:		b	.FPUnav				#0
 
 .VMXUnav:					#AltiVec Unavailable Exception
 		mtsprg0	r0
+
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
 
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)
@@ -4702,9 +5227,9 @@ EInt:		b	.FPUnav				#0
 		mr.	r4,r4
 		beq	.ErrorVMX
 
-		mfsrr1	r0
+		lwz	r0,Exc_srr1(r0)
 		oris	r0,r0,PSL_VEC@h
-		mtsrr1	r0
+		stw	r0,Exc_srr1(r0)
 		sync
 		isync
 
@@ -4724,10 +5249,21 @@ EInt:		b	.FPUnav				#0
 		mtxer	r0
 		lwz	r1,0(r1)
 
+		mtsprg1	r30
 		mfspr	r0,HID0
+		mr	r30,r0
 		ori	r0,r0,HID0_ICFI
 		mtspr	HID0,r0
-		isync
+		mtspr	HID0,r30
+		sync
+		
+		mfsprg1	r30
+
+		lwz	r0,Exc_srr0(r0)
+		mtsrr0	r0
+		
+		lwz	r0,Exc_srr1(r0)
+		mtsrr1	r0
 
 		mfsprg0	r0
 		
@@ -4742,6 +5278,11 @@ EInt:		b	.FPUnav				#0
 
 .DSI:							#Data Storage Exception
 		mtsprg0	r0
+
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
 
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable FPU & MMU
@@ -4825,14 +5366,13 @@ EInt:		b	.FPUnav				#0
 
 		lwz	r7,PowerPCBase(r0)		#For GetHALInfo
 		lwz	r6,DataExcLow(r7)		#Counts number of Amiga RAM
-		addic	r6,r6,1				#accesses by the PPC
+		addic	r6,r6,1				#accesses by the PPC		
 		stw	r6,DataExcLow(r7)		#For debugging/optimization purposes
 		lwz	r6,DataExcHigh(r7)
 		addze	r6,r6
 		stw	r6,DataExcHigh(r7)
 
-		mfsrr0	r31
-		
+		lwz	r31,Exc_srr0(r0)
 		cmpwi	r31,0x7f00			#Called from other exception
 		blt	.NotSupported			#NOT GOOD!
 		
@@ -4843,8 +5383,8 @@ EInt:		b	.FPUnav				#0
 		cmpwi	r29,0x100
 		blt	.NotSupported			#68K zero page access NOT GOOD!
 		
-.Execbase:	lwz	r31,0(r31)			#get offending instruction in r31		
-		li	r29,0
+.Execbase:	lwz	r31,0(r31)			#get offending instruction in r31
+		li	r29,0		
 		lis	r0,0xc000			#check for load or store instruction
 		and.	r0,r31,r0
 		lis	r6,0x8000
@@ -4961,7 +5501,7 @@ EInt:		b	.FPUnav				#0
 		cmplwi	r9,0xa800			#lha/lhau 0xa800
 		beq	.FixedValue
 		rlwinm	r10,r10,24,24,31
-		cmplwi	r9,0x8800			#lbz/lbzu 0x8800
+		cmplwi	r9,0x8800			#lbz/lbzu 0x8800		
 		bne	.NotSupported			#Not Supported
 
 .FixedValue:	stwx	r10,r30,r6			#Store gotten value in correct register
@@ -5017,10 +5557,9 @@ EInt:		b	.FPUnav				#0
 		mr.	r0,r0
 		beq	.HaltDSI
 
-		mfsrr0	r3				#Skip offending instruction
+		lwz	r3,Exc_srr0(r0)			#Skip offending instruction
 		addi	r3,r3,4
-		mtsrr0	r3
-		isync
+		stw	r3,Exc_srr0(r0)
 
 		lwz	r3,PowerPCBase(r0)
 		li	r0,0
@@ -5032,6 +5571,16 @@ EInt:		b	.FPUnav				#0
 		mtxer	r0
 		lwz	r0,48(r1)
 		lwz	r1,0(r1)
+		
+		mtsprg0	r0
+		
+		lwz	r0,Exc_srr0(r0)
+		mtsrr0	r0
+		
+		lwz	r0,Exc_srr1(r0)
+		mtsrr1	r0
+		
+		mfsprg0	r0
 
 		rfi
 	
@@ -5043,7 +5592,21 @@ EInt:		b	.FPUnav				#0
 
 #*************************************************
 
-.DoSixtyEight:	lwz	r25,XMPIBase(r0)
+.DoSixtyEight:	mfpvr	r25
+		rlwinm	r23,r25,16,16,31
+		cmplwi	r23,ID_MPC834X
+		bne	.DoH68
+
+		lwz	r28,SonnetBase(r0)
+		addis	r28,r28,FIFO_BASE
+		lwz	r25,FIFO_MIOFT(r28)
+		addi	r23,r25,4
+		loadreg	r20,0xffff3fff
+		and	r23,r23,r20
+		stw	r23,FIFO_MIOFT(r28)
+		b	.Cont68H
+
+.DoH68:		lwz	r25,XMPIBase(r0)
 		mr.	r25,r25
 		beq	.DoS68
 	
@@ -5066,7 +5629,6 @@ EInt:		b	.FPUnav				#0
 
 .Cont68H:	sync
 		lwz	r25,0(r25)
-
 .Loading:	stw	r9,MN_IDENTIFIER(r25)
 		stw	r2,MN_IDENTIFIER+4(r25)		#AmigaValue
 		stw	r3,MN_IDENTIFIER+8(r25)		#AmigaAddress
@@ -5080,7 +5642,25 @@ EInt:		b	.FPUnav				#0
 
 		sync
 
-		lwz	r24,XMPIBase(r0)
+		mfpvr	r24
+		rlwinm	r22,r24,16,16,31
+		cmplwi	r22,ID_MPC834X
+		bne	.DoH68Write
+
+		lwz	r28,SonnetBase(r0)
+		addis	r28,r28,FIFO_BASE
+		lwz	r22,FIFO_MIOPH(r28)
+		stw	r25,0(r22)
+		addi	r23,r22,4
+		loadreg	r21,0xffff3fff
+		and	r23,r23,r21
+		stw	r23,FIFO_MIOPH(r28)
+		lis	r24,IMMR_ADDR_DEFAULT
+		ori	r24,r24,IMMR_OMR0
+		stw	r23,0(r24)
+		b	.Done68WH
+
+.DoH68Write:	lwz	r24,XMPIBase(r0)
 		mr.	r24,r24
 		beq	.DoS68Write
 	
@@ -5102,18 +5682,21 @@ EInt:		b	.FPUnav				#0
 		stwbrx	r23,r24,r28			#triggers Interrupt
 
 .Done68WH:	sync
+
 		mr.	r7,r7
 		bne	.NoWaitSE
 		mfctr	r0
 		loadreg	r9,'DONE'
+		
 		lis	r7,0x40
 		mtctr	r7
+
 .WaitPFIFO:	lwz	r21,MN_IDENTIFIER(r25)
 		sync
 		cmpw	r21,r9
+		
 		beq	.DonePFIFO
 		bdnz	.WaitPFIFO
-
 		b	.HaltDSI
 
 .DonePFIFO:	mtctr	r0
@@ -5125,6 +5708,11 @@ EInt:		b	.FPUnav				#0
 
 .PrInt:							#Program Exception
 		mtsprg0	r0
+
+		mfsrr0	r0
+		stw	r0,Exc_srr0(r0)
+		mfsrr1	r0
+		stw	r0,Exc_srr1(r0)
 		
 		mfmsr	r0
 		ori	r0,r0,(PSL_IR|PSL_DR|PSL_FP)	#Reenable FPU & MMU
@@ -5154,7 +5742,7 @@ EInt:		b	.FPUnav				#0
 		stw	r5,36(r1)
 		li	r0,-1
 		stb	r0,sonnet_ExceptionMode(r3)
-		mfsrr0	r5
+		lwz	r5,Exc_srr0(r0)
 		lwz	r0,ViolationAddress(r0)
 		cmplw	r0,r5
 		beq	.DoWOSHandler
@@ -5231,9 +5819,9 @@ EInt:		b	.FPUnav				#0
 		b	.NextExcOnList
 	
 .LargeContext:	stw	r0,104(r1)
-		mfsrr0	r0
+		lwz	r0,Exc_srr0(r0)
 		stw	r0,108(r1)
-		mfsrr1	r0		
+		lwz	r0,Exc_srr1(r0)
 		stw	r0,112(r1)
 		mfdar	r0
 		stw	r0,116(r1)
@@ -5404,9 +5992,9 @@ EInt:		b	.FPUnav				#0
 		blrl
 
 		lwz	r0,108(r1)		#Skips Exc type
-		mtsrr0	r0
+		stw	r0,Exc_srr0(r0)
 		lwz	r0,112(r1)
-		mtsrr1	r0		
+		stw	r0,Exc_srr1(r0)
 		lwz	r0,116(r1)
 		mtdar	r0
 		lwz	r0,120(r1)
@@ -5524,19 +6112,19 @@ EInt:		b	.FPUnav				#0
 
 #****************************************************
 
-.Private:	mfsrr0	r5
+.Private:	lwz	r5,Exc_srr0(r0)
 		lwz	r0,ViolationAddress(r0)
 		cmplw	r0,r5
 		li	r0,EXCF_PROGRAM
 		bne	.CommonError
 
 		addi	r5,r5,4				#Next instruction
-		mtsrr0	r5
-		mfsrr1	r5
+		stw	r5,Exc_srr0(r0)
+		lwz	r5,Exc_srr1(r0)
 
 		ori	r5,r5,PSL_PR			#Set to Super
 		xori	r5,r5,PSL_PR
-		mtsrr1	r5
+		stw	r5,Exc_srr1(r0)
 
 		li	r0,0				#SuperKey
 		stw	r0,48(r1)
@@ -5548,9 +6136,11 @@ EInt:		b	.FPUnav				#0
 		stb	r0,sonnet_ExceptionMode(r3)
 
 		mfspr	r0,HID0
+		mr	r3,r0
 		ori	r0,r0,HID0_ICFI
 		mtspr	HID0,r0
-		isync
+		mtspr	HID0,r3
+		sync
 
 		lwz	r0,52(r1)
 		mtcr	r0
@@ -5562,6 +6152,16 @@ EInt:		b	.FPUnav				#0
 		lwz	r5,36(r1)
 		lwz	r6,32(r1)
 		lwz	r1,0(r1)			#User stack restored
+
+		mtsprg0	r0
+		
+		lwz	r0,Exc_srr0(r0)
+		mtsrr0	r0
+		
+		lwz	r0,Exc_srr1(r0)
+		mtsrr1	r0
+		
+		mfsprg0	r0
 
 		rfi
 		
@@ -5652,7 +6252,9 @@ EInt:		b	.FPUnav				#0
 		.align	2
 
 .GotStrings:	mtsprg3	r31
-		li	r31,0x2100
+		lwz	r31,SonnetBase(r0)
+		addis	r31,r31,FIFO_BASE
+		addi	r31,r31,0x100
 		addi	r31,r31,18*4
 		stwu	r0,4(r31)
 		stwu	r1,4(r31)
@@ -5719,8 +6321,10 @@ EInt:		b	.FPUnav				#0
 		mfdbatu	r0,3
 		stwu	r0,4(r31)
 		mfdbatl	r0,3
-		stwu	r0,4(r31)		
-		li	r31,0x2100
+		stwu	r0,4(r31)
+		lwz	r31,SonnetBase(r0)
+		addis	r31,r31,FIFO_BASE
+		addi	r31,r31,0x100		
 
 		lwz	r3,PowerPCBase(r0)
 		lwz	r4,ThisPPCProc(r3)
@@ -5736,9 +6340,9 @@ EInt:		b	.FPUnav				#0
 		add	r4,r4,r5
 		stwu	r4,4(r31)
 
-		mfsrr0	r0
+		lwz	r0,Exc_srr0(r0)
 		stwu	r0,4(r31)
-		mfsrr1	r0
+		lwz	r0,Exc_srr1(r0)
 		stwu	r0,4(r31)
 		mfmsr	r0
 		stwu	r0,4(r31)
@@ -5769,7 +6373,21 @@ EInt:		b	.FPUnav				#0
 		mfctr	r0
 		stwu	r0,4(r31)
 
-		lwz	r4,XMPIBase(r0)
+		mfpvr	r4
+		rlwinm	r6,r4,16,16,31
+		cmplwi	r6,ID_MPC834X
+		bne	.DoCrashH
+
+		lwz	r6,SonnetBase(r0)
+		addis	r6,r6,FIFO_BASE
+		lwz	r5,FIFO_MIOFT(r6)
+		addi	r3,r5,4
+		loadreg	r7,0xffff3fff
+		and	r3,r3,r7
+		stw	r3,FIFO_MIOFT(r6)
+		b	.ContCrasH
+
+.DoCrashH:	lwz	r4,XMPIBase(r0)
 		mr.	r4,r4
 		beq	.DoCrashS
 	
@@ -5803,7 +6421,25 @@ EInt:		b	.FPUnav				#0
 
 		sync
 
-		lwz	r4,XMPIBase(r0)
+		mfpvr	r4
+		rlwinm	r6,r4,16,16,31
+		cmplwi	r6,ID_MPC834X
+		bne	.FinishCrashH
+
+		lwz	r6,SonnetBase(r0)
+		addis	r6,r6,FIFO_BASE
+		lwz	r7,FIFO_MIOPH(r6)
+		stw	r5,0(r7)
+		addi	r3,r7,4
+		loadreg	r10,0xffff3fff
+		and	r3,r3,r10
+		stw	r3,FIFO_MIOPH(r6)
+		lis	r9,IMMR_ADDR_DEFAULT
+		ori	r9,r9,IMMR_OMR0
+		stw	r3,0(r9)
+		b	.FinishCrasH
+
+.FinishCrashH:	lwz	r4,XMPIBase(r0)
 		mr.	r4,r4
 		beq	.FinishCrashS
 		
@@ -5829,6 +6465,7 @@ EInt:		b	.FPUnav				#0
 		lwz	r9,ThisPPCProc(r10)
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r9)
+		
 		b	.TrySwitch			#Try to salvage the system
 
 #********************************************************************************************
@@ -5836,8 +6473,14 @@ EInt:		b	.FPUnav				#0
 EIntEnd:
 		mflr	r4				#Setup a small jumptable for exceptions
 
-		loadreg r5,0x48002b38
+		loadreg r5,0x48002b44
 		stw	r5,0x500(r0)			#External Interrupt
+		loadreg	r5,0x48001e40
+		stw	r5,0x1200(r0)			#Data TLB miss on store (G2/e300/option on MPC7450)
+		loadreg	r5,0x48001f3c
+		stw	r5,0x1100(r0)			#Data TLB miss on load (G2/e300)
+		loadreg	r5,0x48002038
+		stw	r5,0x1000(r0)			#Instruction TLB Miss (G2/e300)
 		loadreg r5,0x48002114
 		stw	r5,0xf20(r0)			#AltiVec Unavailable
 		loadreg	r5,0x48001930			

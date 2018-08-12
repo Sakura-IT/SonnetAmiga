@@ -19,35 +19,38 @@
 # SOFTWARE.
 #
 #Sonnet Memory Map
-#0x00000000	Zero Page				0x003000	12288
-#0x00003000	Exceptions/Scheduler			0x005000	20480
-#0x00100000	Message FIFOs				0x010000	65536	Must be 0x100000 aligned
-#0x00200000	Message Frames 2x4096xPP_SIZE+48	0x180000
-#0x00400000	Idle Task				0x000c00	3072
-#0x00480000	System Stack				0x0EF000	32768
+#0x00000000	Zero Page/Exception Vectors
+#0x00003000	Exceptions/Scheduler
+#0x00100000	Message FIFOs				0x100000 aligned
+#0x00200000	Message Frames
+#0x00400000	Idle Task
+#0x00480000	Upper limit System Stack
 #0x00480000	Free memory
-#0x7xf00000	Room for the page table			0x100000	1048576 (for 128MB addressing)
+#0xxxf00000	Room for the page table			Last 1MB of memory
 
 
-#Overhead = 5MB
+#Overhead = 6MB (including page table)
 
 #Sonnet Base:
 
-.set SonnetBase,0
-.set SysBase,4
-.set PPCMemHeader,8
-.set DOSBase,12
-.set MCPort,16
-.set Init,20					#Pointer
-.set PowerPCBase,24				#All within first cacheline!
+.set SonnetBase,			0x00
+.set SysBase,				0x04
+.set PPCMemHeader,			0x08
+.set DOSBase,				0x0c
+.set MCPort,				0x10
+.set Init,				0x14
+.set PowerPCBase,			0x18	#All within first cacheline!
 
-.set AdListStart,64
-.set AdListEnd,68
-.set RunPPCStart,72
-.set ViolationAddress,76			#Pointer
-.set MemSize,80
-.set Quantum,84
-.set XMPIBase,88
+.set AdListStart,			0x40
+.set AdListEnd,				0x44
+.set RunPPCStart,			0x48
+.set ViolationAddress,			0x4c
+.set MemSize,				0x50
+.set Quantum,				0x54
+.set XMPIBase,				0x58
+
+.set Exc_srr0,				0x60
+.set Exc_srr1,				0x64
 
 .set option_EnEDOMem,0
 .set option_EnDebug,1
@@ -260,8 +263,10 @@
 
 .set SonnetBusClock,66666666			#66.6 MHz
 .set RaptureBusClock,100000000			#100 MHz
+.set KillerBusClock,266666666			#266 MHz
 .set SonnetQuantum,333333			#Bus clock divided by 4 (decrementer speed) divided
 .set RaptureQuantum,500000			#by 50 (= switched per seconds so 20ms)
+.set KillerQuantum,1333333
 .set QuickQuantum,50
 
 .set EXCATTR_CODE,		0x80101000		#
@@ -293,7 +298,8 @@
 .set HINFO_DSEXC_LOW,		0x80103003
 
 .set SCHED_REACTION,		0x80104000		#Reaction time of low-activity tasks
-			
+
+.set CPUF_603E,			0x00000100
 .set CPUF_G3,			0x00200000
 .set CPUF_G4,			0x00400000
 .set CPUF_750,			0x00200000
@@ -362,6 +368,14 @@
 .set IABR,1010
 .set DABR,1013
 
+.set DMISS,976
+.set DCMP,977
+.set HASH1,978
+.set HASH2,979
+.set IMISS,980
+.set ICMP,981
+.set RPA,982
+
 .set MSSCR0,1014
 .set MSSCR0_EIDIS,		0x01000000
 .set MSSCR0_L2PFE_1,		0x00000001
@@ -380,7 +394,15 @@
 .set HID0_SGE,			0x00000080
 .set HID0_BTIC,			0x00000020
 .set HID0_BHTE,			0x00000004
+
 .set HID1,1009
+
+.set HID2,1011
+.set HID2_HBE,			0x00040000
+
+.set DSISR_NOTFOUND,		0x40000000
+.set DSISR_PROTECT,		0x08000000
+.set DSISR_STORE,		0x02000000
 
 .set PICR1,0xA8			#Processor Interface Configuration Register 1
 .set PICR1_CF_MP_MULTI,		0x00000003
@@ -570,6 +592,9 @@
 .set EUMBEPICPROC,EUMB+0x60000
 .set EPIC_IACK,0xa0
 .set EPIC_EOI,0xb0
+.set IMMR_ADDR_DEFAULT,0xff40		#e300 core
+
+.set	SRR1_KEY,	0x00080000
 
 .set	PSL_VEC,	0x02000000	#/* ..6. AltiVec vector unit available */
 .set	PSL_SPV,	0x02000000	#/* B... (e500) SPE enable */
@@ -627,6 +652,11 @@
 .set BAT_CACHE_INHIBITED,	0x00000020
 .set BAT_COHERENT,		0x00000010
 .set BAT_GUARDED,		0x00000008
+
+# General PTE bits
+.set PTE_REFERENCED,		0x00000100
+.set PTE_CHANGED,		0x00000080
+.set PTE_HASHID,		0x00000040
 
 # Some BAT Examples
 
@@ -983,3 +1013,23 @@
 .set XMPI_GLBC_RESET,			0x80000000
 .set XMPI_GLBC_M,			0x20000000
 .set XMPI_IFEDE_P0,			0x00000001
+
+#Killer NIC Stuff
+
+.set ID_MPC834X,			0x8083
+
+.set FIFO_BASE,				0x3c
+
+.set FIFO_MIOFH,			0x00	#Killer NIC FIFO
+.set FIFO_MIOFT,			0x20
+.set FIFO_MIOPH,			0x24
+.set FIFO_MIOPT,			0x04
+.set FIFO_MIIFH,			0x28
+.set FIFO_MIIFT,			0x08
+.set FIFO_MIIPH,			0x0c
+.set FIFO_MIIPT,			0x2c
+
+.set IMMR_OMR0,				0x8058
+.set IMMR_IMISR,			0x8080
+.set IMMR_IMISR_IM0I,			0x00000001
+.set IMMR_IMISR_IDI,			0x00000008
