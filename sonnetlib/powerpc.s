@@ -625,6 +625,8 @@ ContTimer	move.l SonnetBase(pc),a1
 		move.l SonAddr(pc),a2
 		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
 		beq.s NoOutBound107
+		cmp.w #DEVICE_MPC8343E,PCI_DEVICEID(a2)
+		beq.s NoOutBound107
 
 		move.l GfxMem(pc),d0			;Amiga PCI Memory
 		move.l PCI_SPACE1(a2),a3		;PCSRBAR Sonnet
@@ -1008,12 +1010,16 @@ SetupKiller	move.l PCIBase(pc),a6
 		moveq.l #PCI_OFFSET_COMMAND,d1
 		jsr _LVOPCIConfigWriteWord(a6)		;Enable Read/Write to PCI space
 
+		move.l #$20000000,d0
+		move.l MediatorType(pc),d1
+		bne.s AllocKil1200
+
 		move.l #$000000fc,d0			;Set 64MB PCI Memory (swapped and negged)
 		moveq.l #1,d1				;Dummy bar 1
 		move.l SonAddr(pc),a0
 		jsr _LVOPCIAllocMem(a6)			;Get space for Killer Memory
 
-		move.l d0,d2
+AllocKil1200	move.l d0,d2
 		bne.s PCIMemKil1
 
 		lea PCIMemError(pc),a2
@@ -1087,7 +1093,6 @@ loopKiller	move.l (a2)+,(a5)+			;Copy code to 0x13000
 		bsr ResetCPU
 
 		move.l #SIMSR_L_MU,IMMR_SIMSR_L(a3)	;Enable Message Units Interrupts on the PPC
-
 		bra ReturnInitPPC
 
 ;******************************************************
@@ -1101,11 +1106,10 @@ ResetCPU	move.l a1,-(a7)
 		move.l IMMR_RCER(a3),d1
 		move.l d1,IMMR_RCR(a3)			;Reset the PowerPC CPU (SOFT)
 
-		move.l #$DEADBEEF,d2
-WaitReset	move.l d2,$1f0(a2)
-		move.l $1f0(a2),d3
-		cmp.l d2,d3
-		bne.s WaitReset				;Kludge...
+		move.l #$10000,d0
+WaitReset	subq.l #1,d0
+		bne.s WaitReset				;Dirty Ass Wait Loop.....
+		
 		moveq.l #0,d2
 		move.l d2,$1f0(a2)
 		move.l IMMR_RSR(a3),d1
@@ -1810,8 +1814,6 @@ IntData		dc.l 0
 
 SonInt1200:	movem.l d1-a6,-(a7)			;68K interrupt which distributes
 
-		ILLEGAL					;DEBUGDEBUG
-
 		moveq.l #0,d5				;messages send by the PPC
 		move.l LExecBase(pc),a6
 		jsr _LVODisable(a6)
@@ -1825,10 +1827,17 @@ SonInt1200:	movem.l d1-a6,-(a7)			;68K interrupt which distributes
 
 		move.l d0,d7
 NoWindowShift1	move.l SonAddr(pc),a2
-		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
+		move.w PCI_DEVICEID(a2),d4
+		cmp.w #DEVICE_MPC8343E,d4
+		beq.s Got1200K
+
+		cmp.w #DEVICE_HARRIER,d4
 		bne.s No1200H
+
 		move.l PMEPAddr(pc),a2
-		moveq.l #1,d4
+		bra.s Got1200H
+
+Got1200K	move.l PCI_SPACE0(a2),a2		;Get config block
 		bra.s Got1200H
 
 No1200H		move.l EUMBAddr(pc),a2
@@ -1838,22 +1847,37 @@ Got1200H	move.l a2,d6
 		
 		bsr ShiftWindow
 
-NoWindowShift2	tst.l d4
-		beq.s NoInt1200H
+NoWindowShift2	cmp.w #DEVICE_MPC8343E,d4
+		beq.s Int1200K
+
+		cmp.w #DEVICE_HARRIER,d4
+		bne.s NoInt1200H
 
 		move.l PMEP_MIST(a2),d3
-		beq.s DoNothingYet
+		beq DoNothingYet
+		bra.s NxtMsg1200
+
+Int1200K	move.l IMMR_OMISR(a2),d3
+		and.l #IMMR_OMISR_OM0I,d3
+		beq DoNothingYet
+		move.l #IMMR_OMISR_OM0I,IMMR_OMISR(a2)	;Ack Interrupt
 		bra.s NxtMsg1200
 
 NoInt1200H	move.l OMISR(a2),d3
 		and.l #OPQI,d3
-		beq.s DoNothingYet
+ReUseK		beq.s DoNothingYet
 
-NxtMsg1200	move.l d6,a2
-		tst.l d4
-		beq.s NoGetMsg1200H
+NxtMsg1200	cmp.w #DEVICE_MPC8343E,d4
+		beq.s GetMsg1200K
+		
+		move.l d6,a2
+		cmp.w #DEVICE_HARRIER,d4
+		bne.s NoGetMsg1200H
 
 		bsr GetMsgFrameHar
+		bra.s GotMsg1200H
+		
+GetMsg1200K	bsr GetMsgFrameK
 		bra.s GotMsg1200H
 		
 NoGetMsg1200H	move.l OFQPR(a2),a1
@@ -1862,9 +1886,12 @@ GotMsg1200H	move.l a1,d3
 		cmp.l #-1,d3
 		beq EmptyQueue
 
-		tst.l d4
-		bne.s PrevDone
-		
+		cmp.w #DEVICE_MPC8343E,d4
+		beq.s PrevDone
+
+		cmp.w #DEVICE_HARRIER,d4
+		beq.s PrevDone
+
 		lea Previous2(pc),a1
 		move.l (a1),d5
 		cmp.l d5,d3
@@ -2423,6 +2450,51 @@ GotMsgHar	moveq.l #-1,d1
 		move.l a1,(a0)
 NoPrevHar	movem.l (a7)+,d1-d3/a0/a2-a3
 		rts
+
+;********************************************************************************************
+
+GetMsgFrameK:
+		movem.l d1-d3/a0/a2-a3,-(a7)		;Get next message send from the PPC
+
+TooFast4Kil	move.l SonnetBase(pc),a2
+		add.l #FIFO_BASE,a2
+		
+		bsr ShiftWindow
+		
+		move.l FIFO_MIOPT(a2),d1		;Compare Outgoing Post Tail with
+		move.l FIFO_MIOPH(a2),d2		;Outgoing Post Header. Equal means empty
+		cmp.l d1,d2
+		bne.s DoQueueKil
+		
+		moveq.l #-1,d3				;Give -1 when empty.
+		move.l d3,a1
+		bra.s GotMsgKil
+
+DoQueueKil	move.l d1,d2
+		addq.l #4,d1
+		and.w #$3fff,d1				;Wrap queue to 16K (4K entries)
+		move.l d2,a3
+		move.l d1,FIFO_MIOPT(a2)
+		move.l a3,a2
+		
+		bsr ShiftWindow
+		
+		move.l (a2),d3
+
+GotMsgKil	moveq.l #-1,d1
+		move.l d3,a1
+		cmp.l a1,d1
+		beq.s NoPrevKil
+
+		lea Previous2(pc),a0
+		move.l (a0),a2
+		cmp.l a1,a2
+		beq.s TooFast4Kil			;To prevent duplicates (Is there a better way?)
+		move.l a1,(a0)
+NoPrevKil	movem.l (a7)+,d1-d3/a0/a2-a3
+		rts
+
+;********************************************************************************************
 
 ShiftWindow	move.l a2,d0
 		move.l a2,d6
@@ -3686,18 +3758,25 @@ ClrXMsg		clr.l (a2)+
 CausePPCInterrupt:
 		movem.l d1-a6,-(a7)
 		move.l SonAddr(pc),a2
+		cmp.w #DEVICE_MPC8343E,PCI_DEVICEID(a2)
+		beq.s CausedK
+		
 		moveq.l #-1,d1
 		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
 		bne.s NoCauseH
 		
 		move.l PMEPAddr(pc),a2
 		move.l d1,PMEP_MGIM0(a2)
-		bra.s CausedH
+		bra.s CausedIt
+
+CausedK		move.l PCI_SPACE0(a2),a2
+		move.l #IMMR_IDR_IDR0,IMMR_IDR(a2)
+		bra.s CausedIt
 
 NoCauseH	move.l EUMBAddr(pc),a2
 		move.l d1,IMR0(a2)
 
-CausedH		movem.l (a7)+,d1-a6
+CausedIt	movem.l (a7)+,d1-a6
 		rts
 
 ;********************************************************************************************
@@ -4080,7 +4159,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.10 (12.08.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.10 (13.08.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		

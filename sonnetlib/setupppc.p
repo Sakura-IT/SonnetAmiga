@@ -2461,7 +2461,7 @@ EInt:		b	.FPUnav				#0
 .HandleKiller:	lis	r3,IMMR_ADDR_DEFAULT
 		ori	r3,r3,IMMR_IMISR
 		lwbrx	r4,r0,r3		
-		andi.	r4,r4,IMMR_IMISR_IDI			#From CausePPInterrupt on MPC8343E
+		andi.	r4,r4,IMMR_IMISR_IDI		#From CausePPInterrupt on MPC8343E
 		b	.DoneIMH
 
 .HandleSonnI:	lis	r3,EUMB@h
@@ -2611,7 +2611,17 @@ EInt:		b	.FPUnav				#0
 
 #**********************************************************
 
-.KillerAck:	lwz	r3,SonnetBase(r0)
+.KillerAck:	lis	r9,IMMR_ADDR_DEFAULT
+		ori	r3,r9,IMMR_IMISR
+		lwbrx	r4,r0,r3		
+		andi.	r4,r4,IMMR_IMISR_IDI	
+		beq	.NoDoorBell
+
+		li	r4,1
+		ori	r3,r9,IMMR_IDR
+		stwbrx	r4,r0,r3			#Acknowledge Doorbell
+
+.NoDoorBell:	lwz	r3,SonnetBase(r0)
 		addis	r3,r3,FIFO_BASE
 		lwz	r9,FIFO_MIIPH(r3)
 		lwz	r5,FIFO_MIIPT(r3)
