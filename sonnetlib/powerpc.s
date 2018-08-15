@@ -1820,13 +1820,13 @@ SonInt1200:	movem.l d1-a6,-(a7)			;68K interrupt which distributes
 
 		moveq.l #0,d4
 		move.l MediatorType(pc),d0
-		beq.s NoWindowShift1
+		beq.s NoWindowShift
 
 		move.l PCIBase(pc),a6
 		jsr _LVOPCIGetZorroWindow(a6)
 
 		move.l d0,d7
-NoWindowShift1	move.l SonAddr(pc),a2
+NoWindowShift	move.l SonAddr(pc),a2
 		move.w PCI_DEVICEID(a2),d4
 		cmp.w #DEVICE_MPC8343E,d4
 		beq.s Got1200K
@@ -1842,12 +1842,10 @@ Got1200K	move.l PCI_SPACE0(a2),a2		;Get config block
 
 No1200H		move.l EUMBAddr(pc),a2
 Got1200H	move.l a2,d6		
-		move.l MediatorType(pc),d0
-		beq.s NoWindowShift2
 		
 		bsr ShiftWindow
 
-NoWindowShift2	cmp.w #DEVICE_MPC8343E,d4
+		cmp.w #DEVICE_MPC8343E,d4
 		beq.s Int1200K
 
 		cmp.w #DEVICE_HARRIER,d4
@@ -1921,14 +1919,14 @@ EmptyQueue	move.l LExecBase(pc),a6			;messages send by the PPC
 		jsr _LVOSignal(a6)
 				
 DoNothingYet	move.l MediatorType(pc),d0
-		beq.s NoWindowShift3
+		beq.s NoWindowShiftB
 
 		move.l PCIBase(pc),a6
 		move.l d7,d0
 		jsr _LVOPCISetZorroWindow(a6)
 		
 		move.l LExecBase(pc),a6
-NoWindowShift3	jsr _LVOEnable(a6)
+NoWindowShiftB	jsr _LVOEnable(a6)
 		move.l d5,d0
 
 		movem.l (a7)+,d1-a6
@@ -2051,24 +2049,54 @@ MsgSignal68k	move.l MN_PPSTRUCT+4(a1),d0		;Signal from a PPC task to 68K task
 ;********************************************************************************************
 
 ZenInt		movem.l d1-a6,-(a7)
-		move.l SonAddr(pc),a2
+
+		move.l MediatorType(pc),d0
+		beq.s NoZenShift
+
+		move.l PCIBase(pc),a6
+		jsr _LVOPCIGetZorroWindow(a6)
+
+		move.l d0,d7
+		
+NoZenShift	move.l SonAddr(pc),a2
 		move.l PCI_SPACE0(a2),a2		;Get config block
+		
+		bsr ShiftWindow
+		
 		move.l IMMR_OMISR(a2),d3
 		and.l #IMMR_OMISR_OM0I,d3
 		bne DoNotChkInt
 
 		move.l SonnetBase(pc),a2
 		add.l #FIFO_BASE,a2
+		
+		bsr ShiftWindow
+		
 		move.l FIFO_MIOPT(a2),d1		;Compare Outgoing Post Tail with
 		move.l FIFO_MIOPH(a2),d2		;Outgoing Post Header. Equal means empty
 		cmp.l d1,d2
 		beq DoNotChkInt
 
 		move.w #INTF_PORTS,INTENA
-		bsr SonInt
-		move.w #INTF_SETCLR|INTF_INTEN|INTF_PORTS,INTENA
+		
+		move.b Options68K+1(pc),d0
+		beq.s DoSonInt
 
-DoNotChkInt	movem.l (a7)+,d1-a6
+		bsr SonInt1200
+		bra.s DoneSonInt
+		
+DoSonInt	bsr SonInt
+
+DoneSonInt	move.w #INTF_SETCLR|INTF_INTEN|INTF_PORTS,INTENA
+
+DoNotChkInt	move.l MediatorType(pc),d0
+		beq.s NoZenShiftB
+
+		move.l PCIBase(pc),a6
+		move.l d7,d0
+		jsr _LVOPCISetZorroWindow(a6)
+
+NoZenShiftB	movem.l (a7)+,d1-a6
 		moveq.l #0,d0
 		rts
 
@@ -2496,13 +2524,16 @@ NoPrevKil	movem.l (a7)+,d1-d3/a0/a2-a3
 
 ;********************************************************************************************
 
-ShiftWindow	move.l a2,d0
+ShiftWindow	move.l MediatorType(pc),d0
+		beq.s ExitShift
+
+		move.l a2,d0
 		move.l a2,d6
 		and.l #$3fffff,d6
 		add.l #$200000,d6
 		jsr _LVOPCISetZorroWindow(a6)
 		move.l d6,a2
-		rts
+ExitShift	rts
 
 ;********************************************************************************************
 ;
@@ -4159,7 +4190,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.10 (13.08.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.11 (15.08.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
