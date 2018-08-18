@@ -471,6 +471,15 @@ End:		mflr	r4
 	
 		loadreg	r0,KillerQuantum
 		loadreg	r4,KillerBusClock
+		
+		lis	r14,IMMR_ADDR_DEFAULT
+		addi	r14,r14,IMMR_RCWLR
+		lwz	r6,0(r14)
+		rlwinm.	r6,r6,2,30,31
+		beq	.PutClocks
+
+		rlwinm	r0,r0,31,0,31
+		rlwinm	r4,r4,31,0,31
 		b	.PutClocks
 		
 .NoKillerClock:	lbz	r6,option_VersionNB(r14)
@@ -1229,7 +1238,7 @@ Wait2:		mfl2cr	r3
 		bl	.END_CFG_KILL
 
 		.long	0,0						#For the Modders
-.PLL_CFG_KILL:	.long	0b0100011,400000000,0b01010,333333333
+.PLL_CFG_KILL:	.long	0b0100011,400000000,0b0100101,333333333
 
 .END_CFG_KILL:	
 		mflr	r6

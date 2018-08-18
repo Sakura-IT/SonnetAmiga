@@ -1029,6 +1029,8 @@
 .set FIFO_MIIPH,			0x0c
 .set FIFO_MIIPT,			0x2c
 
+.set IMMR_RCWLR,			0x900
+
 .set IMMR_OMR0,				0x8058
 .set IMMR_IDR,				0x8068
 .set IMMR_IMISR,			0x8080
