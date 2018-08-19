@@ -89,6 +89,12 @@ SetCache:
 		beq-	.DCACHELOCK
 		cmplwi	r4,CACHE_DCACHEINV
 		beq-	.DCACHEINV
+
+		lwz	r31,sonnet_CPUInfo(r30)
+		rlwinm	r31,r31,16,16,31
+		cmplwi	r31,ID_MPC834X
+		beq	.DoneCache
+		
 		cmplwi	r4,CACHE_L2CACHEON
 		beq-	.L2ENABLE
 		cmplwi	r4,CACHE_L2CACHEOFF
@@ -1127,10 +1133,15 @@ GetInfo:
 		stw	r3,sonnet_CPUHID0(r30)
 		mfsdr1	r3
 		stw	r3,sonnet_CPUSDR1(r30)
+		mfpvr	r3
+		rlwinm	r3,r3,16,16,31
+		cmplwi	r3,ID_MPC834X
+		beq	.NoL2
+
 		mfl2cr	r3
 		stw	r3,sonnet_L2STATE(r30)
 		
-		bl User	
+.NoL2:		bl User	
 
 .NextInList:	mr	r4,r13
 		
