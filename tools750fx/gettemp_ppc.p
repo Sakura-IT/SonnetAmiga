@@ -124,7 +124,7 @@ exit:		mfmsr	r28			#turn interrupts back on
 
 		mr	r4,r27
 
-		CALLPOWERPC User		#restore user mode sanity - uncommenting causes a crash, not clear why!
+		CALLPOWERPC User		#restore user mode sanity
 
 		mr	r3,r31
 

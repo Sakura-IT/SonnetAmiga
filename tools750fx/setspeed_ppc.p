@@ -140,7 +140,7 @@ found750FX:	mfmsr	r28			#turn off interrupts
 
 exit:		mr	r4,r30
 
-		CALLPOWERPC User		#restore user mode sanity - uncommenting causes a crash for some reason
+		CALLPOWERPC User		#restore user mode sanity
 
 		mr	r3,r31
 
