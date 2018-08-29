@@ -80,7 +80,7 @@ found750FX:	mfmsr	r28			#turn off interrupts
 
 		li	r31,N			#start point for search
 
-search:		mr	r17,r3			#copy current temp
+search:		mr	r17,r31			#copy current temp
 		rlwinm	r17,r17,23,2,8		#shift temp to bits 2 to 8
 		ori	r17,r17,1		#set V bit
 		mtspr	THRM1,r17		#apply threshold, TID=TIE=0,V=1 
