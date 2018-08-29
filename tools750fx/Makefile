@@ -5,7 +5,7 @@ OBJ_GETTEMP=gettemp_68k.o gettemp_ppc.o
 GETTEMP_EXE=gettemp
 
 OBJ_SETSPEED=setspeed_68k.o setspeed_ppc.o
-TEMPLATE_EXE=setspeed
+SETSPEED_EXE=setspeed
 
 ASMPPCPARAM+=-I../sonnetlib
 
