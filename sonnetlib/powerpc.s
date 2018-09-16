@@ -299,7 +299,9 @@ GotPPCCard	move.w #VENDOR_3DFX,d0
 		beq.s Nxt3DFX
 		move.l d0,a2
 		addq.l #1,d5
-		move.l PCI_SPACE0(a2),d4
+Use3DFX		move.l PCI_SPACE0(a2),d4
+		move.l PCI_SPACELEN0(a2),d7
+		lsl.l #1,d7
 		bra.s FoundGfx
 	
 Nxt3DFX		move.w #VENDOR_3DFX,d0
@@ -310,8 +312,7 @@ Nxt3DFX		move.w #VENDOR_3DFX,d0
 		tst.l d0		
 		beq.s Not3DFX
 		move.l d0,a2
-		move.l PCI_SPACE0(a2),d4
-		bra.s FoundGfx
+		bra.s Use3DFX
 			
 Not3DFX		lea ATIs(pc),a3
 NextATI		move.l (a3)+,d1
@@ -331,10 +332,13 @@ GotATI		move.l d0,a2
 		move.l PCI_SPACE2(a2),d4
 		move.l d4,GfxConfig-Buffer(a4)
 		move.l PCI_SPACE0(a2),d4
+		move.l PCI_SPACELEN0(a2),d7
 
-FoundGfx	move.l d4,GfxMem-Buffer(a4)
+FoundGfx	neg.l d7
+		move.l d4,GfxMem-Buffer(a4)
 		move.w d5,GfxType-Buffer(a4)
 		move.l d6,SonAddr-Buffer(a4)
+		move.l d7,GfxLen-Buffer(a4)
 		
 		bsr GetENVs
 
@@ -429,17 +433,16 @@ GotVGAMem	add.l #$10000,d0
 loop2		move.l (a2)+,(a5)+			;Copy code to 0x3000
 		dbf d6,loop2
 
-		move.l #$abcdabcd,$3004(a1)		;Code Word
-		move.l #$abcdabcd,$3008(a1)		;Sonnet Mem Start (Translated to PCI)
-		move.l #$abcdabcd,$300c(a1)		;Sonnet Mem Len
-		move.l GfxMem(pc),$3010(a1)
-		move.l GfxType(pc),$3014(a1)
-		move.l GfxConfig(pc),$3018(a1)
-		move.l ENVOptions(pc),$301c(a1)
-		move.l ENVOptions+4(pc),$3020(a1)
-		move.l ENVOptions+8(pc),$3024(a1)
-		move.l StartBAT(pc),$302c(a1)
-		move.l SizeBAT(pc),$3030(a1)
+		move.l #$abcdabcd,BASE_CODEWORD(a1)	;Code Word
+		move.l #$abcdabcd,BASE_MEM(a1)		;Sonnet Mem Start (Translated to PCI)
+		move.l #$abcdabcd,BASE_MEMLEN(a1)	;Sonnet Mem Len
+		move.l GfxMem(pc),BASE_GFXMEM(a1)
+		move.l GfxLen(pc),BASE_GFXLEN(a1)
+		move.l GfxType(pc),BASE_GFXTYPE(a1)
+		move.l GfxConfig(pc),BASE_GFXCONFIG(a1)
+		move.l ENVOptions(pc),BASE_ENV1(a1)
+		move.l ENVOptions+4(pc),BASE_ENV2(a1)
+		move.l ENVOptions+8(pc),BASE_ENV3(a1)	;No extra VGA memory for MPC107 (not enough mapping windows)
 		move.l a1,-(a7)
 		
 		jsr _LVOCacheClearU(a6)
@@ -464,7 +467,7 @@ ReturnInitPPC	move.l	#$EC0000,d7			;Simple Time-out timer
 
 Wait		subq.l #1,d7
 		beq.s TimeOut
-		move.l $3004(a1),d5
+		move.l BASE_CODEWORD(a1),d5
 		cmp.l #"Boon",d5			;This is returned when PPC is set up
 		beq.s PPCReady
 		cmp.l #"Err3",d5
@@ -496,10 +499,10 @@ NoSonRam	lea SonnetMemError(pc),a2
 		bra PrintError
 
 PPCReady	move.l #NoMemAccess,d7			;Part of memory not accessible
-		move.l $3008(a1),d5
+		move.l BASE_MEM(a1),d5
 		move.l d5,SonnetBase-Buffer(a4)
 		add.l d7,d5
-		move.l $300c(a1),d6
+		move.l BASE_MEMLEN(a1),d6
 		sub.l d7,d6
 		add.l d6,d7
 
@@ -967,7 +970,7 @@ PCIMemHar4	move.l d2,MPICAddr-Buffer(a4)
 		add.w #$1000,d0						;Set range (256MB)
 		or.w d0,d1				
 		swap d2
-		or.b #XCSR_OTAT0_ENA|XCSR_OTAT0_WPE|XCSR_OTAT0_SGE|XCSR_OTAT0_RAE|XCSR_OTAT0_MEM,d2
+		or.b #XCSR_OTAT_ENA|XCSR_OTAT_WPE|XCSR_OTAT_SGE|XCSR_OTAT_RAE|XCSR_OTAT_MEM,d2
 
 		move.l d2,XCSR_OTAT0(a3)
 		move.l d1,XCSR_OTAD0(a3)
@@ -992,20 +995,21 @@ PCIMemHar4	move.l d2,MPICAddr-Buffer(a4)
 loopHarrier	move.l (a2)+,(a5)+					;Copy code to 0x13000
 		dbf d6,loopHarrier
 
-		move.l #$abcdabcd,$3004(a1)				;Code Word
-		move.l GfxMem(pc),$3010(a1)
-		move.l GfxType(pc),$3014(a1)
-		move.l GfxConfig(pc),$3018(a1)
-		move.l ENVOptions(pc),$301c(a1)
-		move.l ENVOptions+4(pc),$3020(a1)
-		move.l ENVOptions+8(pc),$3024(a1)
+		move.l #$abcdabcd,BASE_CODEWORD(a1)			;Code Word
+		move.l GfxMem(pc),BASE_GFXMEM(a1)
+		move.l GfxLen(pc),BASE_GFXLEN(a1)		
+		move.l GfxType(pc),BASE_GFXTYPE(a1)
+		move.l GfxConfig(pc),BASE_GFXCONFIG(a1)
+		move.l ENVOptions(pc),BASE_ENV1(a1)
+		move.l ENVOptions+4(pc),BASE_ENV2(a1)
+		move.l ENVOptions+8(pc),BASE_ENV3(a1)
 		move.l a1,-(a7)
 
-		move.l SonnetBase(pc),$3008(a1)
-		move.l d7,$300c(a1)					;Set available memory.
-		move.l MPICAddr,$3028(a1)				;XPMI (MPIC)
-		move.l StartBAT(pc),$302c(a1)
-		move.l SizeBAT(pc),$3030(a1)
+		move.l SonnetBase(pc),BASE_MEM(a1)
+		move.l d7,BASE_MEMLEN(a1)				;Set available memory.
+		move.l MPICAddr,BASE_XPMI(a1)				;XPMI (MPIC)
+		move.l StartBAT(pc),BASE_STARTBAT(a1)
+		move.l SizeBAT(pc),BASE_SIZEBAT(a1)
 
 		move.l LExecBase(pc),a6
 		jsr _LVOCacheClearU(a6)
@@ -1107,17 +1111,18 @@ PCIMemKil1	move.l d2,SonnetBase-Buffer(a4)		;Set base
 loopKiller	move.l (a2)+,(a5)+			;Copy code to 0x13000
 		dbf d6,loopKiller
 
-		move.l #$abcdabcd,$3004(a1)		;Code Word
-		move.l SonnetBase(pc),$3008(a1)
-		move.l d7,$300c(a1)
-		move.l GfxMem(pc),$3010(a1)
-		move.l GfxType(pc),$3014(a1)
-		move.l GfxConfig(pc),$3018(a1)
-		move.l ENVOptions(pc),$301c(a1)
-		move.l ENVOptions+4(pc),$3020(a1)
-		move.l ENVOptions+8(pc),$3024(a1)
-		move.l StartBAT(pc),$302c(a1)
-		move.l SizeBAT(pc),$3030(a1)
+		move.l #$abcdabcd,BASE_CODEWORD(a1)	;Code Word
+		move.l SonnetBase(pc),BASE_MEM(a1)
+		move.l d7,BASE_MEMLEN(a1)
+		move.l GfxMem(pc),BASE_GFXMEM(a1)
+		move.l GfxLen(pc),BASE_GFXLEN(a1)		
+		move.l GfxType(pc),BASE_GFXTYPE(a1)
+		move.l GfxConfig(pc),BASE_GFXCONFIG(a1)
+		move.l ENVOptions(pc),BASE_ENV1(a1)
+		move.l ENVOptions+4(pc),BASE_ENV2(a1)
+		move.l ENVOptions+8(pc),BASE_ENV3(a1)
+		move.l StartBAT(pc),BASE_STARTBAT(a1)
+		move.l SizeBAT(pc),BASE_SIZEBAT(a1)
 
 		bsr ResetCPU
 
@@ -3925,6 +3930,7 @@ PCIBase			ds.l	1
 LExecBase		ds.l	1
 ROMMem			ds.l	1
 GfxMem			ds.l	1
+GfxLen			ds.l	1
 GfxType			ds.l	1
 GfxConfig		ds.l	1
 ComProc			ds.l	1

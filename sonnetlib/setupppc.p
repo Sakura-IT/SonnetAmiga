@@ -30,12 +30,13 @@
 .set	base_MemStart,4
 .set	base_MemLen,8
 .set	base_RTGBase,12
-.set	base_RTGType,16
-.set	base_RTGConfig,20
-.set	base_Options,24
-.set	base_XMPI,36
-.set	base_StartBAT,40
-.set	base_SizeBAT,44
+.set	base_RTGLen,16
+.set	base_RTGType,20
+.set	base_RTGConfig,24
+.set	base_Options,28
+.set	base_XMPI,40
+.set	base_StartBAT,44
+.set	base_SizeBAT,48
 
 .set	rtgtype_ati,0x1002
 .set	rtgtype_voodoo3,0x121a
@@ -51,6 +52,7 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 .long		0					#MemStart
 .long		0					#MemLen
 .long		0					#RTGBase
+.long		0					#RTGLen
 .long		0					#RTGType
 .long		0					#RTGConfig
 .long		0					#Options1
