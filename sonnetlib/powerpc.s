@@ -367,35 +367,26 @@ FndMem		jsr _LVODisable(a6)
 		move.l MH_LOWER(a2),d0
 		move.l MH_UPPER(a2),d1
 		sub.l d0,d1
-		moveq.l #0,d2				;0 = no BAT, 1 = 64MB, 2 = 128MB, 3 = 256MB, 4 = 512MB
 
-		cmp.l #$20000000,d1
-		bcs.s GotBATSize
-		
-		and.l #$fc000000,d0
+		move.l #$1000000,d3
+		move.l #$ff000000,d4
+		moveq.l #-1,d2				;0 = no BAT, 1 = 64MB, 2 = 128MB, 3 = 256MB, 4 = 512MB
+Next		lsl.l #1,d3
+		lsl.l #1,d4
 		addq.l #1,d2
-		cmp.l #$40000000,d1
+		and.l d4,d0
+		cmp.l d3,d1
 		bcs.s GotBATSize
-		
-		and.l #$f8000000,d0
-		addq.l #1,d2
-		cmp.l #$80000000,d1
-		bcs.s GotBATSize
+		bne.s Next
 
-		and.l #$f0000000,d0
-		addq.l #1,d2		
-		cmp.l #$10000000,d1
-		bcs.s GotBATSize
+GotBATSize	move.l d2,d1
+		subq.l #4,d1
+		bpl.s NotSupported
 
-		moveq.l #0,d2				;512MB currently not supported.
-
-;		and.l #$e0000000,d0			;d0 = start, d2 = size
-;		addq.l #1,d2
-
-GotBATSize	move.l d0,StartBAT-Buffer(a4)
+		move.l d0,StartBAT-Buffer(a4)
 		move.l d2,SizeBAT-Buffer(a4)
 
-		move.l SonAddr(pc),a2
+NotSupported	move.l SonAddr(pc),a2
 		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
 		beq SetupHarrier
 
