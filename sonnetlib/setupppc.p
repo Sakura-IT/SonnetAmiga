@@ -34,6 +34,8 @@
 .set	base_RTGConfig,20
 .set	base_Options,24
 .set	base_XMPI,36
+.set	base_StartBAT,40
+.set	base_SizeBAT,44
 
 .set	rtgtype_ati,0x1002
 .set	rtgtype_voodoo3,0x121a
@@ -55,6 +57,8 @@ PPCCode:	bl	.SkipCom			#0x3000	System initialization
 .long		0					#Options2
 .long		0					#Options3
 .long		0					#XMPI Address
+.long		0					#StartBAT
+.long		0					#SizeBAT
 
 .SkipCom:	mflr	r29				#For initial communication with 68k
 		lis	r22,CMD_BASE@h			#Used in setpcireg macro
@@ -1549,8 +1553,38 @@ mmuSetup:
 
 		sync
 		isync
+		
+		lwz	r19,base_SizeBAT(r29)
+		mr.	r19,r19
+		beq	.DoneVGAMem
 
-		lis	r3,0x40				#Sonnet memory (Rest cached)
+		lwz	r3,base_StartBAT(r29)
+		mr	r5,r3
+		li	r17,BAT_READ_WRITE
+		li	r18,BAT_BL_64M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
+		subi	r19,r19,1
+		mr.	r19,r19
+		beq	.DoVGAMem
+
+		li	r18,BAT_BL_128M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
+		subi	r19,r19,1
+		mr.	r19,r19
+		beq	.DoVGAMem
+
+		li	r18,BAT_BL_256M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
+
+.DoVGAMem:	or	r17,r17,r5
+		or	r18,r18,r3
+		
+		mtspr	ibat3l,r17
+		mtspr	ibat3u,r18
+		mtspr	dbat3l,r17
+		mtspr	dbat3u,r18
+
+		sync
+		isync
+
+.DoneVGAMem:	lis	r3,0x40				#Sonnet memory (Rest cached)
 		lwz	r4,MemSize(r0)
 		mr	r5,r3
 		add	r3,r3,r27

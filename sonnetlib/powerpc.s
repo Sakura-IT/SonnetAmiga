@@ -363,6 +363,38 @@ FndMem		jsr _LVODisable(a6)
 		jsr _LVOAddTail(a6)			;Move gfx memory to back to prevent
 		jsr _LVOEnable(a6)			;mem list corruption if BE screenmode switch
 
+		move.l d7,a2
+		move.l MH_LOWER(a2),d0
+		move.l MH_UPPER(a2),d1
+		sub.l d0,d1
+		moveq.l #0,d2				;0 = no BAT, 1 = 64MB, 2 = 128MB, 3 = 256MB, 4 = 512MB
+
+		cmp.l #$20000000,d1
+		bcs.s GotBATSize
+		
+		and.l #$fc000000,d0
+		addq.l #1,d2
+		cmp.l #$40000000,d1
+		bcs.s GotBATSize
+		
+		and.l #$f8000000,d0
+		addq.l #1,d2
+		cmp.l #$80000000,d1
+		bcs.s GotBATSize
+
+		and.l #$f0000000,d0
+		addq.l #1,d2		
+		cmp.l #$10000000,d1
+		bcs.s GotBATSize
+
+		moveq.l #0,d2				;512MB currently not supported.
+
+;		and.l #$e0000000,d0			;d0 = start, d2 = size
+;		addq.l #1,d2
+
+GotBATSize	move.l d0,StartBAT-Buffer(a4)
+		move.l d2,SizeBAT-Buffer(a4)
+
 		move.l SonAddr(pc),a2
 		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
 		beq SetupHarrier
@@ -415,6 +447,8 @@ loop2		move.l (a2)+,(a5)+			;Copy code to 0x3000
 		move.l ENVOptions(pc),$301c(a1)
 		move.l ENVOptions+4(pc),$3020(a1)
 		move.l ENVOptions+8(pc),$3024(a1)
+		move.l StartBAT(pc),$302c(a1)
+		move.l SizeBAT(pc),$3030(a1)
 		move.l a1,-(a7)
 		
 		jsr _LVOCacheClearU(a6)
@@ -890,7 +924,7 @@ AllocPCI1200	move.l #$10000000,d7
 		move.l d0,d2				;TODO: Should then try 128MB (Will happen in case of Radeon)
 		bne.s PCIMemHar3
 
-;		move.l #$000000f8,d0			;Retry with 128MB RAM
+;		move.l #$000000f8,d0			;Retry with 128MB RAM - **Crashes on current pci.library**
 ;		moveq.l #2,d1
 ;		move.l SonAddr(pc),a0
 ;		jsr _LVOPCIAllocMem(a6)
@@ -979,6 +1013,8 @@ loopHarrier	move.l (a2)+,(a5)+					;Copy code to 0x13000
 		move.l SonnetBase(pc),$3008(a1)
 		move.l d7,$300c(a1)					;Set available memory.
 		move.l MPICAddr,$3028(a1)				;XPMI (MPIC)
+		move.l StartBAT(pc),$302c(a1)
+		move.l SizeBAT(pc),$3030(a1)
 
 		move.l LExecBase(pc),a6
 		jsr _LVOCacheClearU(a6)
@@ -1060,7 +1096,7 @@ PCIMemKil1	move.l d2,SonnetBase-Buffer(a4)		;Set base
 		move.l #POCMR_EN|POCMR_CM_128MB,IMMR_POCMR0(a3)
 
 		move.l SonnetBase(pc),a2
-		move.l #$48000000,$fc(a2)
+		move.l #$48000000,$fc(a2)		;This is a loop in PPC assembly
 		move.l #$4bfffffc,$100(a2)		;Going to park the CPU
 
 		move.l LExecBase(pc),a6
@@ -1069,7 +1105,7 @@ PCIMemKil1	move.l d2,SonnetBase-Buffer(a4)		;Set base
 
 		lea $10000(a2),a1
 		lea $3000(a1),a5
-		move.l #$48012f00,$100(a2)		;Start vector PPC
+		move.l #$48012f00,$100(a2)		;Start vector PPC with a jump in PPC assembly
 
 		move.l #IMMR_ADDR_DEFAULT,IMMR_IMMRBAR(a3)
 
@@ -1089,6 +1125,8 @@ loopKiller	move.l (a2)+,(a5)+			;Copy code to 0x13000
 		move.l ENVOptions(pc),$301c(a1)
 		move.l ENVOptions+4(pc),$3020(a1)
 		move.l ENVOptions+8(pc),$3024(a1)
+		move.l StartBAT(pc),$302c(a1)
+		move.l SizeBAT(pc),$3030(a1)
 
 		bsr ResetCPU
 
@@ -1310,7 +1348,7 @@ DosLib		dc.b "dos.library",0
 ExpLib		dc.b "expansion.library",0
 pcilib		dc.b "pci.library",0
 ppclib		dc.b "ppc.library",0
-MemName		dc.b "Sonnet memory",0
+MemName		dc.b "ppc memory",0
 PCIMem		dc.b "pcidma memory",0
 IntName		dc.b "Gort",0
 ZenIntName	dc.b "Zen",0
@@ -3927,6 +3965,8 @@ BufCopyDst		ds.l	1
 BufCopySz		ds.l	1
 Previous		ds.l	1
 Previous2		ds.l	1
+StartBAT		ds.l	1
+SizeBAT			ds.l	1
 Options68K		ds.l	1
 ENVBuff			ds.l	1
 ENVOptions		ds.l	3
@@ -3952,7 +3992,7 @@ POWERDATATABLE:
 	INITLONG	LN_NAME,PowerName
 	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITWORD	LIB_VERSION,17
-	INITWORD	LIB_REVISION,10
+	INITWORD	LIB_REVISION,11
 	INITLONG	LIB_IDSTRING,PowerIDString
 	ds.l	1
 
@@ -4190,7 +4230,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.11 (15.08.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.11 (16.09.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
