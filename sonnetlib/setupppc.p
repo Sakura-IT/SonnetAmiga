@@ -1557,6 +1557,10 @@ mmuSetup:
 		lwz	r19,base_SizeBAT(r29)
 		mr.	r19,r19
 		beq	.DoneVGAMem
+		
+		lhz	r3,base_RTGType(r29)
+		cmpwi	r3,rtgtype_ati
+		beq	.DoneVGAMem			#If ATI primary card, then skip
 
 		lwz	r3,base_StartBAT(r29)
 		mr	r5,r3
