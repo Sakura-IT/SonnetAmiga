@@ -961,13 +961,15 @@ PCIMemHar4	move.l d2,MPICAddr-Buffer(a4)
 
 		moveq.l #0,d0
 		moveq.l #0,d2
-		move.w GfxMem(pc),d0
+		move.w GfxMem(pc),d0					;Setup mapping window gfx card
 		sub.w #$6000,d2						;Calculate offset
 		move.l d0,d1
 		add.w #$6000,d1	
 		move.l d1,d0
 		swap d1
-		add.w #$1000,d0						;Set range (256MB)
+		move.l GfxLen(pc),d3
+		swap d3
+		add.w d3,d0						;Set range based of GfxLen
 		or.w d0,d1				
 		swap d2
 		or.b #XCSR_OTAT_ENA|XCSR_OTAT_WPE|XCSR_OTAT_SGE|XCSR_OTAT_RAE|XCSR_OTAT_MEM,d2
