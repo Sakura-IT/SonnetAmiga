@@ -1078,17 +1078,32 @@ PCIMemKil1	move.l d2,SonnetBase-Buffer(a4)		;Set base
 		move.l d1,IMMR_POCMR4(a3)
 		move.l d1,IMMR_POCMR5(a3)
 
-		moveq.l #12,d1				;Set-up of 128MB outbound window to PCI space of gfx cards
+		moveq.l #12,d1				;Set-up of outbound window to PCI space of gfx cards
 		move.l GfxMem(pc),d2
 		move.l d2,d3		
 		add.l #$60000000,d3
 		move.l d3,IMMR_PCILAWBAR1(a3)
-		move.l #LAWAR_EN|LAWAR_128MB,IMMR_PCILAWAR1(a3)
+		
+		move.l GfxLen(pc),d4
+		move.l #LAWAR_EN|LAWAR_256MB,d5
+		move.l #POCMR_EN|POCMR_CM_256MB,d6
+		btst.l #28,d4
+		bne.s DoWindow1
+
+		move.l #LAWAR_EN|LAWAR_64MB,d5
+		move.l #POCMR_EN|POCMR_CM_64MB,d6
+		btst.l #26,d4
+		bne.s DoWindow1
+
+		move.l #LAWAR_EN|LAWAR_128MB,d5		;default
+		move.l #POCMR_EN|POCMR_CM_128MB,d6
+		
+DoWindow1	move.l d5,IMMR_PCILAWAR1(a3)
 		lsr.l d1,d2
 		lsr.l d1,d3
 		move.l d3,IMMR_POBAR0(a3)
 		move.l d2,IMMR_POTAR0(a3)		
-		move.l #POCMR_EN|POCMR_CM_128MB,IMMR_POCMR0(a3)
+		move.l d6,IMMR_POCMR0(a3)
 
 		move.l SonnetBase(pc),a2
 		move.l #$48000000,$fc(a2)		;This is a loop in PPC assembly

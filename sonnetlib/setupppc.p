@@ -1477,7 +1477,7 @@ mmuSetup:
 
 		lwz	r3,base_RTGConfig(r29)
 		addis	r5,r3,0x6000
-		addis	r4,r3,0x1			#64k config RAM (ATI)
+		addis	r4,r3,0x1			#64k config RAM (ATI) -> NO LONGER WORKING
 		loadreg	r6,PTE_CACHE_INHIBITED|PTE_GUARDED
 		li	r7,PP_USER_RW
 
