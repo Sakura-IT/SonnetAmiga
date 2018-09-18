@@ -339,8 +339,16 @@ FoundGfx	neg.l d7
 		move.w d5,GfxType-Buffer(a4)
 		move.l d6,SonAddr-Buffer(a4)
 		move.l d7,GfxLen-Buffer(a4)
-		
-		bsr GetENVs
+		move.l MediatorType(pc),d0
+		beq.s NoNegMemAddr
+
+		btst #31,d4
+		beq.s NoNegMemAddr
+
+		lea NoPPCPCI(pc),a2
+		bra PrintError
+
+NoNegMemAddr	bsr GetENVs
 
 		move.l LExecBase(pc),a6
 		lea MemList(a6),a0
@@ -545,12 +553,16 @@ GotMemName	move.l d0,a0
 		jsr _LVODisable(a6)
 		lea MemList(a6),a0
 		move.l d4,a2
-		sub.l #NoMemAccess,d5
+		
+		cmp.w #DEVICE_MPC107,PCI_DEVICEID(a2)
+		bne.s SkipCorrection
+		
+		sub.l #NoMemAccess,d5			;Should fix it to be the same as Harrier/Killer
 		move.l d5,PCI_SPACE0(a2)
 		moveq.l #0,d6
 		sub.l d7,d6
 		move.l d6,PCI_SPACELEN0(a2)		;Correct MemSpace0 in the PCI database
-		jsr _LVOEnqueue(a6)			;Add the memory node
+SkipCorrection	jsr _LVOEnqueue(a6)			;Add the memory node
 
 		lea POWERDATATABLE(pc),a2
 		bsr MakeLibrary
@@ -811,7 +823,8 @@ GotPPCControl	move.l LExecBase(pc),a6
 
 ;********************************************************************************************
 
-SetupHarrier	move.l PCIBase(pc),a6
+SetupHarrier	movem.l d0-a0/a2-a6,-(a7)
+		move.l PCIBase(pc),a6
 
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCI_OFFSET_COMMAND,d1
@@ -839,12 +852,9 @@ SetupHarrier	move.l PCIBase(pc),a6
 		jsr _LVOPCIAllocMem(a6)			;Get space for PMEP
 
 		move.l d0,d2
-		bne.s PCIMemHar1
+		beq PCIMemErr
 
-		lea PCIMemError(pc),a2
-		bra PrintError
-
-PCIMemHar1	move.l d2,PMEPAddr-Buffer(a4)
+		move.l d2,PMEPAddr-Buffer(a4)
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_MBAR,d1
 		jsr _LVOPCIConfigWriteLong(a6)		;Set PCFS_MPBAR to location of PMEP (ie I2O etc)
@@ -876,12 +886,9 @@ PCIMemHar1	move.l d2,PMEPAddr-Buffer(a4)
 		jsr _LVOPCIAllocMem(a6)			;Get space for XCSR
 
 		move.l d0,d2
-		bne.s PCIMemHar2
+		beq PCIMemErr
 
-		lea PCIMemError(pc),a2
-		bra PrintError
-
-PCIMemHar2	move.l d2,XCSRAddr-Buffer(a4)
+		move.l d2,XCSRAddr-Buffer(a4)
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_ITBAR0,d1
 		jsr _LVOPCIConfigWriteLong(a6)		;Set PCFS_ITBAR0 with inbound PCI address (XCSR)
@@ -916,7 +923,7 @@ NoReset		move.l #$20000000,d0
 
 AllocPCI1200	move.l #$10000000,d7
 		move.l d0,d2				;TODO: Should then try 128MB (Will happen in case of Radeon)
-		bne.s PCIMemHar3
+		bne.s PCIMemHar
 
 ;		move.l #$000000f8,d0			;Retry with 128MB RAM - **Crashes on current pci.library**
 ;		moveq.l #2,d1
@@ -925,12 +932,11 @@ AllocPCI1200	move.l #$10000000,d7
 
 ;		move.l #$08000000,d7
 ;		move.l d0,d2
-;		bne.s PCIMemHar3
+;		beq PCIMemErr
 
-		lea PCIMemError(pc),a2
-		bra PrintError
+		bra PCIMemErr				;remove when above uncommented
 
-PCIMemHar3	move.l d2,SonnetBase-Buffer(a4)
+PCIMemHar	move.l d2,SonnetBase-Buffer(a4)
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_ITBAR1,d1
 		jsr _LVOPCIConfigWriteLong(a6)		;Set PCFS_ITBAR1 with inbound PCI address (PPC RAM)
@@ -950,26 +956,31 @@ Got256MB	move.l ConfigDevNum(pc),d0
 		jsr _LVOPCIAllocMem(a6)					;Get space for PPC MPIC (Just a dummy, not accessable)
 
 		move.l d0,d2
-		bne.s PCIMemHar4
+		beq PCIMemErr
 
-		lea PCIMemError(pc),a2
-		bra PrintError
-
-PCIMemHar4	move.l d2,MPICAddr-Buffer(a4)
+		move.l d2,MPICAddr-Buffer(a4)
 		or.l #XCSR_MBAR_ENA,d2
 		move.l d2,XCSR_MBAR(a3)					;Set location of MPIC (256kb boundary) plus MBAR_ENA
 
 		moveq.l #0,d0
 		moveq.l #0,d2
-		move.w GfxMem(pc),d0					;Setup mapping window gfx card
-		sub.w #$6000,d2						;Calculate offset
+		moveq.l #0,d3
+				
+		move.l PCIBase(pc),a1
+		move.w pcibase_MemWindow(a1),d0				;setup mapping of mediator PCI window
+		move.w #$2000,d3					;512MB
+		move.l MediatorType(pc),d4
+		beq.s BigBox1
+		
+		move.w #$3000,d0					;Fixed for A1200
+		move.w #$1000,d3					;256MB
+
+BigBox1		sub.w #$6000,d2						;Calculate offset
 		move.l d0,d1
 		add.w #$6000,d1	
 		move.l d1,d0
 		swap d1
-		move.l GfxLen(pc),d3
-		swap d3
-		add.w d3,d0						;Set range based of GfxLen
+		add.w d3,d0
 		or.w d0,d1				
 		swap d2
 		or.b #XCSR_OTAT_ENA|XCSR_OTAT_WPE|XCSR_OTAT_SGE|XCSR_OTAT_RAE|XCSR_OTAT_MEM,d2
@@ -1025,13 +1036,21 @@ loopHarrier	move.l (a2)+,(a5)+					;Copy code to 0x13000
 		moveq.l #0,d2
 		move.l d2,PMEP_MIMS(a3)					;Clear OPIM to generate PCI interrupts
 
-		move.l (a7)+,a1	
+		move.l (a7)+,a1
+		movem.l (a7)+,d0-a0/a2-a6	
 
 		bra ReturnInitPPC
 
+;*********************************************************
+
+PCIMemErr	movem.l (a7)+,d0-a0/a2-a6
+		lea PCIMemError(pc),a2
+		bra PrintError
+
 ;********************************************************************************************
 
-SetupKiller	move.l PCIBase(pc),a6
+SetupKiller	movem.l d0-a0/a2-a6,-(a7)
+		move.l PCIBase(pc),a6
 
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCI_OFFSET_COMMAND,d1
@@ -1053,12 +1072,9 @@ SetupKiller	move.l PCIBase(pc),a6
 		jsr _LVOPCIAllocMem(a6)			;Get space for Killer Memory
 
 AllocKil1200	move.l d0,d2
-		bne.s PCIMemKil1
+		beq PCIMemErr
 
-		lea PCIMemError(pc),a2
-		bra PrintError
-
-PCIMemKil1	move.l d2,SonnetBase-Buffer(a4)		;Set base
+		move.l d2,SonnetBase-Buffer(a4)		;Set base
 		move.l #$04000000,d7			;and length default Killer NIC memory (64MB)
 
 		move.l SonAddr(pc),a2
@@ -1082,23 +1098,28 @@ PCIMemKil1	move.l d2,SonnetBase-Buffer(a4)		;Set base
 
 		moveq.l #12,d1				;Set-up of outbound window to PCI space of gfx cards
 		move.l GfxMem(pc),d2
-		move.l d2,d3		
-		add.l #$60000000,d3
+		move.l PCIBase(pc),a2
+		move.l pcibase_MemWindow(a2),d3
+		move.l #LAWAR_EN|LAWAR_512MB,d5
+		move.l MediatorType(pc),d4
+		beq.s BigBox2
+
+		move.l #$30000000,d3
+		move.l #LAWAR_EN|LAWAR_256MB,d5
+
+BigBox2		add.l #$60000000,d3
 		move.l d3,IMMR_PCILAWBAR1(a3)
 		
 		move.l GfxLen(pc),d4
-		move.l #LAWAR_EN|LAWAR_256MB,d5
 		move.l #POCMR_EN|POCMR_CM_256MB,d6
 		btst.l #28,d4
 		bne.s DoWindow1
 
-		move.l #LAWAR_EN|LAWAR_64MB,d5
 		move.l #POCMR_EN|POCMR_CM_64MB,d6
 		btst.l #26,d4
 		bne.s DoWindow1
 
-		move.l #LAWAR_EN|LAWAR_128MB,d5		;default
-		move.l #POCMR_EN|POCMR_CM_128MB,d6
+		move.l #POCMR_EN|POCMR_CM_128MB,d6	;default
 		
 DoWindow1	move.l d5,IMMR_PCILAWAR1(a3)
 		lsr.l d1,d2
@@ -1107,7 +1128,31 @@ DoWindow1	move.l d5,IMMR_PCILAWAR1(a3)
 		move.l d2,IMMR_POTAR0(a3)		
 		move.l d6,IMMR_POCMR0(a3)
 
-		move.l SonnetBase(pc),a2
+		move.l SizeBAT(pc),d4
+		beq.s NoSecWin
+
+		move.l StartBAT(pc),d2
+		move.l d2,d3
+		add.l #$60000000,d3
+
+		move.l #POCMR_EN|POCMR_CM_256MB,d6
+		btst.l #28,d4
+		bne.s DoWindow2
+
+		move.l #POCMR_EN|POCMR_CM_64MB,d6
+		btst.l #26,d4
+		bne.s DoWindow2
+
+		move.l #POCMR_EN|POCMR_CM_128MB,d6	;default
+
+DoWindow2	lsr.l d1,d2
+		lsr.l d1,d3
+
+		move.l d3,IMMR_POBAR1(a3)
+		move.l d2,IMMR_POTAR1(a3)		
+		move.l d6,IMMR_POCMR1(a3)
+
+NoSecWin	move.l SonnetBase(pc),a2
 		move.l #$48000000,$fc(a2)		;This is a loop in PPC assembly
 		move.l #$4bfffffc,$100(a2)		;Going to park the CPU
 
@@ -1144,6 +1189,9 @@ loopKiller	move.l (a2)+,(a5)+			;Copy code to 0x13000
 		bsr ResetCPU
 
 		move.l #SIMSR_L_MU,IMMR_SIMSR_L(a3)	;Enable Message Units Interrupts on the PPC
+		
+		movem.l (a7)+,d0-a0/a2-a6
+		
 		bra ReturnInitPPC
 
 ;******************************************************
@@ -4274,6 +4322,7 @@ MasterError	dc.b	"Error setting up 68K MasterControl process",0
 PPCTaskError	dc.b	"Error setting up Kryten PPC process",0
 PCIMemError	dc.b	"Could not allocate sufficient PCI memory",0
 CPUReqError	dc.b	"This library requires a 68LC040 or better",0
+NoPPCPCI	dc.b	"PPCPCI environment not set in ENVARC:Mediator",0
 
 ConWindow	dc.b	"CON:0/20/680/250/Sonnet - PowerPC Exception/AUTO/CLOSE/WAIT/"
 		dc.b	"INACTIVE",0		

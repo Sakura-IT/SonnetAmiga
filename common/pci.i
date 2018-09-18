@@ -26,6 +26,8 @@
 PCI_List	EQU	100
 PCI_MemType	EQU	0		;EQ=MEM NE=IO
 
+pcibase_MemWindow		=	$2a
+
 _LVOPCIFindCard			=	-30
 _LVOPCIFindCardbyClass		=	-36
 _LVOPCIFindCardbyNumber		=	-42

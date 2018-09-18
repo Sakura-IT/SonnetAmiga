@@ -1565,7 +1565,7 @@ mmuSetup:
 		beq	.DoneVGAMem			#If ATI primary card, then skip
 
 		lwz	r3,base_StartBAT(r29)
-		mr	r5,r3
+		addis	r5,r3,0x6000
 		li	r17,BAT_READ_WRITE
 		li	r18,BAT_BL_64M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
 		subi	r19,r19,1
