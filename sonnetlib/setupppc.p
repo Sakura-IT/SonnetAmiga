@@ -1566,7 +1566,7 @@ mmuSetup:
 
 		lwz	r3,base_StartBAT(r29)
 		addis	r5,r3,0x6000
-		li	r17,BAT_READ_WRITE
+		li	r17,BAT_CACHE_INHIBITED | BAT_READ_WRITE
 		li	r18,BAT_BL_64M | BAT_VALID_SUPERVISOR | BAT_VALID_USER
 		subi	r19,r19,1
 		mr.	r19,r19
@@ -1581,6 +1581,7 @@ mmuSetup:
 
 .DoVGAMem:	or	r17,r17,r5
 		or	r18,r18,r3
+		or	r20,r20,r5
 		
 		mtspr	ibat3l,r17
 		mtspr	ibat3u,r18

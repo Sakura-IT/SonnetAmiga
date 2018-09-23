@@ -131,7 +131,7 @@
 .set DataExcLow,606
 .set CurrentPort,610
 .set sonnet_DosBase,614
-
+						#Free room (618, 619)
 .set sonnet_ExternalInt,620
 .set sonnet_AltivecOn,621
 .set sonnet_ExceptionMode,622

@@ -350,7 +350,8 @@ FoundGfx	neg.l d7
 
 NoNegMemAddr	bsr GetENVs
 
-		move.l LExecBase(pc),a6
+		moveq.l #0,d6
+DoItAgain	move.l LExecBase(pc),a6
 		lea MemList(a6),a0
 		lea PCIMem(pc),a1			;Check for PCI DMA (GFX) memory
 		jsr _LVOFindName(a6)
@@ -367,15 +368,11 @@ NoNegMemAddr	bsr GetENVs
 		lea MemMedError(pc),a2
 		bra PrintError
 
-FndMem		jsr _LVODisable(a6)
-		move.l d7,a1
-		jsr _LVORemove(a6)
-		lea MemList(a6),a0
-		move.l d7,a1
-		jsr _LVOAddTail(a6)			;Move gfx memory to back to prevent
-		jsr _LVOEnable(a6)			;mem list corruption if BE screenmode switch
+FndMem		move.l d7,a2
+		move.l (a2),a1
+		tst.l (a1)
+		beq.s EndItHere
 
-		move.l d7,a2
 		move.l MH_LOWER(a2),d0
 		move.l MH_UPPER(a2),d1
 		sub.l d0,d1
@@ -392,13 +389,31 @@ Next		lsl.l #1,d3
 		bne.s Next
 
 GotBATSize	move.l d2,d1
+		beq.s NotSupported
 		subq.l #4,d1
 		bpl.s NotSupported
-
+		
+		moveq.l #-15,d3
 		move.l d0,StartBAT-Buffer(a4)
 		move.l d2,SizeBAT-Buffer(a4)
+		bra.s MemSupported
 
-NotSupported	move.l SonAddr(pc),a2
+NotSupported	moveq.l #-20,d3
+MemSupported	move.b d3,LN_PRI(a2)
+		jsr _LVODisable(a6)
+		move.l d7,a1
+		jsr _LVORemove(a6)
+		lea MemList(a6),a0
+		move.l d7,a1
+		jsr _LVOEnqueue(a6)			;Move gfx memory to back to prevent
+		jsr _LVOEnable(a6)			;mem list corruption if BE screenmode switch
+
+		tst.l d6
+		bne.s EndItHere
+		moveq.l #1,d6
+		bra DoItAgain
+		
+EndItHere	move.l SonAddr(pc),a2
 		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)
 		beq SetupHarrier
 
