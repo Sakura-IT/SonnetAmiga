@@ -46,10 +46,10 @@ Automated binary builds are available from Jenkins: https://sonnet.uguu.waw.pl/j
 
 # Installation
 
-Just drop powerpc.library into your `LIBS:`. When powerpc.library is installed you also need InitPPC.
-You can execute the initialization program from a shell after workbench has loaded or if you feel lucky
-you can add it to the startup-sequence after LoadMonDrvs and before AddDataTypes
-using `Run >NIL: <NIL: C:InitPPC`.
+Sadly, you cannot just drop powerpc.library into your `LIBS:`. When powerpc.library is installed you
+also **NEED** InitPPC. If you run InitPPC from the startup-sequence after LoadMonDrvs and before
+AddDataTypes using `Run >NIL: <NIL: C:InitPPC`, then you can add powerpc.library to LIBS:. For all
+other cases see the installation wiki.
 
 The initialization is needed to correctly patch the system. Do not run WarpOS (patched) binaries without
 first running the initialization program.

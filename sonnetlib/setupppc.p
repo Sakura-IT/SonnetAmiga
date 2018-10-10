@@ -1,4 +1,4 @@
-# Copyright (c) 2015-2017 Dennis van der Boon
+# Copyright (c) 2015-2018 Dennis van der Boon
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -319,7 +319,6 @@ SetLen:		mr	r30,r28
 Start:							#Dummy task at absolute (see ppcdefines)
 		nop
 		nop
-		nop
 		b	Start
 
 #*********************************************************
@@ -352,7 +351,7 @@ End:		mflr	r4
 		addi	r5,r4,End-Start
 		subf	r5,r4,r5
 		li	r6,0
-		bl	copy_and_flush			#Put program in Sonnet Mem instead of PCI Mem
+		bl	copy_and_flush			#Put program in PPC Card Mem instead of PCI Mem
 
 		stw	r13,-4(r1)
 		subi	r13,r1,4
@@ -605,8 +604,7 @@ End:		mflr	r4
 #********************************************************************************************		
 
 .MakeList:	stw	r4,8(r4)			#NewList()
-		lis	r0,0
-		nop	
+		lis	r0,0	
 		stwu	r0,4(r4)
 		stw	r4,-4(r4)
 
@@ -1483,6 +1481,10 @@ mmuSetup:
 
 		bl	.DoTBLs
 
+		lwz	r3,base_RTGBase(r29)
+		rlwinm.	r0,r3,5,31,31			#Test for split memory
+		bne	.Split128
+
 		lwz	r3,base_RTGConfig(r29)
 		rlwinm.	r0,r3,5,31,31			#Test for split memory
 		bne	.Split128
@@ -1591,7 +1593,7 @@ mmuSetup:
 		sync
 		isync
 
-.DoneVGAMem:	lis	r3,0x40				#Sonnet memory (Rest cached)
+.DoneVGAMem:	lis	r3,0x40				#PPC card memory (Rest cached)
 		lwz	r4,MemSize(r0)
 		mr	r5,r3
 		add	r3,r3,r27
@@ -1621,13 +1623,13 @@ mmuSetup:
 
 #********************************************************************************************	
 
-.SetupPT:	mr	r23,r8				#Save sonnet memory size
+.SetupPT:	mr	r23,r8				#Save ppc card memory size
 		srwi	r6,r6,7				#Get pt_size
 		rlwinm.	r8,r6,20,12,31			#is pt_size >= 64 KB
 		bne	.Cont
 		lis	r6,0x10
 		
-.Cont:		mr	r3,r23				#Size of sonnet memory
+.Cont:		mr	r3,r23				#Size of ppc card memory
 
 		sub	r3,r3,r6			#Set pt_loc
 		mr	r7,r3

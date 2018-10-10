@@ -334,7 +334,8 @@ GotATI		move.l d0,a2
 		move.l PCI_SPACE0(a2),d4
 		move.l PCI_SPACELEN0(a2),d7
 
-FoundGfx	neg.l d7
+FoundGfx	and.w #$fff0,d7				;remove bits like PREFETCH.
+		neg.l d7
 		move.l d4,GfxMem-Buffer(a4)
 		move.w d5,GfxType-Buffer(a4)
 		move.l d6,SonAddr-Buffer(a4)
@@ -350,7 +351,7 @@ FoundGfx	neg.l d7
 
 NoNegMemAddr	bsr GetENVs
 
-		moveq.l #0,d6
+		moveq.l #0,d6		
 DoItAgain	move.l LExecBase(pc),a6
 		lea MemList(a6),a0
 		lea PCIMem(pc),a1			;Check for PCI DMA (GFX) memory
@@ -392,6 +393,8 @@ GotBATSize	move.l d2,d1
 		beq.s NotSupported
 		subq.l #4,d1
 		bpl.s NotSupported
+		cmp.w #VENDOR_ATI,GfxType(pc)
+		beq.s NotSupported
 		
 		moveq.l #-15,d3
 		move.l d0,StartBAT-Buffer(a4)
@@ -695,7 +698,7 @@ ContTimer	move.l SonnetBase(pc),a1
 		move.l d0,OMBAR(a3)			;0xa0000000-0xc0000000
 		
 NoOutBound107	jsr _LVODisable(a6)
-		
+
 		moveq.l #MEMF_PUBLIC,d1
 		move.l #$4000,d2
 		moveq.l #0,d3
@@ -1115,7 +1118,7 @@ AllocKil1200	move.l d0,d2
 		move.l GfxMem(pc),d2
 		move.l PCIBase(pc),a2
 		move.l pcibase_MemWindow(a2),d3
-		
+
 		btst #25,d2
 		beq.s NoOdd64
 
@@ -1147,7 +1150,14 @@ BigBox2		add.l #$60000000,d3
 DefaultSizeW	move.l #POCMR_EN|POCMR_CM_128MB,d6	;default
 		
 DoWindow1	move.l d5,IMMR_PCILAWAR1(a3)
-		lsr.l d1,d2
+		btst #27,d4
+		beq.s No128ATI
+
+		btst #27,d2
+		beq.s No128ATI
+		
+		add.l d4,d3
+No128ATI	lsr.l d1,d2
 		lsr.l d1,d3
 		move.l d3,IMMR_POBAR0(a3)
 		move.l d2,IMMR_POTAR0(a3)		
