@@ -1,4 +1,4 @@
-; Copyright (c) 2015-2017 Dennis van der Boon
+; Copyright (c) 2015-2018 Dennis van der Boon
 ;
 ; Permission is hereby granted, free of charge, to any person obtaining a copy
 ; of this software and associated documentation files (the "Software"), to deal
@@ -285,7 +285,7 @@ LoopPPCList	move.w (a2)+,d0
 		bne.s GotPPCCard
 		bra.s LoopPPCList
 
-EndOfPPCList	lea SonnetError(pc),a2
+EndOfPPCList	lea PPCCardError(pc),a2
 		bra PrintError
 		
 PPCPCIS		dc.w VENDOR_MOTOROLA,DEVICE_MPC107,VENDOR_MOTOROLA,DEVICE_HARRIER,VENDOR_FREESCALE,DEVICE_MPC8343E,0,0
@@ -545,7 +545,7 @@ GotMemName	move.l d0,a0
 		move.l 8(a1),8(a0)
 		move.l 12(a1),12(a0)
 
-		move.l a0,a1				;Set up sonnet memory on 68k side:
+		move.l a0,a1				;Set up PPC memory on 68k side:
 		move.l d5,a0
 		move.w #$0a01,LN_TYPE(a0)		;TYPE and PRI
 		move.l a1,LN_NAME(a0)
@@ -644,7 +644,7 @@ GotMyInt	move.l a2,IS_CODE(a1)
 
 		move.l PCIBase(pc),a6
 		move.l SonAddr(pc),a0
-		jsr _LVOPCIAddIntServer(a6)		;Attach Sonnet card to PCI Interrupt Chain
+		jsr _LVOPCIAddIntServer(a6)		;Attach PPC card to PCI Interrupt Chain
 
 		move.l SonAddr(pc),a0
 		jsr _LVOPCIEnableInterupt(a6)		;Enable interrupt
@@ -706,7 +706,7 @@ NoOutBound107	jsr _LVODisable(a6)
 		lea NewOldLoadSeg(pc),a3
 		move.l a3,d0
 		move.l DosBase(pc),a1
-		jsr _LVOSetFunction(a6)			;LoadSeg to correctly scatter-load sonnet exes
+		jsr _LVOSetFunction(a6)			;LoadSeg to correctly scatter-load WarpOS exes
 		lea LoadSegAddress(pc),a3
 		move.l d0,(a3)
 		
@@ -714,7 +714,7 @@ NoOutBound107	jsr _LVODisable(a6)
 		lea NewNewLoadSeg(pc),a3
 		move.l a3,d0
 		move.l DosBase(pc),a1
-		jsr _LVOSetFunction(a6)			;NewLoadSeg to correctly scatter-load sonnet exes
+		jsr _LVOSetFunction(a6)			;NewLoadSeg to correctly scatter-load WarpOS exes
 		lea NewLoadSegAddress(pc),a3
 		move.l d0,(a3)
 	
@@ -1115,7 +1115,14 @@ AllocKil1200	move.l d0,d2
 		move.l GfxMem(pc),d2
 		move.l PCIBase(pc),a2
 		move.l pcibase_MemWindow(a2),d3
-		move.l #LAWAR_EN|LAWAR_512MB,d5
+		
+		btst #25,d2
+		beq.s NoOdd64
+
+		move.l d2,d0
+		bclr #25,d2
+
+NoOdd64		move.l #LAWAR_EN|LAWAR_512MB,d5
 		move.l MediatorType(pc),d4
 		beq.s BigBox2
 
@@ -1124,7 +1131,10 @@ AllocKil1200	move.l d0,d2
 
 BigBox2		add.l #$60000000,d3
 		move.l d3,IMMR_PCILAWBAR1(a3)
-		
+
+		btst #25,d0
+		bne.s DefaultSizeW
+
 		move.l GfxLen(pc),d4
 		move.l #POCMR_EN|POCMR_CM_256MB,d6
 		btst.l #28,d4
@@ -1134,7 +1144,7 @@ BigBox2		add.l #$60000000,d3
 		btst.l #26,d4
 		bne.s DoWindow1
 
-		move.l #POCMR_EN|POCMR_CM_128MB,d6	;default
+DefaultSizeW	move.l #POCMR_EN|POCMR_CM_128MB,d6	;default
 		
 DoWindow1	move.l d5,IMMR_PCILAWAR1(a3)
 		lsr.l d1,d2
@@ -1278,7 +1288,7 @@ MakeLibrary
 		lsr.l #2,d1
 		subq.l #1,d1
 MoveSon		move.l (a0)+,(a1)+
-		dbf d1,MoveSon				;Do the copy to PPC/Sonnet memory		
+		dbf d1,MoveSon				;Do the copy to PPC memory		
 		
 		sub.l a0,a1
 		move.l a1,d6
@@ -2303,12 +2313,12 @@ Reserved:
 ;********************************************************************************************
 
 GetCPU:
-		movem.l d1-a6,-(a7)			;As we only have G3 and G4 on a sonnet
-		
-		moveq.l #HW_CPUTYPE,d1			;only those are returned (no 603/604 etc)			
-		
+		movem.l d1-a6,-(a7)			;No 604e cards at the moment, so we
+
+		moveq.l #HW_CPUTYPE,d1			;Only return 603e G3 and G4
+
 		RUNPOWERPC	_PowerPCBase,SetHardware
-		
+
 		and.w #$0,d0
 		swap d0
 		cmp.w #$7000,d0
@@ -2850,7 +2860,7 @@ Checkers	cmp.l #"2005",d7				;Task has name with 2005 at end?
 		beq.s NotPPCTask
 		cmp.l #".exe",d7
 		beq.s FreeBit
-NotPPCTask	btst #TB_PPC,TC_FLAGS(a3)			;Check if task was tagged by sonnet.library
+NotPPCTask	btst #TB_PPC,TC_FLAGS(a3)			;Check if task was tagged by powerpc.library
 ToSpace		bne.s DoBit					;If yes, then redirect to PPC memory
 		bra.s NoBit
 
@@ -3059,7 +3069,7 @@ AllocFunc:	lea Options68K(pc),a0			;InternalLoadSeg() Memory allocation function
 		bset #TB_PPC,TC_FLAGS(a0)
 
 NoHunkPatch2	and.l #MEMF_CLEAR,d1
-		or.l #MEMF_PUBLIC|MEMF_PPC,d1		;attributes are FIXED to Sonnet mem
+		or.l #MEMF_PUBLIC|MEMF_PPC,d1		;attributes are FIXED to PPC memory
 
 DoNormMem	jsr _LVOAllocMem(a6)
 		move.l ThisTask(a6),a0
@@ -3676,7 +3686,7 @@ AllocVec32:
 		move.l LExecBase(pc),a6
 
 		and.l #MEMF_CLEAR,d1
-		or.l #MEMF_PUBLIC|MEMF_PPC,d1		;attributes are FIXED to Sonnet mem
+		or.l #MEMF_PUBLIC|MEMF_PPC,d1		;attributes are FIXED to PPC memory
 
 		jsr _LVOAllocVec(a6)
 		move.l ThisTask(a6),a0
@@ -4317,7 +4327,7 @@ LExpError	dc.b	"Could not open expansion.library V37+",0
 LPCIError	dc.b	"Could not open pci.library V13.6+",0
 MedError	dc.b	"Could not find a supported Mediator board",0
 MemMedError	dc.b	"No system VGA memory detected (pcidma)",0
-SonnetError	dc.b	"No Sonnet card detected",0
+PPCCardError	dc.b	"No PPC card detected",0
 NBridgeError	dc.b	"No supported PPC PCI bridge detected",0
 VGAError	dc.b	"No supported VGA card detected",0
 MemVGAError	dc.b	"Could not allocate VGA memory",0
@@ -4339,7 +4349,7 @@ PCIMemError	dc.b	"Could not allocate sufficient PCI memory",0
 CPUReqError	dc.b	"This library requires a 68LC040 or better",0
 NoPPCPCI	dc.b	"PPCPCI environment not set in ENVARC:Mediator",0
 
-ConWindow	dc.b	"CON:0/20/680/250/Sonnet - PowerPC Exception/AUTO/CLOSE/WAIT/"
+ConWindow	dc.b	"CON:0/20/680/250/PowerPC Exception/AUTO/CLOSE/WAIT/"
 		dc.b	"INACTIVE",0		
 
 EnEDOMem	dc.b	"sonnet/EnEDOMem",0			;0
@@ -4369,7 +4379,9 @@ CrashMessage	dc.b	"Task name: '%s'  Task address: %08lx  Exception: %s",10
 		dc.b	"R16-R19: %08lx %08lx %08lx %08lx   DBAT0: %08lx %08lx",10
 		dc.b	"R20-R23: %08lx %08lx %08lx %08lx   DBAT1: %08lx %08lx",10
 		dc.b	"R24-R27: %08lx %08lx %08lx %08lx   DBAT2: %08lx %08lx",10
-		dc.b	"R28-R31: %08lx %08lx %08lx %08lx   DBAT3: %08lx %08lx",10,10,0
+		dc.b	"R28-R31: %08lx %08lx %08lx %08lx   DBAT3: %08lx %08lx",10,10
+
+		IFD	_FULLERROR_
 
 		dc.b	"F0-F3:    %s   %s   %s   %s",10		;Unused at the moment
 		dc.b	"F4-F7:    %s   %s   %s   %s",10
@@ -4378,8 +4390,8 @@ CrashMessage	dc.b	"Task name: '%s'  Task address: %08lx  Exception: %s",10
 		dc.b	"F16-F19:  %s   %s   %s   %s",10
 		dc.b	"F20-F23:  %s   %s   %s   %s",10
 		dc.b	"F24-F27:  %s   %s   %s   %s",10
-		dc.b	"F28-F31:  %s   %s   %s   %s",10,10,0
-		
+		dc.b	"F28-F31:  %s   %s   %s   %s",10,10
+
 		dc.b	"V0-V3:    %s   %s   %s   %s",10		;Unused at the moment
 		dc.b	"V4-V7:    %s   %s   %s   %s",10
 		dc.b	"V8-V11:   %s   %s   %s   %s",10
@@ -4387,7 +4399,11 @@ CrashMessage	dc.b	"Task name: '%s'  Task address: %08lx  Exception: %s",10
 		dc.b	"V16-V19:  %s   %s   %s   %s",10
 		dc.b	"V20-V23:  %s   %s   %s   %s",10
 		dc.b	"V24-V27:  %s   %s   %s   %s",10
-		dc.b	"V28-V31:  %s   %s   %s   %s",10,10,0
+		dc.b	"V28-V31:  %s   %s   %s   %s",10,10
+
+		ENDC
+
+		dc.b	0
 
 RContinue	dc.b	"Continue",0
 
