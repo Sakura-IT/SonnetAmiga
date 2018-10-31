@@ -816,7 +816,7 @@ NoZen		move.l _PowerPCBase(pc),a6
 		move.l a1,12(a0)
 		move.l a6,20(a0)
 		bsr CreatePPCTask
-
+		
 		tst.l d0
 		bne.s GotPPCControl
 		
@@ -893,7 +893,8 @@ SetupHarrier	movem.l d0-a0/a2-a6,-(a7)
 		jsr _LVOPCIConfigReadLong(a6)		;Read PCFS_ITAT1 (Another address translation unit)
 
 		move.l d0,d2
-		or.l #PCFS_ITAT1_GBL|PCFS_ITAT1_ENA|PCFS_ITAT1_WPE|PCFS_ITAT1_RAE,d2		
+		or.l #PCFS_ITAT1_GBL|PCFS_ITAT1_ENA|PCFS_ITAT1_WPE|PCFS_ITAT1_RAE,d2
+
 		move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_ITAT1,d1
 		jsr _LVOPCIConfigWriteLong(a6)		;Enable PCFS_ITAT1, Snooping, Write-Post and Read-Ahead
@@ -923,6 +924,7 @@ SetupHarrier	movem.l d0-a0/a2-a6,-(a7)
 		move.l d2,XCSR_XPAT2(a3)
 		move.l d2,XCSR_XPAT3(a3)				;Let's just do them all..
 
+		move.l XCSR_SDBAA(a3),d6
 		move.l XCSR_BXCS(a3),d2
 		btst #20,d2
 		bne.s NoReset
@@ -939,27 +941,47 @@ NoReset		move.l #$20000000,d0
 		move.l SonAddr(pc),a0
 		jsr _LVOPCIAllocMem(a6)			;Get space for PPC RAM
 
-AllocPCI1200	move.l #$10000000,d7
+AllocPCI1200	move.l #PPC_RAM_BASE|PCFS_ITSZ_256MB,d4
+		move.l #$10000000,d7
 		move.l d0,d2				;TODO: Should then try 128MB (Will happen in case of Radeon)
+		beq PCIMemErr
+
+		move.l MediatorType(pc),d0
+		bne.s PCIMemHar				;No 512MB on Amiga 1200.
+
+		move.l d6,d0
+		and.l #XCSR_SDBA_SIZE,d0
+		cmp.l #XCSR_SDBA_256MB,d0
 		bne.s PCIMemHar
 
-;		move.l #$000000f8,d0			;Retry with 128MB RAM - **Crashes on current pci.library**
-;		moveq.l #2,d1
-;		move.l SonAddr(pc),a0
-;		jsr _LVOPCIAllocMem(a6)
+		move.l #$000000f8,d0			;add more mem for 512MB cards.
+		moveq.l #4,d1
+		move.l SonAddr(pc),a0		
+		jsr _LVOPCIAllocMem(a6)
 
-;		move.l #$08000000,d7
-;		move.l d0,d2
-;		beq PCIMemErr
+		move.l d0,d5
+		beq.s PCIMemHar
 
-		bra PCIMemErr				;remove when above uncommented
+		move.l d5,d3
+		move.l #$08000000,d0			;add 128mb extra RAM.
+		add.l d0,d3
+		cmp.l d3,d2
+		beq.s ConsecutiveMem			;Memory is one block. Otherwise failure.
+
+		moveq.l #0,d5
+		bra.s PCIMemHar
+
+ConsecutiveMem	add.l d0,d7
+		add.l d0,d4
+		move.l d5,SonnetBase-Buffer(a4)
+		bra.s SkipBase
 
 PCIMemHar	move.l d2,SonnetBase-Buffer(a4)
-		move.l ConfigDevNum(pc),d0
+SkipBase	move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_ITBAR1,d1
 		jsr _LVOPCIConfigWriteLong(a6)		;Set PCFS_ITBAR1 with inbound PCI address (PPC RAM)
 
-		move.l #PPC_RAM_BASE|PCFS_ITSZ_256MB,d2
+		move.l d4,d2
 		btst #28,d7
 		bne.s Got256MB
 
@@ -968,7 +990,31 @@ Got256MB	move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_ITOFSZ1,d1
 		jsr _LVOPCIConfigWriteLong(a6)		;Set size & offset for RAM ($0 256MB)
 
-		move.l #$0000fcff,d0					;Set 256kb PCI Memory (swapped and negged)
+		tst.l d5
+		beq.s NoMoreMem
+
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_ITAT2,d1
+		jsr _LVOPCIConfigReadLong(a6)		;Read PCFS_ITAT1 (Another address translation unit)
+
+		move.l d0,d2
+		or.l #PCFS_ITAT1_GBL|PCFS_ITAT1_ENA|PCFS_ITAT1_WPE|PCFS_ITAT1_RAE,d2
+
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_ITAT2,d1
+		jsr _LVOPCIConfigWriteLong(a6)		;Enable PCFS_ITAT2, Snooping, Write-Post and Read-Ahead
+
+		move.l SonnetBase(pc),d2
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_ITBAR2,d1
+		jsr _LVOPCIConfigWriteLong(a6)		;Set PCFS_ITBAR1 with inbound PCI address (PPC RAM)
+
+		move.l #PPC_RAM_BASE|PCFS_ITSZ_128MB,d2
+		move.l ConfigDevNum(pc),d0
+		moveq.l #PCFS_ITOFSZ2,d1
+		jsr _LVOPCIConfigWriteLong(a6)		;Set size & offset for RAM ($0 128MB)
+
+NoMoreMem	move.l #$0000fcff,d0					;Set 256kb PCI Memory (swapped and negged)
 		moveq.l #3,d1						;Dummy bar 3
 		move.l SonAddr(pc),a0
 		jsr _LVOPCIAllocMem(a6)					;Get space for PPC MPIC (Just a dummy, not accessable)
@@ -983,13 +1029,13 @@ Got256MB	move.l ConfigDevNum(pc),d0
 		moveq.l #0,d0
 		moveq.l #0,d2
 		moveq.l #0,d3
-				
+
 		move.l PCIBase(pc),a1
 		move.w pcibase_MemWindow(a1),d0				;setup mapping of mediator PCI window
 		move.w #$2000,d3					;512MB
 		move.l MediatorType(pc),d4
 		beq.s BigBox1
-		
+
 		move.w #$3000,d0					;Fixed for A1200
 		move.w #$1000,d3					;256MB
 
@@ -1002,16 +1048,22 @@ BigBox1		sub.w #$6000,d2						;Calculate offset
 		or.w d0,d1				
 		swap d2
 		or.b #XCSR_OTAT_ENA|XCSR_OTAT_WPE|XCSR_OTAT_SGE|XCSR_OTAT_RAE|XCSR_OTAT_MEM,d2
-
 		move.l d2,XCSR_OTAT0(a3)
 		move.l d1,XCSR_OTAD0(a3)
+		move.l #XCSR_SDGC_ENRV_ENA,d3
+		tst.l d6
+		bne.s SkipRamSettings
 
-		move.l #XCSR_SDBA_32M8|XCSR_SDBA_ENA,XCSR_SDBAA(a3)	;Set SDRAM bank A to 32Mx8 / 256MBytes
-		move.l XCSR_SDGC(a3),d2					;Read General Control Register SDGC
-		or.l #XCSR_SDGC_MXRR_7|XCSR_SDGC_ENRV_ENA,d2		;Set MXRR to 7us Refresh Rate
-		move.l d2,XCSR_SDGC(a3)					;and remap using ENRV from $fff00000 to $0
+		or.l #XCSR_SDGC_MXRR_7,d3
 		move.l #XCSR_SDTC_DEFAULT,XCSR_SDTC(a3)			;Set RAM settings.
+		move.l #XCSR_SDBA_32M8,XCSR_SDBAA(a3)			;Set SDRAM bank A to 32Mx8 / 256MBytes as default
 
+SkipRamSettings	move.l XCSR_SDBAA(a3),d2
+		or.l #XCSR_SDBA_ENA,d2
+		move.l d2,XCSR_SDBAA(a3)
+		move.l XCSR_SDGC(a3),d2					;Read General Control Register SDGC
+		or.l d3,d2						;Set MXRR to required Refresh Rate
+		move.l d2,XCSR_SDGC(a3)					;and remap using ENRV from $fff00000 to $0
 		move.w #XCSR_XARB_PRKCPU0|XCSR_XARB_ENA,XCSR_XARB(a3)	;Set external arbiter to park on CPU 0.
 
 		move.l SonnetBase(pc),a3
@@ -4327,7 +4379,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.11 (16.09.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.11 (01.11.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		

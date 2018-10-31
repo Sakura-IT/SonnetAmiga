@@ -1660,6 +1660,14 @@ mmuSetup:
 .zero_out:	stwu	r8,4(r7)
 		bdnz	.zero_out
 
+		li	r6,16				#set up SR registers
+		mtctr	r6
+		li	r5,0
+		lis	r4,0x2000			#set ks and kp (0x6000 = 11; 0x4000 = 10 etc.)
+.srx_set:	mtsrin	r4,r5
+		addi	r4,r4,1
+		addis	r5,r5,0x1000
+		bdnz	.srx_set
 		blr
 		
 #********************************************************************************************		
@@ -1670,32 +1678,11 @@ mmuSetup:
 		mr	r20,r6
 		mr	r21,r7
 		mflr	r22
-
-		mr	r8,r17
-		mr	r9,r18
-
-		rlwinm	r3,r8,4,28,31			#get 4 MSBs
-		rlwinm	r4,r9,4,28,31
-
-		lis	r8,0x2000			#set ks and kp (0x6000 = 11; 0x4000 = 10 etc.)
-.srx_set:	or	r5,r3,r8
-
-		rlwinm	r13,r3,28,0,4
-		mtsrin	r5,r13
-
-		addi	r3,r3,1
-		cmplw	r3,r4
-		ble	.srx_set
-
-		mr	r3,r17
-		mr	r4,r18
 		
 .load_PTEs:	cmplw	r3,r4
 		bge	.ExitTBL
 		
-		rlwinm	r8,r3,4,28,31
 		mfsrin	r13,r3
-
 		mr	r5,r20				#set WIMG
 		
 		rlwinm	r11,r13,7,1,24			#Upper PTE (with effective address)
