@@ -695,7 +695,7 @@ ContTimer	move.l SonnetBase(pc),a1
 		and.b #$fe,d0
 		move.l d0,OTWR(a3)			;0x40000000 or 0x60000000
 		add.b #$60,d0
-		move.l d0,OMBAR(a3)			;0xa0000000-0xc0000000
+		move.l d0,OMBAR(a3)			;0xa0000000 - 0xc0000000
 		
 NoOutBound107	jsr _LVODisable(a6)
 
@@ -1215,10 +1215,22 @@ No128ATI	lsr.l d1,d2
 		move.l d2,IMMR_POTAR0(a3)		
 		move.l d6,IMMR_POCMR0(a3)
 
-		move.l SizeBAT(pc),d4
+		move.l GfxConfig(pc),d2
+		beq.s NoATIConfig
+		
+		move.l d2,d3				;make Radeon config block available to PPC
+		add.l #$60000000,d3
+		move.l #POCMR_EN|POCMR_CM_64KB,d6
+		lsr.l d1,d2
+		lsr.l d1,d3
+		move.l d3,IMMR_POBAR2(a3)
+		move.l d2,IMMR_POTAR2(a3)		
+		move.l d6,IMMR_POCMR2(a3)
+
+NoATIConfig	move.l SizeBAT(pc),d4
 		beq.s NoSecWin
 
-		move.l StartBAT(pc),d2
+DoSecWin	move.l StartBAT(pc),d2
 		move.l d2,d3
 		add.l #$60000000,d3
 
@@ -4379,7 +4391,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.11 (01.11.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.11 (10.12.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		

@@ -483,8 +483,8 @@ End:		mflr	r4
 		rlwinm.	r6,r6,2,30,31
 		beq	.PutClocks
 
-		rlwinm	r0,r0,31,0,31
-		rlwinm	r4,r4,31,0,31
+		rlwinm	r0,r0,31,1,31
+		rlwinm	r4,r4,31,1,31
 		b	.PutClocks
 		
 .NoKillerClock:	lbz	r6,option_VersionNB(r14)
@@ -598,6 +598,9 @@ End:		mflr	r4
 
 		loadreg	r0,MACHINESTATE_DEFAULT
 		mtsrr1	r0				#load up user MSR. Also clears PSL_IP
+		
+		loadreg r0,Quantum			#Load time slice
+		mtdec	r0
 
 		rfi					#To user code
 		
