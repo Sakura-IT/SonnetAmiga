@@ -39,7 +39,8 @@
 .set DOSBase,				0x0c
 .set MCPort,				0x10
 .set Init,				0x14
-.set PowerPCBase,			0x18	#All within first cacheline!
+.set PowerPCBase,			0x18
+.set PageTableSize,			0x1c	#All within first cacheline!
 
 .set AdListStart,			0x40
 .set AdListEnd,				0x44
@@ -165,7 +166,8 @@
 .set sonnet_SystemBATs,1312
 .set sonnet_ErrorStrings,1376
 .set sonnet_BusClock,1380
-.set sonnet_PosSize,1384			#Library PosSize
+.set sonnet_Quantum,1384
+.set sonnet_PosSize,1388			#Library PosSize
 
 .set EXCDATA_TYPE,8				#Always NT_INTERRUPT
 .set EXCDATA_PRI,9				#This

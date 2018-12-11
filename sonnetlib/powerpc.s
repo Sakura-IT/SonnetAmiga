@@ -71,7 +71,7 @@
 	
 	ENDC
 
-	XREF 	PPCCode,PPCLen,MCPort,Init,SysBase,PowerPCBase,DOSBase,sonnet_PosSize
+	XREF 	PPCCode,PPCLen,MCPort,Init,SysBase,PowerPCBase,DOSBase,sonnet_PosSize,PageTableSize
 	XDEF	_PowerPCBase,FunctionsLen,LibFunctions
 
 ;********************************************************************************************
@@ -527,6 +527,8 @@ NoSonRam	lea SonnetMemError(pc),a2
 PPCReady	move.l #NoMemAccess,d7			;Part of memory not accessible
 		move.l BASE_MEM(a1),d5
 		move.l d5,SonnetBase-Buffer(a4)
+		move.l d5,a0
+		move.l PageTableSize(a0),d3
 		add.l d7,d5
 		move.l BASE_MEMLEN(a1),d6
 		sub.l d7,d6
@@ -558,11 +560,12 @@ GotMemName	move.l d0,a0
 		clr.l (a1)
 
 		move.l d6,d1
-		sub.l #PageTableSize+32,d1		;for pagetable
+		sub.l #32,d1
+		sub.l d3,d1				;for pagetable
 		move.l d1,MC_BYTES(a1)
 		move.l a1,MH_LOWER(a0)
 		add.l a0,d6
-		sub.l #PageTableSize,d6			;for pagetable
+		sub.l d3,d6				;for pagetable
 		move.l d6,MH_UPPER(a0)
 		move.l d1,MH_FREE(a0)
 		move.l a0,a1
@@ -943,10 +946,30 @@ NoReset		move.l #$20000000,d0
 
 AllocPCI1200	move.l #PPC_RAM_BASE|PCFS_ITSZ_256MB,d4
 		move.l #$10000000,d7
-		move.l d0,d2				;TODO: Should then try 128MB (Will happen in case of Radeon)
-		beq PCIMemErr
+		move.l d0,d2
+		bne.s AtLeast256
 
-		move.l MediatorType(pc),d0
+		move.l #$000000f8,d0
+		moveq.l #2,d1
+		move.l SonAddr(pc),a0
+		jsr _LVOPCIAllocMem(a6)
+
+		move.l #PPC_RAM_BASE|PCFS_ITSZ_128MB,d4
+		move.l #$08000000,d7
+		move.l d0,d2		
+		beq PCIMemErr
+		
+		move.l #$000000fc,d0			;Try to squeeze out an extra 64MB
+		moveq.l #4,d1
+		move.l SonAddr(pc),a0		
+		jsr _LVOPCIAllocMem(a6)
+		move.l d0,d5
+		beq PCIMemHar
+		
+		move.l #$04000000,d0
+		bra Do192
+
+AtLeast256	move.l MediatorType(pc),d0
 		bne.s PCIMemHar				;No 512MB on Amiga 1200.
 
 		move.l d6,d0
@@ -962,8 +985,8 @@ AllocPCI1200	move.l #PPC_RAM_BASE|PCFS_ITSZ_256MB,d4
 		move.l d0,d5
 		beq.s PCIMemHar
 
-		move.l d5,d3
 		move.l #$08000000,d0			;add 128mb extra RAM.
+Do192		move.l d5,d3
 		add.l d0,d3
 		cmp.l d3,d2
 		beq.s ConsecutiveMem			;Memory is one block. Otherwise failure.
@@ -984,6 +1007,9 @@ SkipBase	move.l ConfigDevNum(pc),d0
 		move.l d4,d2
 		btst #28,d7
 		bne.s Got256MB
+
+		btst #26,d7
+		bne.s Got256MB				;Not named correctly...
 
 		move.l #PPC_RAM_BASE|PCFS_ITSZ_128MB,d2
 Got256MB	move.l ConfigDevNum(pc),d0
@@ -1009,10 +1035,14 @@ Got256MB	move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_ITBAR2,d1
 		jsr _LVOPCIConfigWriteLong(a6)		;Set PCFS_ITBAR1 with inbound PCI address (PPC RAM)
 
+		move.l #PPC_RAM_BASE|PCFS_ITSZ_64MB,d2
+		btst #26,d7
+		bne.s AddOnly64
+		
 		move.l #PPC_RAM_BASE|PCFS_ITSZ_128MB,d2
-		move.l ConfigDevNum(pc),d0
+AddOnly64	move.l ConfigDevNum(pc),d0
 		moveq.l #PCFS_ITOFSZ2,d1
-		jsr _LVOPCIConfigWriteLong(a6)		;Set size & offset for RAM ($0 128MB)
+		jsr _LVOPCIConfigWriteLong(a6)		;Set size & offset for RAM ($0 64MB or 128MB)
 
 NoMoreMem	move.l #$0000fcff,d0					;Set 256kb PCI Memory (swapped and negged)
 		moveq.l #3,d1						;Dummy bar 3
@@ -1909,7 +1939,6 @@ KrytenTags	dc.l TASKATTR_CODE,0,TASKATTR_NAME,0,TASKATTR_R3,0,TASKATTR_SYSTEM,-1
 ;********************************************************************************************
 ;********************************************************************************************
 
-
 Crashed		movem.l d0-a6,-(a7)			;Prints message when PPC has crashed
 		move.l a1,a0
 		bsr FreeMsgFrame
@@ -1918,17 +1947,44 @@ Crashed		movem.l d0-a6,-(a7)			;Prints message when PPC has crashed
 		move.l a0,d1
 		move.l #MODE_NEWFILE,d2
 		jsr _LVOOpen(a6)
-		move.l d0,d1
-		beq.s VeryBad
 		
-		lea CrashMessage(pc),a0
+		move.l d0,d1
+		bne.s GiveError
+	
+		lea PPCCrashNoWin(pc),a2
+		bsr PrintError2
+		bra.s SkipToEnd
+		
+GiveError	lea CrashMessage(pc),a0
 		move.l a0,d2		
 		move.l SonnetBase(pc),a0
 		move.l a0,d3
 		add.l #FIFO_BASE+$100,d3
+		move.l d3,a5				;value of PPC register r0 is at offset 76
 		jsr _LVOVFPrintf(a6)
+
+		move.l 76(a5),d0
+		lea PPCErrSem(pc),a2
+		cmp.l #"ESEM",d0
+		beq.s OutputErrWin
+
+		lea PPCErrFifo(pc),a2
+		cmp.l #"EFIF",d0
+		beq.s OutputErrWin
+
+		lea PPCErrAsync(pc),a2
+		cmp.l #"ESNC",d0
+		beq.s OutputErrWin
+
+		lea PPCErrMem(pc),a2
+		cmp.l #"EMEM",d0		
+		beq.s OutputErrWin
 		
-VeryBad		movem.l (a7)+,d0-a6
+		bra.s SkipToEnd
+		
+OutputErrWin	bsr PrintError2
+		
+SkipToEnd	movem.l (a7)+,d0-a6
 		bra NextMsg
 
 ;********************************************************************************************
@@ -4153,7 +4209,7 @@ POWERDATATABLE:
 	INITLONG	LN_NAME,PowerName
 	INITBYTE	LIB_FLAGS,LIBF_SUMMING|LIBF_CHANGED
 	INITWORD	LIB_VERSION,17
-	INITWORD	LIB_REVISION,11
+	INITWORD	LIB_REVISION,12
 	INITLONG	LIB_IDSTRING,PowerIDString
 	ds.l	1
 
@@ -4391,7 +4447,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.11 (10.12.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.12 (11.12.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
@@ -4422,6 +4478,11 @@ PPCTaskError	dc.b	"Error setting up Kryten PPC process",0
 PCIMemError	dc.b	"Could not allocate sufficient PCI memory",0
 CPUReqError	dc.b	"This library requires a 68LC040 or better",0
 NoPPCPCI	dc.b	"PPCPCI environment not set in ENVARC:Mediator",0
+PPCErrMem	dc.b	"PPC CPU ran out of memory",0
+PPCErrAsync	dc.b	"Async Run68K function not supported",0
+PPCErrSem	dc.b	"PPC Semaphore in illegal state",0
+PPCErrFifo	dc.b	"PPC received an illegal command packet",0
+PPCCrashNoWin	dc.b	"PPC crashed but could not output crash window",0
 
 ConWindow	dc.b	"CON:0/20/680/250/PowerPC Exception/AUTO/CLOSE/WAIT/"
 		dc.b	"INACTIVE",0		

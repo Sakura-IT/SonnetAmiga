@@ -23,7 +23,7 @@
 .include ppcmacros-std.i
 
 .global PPCCode,PPCLen,ThisPPCProc,LIST_WAITINGTASKS,Init,ViolationAddress
-.global MCPort,SysBase,PowerPCBase,DOSBase,sonnet_DebugLevel,sonnet_PosSize
+.global MCPort,SysBase,PowerPCBase,DOSBase,sonnet_DebugLevel,sonnet_PosSize,PageTableSize
 
 .set	PPCLen,(PPCEnd-PPCCode)
 .set	base_Comm,0
@@ -496,6 +496,7 @@ End:		mflr	r4
 		loadreg	r4,RaptureBusClock
 
 .PutClocks:	stw	r0,Quantum(r0)
+		stw	r0,sonnet_Quantum(r3)
 		stw	r4,sonnet_BusClock(r3)
 		mr	r14,r3
 		la	r6,SemMemory(r14)
@@ -599,7 +600,7 @@ End:		mflr	r4
 		loadreg	r0,MACHINESTATE_DEFAULT
 		mtsrr1	r0				#load up user MSR. Also clears PSL_IP
 		
-		loadreg r0,Quantum			#Load time slice
+		lwz	r0,Quantum(r0)			#Load time slice
 		mtdec	r0
 
 		rfi					#To user code
@@ -1359,7 +1360,14 @@ Wait2:		mfl2cr	r3
 	
 mmuSetup:	
 		mflr	r30
-		lis	r6,0x800				#Amount of memory to virtualize (128MB)
+		
+		lwz	r6,MemSize(r0)
+		cntlzw	r4,r6
+		li	r3,24
+		sub	r5,r3,r4
+		li	r4,1
+		rlwnm	r6,r4,r5,0,31				#r6 = Amount of memory to virtualize
+		stw	r6,PageTableSize(r0)
 
 		bl	.SetupPT
 
@@ -1627,7 +1635,6 @@ mmuSetup:
 #********************************************************************************************	
 
 .SetupPT:	mr	r23,r8				#Save ppc card memory size
-		srwi	r6,r6,7				#Get pt_size
 		rlwinm.	r8,r6,20,12,31			#is pt_size >= 64 KB
 		bne	.Cont
 		lis	r6,0x10
@@ -6517,7 +6524,7 @@ dsi2:
 		lwz	r9,ThisPPCProc(r10)
 		li	r0,TS_REMOVED
 		stb	r0,TC_STATE(r9)
-		
+
 		b	.TrySwitch			#Try to salvage the system
 
 #********************************************************************************************

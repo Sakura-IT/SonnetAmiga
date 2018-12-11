@@ -2539,9 +2539,7 @@ ReleaseSemaphorePPC:
 
 		bl AtomicDone
 
-		loadreg	r0,'DBUG'
-		lwz	r2,0(r1)
-		lwz	r2,8(r2)			#Original LR
+		loadreg	r0,'ESEM'
 		
 		illegal					#Not Yet Implemented
 
@@ -3404,6 +3402,7 @@ WaitFor68K:
 		cmpw	r4,r29
 		beq	.WasDone
 		
+		loadreg	r0,'EFIF'
 		illegal					##FIFO list corruption?
 		b	.NextMsg			##Needs error message
 		
@@ -3529,7 +3528,7 @@ Run68K:
 		stw	r4,PP_STACKPTR(r30)
 		b	.FromRunPPC
 		
-.GivErr:	loadreg	r0,'DBUG'
+.GivErr:	loadreg	r0,'ESNC'
 
 		illegal					#DEBUG Not yet implemented (async)
 		
@@ -4872,7 +4871,6 @@ CreateTaskPPC:
  		bl GetTagDataPPC
  
 		stw	r3,CONTEXT_LR(r26)		#Exit code. Default=0 
- 
  		loadreg r4,TASKATTR_PRIVATE
 		li	r5,0 
 		mr	r6,r30 
@@ -5119,7 +5117,7 @@ CreateTaskPPC:
 		stb	r0,TC_STATE(r31)
 		la	r4,LIST_READYTASKS(r23)
 		mr	r5,r31				#Task
-		loadreg	r0,Quantum
+		lwz	r0,sonnet_Quantum(r23)
 		stw	r0,TASKPPC_QUANTUM(r31)
 		lwz	r7,TASKPPC_NICE(r31)		
 		addi	r8,r7,20
@@ -6184,7 +6182,7 @@ DeleteTaskPPC:
 		
 		li	r31,FDeleteTaskPPC-FRun68K
 		bl	DebugStartFunction
-		
+
 		mr	r30,r3
 
 		lwz	r5,ThisPPCProc(r30)		#ThisTask
@@ -7023,7 +7021,7 @@ DeallocatePPC:
 		
 #********************************************************************************************
 
-.GuruTime:	loadreg	r0,'MEM!'
+.GuruTime:	loadreg	r0,'EMEM'
 		
 		illegal
 
@@ -10119,7 +10117,7 @@ StartCode:	bl	.StartRunPPC
 
 .NoStack:	stwu	r1,-68(r1)				#make sure stack is aligned on 32.
 .DoneStack:	lwz	r2,ThisPPCProc(r3)
-		stw	r30,TASKPPC_STARTMSG(r2)
+		stw	r30,TASKPPC_STARTMSG(r2)			
 		lwz	r3,MN_ARG1(r8)
 		stw	r3,TC_SIGALLOC(r2)
 		lwz	r2,PP_REGS+12*4(r8)
@@ -10232,8 +10230,8 @@ ExitCode:	lwz	r14,0(r1)
 
 		lwz	r7,ThisPPCProc(r14)
 		lwz	r8,TC_SIGALLOC(r7)
-		stw	r8,MN_ARG1(r9)		
-		lwz	r7,TASKPPC_STARTMSG(r7)						
+		stw	r8,MN_ARG1(r9)
+		lwz	r7,TASKPPC_STARTMSG(r7)			
 		lwz	r7,MN_REPLYPORT(r7)		
 		stw	r7,MN_REPLYPORT(r9)
 		stw	r2,PP_REGS+12*4(r9)
@@ -10265,7 +10263,6 @@ ExitCode:	lwz	r14,0(r1)
 
 		lwz	r4,ThisPPCProc(r14)
 		stw	r4,MN_PPC(r9)
-
 		lwz	r4,TASKPPC_STARTMSG(r4)			#Free original 68K -> PPC message
 
 		bl FreeMsgFramePPC
