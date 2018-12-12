@@ -2,12 +2,12 @@ SonnetAmiga
 ===========
 
 This project is an attempt at reimplementation of WarpOS for Sonnet Crescendo
-7200 PCI cards.
+7200 and other PPC PCI cards.
 
 The main part of the project is a library, which aims at API and ABI
 compatibility with WarpOS powerpc.library.
 
-This project is in an early beta stage of development.
+This project is in a beta stage of development.
 
 # Hardware
 
@@ -31,6 +31,7 @@ SonnetAmiga has the following hardware requirements:
 - Motorola PrPMC800 card with Harrier chip-set and 256MB SDRAM on-board.
   Also needs a PMC to PCI card with 3.3V regulator and enough Amps.
 - BigFoot Killer NIC M1 with 400MHz e300 core and 64MB on-board
+- BigFoot Killer NIC K1 with 333MHz e300 core and 64MB on-board
 
 # Software
 
