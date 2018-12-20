@@ -1980,6 +1980,10 @@ GiveError	lea CrashMessage(pc),a0
 		cmp.l #"EMEM",d0		
 		beq.s OutputErrWin
 		
+		lea PPCErrorTimeOut(pc),a2
+		cmp.l #"ETIM",d0
+		beq.s OutputErrWin
+		
 		bra.s SkipToEnd
 		
 OutputErrWin	bsr PrintError2
@@ -4447,7 +4451,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.12 (11.12.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.12 (20.12.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
@@ -4483,6 +4487,7 @@ PPCErrAsync	dc.b	"Async Run68K function not supported",0
 PPCErrSem	dc.b	"PPC Semaphore in illegal state",0
 PPCErrFifo	dc.b	"PPC received an illegal command packet",0
 PPCCrashNoWin	dc.b	"PPC crashed but could not output crash window",0
+PPCErrorTimeOut	dc.b	"PPC timed out while waiting on 68k",0
 
 ConWindow	dc.b	"CON:0/20/680/250/PowerPC Exception/AUTO/CLOSE/WAIT/"
 		dc.b	"INACTIVE",0		

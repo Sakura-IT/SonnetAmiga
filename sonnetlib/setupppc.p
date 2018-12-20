@@ -5756,6 +5756,9 @@ dsi2:
 		
 		beq	.DonePFIFO
 		bdnz	.WaitPFIFO
+		
+		loadreg	r0,'ETIM'
+		stw	r0,48(r1)			#Error code to r0
 		b	.HaltDSI
 
 .DonePFIFO:	mtctr	r0
