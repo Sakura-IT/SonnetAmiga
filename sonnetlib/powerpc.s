@@ -1,4 +1,4 @@
-; Copyright (c) 2015-2018 Dennis van der Boon
+; Copyright (c) 2015-2019 Dennis van der Boon
 ;
 ; Permission is hereby granted, free of charge, to any person obtaining a copy
 ; of this software and associated documentation files (the "Software"), to deal
@@ -236,7 +236,7 @@ NoCardError	lea NBridgeError(pc),a2
 		bra PrintError	
 		
 CardList	dc.l DEVICE_MPC107<<16|VENDOR_MOTOROLA,DEVICE_HARRIER<<16|VENDOR_MOTOROLA
-		dc.l DEVICE_MPC8343E<<16|VENDOR_FREESCALE,0
+		dc.l DEVICE_MPC8343E<<16|VENDOR_FREESCALE,DEVICE_HAWK<<16|VENDOR_MOTOROLA,0
 		
 FoundCfg	lsl.l #3,d6
 		move.l d6,ConfigDevNum-Buffer(a4)	;Number of the PPC card.
@@ -288,7 +288,10 @@ LoopPPCList	move.w (a2)+,d0
 EndOfPPCList	lea PPCCardError(pc),a2
 		bra PrintError
 		
-PPCPCIS		dc.w VENDOR_MOTOROLA,DEVICE_MPC107,VENDOR_MOTOROLA,DEVICE_HARRIER,VENDOR_FREESCALE,DEVICE_MPC8343E,0,0
+PPCPCIS		dc.w VENDOR_MOTOROLA,DEVICE_MPC107,VENDOR_MOTOROLA,DEVICE_HARRIER,VENDOR_FREESCALE
+		dc.w DEVICE_MPC8343E,VENDOR_MOTOROLA,DEVICE_HAWK,0
+		
+		cnop 0,4
 
 GotPPCCard	move.w #VENDOR_3DFX,d0
 		move.w d0,d5
@@ -351,25 +354,16 @@ FoundGfx	and.w #$fff0,d7				;remove bits like PREFETCH.
 
 NoNegMemAddr	bsr GetENVs
 
-		moveq.l #0,d6		
+		moveq.l #0,d6
+				
 DoItAgain	move.l LExecBase(pc),a6
 		lea MemList(a6),a0
 		lea PCIMem(pc),a1			;Check for PCI DMA (GFX) memory
 		jsr _LVOFindName(a6)
 		move.l d0,d7
-		bne.s FndMem
-		
-		move.l SonAddr(pc),a2
-		cmp.w #DEVICE_HARRIER,PCI_DEVICEID(a2)	;Following cards don't need vga memmory
-		beq SetupHarrier			;for boot
-		
-		cmp.w #DEVICE_MPC8343E,PCI_DEVICEID(a2)
-		beq SetupKiller
+		beq EndItHere
 
-		lea MemMedError(pc),a2
-		bra PrintError
-
-FndMem		move.l d7,a2
+		move.l d7,a2
 		move.l (a2),a1
 		tst.l (a1)
 		beq.s EndItHere
@@ -423,7 +417,16 @@ EndItHere	move.l SonAddr(pc),a2
 		cmp.w #DEVICE_MPC8343E,PCI_DEVICEID(a2)
 		beq SetupKiller
 
-		move.l #$20000,d0
+		tst.l d7
+		bne.s FndDMAMem
+
+		move.l GfxMem(pc),d0
+		bne.s DirtyPCIMem
+
+		lea MemVGAError(pc),a2			;use a FORCE flag? debugdebug
+		bra PrintError
+
+FndDMAMem	move.l #$20000,d0
 		move.l #MEMF_PUBLIC|MEMF_PPC,d1
 		jsr _LVOAllocVec(a6)
 		move.l d0,ROMMem-Buffer(a4)
@@ -433,8 +436,14 @@ EndItHere	move.l SonAddr(pc),a2
 		lea MemVGAError(pc),a2
 		bra PrintError
 
+DirtyPCIMem	add.l #$600000,d0			;My eyes hurt! Startup using unallocated VGA Memory
+
 GotVGAMem	add.l #$10000,d0
 		and.w #0,d0				;Align ROM on $10000
+
+		cmp.w #DEVICE_HAWK,PCI_DEVICEID(a2)
+		beq SetupHawk
+
 		move.l d0,a5
 		move.l a5,a1
 		lea $100(a5),a5				;Pointer to system reset exception
@@ -448,9 +457,17 @@ GotVGAMem	add.l #$10000,d0
 		move.l d0,OTWR(a3)			;Make ROM visible and place it at
 		move.l #$0000F0FF,OMBAR(a3)		;Processor outbound mem at $FFF00000
 
+		move.l #$48002f00,d6
 		move.l a2,d4
-		move.l #$48002f00,(a5)			;PPC branch to code outside exception space (0x3000)
-		lea $2f00(a5),a5
+		move.l d6,(a5)				;PPC branch to code outside exception space (0x3000)
+		move.l (a5),d0
+		cmp.l d6,d0				;Should be cache inhibited for this to work
+		beq.s WritableMem
+
+		lea MemVGAError(pc),a2			;use a FORCE flag? debugdebug
+		bra PrintError
+		
+WritableMem	lea $2f00(a5),a5
 		lea PPCCode(pc),a2
 		move.l #PPCLen,d6
 		lsr.l #2,d6
@@ -1343,6 +1360,188 @@ WaitReset	subq.l #1,d0
 		move.l IMMR_RSR(a3),d1
 		move.l d1,IMMR_RSR(a3)			;Clear reset status
 		rts
+
+;********************************************************************************************
+
+SetupHawk	movem.l d0-a0/a2-a6,-(a7)
+		move.l PCIBase(pc),a6
+		move.l d0,d5				;VGA 'ROM'
+		move.l d0,a5
+		move.l #$48012f00,d6			;Start vector PPC
+		move.l d6,$100(a5)			;PPC branch to code outside exception space (0x3000)
+		move.l $100(a5),d0
+		cmp.l d6,d0				;Should be cache inhibited for this to work
+		beq.s WritableVMem
+
+		lea MemVGAError(pc),a2			;use a FORCE flag? debugdebug
+		bra PrintError
+
+WritableVMem	move.l #$0000f0ff,d0			;Set 1MB PCI Memory (negged and swapped)
+		moveq.l #0,d1				;Dummy bar 0 (Really dummy, not linked to BAR0)
+		move.l SonAddr(pc),a0			;It will hold PHB, SMC and external reg set
+		jsr _LVOPCIAllocMem(a6)			;Get space for Killer Memory
+
+		move.l d0,d2				;Should be 1MB aligned (pci.lib takes care of it)
+		beq PCIMemErr
+
+		move.l d0,d6				;For offset
+		swap d2
+		add.w #$10,d2				;Size = 1MB
+		or.l d6,d2
+
+		move.l ConfigDevNum(pc),d0
+		move.l #HAWK_PCI_PSADD0,d1
+		jsr _LVOPCIConfigWriteLong(a6)
+
+		move.l ConfigDevNum(pc),d0
+		move.l #HAWK_PCI_PSOFFATT0,d1
+		move.l #HAWK_SMC_BASE,d2			
+		sub.l d6,d2
+		or.l #$d2,d2
+		jsr _LVOPCIConfigWriteLong(a6)
+
+		move.l d6,a2
+		cmp.l #VENDOR_MOTOROLA<<16|DEVICE_HAWK,(a2)
+		bne CardSetupErr
+
+		moveq.l #0,d0					;Total RAM
+		moveq.l #0,d2
+		move.l HAWK_SMC_RAMENSZ_1(a2),d1
+		bne.s TestMem
+
+StartTest2	move.l HAWK_SMC_RAMENSZ_2(a2),d1
+		beq.s EndMemTest
+
+TestMem2	moveq.l #1,d2
+
+TestMem		moveq.l #3,d3
+NextBank	rol.l #8,d1
+		btst #HAWM_SMC_RAMX_ENA,d1
+		beq.s NotEnabledBank
+
+		bclr #HAWM_SMC_RAMX_ENA,d1
+		lea MemSizes(pc),a1
+LoopSizes	move.l (a1)+,d7
+		beq.s NotEnabledBank
+
+		move.l (a1)+,d4
+		cmp.b d7,d1
+		bne.s LoopSizes
+
+		add.l d4,d0		
+NotEnabledBank	dbf d3,NextBank
+
+		tst.l d2
+		beq.s StartTest2
+
+EndMemTest	move.l d0,d7
+		beq NoMemError
+
+		neg.l d0
+		rol.w #8,d0
+		swap d0
+		rol.w #8,d0
+
+		moveq.l #2,d1				;Dummy bar 2 (Really dummy, not linked to BAR2)
+		move.l SonAddr(pc),a0
+		jsr _LVOPCIAllocMem(a6)			;Get space for Hawk Memory
+
+		move.l d0,d2
+		beq PCIMemErr 
+
+		move.l d0,SonnetBase-Buffer(a4)
+		add.l d7,d2
+		swap d2
+		add.l d0,d2
+
+		move.l ConfigDevNum(pc),d0
+		move.l #HAWK_PCI_PSADD1,d1
+		jsr _LVOPCIConfigWriteLong(a6)
+
+		move.l SonnetBase(pc),d0		
+		move.l #HAWK_RAM_BASE,d2
+		sub.l d0,d2
+		add.l #$d2,d2
+		move.l ConfigDevNum(pc),d0
+		move.l #HAWK_PCI_PSOFFATT1,d1
+		jsr _LVOPCIConfigWriteLong(a6)
+
+		move.l ConfigDevNum(pc),d0
+		move.l #HAWK_PCI_MMBAR,d1
+		jsr _LVOPCIConfigReadLong(a6)
+
+		move.l d0,a4					;MPIC
+		move.l #HAWK_MPIC_PROCINIT_P0|HAWK_MPIC_PROCINIT_P1,d0
+		move.l d0,HAWK_MPIC_PROCINIT(a4)		;Hold CPU in reset
+
+		move.l HAWK_SMC_ROMA(a2),d0
+		or.b #HAWK_SMC_ROMA_RV,d0
+		eor.b #HAWK_SMC_ROMA_RV,d0			;turn off Flash A being Boot ROM
+		move.l d0,HAWK_SMC_ROMA(a2)
+
+		move.l a2,a3
+		add.l #HAWM_SMCPHB_OFFSET,a3			;PHB
+		move.l #$fff0fff1,HAWK_PHB_XSADD0(a3)		;Reset vector range $fff00000-$fff10000
+
+		move.l #$fff00000,d0				;point reset vector table to our own VGA 'ROM'
+		sub.l d5,d0
+		add.l #$d2,d0
+		move.l d0,HAWK_PHB_XSOFFATT0(a3)
+
+		move.l d5,a3
+		lea $10000(a3),a1
+		lea $3000(a1),a5
+
+		lea PPCCode(pc),a2
+		move.l #PPCLen,d6
+		lsr.l #2,d6
+		subq.l #1,d6
+loopHawk	move.l (a2)+,(a5)+					;Copy code to 0x13000
+		dbf d6,loopHawk
+
+		move.l #$abcdabcd,BASE_CODEWORD(a1)			;Code Word
+		move.l GfxMem(pc),BASE_GFXMEM(a1)
+		move.l GfxLen(pc),BASE_GFXLEN(a1)		
+		move.l GfxType(pc),BASE_GFXTYPE(a1)
+		move.l GfxConfig(pc),BASE_GFXCONFIG(a1)
+		move.l ENVOptions(pc),BASE_ENV1(a1)
+		move.l ENVOptions+4(pc),BASE_ENV2(a1)
+		move.l ENVOptions+8(pc),BASE_ENV3(a1)
+		move.l a1,-(a7)
+
+		move.l SonnetBase(pc),BASE_MEM(a1)
+		move.l d7,BASE_MEMLEN(a1)				;Set available memory.
+		move.l MPICAddr,BASE_XPMI(a1)				;XPMI (MPIC)
+		move.l StartBAT(pc),BASE_STARTBAT(a1)
+		move.l SizeBAT(pc),BASE_SIZEBAT(a1)
+
+		move.l LExecBase(pc),a6
+		jsr _LVOCacheClearU(a6)
+
+		moveq.l #0,d0
+		move.l d0,HAWK_MPIC_PROCINIT(a4)			;Negate reset state
+		move.l (a7)+,a1
+
+		movem.l (a7)+,d0-a0/a2-a6
+
+		bra ReturnInitPPC
+
+;*********************************************************
+
+NoMemError	movem.l (a7)+,d0-a0/a2-a6
+		lea SonnetMemError(pc),a2
+		bra PrintError
+
+;*********************************************************
+
+CardSetupErr	movem.l (a7)+,d0-a0/a2-a6
+		lea CardStateError(pc),a2
+		bra PrintError
+
+;*********************************************************
+
+MemSizes	dc.l 1,$02000000,2,$04000000,3,$04000000,4,$08000000,5,$08000000
+		dc.l 6,$08000000,7,$10000000,8,$10000000,9,$20000000,0,0
 
 ;********************************************************************************************
 
@@ -4451,7 +4650,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.12 (20.12.18)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.12 (26.12.18)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
@@ -4460,7 +4659,6 @@ LDOSError	dc.b	"Could not open dos.library V37+",0
 LExpError	dc.b	"Could not open expansion.library V37+",0
 LPCIError	dc.b	"Could not open pci.library V13.6+",0
 MedError	dc.b	"Could not find a supported Mediator board",0
-MemMedError	dc.b	"No system VGA memory detected (pcidma)",0
 PPCCardError	dc.b	"No PPC card detected",0
 NBridgeError	dc.b	"No supported PPC PCI bridge detected",0
 VGAError	dc.b	"No supported VGA card detected",0
@@ -4488,6 +4686,7 @@ PPCErrSem	dc.b	"PPC Semaphore in illegal state",0
 PPCErrFifo	dc.b	"PPC received an illegal command packet",0
 PPCCrashNoWin	dc.b	"PPC crashed but could not output crash window",0
 PPCErrorTimeOut	dc.b	"PPC timed out while waiting on 68k",0
+CardStateError	dc.b	"PPC card in unsupported state",0
 
 ConWindow	dc.b	"CON:0/20/680/250/PowerPC Exception/AUTO/CLOSE/WAIT/"
 		dc.b	"INACTIVE",0		
