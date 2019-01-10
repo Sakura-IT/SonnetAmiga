@@ -3376,6 +3376,9 @@ WaitFor68K:
 		beq	.NextMsg
 
 		lwz	r4,TASKPPC_MIRRORPORT(r27)
+		mr.	r4,r4
+		beq	.NextMsg			#No 68k mirror exists (yet)
+
 		lwz	r4,MP_SIGTASK(r4)
 		mr	r3,r25
 		
@@ -9943,6 +9946,9 @@ StartCode:	bl	.StartRunPPC
 		beq	.NextEMsg
 
 		lwz	r4,TASKPPC_MIRRORPORT(r31)
+		mr.	r4,r4
+		beq	.NextEMsg				#No 68k mirror exists (yet)
+
 		lwz	r4,MP_SIGTASK(r4)
 		mr	r3,r25
 		
