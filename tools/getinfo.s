@@ -36,6 +36,7 @@ PPCINFO_L2SIZE	EQU	$8010200C
 HINFO_DSEXC_LOW EQU	$80103003
 CPUF_7410	EQU	$00800000
 CPUF_7441	EQU	$01000000
+CPUF_74x7	EQU	$02000000
 
 ;************************************************************************************************
 
@@ -103,9 +104,16 @@ NoG3		move.l d2,d3
 
 		move.l d2,d3
 		and.l #CPUF_7441,d3
-		beq.s StoreCPU
+		bne.s Store7441
 
-		lea CPU_7441-infotext(a4),a3
+		move.l d2,d3
+		and.l #CPUF_74x7,d3
+		beq.s StoreCPU
+		
+		lea CPU_74X7-infotext(a4),a3
+		bra.s StoreCPU
+		
+Store7441	lea CPU_7441-infotext(a4),a3
 		bra.s StoreCPU
 		
 Store7410	lea CPU_7410-infotext(a4),a3
@@ -259,6 +267,7 @@ CPU_750		dc.b	"PPC 750",0
 CPU_7400	dc.b	"PPC 7400",0
 CPU_7410	dc.b	"PPC 7410",0
 CPU_7441	dc.b	"PPC 7441",0
+CPU_74X7	dc.b	"PPC 7457",0
 CPU_Unknown     dc.b    "UNKNOWN",0
 CACHE_ON_U      dc.b    "ON and UNLOCKED",0
 CACHE_OFF_U     dc.b    "OFF and UNLOCKED",0
