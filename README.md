@@ -44,7 +44,7 @@ SonnetAmiga has the following hardware requirements:
 See the "Building SonnetAmiga project from source" article on project's Wiki:
 https://github.com/Sakura-IT/SonnetAmiga/wiki
 
-Automated binary builds are available from Jenkins: https://sonnet.uguu.waw.pl/jenkins/job/sonnetamiga/
+Automated binary builds are available from Jenkins: https://jenkins.sakura-it.pl/job/sonnetamiga/
 
 # Installation
 
