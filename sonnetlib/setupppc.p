@@ -5645,8 +5645,15 @@ dsi2:
 	
 #***********************************************	
 
-.HaltDSI:
-		li	r0,EXCF_DACCESS
+.HaltDSI:	lwz	r3,PowerPCBase(r0)
+		lbz	r4,sonnet_EnDAccessExc(r3)
+		mr.	r4,r4
+		bne	.RealHalt
+
+		la	r4,LIST_EXCDACCESS(r3)
+		b	.CommonHandler
+
+.RealHalt:	li	r0,EXCF_DACCESS
 		b	.CommonError
 
 #*************************************************
@@ -6164,7 +6171,7 @@ dsi2:
 		cmpwi	r5,EXCF_PROGRAM
 		beq	.Private			#Needs jump table
 		cmpwi	r5,EXCF_DACCESS
-		beq	.DoDSI
+		beq	.DoDSI3
 		cmpwi	r5,EXCF_INTERRUPT
 		beq	.DoEInt
 		cmpwi	r5,EXCF_DECREMENTER
@@ -6172,6 +6179,13 @@ dsi2:
 		mr	r0,r5
 		b	.CommonError
 
+.DoDSI3:	lwz	r3,PowerPCBase(r0)
+		lbz	r4,sonnet_EnDAccessExc(r3)
+		mr.	r4,r4
+		bne	.DoDSI2
+		mr	r0,r5
+		b	.CommonError
+		
 #****************************************************
 
 .Private:	lwz	r5,Exc_srr0(r0)
