@@ -19,7 +19,8 @@ SonnetAmiga has the following hardware requirements:
   own risk with a 3.3V modified Sonnet (see Wiki).
 - Sonnet Crescendo 7200 with local memory installed (up to 128 or 256MB
   depending on installed graphics card).
-- 3Dfx Voodoo 3, 4, 5 or ATI Radeon 9200 (ID $5960, $5964 and $5C63) graphics card.
+- 3Dfx Voodoo 3, 4, 5 or ATI Radeon 9200 (ID $5960, $5961, $5962, $5964 and
+  $5C63) graphics card.
 - 5V 168 pins FPM DIMMs 2K Refresh (up to 256MB with Voodoo3; 128MB with other
   supported video cards). 128 MB and 256 MB DIMMs are currently not supported.
   Please use up to 3x64 MB.
