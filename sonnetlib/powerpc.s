@@ -4657,7 +4657,7 @@ DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 PowerPCError	dc.b	"Other PPC library already active (WarpOS/Sonnet)",0
 LDOSError	dc.b	"Could not open dos.library V37+",0
 LExpError	dc.b	"Could not open expansion.library V37+",0
-LPCIError	dc.b	"Could not open pci.library V13.6+",0
+LPCIError	dc.b	"Could not open pci.library V13.8+",0
 MedError	dc.b	"Could not find a supported Mediator board",0
 PPCCardError	dc.b	"No PPC card detected",0
 NBridgeError	dc.b	"No supported PPC PCI bridge detected",0

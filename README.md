@@ -37,7 +37,7 @@ SonnetAmiga has the following hardware requirements:
 
 # Software
 
-- Elbox' pci.library 13.6+ required.
+- Elbox' pci.library 13.8+ required.
 - THOR's mmulib package recommended.
 
 # Building
