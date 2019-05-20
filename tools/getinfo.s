@@ -37,6 +37,7 @@ HINFO_DSEXC_LOW EQU	$80103003
 CPUF_7410	EQU	$00800000
 CPUF_7441	EQU	$01000000
 CPUF_74x7	EQU	$02000000
+sonnet_Run68k	EQU	1388			;Might change
 
 ;************************************************************************************************
 
@@ -211,7 +212,7 @@ Done		move.l 52(a2),d2
 		mulu.l #100,d3
 		sub.l d3,d2
 		move.l d2,52(a1)
-		
+
 		move.l 100(a2),d2
 		move.l d2,d3
 		divu.l #100,d3
@@ -219,19 +220,22 @@ Done		move.l 52(a2),d2
 		mulu.l #100,d3
 		sub.l d3,d2
 		move.l d2,60(a1)
-		
+
 		move.l 84(a2),d2
 		move.l #1024,d3
 		divu.l d3,d2		
 		move.l d2,72(a1)
-		
+
 		lea HalInfoTags-infotext(a4),a3
 		move.l 4(a3),76(a1)
 		move.l 12(a3),80(a1)
-		
+
+		move.l _PowerPCBase-infotext(a4),a3
+		move.l sonnet_Run68k(a3),84(a1)
+
 		move.l a1,d2
 		jsr _LVOVPrintf(a6)
-				
+
 NoLib		movem.l (a7)+,d0-a6
 		rts
 
@@ -256,6 +260,7 @@ infotext        dc.b    "CPU:                   %s   (PVR = %08lx)",10
 		dc.b	"L2 Size:               %ld KBytes",10
 		dc.b	"FPU Align Emulation:   %ld times",10
 		dc.b	"DSI Emulation:         %ld times",10
+		dc.b	"Run68K called:         %ld times",10
 		dc.b    0
 
 CPU_603         dc.b    "PPC 603",0

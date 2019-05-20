@@ -3479,8 +3479,13 @@ Run68K:
 		li	r31,FRun68K-FRun68K
 		bl	DebugStartFunction
 
+		la	r30,sonnet_Run68k(r3)		#Count number of 68k context switches
 		mr	r28,r3
-		mr	r31,r4		
+		lwz	r25,0(r30)
+		mr	r31,r4
+		addi	r25,r25,1
+		stw	r25,0(r30)
+		dcbf	r0,r30				#flush value
 		mfctr	r25
 
 		bl CreateMsgFramePPC
@@ -10265,7 +10270,6 @@ ExitCode:	lwz	r14,0(r1)
 		stfd	f7,PP_FREGS+6*8(r9)
 		stfd	f8,PP_FREGS+7*8(r9)
 		lwz	r8,sonnet_MCPort(r14)
-		lwz	r7,MN_STACKFRAME(r9)			#StackFrame
 		stw	r8,MN_MCPORT(r9)
 
 		lwz	r4,ThisPPCProc(r14)

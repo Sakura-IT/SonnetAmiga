@@ -167,7 +167,8 @@
 .set sonnet_ErrorStrings,1376
 .set sonnet_BusClock,1380
 .set sonnet_Quantum,1384
-.set sonnet_PosSize,1388			#Library PosSize
+.set sonnet_Run68k,1388
+.set sonnet_PosSize,1392			#Library PosSize
 
 .set EXCDATA_TYPE,8				#Always NT_INTERRUPT
 .set EXCDATA_PRI,9				#This
@@ -899,7 +900,7 @@
 .set MN_ARG1,180
 .set MN_ARG0,184
 .set MN_MCPORT,188
-.set MN_STACKFRAME,188			# depends on MN type
+.set MN_SIGNALS,188			# depends on MN type
 
 .set MH_ATTRIBUTES,14			# characteristics of this region
 .set MH_FIRST,16			# first free region
