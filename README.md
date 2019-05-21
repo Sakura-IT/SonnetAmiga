@@ -82,7 +82,7 @@ Currently the following options are supported through variables in ENVARC:sonnet
 - SetCPUComm (0 or 1): If set will move all requests to MasterControl process and
   are no longer directly handled by the 68K interrupt. Intended for A1200.
   Default = 0. **EXPERIMENTAL** 
-- SetCMemDiv (0-5): Sets the speed divider of the L2 Cache memory.
+- SetCMemDiv (0-5): Sets the speed divider of the L2 Cache memory of a Sonnet card.
   5 = 3, 4 = 2.5, 3 = 2, 2 = 1.5, 1 = 1, 0 = Handled by library. Default = 0.
   For example: A Sonnet with speed 500 MHz and setting 5 will run the L2 cache
   at 166 MHz (500/3). **USE AT OWN RISK!!!**
@@ -108,6 +108,7 @@ Mediator boards was developed without access to the official Mediator SDK.
 This project is not endorsed by ELBOX in any way.
 
 We are not responsible for any damages as a result of hardware modifications you performed needed to get
-the Sonnet working in your system and neither for making your system work with a Sonnet. Buy a Sonnet
-card at your own risk!
+a PCI PPC card working in your system and neither for making your system work with a PPC PCI card. We are
+also not responsible for any money loss due to the inflated prices on e.g. AmiBay or EBay.
+Buy a PCI PPC card at your own risk!
 

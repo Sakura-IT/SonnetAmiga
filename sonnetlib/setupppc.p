@@ -6406,9 +6406,16 @@ dsi2:
 		lwz	r4,ThisPPCProc(r3)
 		stw	r4,4(r31)
 		lwz	r5,LN_NAME(r4)
-		stw	r5,0(r31)
-		addi	r31,r31,4
 
+		lwz	r3,Exc_srr0(r0)
+		lis	r4,0xf000
+		and.	r3,r3,r4
+		bne	.NotKernel
+
+		li	r5,0
+.NotKernel:	stw	r5,0(r31)
+		
+		addi	r31,r31,4
 		lwz	r3,SonnetBase(r0)
 		mflr	r4
 		or	r4,r4,r3

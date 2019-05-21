@@ -2160,7 +2160,13 @@ GiveError	lea CrashMessage(pc),a0
 		move.l a0,d3
 		add.l #FIFO_BASE+$100,d3
 		move.l d3,a5				;value of PPC register r0 is at offset 76
-		jsr _LVOVFPrintf(a6)
+		tst.l (a5)
+		bne.s NotKernelPanic
+		
+		lea KernelPanic(pc),a2
+		move.l a2,(a5)
+		
+NotKernelPanic	jsr _LVOVFPrintf(a6)
 
 		move.l 76(a5),d0
 		lea PPCErrSem(pc),a2
@@ -4650,7 +4656,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.12 (20.05.19)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.12 (21.05.19)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
@@ -4687,6 +4693,7 @@ PPCErrFifo	dc.b	"PPC received an illegal command packet",0
 PPCCrashNoWin	dc.b	"PPC crashed but could not output crash window",0
 PPCErrorTimeOut	dc.b	"PPC timed out while waiting on 68k",0
 CardStateError	dc.b	"PPC card in unsupported state",0
+KernelPanic	dc.b	"Kernel Panic!",0
 
 ConWindow	dc.b	"CON:0/20/680/250/PowerPC Exception/AUTO/CLOSE/WAIT/"
 		dc.b	"INACTIVE",0		
