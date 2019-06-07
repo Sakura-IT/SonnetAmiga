@@ -1,4 +1,4 @@
-# Copyright (c) 2015-2018 Dennis van der Boon
+# Copyright (c) 2015-2019 Dennis van der Boon
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -2760,6 +2760,11 @@ EInt:		b	.FPUnav				#0
 
 .StartQ:	lwz	r10,PowerPCBase(r0)
 
+		lwz	r4,sonnet_Atomic(r10)		#If atomic is set, return to current task
+		mr.	r4,r4
+		bne-	.QuickReturn
+		isync
+
 		lwz	r9,Exc_srr0(r0)
 		lwz	r4,AdListStart(r0)
 		cmpw	r9,r4
@@ -2812,13 +2817,7 @@ EInt:		b	.FPUnav				#0
 		
 #**********************************************************
 
-.XSignal:	la	r4,sonnet_Atomic(r10)
-		lwarx	r0,r0,r4
-		cmpwi	r0,0
-		bne-	.Oopsie
-		isync
-
-		lwz	r3,MN_ARG1(r5)			#68K mirror task
+.XSignal:	lwz	r3,MN_ARG1(r5)			#68K mirror task
 		lwz	r4,ThisPPCProc(r10)		#Check for it in the running task
 		lwz	r8,TASKPPC_MIRROR68K(r4)
 		cmpw	r8,r3

@@ -1707,11 +1707,7 @@ DoneCPUComm	move.b (a3),1(a5)
 		beq.s DoneStackP
 		move.b d2,(a3)
 DoneStackP	move.b (a3),2(a5)
-		lea DisSigBounce(pc),a1
-		bsr DoENV
-		bmi.s NoDisSigBounce
-		move.b (a3),3(a5)
-NoDisSigBounce	rts
+		rts
 
 ;*********************************************
 
@@ -2067,32 +2063,43 @@ GotMirMsgPort	move.l d0,-(a7)
 CleanUp		move.l d6,a0
 		jsr _LVOGetMsg(a6)			;Make sure the original msgport is empty
 		tst.l d0
-		beq.s GoWaitPort
+		beq.s SetUpStuff
 		
 		move.l d0,a1
 		move.l (a7),a0
 		jsr _LVOPutMsg(a6)
 		bra.s CleanUp
 
+SetUpStuff	move.l (a7),a0
+		move.b MP_SIGBIT(a0),d1
+		moveq.l #0,d5
+		bset d1,d5
+		move.l d5,d6
+		add.w #$fff,d6
+		not.l d6
+
 GoWaitPort	move.l (a7),a0
 		move.l ThisTask(a6),a1
 		
 		move.l TC_SIGALLOC(a1),d0
 		and.l #$fffff000,d0			;Do not act on system signals except the CTRL ones
-		or.w #1<<SIGB_BOUNCE,d0			;Special signal to prevent bouncing between CPUs
 
 		jsr _LVOWait(a6)
 
-		move.l (a7),a0		
-		move.b MP_SIGBIT(a0),d1
-		moveq.l #0,d2
-		bset d1,d2
-		not.l d2
 		move.l d0,d1
-		and.l d2,d1
-		beq.s GtLoop2
+		and.l d5,d0
+		bne.s ResetSigs1
+		
+		and.l d6,d1
+		beq.s GoWaitPort
 
 		bsr CrossSignals			;If other signals are detected than the
+
+		bra.s GoWaitPort
+				
+ResetSigs1	and.l d6,d1
+		move.l ThisTask(a6),a0
+		or.l d1,TC_SIGRECVD(a0)			;Reset 68k signals that were negated by the Wait()
 							;the one for the msgport, send it to ppc.
 GtLoop2		move.l (a7),a0
 		jsr _LVOGetMsg(a6)
@@ -2447,8 +2454,7 @@ MsgT68k		move.l MN_MIRROR(a1),a0			;Handles messages to 68K (mirror)tasks
 		move.l d1,a2
 		move.l MP_SIGTASK(a2),a2
 		move.l MN_ARG1(a1),TC_SIGALLOC(a2)
-		move.l MN_ARG2(a1),d0
-		
+
 DoPutMsg	jsr _LVOPutMsg(a6)
 		bra NxtMsgLoop
 
@@ -2501,11 +2507,12 @@ MsgRetX		move.l a1,a2
 
 MsgSignal68k	move.l MN_PPSTRUCT+4(a1),d0		;Signal from a PPC task to 68K task
 		move.l a1,d7
-		or.w #1<<SIGB_BOUNCE,d0			;Mark it as being from PPC to prevent bouncing
 		move.l MN_PPSTRUCT(a1),a1
 		jsr _LVOSignal(a6)
+
 		move.l d7,a0
 		bsr FreeMsgFrame
+
 		bra NxtMsgLoop
 		
 ;********************************************************************************************
@@ -3491,10 +3498,14 @@ GotMsgPort	move.l d0,Port(a5)
 		move.l #MEMF_PUBLIC|MEMF_CLEAR,d1
 		moveq.l #MT_SIZE,d0
 		jsr _LVOAllocVec(a6)
+
 		tst.l d0
-		beq GtLoop
+		bne.s GotMTMem
+	
+		moveq.l #PPERR_MISCERR,d7		;Only DOS processes supported
+		bra EndIt
 		
-		move.l d6,a1
+GotMTMem	move.l d6,a1
 		bset #TB_PPC,TC_FLAGS(a1)		
 		move.l d0,a1
 		move.l ThisTask(a6),MT_TASK(a1)
@@ -3523,9 +3534,12 @@ GotMsgPort	move.l d0,Port(a5)
 		move.l #MEMF_PUBLIC|MEMF_PPC|MEMF_REVERSE,d1
 		jsr _LVOAllocVec32(a6)
 		move.l d0,d6
-		beq Stacker
+		bne.s GotTaskMem
 
-		move.l LExecBase(pc),a6
+		moveq.l #PPERR_MISCERR,d7		;Only DOS processes supported
+		bra EndIt
+
+GotTaskMem	move.l LExecBase(pc),a6
 		move.l ThisTask(a6),a1
 		move.l d6,a2
 		move.l #511,d0
@@ -3602,8 +3616,15 @@ ClrMsg		clr.l (a2)+
 OldPPCTask	move.l d0,d7
 SetSigAlloc	move.l d7,MN_ARG1(a0)
 		move.l a2,MN_ARG2(a0)		
+		move.l TC_SIGRECVD(a2),d0
+		move.l d0,d1
+		move.l Port(a5),a1
+		move.b MP_SIGBIT(a1),d2
+		bclr d2,d0
+		and.l #$fffff000,d0
+		move.l d0,MN_SIGNALS(a0)		;Send current 68K signals to PPC (active CPU)
+		eor.l d0,TC_SIGRECVD(a2)		;Reset the sent signals to zero on the 68K.
 		move.l PStruct(a5),a1
-
 		move.l a1,a3
 		tst.l PP_STACKPTR(a1)
 		beq.s SetupCp
@@ -3658,7 +3679,7 @@ CpMsg2		move.l (a3)+,d1
 		
 		move.l PP_FLAGS(a1),d1			;Asynchronous RunPPC Call
 		btst.l #PPB_ASYNC,d1
-		beq Stacker
+		beq SigsSetup
 		
 		move.l MirrorNode(a5),a3
 		move.l d1,MT_FLAGS(a3)
@@ -3698,33 +3719,44 @@ WaitForPPCErr	moveq.l #PPERR_WAITERR,d7
 DidAsync	moveq.l #0,d0
 		move.l d0,MT_FLAGS(a2)
 
-Stacker		move.l ThisTask(a6),a1
+SigsSetup	move.l Port(a5),a0
+		move.b MP_SIGBIT(a0),d1
+		moveq.l #0,d5
+		bset d1,d5
+		move.l d5,d6
+		add.w #$fff,d6
+		not.l d6
+
+WaitPktLoop	move.l ThisTask(a6),a1
 		cmp.b #0,LN_PRI(a1)
 		blt.s NoAdjustPri
 		move.b #0,LN_PRI(a1)			;Kludge to prevent high pri stuff blocking
 							;the system like Heretic II.
 NoAdjustPri	move.l TC_SIGALLOC(a1),d0		
 		and.l #$fffff000,d0
-		or.w #1<<SIGB_BOUNCE,d0			;Special signal to prevent bouncing
 
 		jsr _LVOWait(a6)
 
-		move.l Port(a5),a0		
-		move.b MP_SIGBIT(a0),d1
-		moveq.l #0,d2
-		bset d1,d2
-		not.l d2
 		move.l d0,d1
-		and.l d2,d1
-		beq.s GtLoop
+		and.l d5,d0
+		bne.s ResetSigs2
 
-		bsr CrossSignals
+		and.l d6,d1
+		beq.s WaitPktLoop
+
+		bsr CrossSignals			;If other signals are detected than the
+
+		bra.s WaitPktLoop
+
+ResetSigs2	and.l d6,d1
+		move.l ThisTask(a6),a0
+		or.l d1,TC_SIGRECVD(a0)			;Reset 68K signals that were negated by Wait().
 
 GtLoop		move.l Port(a5),a0
 		jsr _LVOGetMsg(a6)
 		
 		tst.l d0
-		beq.s Stacker
+		beq.s WaitPktLoop
 
 		move.l d0,a0
 		move.l MN_IDENTIFIER(a0),d0
@@ -3736,6 +3768,9 @@ GtLoop		move.l Port(a5),a0
 		bra.s GtLoop
 
 DizDone		move.l a0,a2
+		move.l ThisTask(a6),a1
+		move.l MN_ARG2(a2),d0
+		or.l d0,TC_SIGRECVD(a1)			;Activate 68K signals as received from PPC.
 		move.l MirrorNode(a5),a1
 		move.l MN_PPC(a2),MT_MIRROR(a1)		
 		move.l PStruct(a5),a1
@@ -3782,9 +3817,13 @@ Runk86		link a3,#-16
 		
 NoFPU		movem.l d0-a6,-(a7)			;68k routines called from PPC
 		move.l a0,-(a7)
+		move.l ThisTask(a6),a1
+		move.l MN_ARG2(a0),d0
+		or.l d0,TC_SIGRECVD(a1)			;Activate signals as received from PPC.	
 		lea MN_PPSTRUCT(a0),a1
 		btst #AFB_FPU40,AttnFlags+1(a6)
 		beq.s NoFPU3
+
 		lea PP_FREGS(a1),a6
 		fmove.d (a6)+,fp0
 		fmove.d (a6)+,fp1
@@ -3930,6 +3969,11 @@ DoReslt		move.l (a1)+,d7
 		move.l ThisTask(a6),a1
 		move.l a1,MN_ARG2(a0)
 		move.l TC_SIGALLOC(a1),MN_ARG1(a0)
+		move.l TC_SIGRECVD(a1),d7
+		move.l $1c(a7),d6			;Get d6 (signal mask) from stack
+		and.l d6,d7
+		move.l d7,MN_ARG0(a0)			;Send current active 68K signals to PPC.
+		eor.l d7,TC_SIGRECVD(a1)		;Reset sent signals to zero for 68K.
 		move.l a0,d7
 		move.l a0,a1
 		lea PushMsg(pc),a5
@@ -3963,13 +4007,7 @@ NoFPU2		move.l a7,a0
 		
 ;********************************************************************************************
 
-CrossSignals	btst #SIGB_BOUNCE,d0			;Test on special signal
-		beq.s SigBouncing
-		move.b Options68K+3(pc),d0
-		beq.s SigBouncing
-		rts
-
-SigBouncing	bsr CreateMsgFrame
+CrossSignals	bsr CreateMsgFrame
 
 		moveq.l #MSG_LEN/4-1,d0
 		move.l a0,a2
@@ -4656,7 +4694,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.12 (21.05.19)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.12 (06.06.19)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
@@ -4709,15 +4747,15 @@ DisHunkPatch	dc.b	"sonnet/DisHunkPatch",0			;7
 SetCMemDiv	dc.b	"sonnet/SetCMemDiv",0			;8
 SetCPUComm	dc.b	"sonnet/SetCPUComm",0			;9
 EnStackPatch	dc.b	"sonnet/EnStackPatch",0			;10
-DisSigBounce	dc.b	"sonnet/DisSigBounce",0			;11
 
 		cnop	0,4
 		
-CrashMessage	dc.b	"Task name: '%s'  Task address: %08lx  Exception: %s",10
+CrashMessage	dc.b	"Task name: '%s'  Task address: %08lx",10
+		dc.b	"Exception: %s",10,10
 		dc.b	"SRR0: %08lx    SRR1:  %08lx     MSR:   %08lx    HID0: %08lx",10
 		dc.b	"PVR:  %08lx    DAR:   %08lx     DSISR: %08lx    SDR1: %08lx",10
 		dc.b	"DEC:  %08lx    TBU:   %08lx     TBL:   %08lx    XER:  %08lx",10
-		dc.b	"CR:   %08lx    FPSCR: %08lx     LR:    %08lx    CTR:  %08lx",10
+		dc.b	"CR:   %08lx    FPSCR: %08lx     LR:    %08lx    CTR:  %08lx",10,10
 		dc.b	"R0-R3:   %08lx %08lx %08lx %08lx   IBAT0: %08lx %08lx",10
 		dc.b	"R4-R7:   %08lx %08lx %08lx %08lx   IBAT1: %08lx %08lx",10
 		dc.b	"R8-R11:  %08lx %08lx %08lx %08lx   IBAT2: %08lx %08lx",10

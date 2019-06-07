@@ -75,8 +75,6 @@ Currently the following options are supported through variables in ENVARC:sonnet
 - EnDAccessExc: See EnAlignExc, but now for the Data Access Exception (DSI).
 - DisHunkPatch (0 or 1): Disable automatic pushing first code hunk to FAST RAM.
   Default = 0.
-- DisSigBounce (0 or 1): Disable signal bouncing between processors. Can gain
-  speed at the expense of compatibility. Default = 0.
 - EnStackPatch (0 or 1): Enable if you want the library to push more 68K data to
   68K memory like stack and task structures. **EXPERIMENTAL**
 - SetCPUComm (0 or 1): If set will move all requests to MasterControl process and

@@ -1,4 +1,4 @@
-* Copyright (c) 2015-2017 Dennis van der Boon
+* Copyright (c) 2015-2019 Dennis van der Boon
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -48,7 +48,6 @@ PCSRBAR			EQU 	$14
 OMBAR			EQU 	$300
 OTWR			EQU 	$308
 OPQI			EQU	$20000000
-SIGB_BOUNCE		EQU	9
 WP_CONTROL		EQU 	$F48
 WP_TRIG01		EQU 	$c0000000
 MEMF_PPC		EQU 	$2000

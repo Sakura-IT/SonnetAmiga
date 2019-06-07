@@ -2167,6 +2167,7 @@ ObtainSemaphorePPC:
 
 		mr.	r3,r3
 		beq+	.WaitRes
+
 		lha	r5,SS_QUEUECOUNT(r30)
 		addi	r5,r5,1
 		sth	r5,SS_QUEUECOUNT(r30)
@@ -2286,6 +2287,7 @@ AttemptSemaphorePPC:
 		lwz	r3,ThisPPCProc(r31)
 		mr.	r5,r5
 		beq-	.NoQueue
+
 		lwz	r4,SS_OWNER(r30)
 		cmplw	r3,r4
 		beq-	.AmOwner
@@ -3371,19 +3373,42 @@ WaitFor68K:
 
 		bl WaitPPC
 
-		li	r28,SIGF_DOS				#Standard msg port wait bit
+		li	r28,SIGF_DOS			#Standard msg port wait bit
+		and.	r4,r3,r28
+		bne	.ResetSigs2		
+
 		andc.	r5,r3,r28
-		beq	.NextMsg
+		beq	.WasNoMsg
 
 		lwz	r4,TASKPPC_MIRRORPORT(r27)
 		mr.	r4,r4
-		beq	.NextMsg			#No 68k mirror exists (yet)
+		beq	.WasNoMsg			#No 68k mirror exists (yet)
 
 		lwz	r4,MP_SIGTASK(r4)
 		mr	r3,r25
-		
-		bl Signal68K		
-		
+
+		bl Signal68K
+
+		b	.WasNoMsg
+
+.ResetSigs2:	andc.	r5,r3,r28
+		beq	.NextMsg
+
+.ResetSigsWt2:	la	r4,sonnet_Atomic(r25)
+
+		bl AtomicTest
+
+		mr.	r3,r3
+		beq	.ResetSigsWt2
+
+		lwz	r29,TC_SIGRECVD(r27)
+		or	r29,r29,r5
+		stw	r29,TC_SIGRECVD(r27)
+
+		la	r4,sonnet_Atomic(r25)
+
+		bl AtomicDone		
+
 .NextMsg:	lwz	r4,TASKPPC_MSGPORT(r27)
 		mr	r3,r25
 
@@ -3410,17 +3435,33 @@ WaitFor68K:
 		illegal					##FIFO list corruption?
 		b	.NextMsg			##Needs error message
 		
-.WasDone:	lwz	r4,ThisPPCProc(r25)
-		lwz	r26,TASKPPC_MIRRORPORT(r4)
+.WasDone:	lwz	r29,ThisPPCProc(r25)
+		lwz	r26,TASKPPC_MIRRORPORT(r29)
 		mr.	r26,r26
 		bne	.GotMirror
 
 		lwz	r26,MN_MIRROR(r30)
-		stw	r26,TASKPPC_MIRRORPORT(r4)
-		lwz	r26,MN_ARG2(r30)
-		stw	r26,TASKPPC_MIRROR68K(r4)
+		lwz	r6,MN_ARG2(r30)
+		stw	r26,TASKPPC_MIRRORPORT(r29)
+		stw	r6,TASKPPC_MIRROR68K(r29)
+
+.GotMirror:	la	r4,sonnet_Atomic(r25)
+
+		bl AtomicTest
 		
-.GotMirror:	mfctr	r26
+		mr.	r3,r3
+		beq	.GotMirror
+
+		lwz	r4,MN_ARG0(r30)
+		lwz	r6,TC_SIGRECVD(r29)
+		or	r6,r6,r4
+		stw	r6,TC_SIGRECVD(r29)		#Set the PPC signals as received from 68K
+
+		la	r4,sonnet_Atomic(r25)
+
+		bl AtomicDone
+
+		mfctr	r26
 		subi	r4,r31,4
 		addi	r29,r30,MN_PPSTRUCT-4		#r30 = new msg
 		li	r6,PP_SIZE/4
@@ -3516,9 +3557,25 @@ Run68K:
 		stw	r4,MN_ARG0(r30)
 		lwz	r4,TC_SIGALLOC(r5)
 		stw	r4,MN_ARG1(r30)
-		lwz	r4,TC_SIGRECVD(r5)
-		stw	r4,MN_ARG2(r30)
+		
+.SigLoop1:	la	r4,sonnet_Atomic(r28)
 
+		bl AtomicTest
+
+		mr.	r3,r3
+		beq	.SigLoop1
+		
+		lwz	r7,TC_SIGRECVD(r5)
+		li	r6,0xfff
+		andc.	r4,r7,r6
+		and.	r29,r7,r6
+		stw	r4,MN_ARG2(r30)			#Send current PPC signals to 68K
+		stw	r29,TC_SIGRECVD(r5)		#Reset sent PPC signals to zero.
+		
+		la	r4,sonnet_Atomic(r28)
+
+		bl AtomicDone
+		
 		lwz	r4,PP_CODE(r30)
 		mr.	r4,r4
 		li	r4,PPERR_MISCERR
@@ -3541,7 +3598,9 @@ Run68K:
 
 		illegal					#DEBUG Not yet implemented (async)
 		
-.DoStackPPC:	li	r4,CACHE_DCACHEFLUSH
+.DoStackPPC:	mr	r3,r28
+		li	r4,CACHE_DCACHEFLUSH
+
 		bl	SetCache
 
 .FromRunPPC:	lwz	r4,sonnet_MCPort(r28)
@@ -6068,9 +6127,13 @@ CheckExcSignal:
 		andc	r8,r8,r4
 		or	r5,r5,r4
 		stw	r5,TC_SIGRECVD(r7)
-		
+
 		stw	r7,sonnet_TaskExcept(r31)
-		
+
+		la	r4,sonnet_Atomic(r31)
+
+		bl AtomicDone
+
 		mr	r3,r31
 
 		bl CauseDECInterrupt
@@ -6078,12 +6141,14 @@ CheckExcSignal:
 .IntWait2:	lwz	r0,sonnet_TaskExcept(r31)
 		mr.	r0,r0
 		bne+	.IntWait2
+		
+		b	.ExitChkESig
 
 .NonePending:	la	r4,sonnet_Atomic(r31)
 
 		bl AtomicDone
 	
-		mr	r3,r8
+.ExitChkESig:	mr	r3,r8
 		
 		lwz	r31,0(r13)
 		addi	r13,r13,4
@@ -9947,8 +10012,11 @@ StartCode:	bl	.StartRunPPC
 		bl WaitPPC
 
 		li	r28,SIGF_DOS				#Standard msg port wait bit
+		and.	r4,r3,r28		
+		bne	.ResetSigs1
+
 		andc.	r5,r3,r28
-		beq	.NextEMsg
+		beq	.WasNoEMsg
 
 		lwz	r4,TASKPPC_MIRRORPORT(r31)
 		mr.	r4,r4
@@ -9956,9 +10024,29 @@ StartCode:	bl	.StartRunPPC
 
 		lwz	r4,MP_SIGTASK(r4)
 		mr	r3,r25
-		
-		bl Signal68K		
-		
+
+		bl Signal68K
+
+		b	.WasNoEMsg
+
+.ResetSigs1:	andc.	r5,r3,r28
+		beq	.NextEMsg
+
+.ResetSigsWait:	la	r4,sonnet_Atomic(r25)
+
+		bl AtomicTest
+
+		mr.	r3,r3
+		beq	.ResetSigsWait
+
+		lwz	r29,TC_SIGRECVD(r31)
+		or	r29,r29,r5
+		stw	r29,TC_SIGRECVD(r31)
+
+		la	r4,sonnet_Atomic(r25)
+
+		bl AtomicDone
+
 .NextEMsg:	lwz	r4,TASKPPC_MSGPORT(r31)
 		mr	r3,r25
 
@@ -10058,9 +10146,26 @@ StartCode:	bl	.StartRunPPC
 		
 		bl SetCache
 		
+.SigLoop2:	la	r4,sonnet_Atomic(r31)
+		
+		bl AtomicTest
+
+		mr.	r3,r3
+		beq	.SigLoop2
+
+ 		lwz	r15,ThisPPCProc(r31)
+ 		lwz	r17,MN_SIGNALS(r30)
+ 		lwz	r14,TC_SIGRECVD(r15)
+ 		or	r14,r14,r17
+ 		stw	r14,TC_SIGRECVD(r15)		#Set PPC signals as received from 68K
+
+		la	r4,sonnet_Atomic(r31)
+		
+		bl AtomicDone
+
 		mr	r3,r31
  		lwz	r4,sonnet_SnoopSem(r31)
-		
+
 		bl ObtainSemaphorePPC
 
 		lwz	r15,LIST_SNOOP(r31)
@@ -10241,14 +10346,35 @@ ExitCode:	lwz	r14,0(r1)
 		stb	r7,LN_TYPE(r9)
 
 		lwz	r7,ThisPPCProc(r14)
+		
+		mr	r18,r4
+		mr	r19,r3
+		
+.SigLoop3:	la	r4,sonnet_Atomic(r14)
+		
+		bl AtomicTest
+		
+		mr.	r3,r3
+		beq	.SigLoop3
+		
 		lwz	r8,TC_SIGALLOC(r7)
 		stw	r8,MN_ARG1(r9)
-		lwz	r7,TASKPPC_STARTMSG(r7)			
+		lwz	r8,TC_SIGRECVD(r7)
+		li	r16,0xfff
+		andc.	r17,r8,r16
+		and.	r8,r8,r16
+		stw	r17,MN_ARG2(r9)				#Send current PPC signals to the active CPU (68K)
+		stw	r8,TC_SIGRECVD(r7)			#Reset sent PPC signals to zero
+		la	r4,sonnet_Atomic(r14)
+		
+		bl AtomicDone
+
+		lwz	r7,TASKPPC_STARTMSG(r7)
 		lwz	r7,MN_REPLYPORT(r7)		
 		stw	r7,MN_REPLYPORT(r9)
 		stw	r2,PP_REGS+12*4(r9)
-		stw	r3,PP_REGS+0*4(r9)
-		stw	r4,PP_REGS+1*4(r9)
+		stw	r19,PP_REGS+0*4(r9)
+		stw	r18,PP_REGS+1*4(r9)
 		stw	r5,PP_REGS+8*4(r9)
 		stw	r6,PP_REGS+9*4(r9)
 		stw	r22,PP_REGS+2*4(r9)
