@@ -72,6 +72,7 @@
 	ENDC
 
 	XREF 	PPCCode,PPCLen,MCPort,Init,SysBase,PowerPCBase,DOSBase,sonnet_PosSize,PageTableSize
+	XREF	UtilityBase
 	XDEF	_PowerPCBase,FunctionsLen,LibFunctions
 
 ;********************************************************************************************
@@ -113,6 +114,7 @@ LIBINIT		movem.l d1-a6,-(a7)
 CorrectCPU	lea MemList(a6),a0
 		lea MemName(pc),a1
 		jsr _LVOFindName(a6)			;Check for sonnet memory (old sonnet.library)
+
 		tst.l d0
 		beq.s NoSonnetLib
 
@@ -122,6 +124,7 @@ CorrectCPU	lea MemList(a6),a0
 NoSonnetLib	lea LibList(a6),a0
 		lea PowerName(pc),a1			;Check for WarpOS
 		jsr _LVOFindName(a6)
+
 		tst.l d0
 		beq.s NoWOS
 
@@ -131,6 +134,7 @@ NoSonnetLib	lea LibList(a6),a0
 NoWOS		lea DosLib(pc),a1
 		moveq.l #37,d0
 		jsr _LVOOpenLibrary(a6)
+
 		move.l d0,DosBase-Buffer(a4)
 		tst.l d0
 		bne GotDOS				;Open dos.library
@@ -138,7 +142,12 @@ NoWOS		lea DosLib(pc),a1
 		lea LDOSError(pc),a2
 		bra PrintError
 
-GotDOS		moveq.l #PCI_VERSION,d0			;Minimal version of pci.library
+GotDOS		lea utillib(pc),a1
+		moveq.l #0,d0
+		jsr _LVOOpenLibrary(a6)
+		move.l d0,UtilBase-Buffer(a4)
+
+		moveq.l #PCI_VERSION,d0			;Minimal version of pci.library
 		lea pcilib(pc),a1
 		jsr _LVOOpenLibrary(a6)
 
@@ -612,12 +621,15 @@ NotLibMade	jsr _LVOEnable(a6)
 		lea LSetupError(pc),a2
 		bra PrintError
 
-GotLibMade	move.l SonnetBase(pc),a1
+GotLibMade	
+
+		move.l SonnetBase(pc),a1
 		move.l d0,PowerPCBase(a1)
 		move.l a5,PPCMemHeader(a1)		;Memheader at $8
 		move.l a1,(a1)				;Sonnet relocated mem at $0
 		move.l a6,SysBase(a1)
 		move.l DosBase(pc),DOSBase(a1)
+		move.l UtilBase(pc),UtilityBase(a1)
 
 		move.l d0,a1
 		addq.w #1,LIB_OPENCNT(a1)		;Prevent closure and all kinds of problems
@@ -1733,6 +1745,7 @@ DosLib		dc.b "dos.library",0
 ExpLib		dc.b "expansion.library",0
 pcilib		dc.b "pci.library",0
 ppclib		dc.b "ppc.library",0
+utillib		dc.b "utility.library",0
 MemName		dc.b "ppc memory",0
 PCIMem		dc.b "pcidma memory",0
 IntName		dc.b "Gort",0
@@ -4395,6 +4408,7 @@ DosBase			ds.l	1
 ExpBase			ds.l	1
 PCIBase			ds.l	1
 LExecBase		ds.l	1
+UtilBase		ds.l	1
 ROMMem			ds.l	1
 GfxMem			ds.l	1
 GfxLen			ds.l	1
@@ -4694,7 +4708,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.12 (06.06.19)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.12 (30.06.19)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		

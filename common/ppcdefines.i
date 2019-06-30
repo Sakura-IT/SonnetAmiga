@@ -43,6 +43,8 @@
 .set PowerPCBase,			0x18
 .set PageTableSize,			0x1c	#All within first cacheline!
 
+.set UtilityBase,			0x20	#Second cacheline
+
 .set AdListStart,			0x40
 .set AdListEnd,				0x44
 .set RunPPCStart,			0x48
@@ -169,7 +171,8 @@
 .set sonnet_BusClock,1380
 .set sonnet_Quantum,1384
 .set sonnet_Run68k,1388
-.set sonnet_PosSize,1392			#Library PosSize
+.set sonnet_UtilityBase,1392
+.set sonnet_PosSize,1396			#Library PosSize
 
 .set EXCDATA_TYPE,8				#Always NT_INTERRUPT
 .set EXCDATA_PRI,9				#This

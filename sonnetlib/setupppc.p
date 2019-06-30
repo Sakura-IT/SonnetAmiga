@@ -24,6 +24,7 @@
 
 .global PPCCode,PPCLen,ThisPPCProc,LIST_WAITINGTASKS,Init,ViolationAddress
 .global MCPort,SysBase,PowerPCBase,DOSBase,sonnet_DebugLevel,sonnet_PosSize,PageTableSize
+.global UtilityBase
 
 .set	PPCLen,(PPCEnd-PPCCode)
 .set	base_Comm,0
@@ -455,6 +456,9 @@ End:		mflr	r4
 
 		lwz	r6,DOSBase(r0)
 		stw	r6,sonnet_DosBase(r3)
+		
+		lwz	r6,UtilityBase(r0)
+		stw	r6,sonnet_UtilityBase(r3)
 
 		la	r14,base_Options(r29)
 		lbz	r6,option_EnDebug(r14)

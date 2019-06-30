@@ -659,6 +659,15 @@ RemTailPPC:	lwz	r5,8(r4)
 		mr	r3,r5
 .TailListEmpty:	blr	
 
+#RemTailPPC:	lwz	r3,8(r4)			#Original V16 code
+#		lwz	r5,4(r3)
+#		mr.	r5,r5
+#		beq-	.TailListEmpty
+#		stw	r5,8(r4)
+#		addi	r4,r4,4
+#		stw	r4,0(r5)
+#.TailListEmpty:	blr
+
 #********************************************************************************************
 #
 #	void EnqueuePPC(list, node) // r4,r5
@@ -3502,6 +3511,61 @@ WaitFor68K:
 
 #********************************************************************************************
 #
+#	support: result = StricmpPPC(string1, string2) // r3=r3,r4
+#
+#********************************************************************************************
+
+StricmpPPC:	subi	r3,r3,1
+		subi	r4,r4,1
+
+.LoopCmp:	lbzu	r5,1(r3)
+		lbzu	r6,1(r4)
+
+		cmplwi	r5,0x40
+		ble	.Not5A
+		cmplwi	r5,0x5a
+		bgt	.Chk52
+
+.DoLower5:	ori	r5,r5,0x20
+		b	.Not5A
+
+.Chk52:		cmplwi	r5,0xc0
+		ble	.Not5A
+		cmplwi	r5,0xdf
+		ble	.DoLower5
+
+.Not5A:		cmplwi	r6,0x40
+		ble	.Not6A
+		cmplwi	r6,0x5a
+		bgt	.Chk62
+
+.DoLower6:	ori	r6,r6,0x20
+		b	.Not6A
+
+.Chk62:		cmplwi	r6,0xc0
+		ble	.Not6A
+		cmplwi	r6,0xdf
+		ble	.DoLower6
+
+.Not6A:		cmplw	r5,r6
+		bne	.NotEqual
+
+		mr.	r5,r5
+		bne	.LoopCmp
+
+		li	r3,0
+
+		blr
+
+.NotEqual:	li	r3,-1
+		blt	.DoneCmp
+
+		li	r3,1
+
+.DoneCmp:	blr		
+
+#********************************************************************************************
+#
 #	status = Run68K(PowerPCBase, PPStruct) // r3=r3,r4
 #
 #********************************************************************************************
@@ -3517,7 +3581,39 @@ Run68K:
 		stwu	r24,-4(r13)
 		stwu	r23,-4(r13)
 
-		li	r31,FRun68K-FRun68K
+		lwz	r31,PP_OFFSET-MN_PPSTRUCT(r4)
+		mr.	r31,r31
+		beq	.DonePatchLib
+
+		lwz	r28,sonnet_UtilityBase(r3)
+		lwz	r30,PP_CODE-MN_PPSTRUCT(r4)
+		mr.	r28,r28
+		beq	.DonePatchLib
+
+		cmpw	r30,r28
+		beq	.IsUtil
+		
+		b	.DonePatchLib
+
+.IsUtil:	cmpwi	r31,-162			#_LVOStricmp (LHA 2.14)
+		beq	.IsStricmp
+		
+		b	.DonePatchLib
+
+.IsStricmp:	la	r31,PP_REGS-MN_PPSTRUCT(r4)
+		mr	r23,r3
+		mr	r24,r4
+
+		lwz	r3,8*4(r31)
+		lwz	r4,9*4(r31)
+
+		bl StricmpPPC
+		
+		stw	r3,0(r31)		
+		li	r4,PPERR_SUCCESS
+		b	.GiveResult
+
+.DonePatchLib:	li	r31,FRun68K-FRun68K
 		bl	DebugStartFunction
 
 		la	r30,sonnet_Run68k(r3)		#Count number of 68k context switches
