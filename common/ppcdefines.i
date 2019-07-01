@@ -24,6 +24,7 @@
 #0x00003000	Exceptions/Scheduler
 #0x00100000	Message FIFOs				0x100000 aligned
 #0x00200000	Message Frames
+#0x003C0000	Error information
 #0x00400000	Idle Task
 #0x00480000	Upper limit System Stack
 #0x00480000	Free memory

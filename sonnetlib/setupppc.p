@@ -5425,7 +5425,59 @@ dsi2:
 		la	r30,104(r1)			#Start of reg table in r30
 		
 		loadreg	r0,'DSI?'
-		stw	r0,0xf4(r0)		
+		stw	r0,0xf4(r0)
+		
+		lwz	r7,Exc_srr0(r0)
+####							#Start of check for picture.datatype patch
+		mfctr	r0
+
+		bl	.PatchPic
+		.long	0x8,0x816100bc,0x800b005c,0x7c1a0040
+
+.PatchPic:	mflr	r6
+		lwz	r9,0(r6)
+		li	r31,3
+		li	r23,0
+		mtctr	r31
+
+		sub	r7,r7,r9
+.CompPtchLoop:	lwzu	r31,4(r7)
+		lwzu	r29,4(r6)
+		cmpw	r29,r31
+		bne	.DonePatch
+		bdnz	.CompPtchLoop
+
+		li	r23,-1
+		lwz	r7,0xb0(r0)
+		cmpwi	r7,2
+		beq	.TryPatch
+
+.TryNew:	li	r6,1
+		lwz	r7,PowerPCBase(r0)
+		lwz	r7,ThisPPCProc(r7)
+		stw	r6,0xb0(r0)
+		lwz	r7,TASKPPC_ID(r7)
+		stw	r11,0xb8(r0)
+		stw	r7,0xb4(r0)
+
+		b	.DonePatch	
+
+.TryPatch:	lwz	r7,PowerPCBase(r0)
+		lwz	r31,0xb4(r0)
+		lwz	r7,ThisPPCProc(r7)
+		lwz	r7,TASKPPC_ID(r7)
+		cmpw	r7,r31
+		beq	.FurtherTest
+
+		b	.TryNew
+
+.FurtherTest:	lwz	r7,0xb8(r0)
+		cmpw	r7,r11
+		bne	.TryNew
+
+.DonePatch:	mtctr	r0
+		stw	r23,0xc0(r0)
+####							#End of check for picture.datatype patch
 
 		lwz	r7,PowerPCBase(r0)		#For GetHALInfo
 		lwz	r6,DataExcLow(r7)		#Counts number of Amiga RAM
@@ -5533,7 +5585,7 @@ dsi2:
 		loadreg	r9,'GETV'
 		
 		bl	.DoSixtyEight
-		
+	
 		mr.	r19,r19
 		beq	.FixedValue			#Word
 		rlwinm	r10,r10,16,16,31
@@ -5549,11 +5601,67 @@ dsi2:
 		mtsprg0	r0
 		b	.CommonDSI
 
-.GoLoad:	loadreg	r9,'GETV'
+.GoLoad:
+
+####							#Check for correct setup for picture.datatype patch
+		lwz	r23,0xc0(r0)
+		mr.	r23,r23
+		beq	.DoX
+		
+		lwz	r23,0xb0(r0)
+		cmpwi	r23,2
+		bne	.DoX
+
+		lwz	r23,PowerPCBase(r0)
+		lwz	r24,0xb4(r0)
+		lwz	r23,ThisPPCProc(r23)
+		lwz	r23,TASKPPC_ID(r23)
+		cmpw	r23,r24
+		bne	.DoX
+		
+		lwz	r11,148(r1)
+		lwz	r23,0xb8(r0)
+		cmpw	r23,r11
+		bne	.DoX
+
+		lwz	r10,0xbc(r0)
+
+		b	.NoX
+
+####							#End of check
+
+.DoX:		loadreg	r9,'GETV'
 
 		bl	.DoSixtyEight			#Returns value in r10
-		
-		rlwinm	r9,r31,16,16,31
+
+####							#Check for correct setup for picture.datatype patch
+		lwz	r23,0xc0(r0)
+		mr.	r23,r23
+		beq	.NoX
+
+		lwz	r23,0xb0(r0)
+		cmpwi	r23,1
+		bne	.NoX
+
+		lwz	r23,PowerPCBase(r0)
+		lwz	r24,0xb4(r0)
+		lwz	r23,ThisPPCProc(r23)
+		lwz	r23,TASKPPC_ID(r23)
+		cmpw	r23,r24
+		bne	.NoX
+
+		lwz	r11,148(r1)
+		lwz	r23,0xb8(r0)
+		cmpw	r23,r11
+		bne	.NoX
+
+		li	r23,2
+		stw	r23,0xb0(r0)
+		stw	r10,0xbc(r0)
+
+####							#End of check
+
+.NoX:		rlwinm	r9,r31,16,16,31
 		andi.	r9,r9,0xa800
 		cmplwi	r9,0x8000			#lwz/lwzu 0x8000
 		beq	.FixedValue
@@ -5774,7 +5882,7 @@ dsi2:
 
 .DonePFIFO:	mtctr	r0
 		lwz	r10,MN_IDENTIFIER+4(r25)	#Returned value for load in r10
-
+		
 .NoWaitSE:	blr
 
 #********************************************************************************************
