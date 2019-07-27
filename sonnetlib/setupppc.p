@@ -5428,6 +5428,21 @@ dsi2:
 		stw	r0,0xf4(r0)
 		
 		lwz	r7,Exc_srr0(r0)
+
+		mfdar	r10				###debugdebug
+		lis	r8,0x7800
+		lwz	r6,0xa0(r0)
+		lwz	r11,PowerPCBase(r0)
+		addi	r9,r6,4
+		lwz	r12,ThisPPCProc(r11)
+		stwx	r10,r8,r9
+		stwx	r12,r8,r6
+		addi	r9,r9,4
+		andi.	r9,r9,0xffff
+		stw	r9,0xa0(r0)
+		dcbf	r8,r6				###end debugdebug
+
+		
 ####							#Start of check for picture.datatype patch
 		mfctr	r0
 
@@ -5448,22 +5463,22 @@ dsi2:
 		bdnz	.CompPtchLoop
 
 		li	r23,-1
-		lwz	r7,0xb0(r0)
+		lwz	r7,Patch_Flag(r0)
 		cmpwi	r7,2
 		beq	.TryPatch
 
 .TryNew:	li	r6,1
 		lwz	r7,PowerPCBase(r0)
 		lwz	r7,ThisPPCProc(r7)
-		stw	r6,0xb0(r0)
+		stw	r6,Patch_Flag(r0)
 		lwz	r7,TASKPPC_ID(r7)
-		stw	r11,0xb8(r0)
-		stw	r7,0xb4(r0)
+		stw	r11,Patch_Value(r0)
+		stw	r7,Patch_Task(r0)
 
 		b	.DonePatch	
 
 .TryPatch:	lwz	r7,PowerPCBase(r0)
-		lwz	r31,0xb4(r0)
+		lwz	r31,Patch_Task(r0)
 		lwz	r7,ThisPPCProc(r7)
 		lwz	r7,TASKPPC_ID(r7)
 		cmpw	r7,r31
@@ -5471,12 +5486,12 @@ dsi2:
 
 		b	.TryNew
 
-.FurtherTest:	lwz	r7,0xb8(r0)
+.FurtherTest:	lwz	r7,Patch_Value(r0)
 		cmpw	r7,r11
 		bne	.TryNew
 
 .DonePatch:	mtctr	r0
-		stw	r23,0xc0(r0)
+		stw	r23,Patch_Flag2(r0)
 ####							#End of check for picture.datatype patch
 
 		lwz	r7,PowerPCBase(r0)		#For GetHALInfo
@@ -5604,27 +5619,27 @@ dsi2:
 .GoLoad:
 
 ####							#Check for correct setup for picture.datatype patch
-		lwz	r23,0xc0(r0)
+		lwz	r23,Patch_Flag2(r0)
 		mr.	r23,r23
 		beq	.DoX
 		
-		lwz	r23,0xb0(r0)
+		lwz	r23,Patch_Flag(r0)
 		cmpwi	r23,2
 		bne	.DoX
 
 		lwz	r23,PowerPCBase(r0)
-		lwz	r24,0xb4(r0)
+		lwz	r24,Patch_Task(r0)
 		lwz	r23,ThisPPCProc(r23)
 		lwz	r23,TASKPPC_ID(r23)
 		cmpw	r23,r24
 		bne	.DoX
 		
 		lwz	r11,148(r1)
-		lwz	r23,0xb8(r0)
+		lwz	r23,Patch_Value(r0)
 		cmpw	r23,r11
 		bne	.DoX
 
-		lwz	r10,0xbc(r0)
+		lwz	r10,Patch_Override(r0)
 
 		b	.NoX
 
@@ -5635,29 +5650,29 @@ dsi2:
 		bl	.DoSixtyEight			#Returns value in r10
 
 ####							#Check for correct setup for picture.datatype patch
-		lwz	r23,0xc0(r0)
+		lwz	r23,Patch_Flag2(r0)
 		mr.	r23,r23
 		beq	.NoX
 
-		lwz	r23,0xb0(r0)
+		lwz	r23,Patch_Flag(r0)
 		cmpwi	r23,1
 		bne	.NoX
 
 		lwz	r23,PowerPCBase(r0)
-		lwz	r24,0xb4(r0)
+		lwz	r24,Patch_Task(r0)
 		lwz	r23,ThisPPCProc(r23)
 		lwz	r23,TASKPPC_ID(r23)
 		cmpw	r23,r24
 		bne	.NoX
 
 		lwz	r11,148(r1)
-		lwz	r23,0xb8(r0)
+		lwz	r23,Patch_Value(r0)
 		cmpw	r23,r11
 		bne	.NoX
 
 		li	r23,2
-		stw	r23,0xb0(r0)
-		stw	r10,0xbc(r0)
+		stw	r23,Patch_Flag(r0)
+		stw	r10,Patch_Override(r0)
 
 ####							#End of check
 

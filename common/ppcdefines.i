@@ -57,6 +57,12 @@
 .set Exc_srr0,				0x60
 .set Exc_srr1,				0x64
 
+.set Patch_Flag,			0xb0
+.set Patch_Task,			0xb4
+.set Patch_Value,			0xb8
+.set Patch_Override,			0xbc
+.set Patch_Flag2,			0xc0
+
 .set option_EnEDOMem,0
 .set option_EnDebug,1
 .set option_EnAlignExc,2

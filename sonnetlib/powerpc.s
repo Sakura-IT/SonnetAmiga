@@ -1598,7 +1598,7 @@ MakeLibrary
 		
 		move.l d0,PPCCodeMem-Buffer(a4)
 		move.l d0,a1
-		lea LibFunctions(pc),a0
+		lea LibFunctions,a0			;debugdebug Made this non-PC relative
 		move.l #FunctionsLen,d1
 		lsr.l #2,d1
 		subq.l #1,d1
@@ -3162,6 +3162,25 @@ DontFlagPPC	move.l (a7)+,a3
 ;
 ;********************************************************************************************
 
+AmigaAMP	btst #TB_PPC,TC_FLAGS(a3)			;Check if task was tagged by powerpc.library
+		bne DoBit
+
+		lea CheckValues(pc),a2				;AmigaAMP v3 patches
+		move.l (a2)+,d6
+CVLoop		move.l (a2)+,d7
+		cmp.l d0,d7
+		beq DoBit
+		dbf d6,CVLoop
+
+BufferAMP2	cmp.l #$4000,d0					;AmigaAMP v2 lazy patch
+		blt NoBit
+
+		cmp.b #$54,d0
+		bne NoBit
+		bra DoBit
+
+CheckValues	dc.l	2,$c094,$904,$4d4
+
 NewAlloc	move.l AllocMemAddress(pc),-(a7)		
 		tst.w d1					;Patch code - Test for attribute $0000 (Any)
 		beq.s Best
@@ -3205,6 +3224,8 @@ FindEnd		move.b (a2)+,d7
 		move.l -5(a2),d7
 Checkers	cmp.l #"2005",d7				;Task has name with 2005 at end?
 		beq.s DoBit					;if yes, then redirect to PPC memory
+		cmp.l #"aAMP",d7
+		beq AmigaAMP
 		cmp.l #"_68K",d7
 		beq.s DoBit
 		cmp.l #"_PPC",d7
@@ -3242,7 +3263,7 @@ IsHell		lsl.l #2,d7
 		add.l d7,a2
 		move.l (a2),d7
 		addq.l #5,a2
-		bra.s Checkers
+		bra Checkers
 
 DoBit		bset #MEMB_PPC,d1				;Set attribute MEMF_PPC
 NoBit		movem.l (a7)+,d6-d7/a2-a3
@@ -3259,6 +3280,7 @@ NewOldLoadSeg	move.l LoadSegAddress(pc),-(a7)
 Loader		movem.l d2-a6,-(a7)
 		move.l d1,d5
 		beq NoInternal
+
 		move.l LExecBase(pc),a3
 		move.l ThisTask(a3),a3
 		move.l LN_NAME(a3),a3
@@ -3290,9 +3312,9 @@ Loader		movem.l d2-a6,-(a7)
 
 		move.l d6,d3
 		and.b #3,d3
-		beq.s DoInternalSeg		;Not marked at all
+		beq.s DoInternalSeg			;Not marked at all
 		cmp.b #2,d3
-		beq DoNormalSeg			;Marked normal file
+		beq DoNormalSeg				;Marked normal file
 
 DoInternalSeg	move.l LExecBase(pc),a3
 		sub.l a0,a0
@@ -3304,7 +3326,7 @@ DoInternalSeg	move.l LExecBase(pc),a3
 		move.l a7,a2
 		move.l d4,d0		
 		move.l ThisTask(a3),a3
-		bset #TB_PPC,TC_FLAGS(a3)	;set bit				
+		bset #TB_PPC,TC_FLAGS(a3)		;set bit				
 		jsr _LVOInternalLoadSeg(a6)
 
 		lea 16(a7),a7
@@ -3316,39 +3338,55 @@ CloseError	move.l d4,d1
 		
 		move.l d7,d0
 		move.l d7,d1
-		beq ExitSeg			;There was no seglist returned
+		beq ExitSeg				;There was no seglist returned
 		bra.s IsNormalSeg
 
 UhOhverlay	move.l d7,d1
 		neg.l d1
-		bra.s DontDoOverlay		;Overlay files are not supported at the moment
+		bra.s DontDoOverlay			;Overlay files are not supported at the moment
 
 IsNormalSeg	move.l d6,d3
 		and.b #3,d3
-		bne.s ExitSeg			;Marked PPC file. No need to search.
+		bne ExitSeg				;Marked PPC file. No need to search.
 
-FindPower	move.l d7,d2			;Search for PPC, then mark file with prot bits
-NextSeg		lsl.l #2,d2
+FindPower	move.l d7,d2				;Search for PPC, then mark file with prot bits
+NextSeg		lsl.l #2,d2		
 		move.l d2,a1
 		move.l -4(a1),d2
-		lea 4(a1),a2
-NextByte	lea PowerName(pc),a3
-NextName	subq.l #1,d2
+		lea 3(a1),a5
+
+NextName	lea 1(a5),a2
+		move.l a2,a5
+		moveq.l #1,d3
+		subq.l #1,d2
 		bmi.s EndSeg
+
 		cmp.l #"RACE",(a2)
 		beq.s WarpRaceMod
-		
+
+		lea PowerName(pc),a3
+
+CmpLoop		tst.b (a3)
+		beq.s WarpRaceMod
+
 		move.b (a2)+,d1
 		cmp.b (a3)+,d1
-		bne.s NextByte
-		tst.b -1(a3)
-		bne.s NextName
-		
+		bne.s NextCheck
+		bra.s CmpLoop
+
+NextCheck	tst.l d3
+		beq.s NextName
+
+		lea AMPName(pc),a3			;Say that AmigaAMP is also PPC
+		move.l a5,a2
+		subq.l #1,d3
+		bra.s CmpLoop
+
 WarpRaceMod	bset #0,d6
 		move.l d6,d2
 		move.l d5,d1
 		swap d2
-		jsr _LVOSetProtection(a6)	;Mark file being PPC
+		jsr _LVOSetProtection(a6)		;Mark file being PPC
 		move.l d7,d0
 		move.l d7,d1
 		bra.s ExitSeg
@@ -3361,12 +3399,12 @@ EndSeg		move.l (a1),d2
 DontDoOverlay	jsr _LVOUnLoadSeg(a6)
 DoNormalSeg	move.l LExecBase(pc),a1
 		move.l ThisTask(a1),a1
-		bclr #TB_PPC,TC_FLAGS(a1)	;clear bit
+		bclr #TB_PPC,TC_FLAGS(a1)		;clear bit
 		move.l d5,d1
 		bset #1,d6
 		move.l d6,d2
 		swap d2
-		jsr _LVOSetProtection(a6)	;Mark file being Non-PPC
+		jsr _LVOSetProtection(a6)		;Mark file being Non-PPC
 		move.l d5,d1
 		bra.s NoInternal
 		
@@ -3406,7 +3444,7 @@ NoCyber		btst #6,20(a2)
 NoHunkPatch	movem.l (a7)+,d0-a6
 		rts
 
-TestCyber1	cmp.l #$710,24(a2)		;Exceptions to moving hunks to FastRAM (dirty)
+TestCyber1	cmp.l #$710,24(a2)			;Exceptions to moving hunks to FastRAM (dirty)
 Testing		beq.s NoHunkPatch
 		bra.s NoCyber
 
@@ -4708,7 +4746,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.12 (01.07.19)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.13 (27.07.19)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
@@ -4746,6 +4784,7 @@ PPCCrashNoWin	dc.b	"PPC crashed but could not output crash window",0
 PPCErrorTimeOut	dc.b	"PPC timed out while waiting on 68k",0
 CardStateError	dc.b	"PPC card in unsupported state",0
 KernelPanic	dc.b	"Kernel Panic!",0
+AMPName		dc.b	"AmigaAMP",0
 
 ConWindow	dc.b	"CON:0/20/680/250/PowerPC Exception/AUTO/CLOSE/WAIT/"
 		dc.b	"INACTIVE",0		
