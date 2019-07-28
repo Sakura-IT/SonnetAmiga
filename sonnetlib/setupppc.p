@@ -5427,22 +5427,7 @@ dsi2:
 		loadreg	r0,'DSI?'
 		stw	r0,0xf4(r0)
 		
-		lwz	r7,Exc_srr0(r0)
-
-		mfdar	r10				###debugdebug
-		lis	r8,0x7800
-		lwz	r6,0xa0(r0)
-		lwz	r11,PowerPCBase(r0)
-		addi	r9,r6,4
-		lwz	r12,ThisPPCProc(r11)
-		stwx	r10,r8,r9
-		stwx	r12,r8,r6
-		addi	r9,r9,4
-		andi.	r9,r9,0xffff
-		stw	r9,0xa0(r0)
-		dcbf	r8,r6				###end debugdebug
-
-		
+		lwz	r7,Exc_srr0(r0)		
 ####							#Start of check for picture.datatype patch
 		mfctr	r0
 
