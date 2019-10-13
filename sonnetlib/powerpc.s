@@ -955,19 +955,26 @@ SetupHarrier	movem.l d0-a0/a2-a6,-(a7)
 		move.l d2,XCSR_XPAT1(a3)				;And XPAT1 to disable on-board ROM startup
 		move.l d2,XCSR_XPAT2(a3)
 		move.l d2,XCSR_XPAT3(a3)				;Let's just do them all..
-
+		
 		move.l XCSR_SDBAA(a3),d6
 		move.l XCSR_BXCS(a3),d2
-		btst #20,d2
+		and.l #XCSR_SDBA_SIZE,d6
+		btst #XCSR_BXCS_BP0H,d2
 		bne.s NoReset
 
-		eor.l #XCSR_BXCS_P0H_ENA,d2		;Reset Processor 0 when already running.
+		bset #XCSR_BXCS_BP0H,d2			;Reset Processor 0 when already running.
 		move.l d2,XCSR_BXCS(a3)
+WaitCPUReset	move.l XCSR_BXCS(a3),d0
+		cmp.l d0,d2
+		bne.s WaitCPUReset
 
 NoReset		move.l #$20000000,d0
 		move.l MediatorType(pc),d1
 		bne.s AllocPCI1200
-
+		
+		cmp.l #XCSR_SDBA_16M8,d6
+		beq.s Is128
+		
 		move.l #$000000f0,d0			;Set 256MB PCI Memory (swapped and negged)
 		moveq.l #2,d1				;Dummy bar 2
 		move.l SonAddr(pc),a0
@@ -978,7 +985,7 @@ AllocPCI1200	move.l #PPC_RAM_BASE|PCFS_ITSZ_256MB,d4
 		move.l d0,d2
 		bne.s AtLeast256
 
-		move.l #$000000f8,d0
+Is128		move.l #$000000f8,d0
 		moveq.l #2,d1
 		move.l SonAddr(pc),a0
 		jsr _LVOPCIAllocMem(a6)
@@ -987,6 +994,10 @@ AllocPCI1200	move.l #PPC_RAM_BASE|PCFS_ITSZ_256MB,d4
 		move.l #$08000000,d7
 		move.l d0,d2		
 		beq PCIMemErr
+		
+		moveq.l #0,d5
+		cmp.l #XCSR_SDBA_16M8,d6
+		beq PCIMemHar
 		
 		move.l #$000000fc,d0			;Try to squeeze out an extra 64MB
 		moveq.l #4,d1
@@ -1001,9 +1012,7 @@ AllocPCI1200	move.l #PPC_RAM_BASE|PCFS_ITSZ_256MB,d4
 AtLeast256	move.l MediatorType(pc),d0
 		bne.s PCIMemHar				;No 512MB on Amiga 1200.
 
-		move.l d6,d0
-		and.l #XCSR_SDBA_SIZE,d0
-		cmp.l #XCSR_SDBA_256MB,d0
+		cmp.l #XCSR_SDBA_64M8,d6
 		bne.s PCIMemHar
 
 		move.l #$000000f8,d0			;add more mem for 512MB cards.
@@ -1158,8 +1167,11 @@ loopHarrier	move.l (a2)+,(a5)+					;Copy code to 0x13000
 
 		move.l XCSRAddr(pc),a3
 		move.l XCSR_BXCS(a3),d2
-		eor.l #XCSR_BXCS_P0H_ENA,d2				;Clear Processor 0 Hold off and start running PPC
+		bclr #XCSR_BXCS_BP0H,d2					;Clear Processor 0 Hold off and start running PPC
 		move.l d2,XCSR_BXCS(a3)
+WaitCPUReset2	move.l XCSR_BXCS(a3),d3
+		cmp.l d2,d3
+		bne.s WaitCPUReset2
 
 		move.l PMEPAddr(pc),a3
 		moveq.l #0,d2
