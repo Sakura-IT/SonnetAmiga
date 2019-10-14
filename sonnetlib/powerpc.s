@@ -855,7 +855,11 @@ NoZen		move.l _PowerPCBase(pc),a6
 		lea PPCTaskError(pc),a2
 		bra PrintError
 
-GotPPCControl	move.l LExecBase(pc),a6
+GotPPCControl	move.l #$70000000,a6
+		move.l #$48000000,$fc(a6)		;This is a loop in PPC assembly
+		move.l #$4bfffffc,$100(a6)		;Going to park the CPU
+
+		move.l LExecBase(pc),a6
 		moveq.l #46,d0
 		lea ppclib(pc),a1
 		jsr _LVOOpenLibrary(a6)			;Open ppc.library for LoadSeg() patch
@@ -964,9 +968,6 @@ SetupHarrier	movem.l d0-a0/a2-a6,-(a7)
 
 		bset #XCSR_BXCS_BP0H,d2			;Reset Processor 0 when already running.
 		move.l d2,XCSR_BXCS(a3)
-WaitCPUReset	move.l XCSR_BXCS(a3),d0
-		cmp.l d0,d2
-		bne.s WaitCPUReset
 
 NoReset		move.l #$20000000,d0
 		move.l MediatorType(pc),d1
@@ -975,7 +976,13 @@ NoReset		move.l #$20000000,d0
 		cmp.l #XCSR_SDBA_16M8,d6
 		beq.s Is128
 		
-		move.l #$000000f0,d0			;Set 256MB PCI Memory (swapped and negged)
+		cmp.l #XCSR_SDBA_32M8,d6
+		beq.s Is256
+		
+		move.b Options68K+3(pc),d0
+		beq.s Is128
+		
+Is256		move.l #$000000f0,d0			;Set 256MB PCI Memory (swapped and negged)
 		moveq.l #2,d1				;Dummy bar 2
 		move.l SonAddr(pc),a0
 		jsr _LVOPCIAllocMem(a6)			;Get space for PPC RAM
@@ -997,6 +1004,9 @@ Is128		move.l #$000000f8,d0
 		
 		moveq.l #0,d5
 		cmp.l #XCSR_SDBA_16M8,d6
+		beq PCIMemHar
+		
+		move.b Options68K+3(pc),d0
 		beq PCIMemHar
 		
 		move.l #$000000fc,d0			;Try to squeeze out an extra 64MB
@@ -1124,7 +1134,11 @@ BigBox1		sub.w #$6000,d2						;Calculate offset
 
 		or.l #XCSR_SDGC_MXRR_7,d3
 		move.l #XCSR_SDTC_DEFAULT,XCSR_SDTC(a3)			;Set RAM settings.
-		move.l #XCSR_SDBA_32M8,XCSR_SDBAA(a3)			;Set SDRAM bank A to 32Mx8 / 256MBytes as default
+		move.l #XCSR_SDBA_16M8,XCSR_SDBAA(a3)			;Set SDRAM bank A to 16Mx8 / 128MBytes as default
+		move.b Options68K+3(pc),d2
+		beq.s SkipRamSettings
+
+		move.l #XCSR_SDBA_32M8,XCSR_SDBAA(a3)			;Set SDRAM bank A to 32Mx8 / 256MBytes as alternative
 
 SkipRamSettings	move.l XCSR_SDBAA(a3),d2
 		or.l #XCSR_SDBA_ENA,d2
@@ -1169,9 +1183,6 @@ loopHarrier	move.l (a2)+,(a5)+					;Copy code to 0x13000
 		move.l XCSR_BXCS(a3),d2
 		bclr #XCSR_BXCS_BP0H,d2					;Clear Processor 0 Hold off and start running PPC
 		move.l d2,XCSR_BXCS(a3)
-WaitCPUReset2	move.l XCSR_BXCS(a3),d3
-		cmp.l d2,d3
-		bne.s WaitCPUReset2
 
 		move.l PMEPAddr(pc),a3
 		moveq.l #0,d2
@@ -1731,7 +1742,11 @@ DoneCPUComm	move.b (a3),1(a5)
 		beq.s DoneStackP
 		move.b d2,(a3)
 DoneStackP	move.b (a3),2(a5)
-		rts
+		lea HarMem(pc),a1
+		bsr DoENV
+		bmi.s NoHarMem
+		move.b (a3),3(a5)
+NoHarMem	rts
 
 ;*********************************************
 
@@ -4812,6 +4827,7 @@ DisHunkPatch	dc.b	"sonnet/DisHunkPatch",0			;7
 SetCMemDiv	dc.b	"sonnet/SetCMemDiv",0			;8
 SetCPUComm	dc.b	"sonnet/SetCPUComm",0			;9
 EnStackPatch	dc.b	"sonnet/EnStackPatch",0			;10
+HarMem		dc.b	"sonnet/Harrier256MB",0			;11
 
 		cnop	0,4
 		

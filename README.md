@@ -29,9 +29,9 @@ SonnetAmiga has the following hardware requirements:
 
 - Force PowerPMC-250 MPC7410 card. Tested with 256MB SDRAM on-board.
   Needs a PMC to PCI card with 3.3V regulator.
-- Motorola PrPMC800/815 cards with Harrier chip-set and 256/512MB SDRAM on-board.
-  Also needs a PMC to PCI card with 3.3V regulator and enough Amps. Up to 384MB
-  supported on the 512MB cards if enough Zorro III space available.
+- Motorola PrPMC800/815 cards with Harrier chip-set and 128/256/512MB SDRAM
+  on-board. Also needs a PMC to PCI card with 3.3V regulator and enough Amps.
+  Up to 384MB supported on the 512MB cards if enough Zorro III space available.
 - BigFoot Killer NIC M1 with 400MHz e300 core and 64MB on-board
 - BigFoot Killer NIC K1 with 333MHz e300 core and 64MB on-board
 
@@ -84,6 +84,8 @@ Currently the following options are supported through variables in ENVARC:sonnet
   5 = 3, 4 = 2.5, 3 = 2, 2 = 1.5, 1 = 1, 0 = Handled by library. Default = 0.
   For example: A Sonnet with speed 500 MHz and setting 5 will run the L2 cache
   at 166 MHz (500/3). **USE AT OWN RISK!!!**
+- Harrier256MB (0 or 1): Enable if you have a Harrier based G4 card with 256MB.
+  Default = 0 (128MB) The 128MB card needs a jumper on pin 11/12 of J2.
 
 # Bugs
 
