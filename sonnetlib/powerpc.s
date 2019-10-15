@@ -855,11 +855,7 @@ NoZen		move.l _PowerPCBase(pc),a6
 		lea PPCTaskError(pc),a2
 		bra PrintError
 
-GotPPCControl	move.l #$70000000,a6
-		move.l #$48000000,$fc(a6)		;This is a loop in PPC assembly
-		move.l #$4bfffffc,$100(a6)		;Going to park the CPU
-
-		move.l LExecBase(pc),a6
+GotPPCControl	move.l LExecBase(pc),a6
 		moveq.l #46,d0
 		lea ppclib(pc),a1
 		jsr _LVOOpenLibrary(a6)			;Open ppc.library for LoadSeg() patch
@@ -976,8 +972,8 @@ NoReset		move.l #$20000000,d0
 		cmp.l #XCSR_SDBA_16M8,d6
 		beq.s Is128
 		
-		cmp.l #XCSR_SDBA_32M8,d6
-		beq.s Is256
+		tst.l d6
+		bne.s Is256
 		
 		move.b Options68K+3(pc),d0
 		beq.s Is128
@@ -1006,10 +1002,13 @@ Is128		move.l #$000000f8,d0
 		cmp.l #XCSR_SDBA_16M8,d6
 		beq PCIMemHar
 		
+		tst.l d6
+		bne.s NoIs128
+		
 		move.b Options68K+3(pc),d0
 		beq PCIMemHar
 		
-		move.l #$000000fc,d0			;Try to squeeze out an extra 64MB
+NoIs128		move.l #$000000fc,d0			;Try to squeeze out an extra 64MB
 		moveq.l #4,d1
 		move.l SonAddr(pc),a0		
 		jsr _LVOPCIAllocMem(a6)
