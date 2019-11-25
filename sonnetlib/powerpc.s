@@ -467,7 +467,6 @@ GotVGAMem	add.l #$10000,d0
 		move.l #$0000F0FF,OMBAR(a3)		;Processor outbound mem at $FFF00000
 
 		move.l #$48002f00,d6
-		move.l a2,d4
 		move.l d6,(a5)				;PPC branch to code outside exception space (0x3000)
 		move.l (a5),d0
 		cmp.l d6,d0				;Should be cache inhibited for this to work
@@ -599,7 +598,7 @@ GotMemName	move.l d0,a0
 
 		jsr _LVODisable(a6)
 		lea MemList(a6),a0
-		move.l d4,a2
+		move.l SonAddr(pc),a2
 		
 		cmp.w #DEVICE_MPC107,PCI_DEVICEID(a2)
 		bne.s SkipCorrection
@@ -4772,7 +4771,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.13 (27.07.19)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.13 (25.11.19)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
