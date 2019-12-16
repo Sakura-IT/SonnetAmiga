@@ -3224,9 +3224,10 @@ Best		movem.l d6-d7/a2-a3,-(a7)
 		bne NoBit
 		
 		move.b ThisTask(a6),d7
+		beq.s NotAPPCMemTask
 		move.b SonnetBase(pc),d6
-		and.b #$f0,d6
-		and.b #$f0,d7
+		and.b #$e0,d6
+		and.b #$e0,d7
 		eor.b d6,d7
 		bne.s NotAPPCMemTask
 
@@ -4771,7 +4772,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.13 (25.11.19)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.13 (16.12.19)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
