@@ -3224,7 +3224,9 @@ Best		movem.l d6-d7/a2-a3,-(a7)
 		bne NoBit
 		
 		move.b ThisTask(a6),d7
+		and.b #$f0,d7
 		beq.s NotAPPCMemTask
+
 		move.b SonnetBase(pc),d6
 		and.b #$e0,d6
 		and.b #$e0,d7
