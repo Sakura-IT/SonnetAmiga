@@ -7541,7 +7541,7 @@ Run68KLowLevel:
 
 		bl SendMsgFramePPC
 
-		subi	r4,r30,MN_PPSTRUCT
+		addi	r4,r30,MN_PPSTRUCT
 		mr	r3,r24
 
 		bl WaitFor68K

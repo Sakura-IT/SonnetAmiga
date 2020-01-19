@@ -4774,7 +4774,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.13 (16.12.19)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.13 (19.01.20)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
@@ -4804,7 +4804,7 @@ PPCTaskError	dc.b	"Error setting up Kryten PPC process",0
 PCIMemError	dc.b	"Could not allocate sufficient PCI memory",0
 CPUReqError	dc.b	"This library requires a 68LC040 or better",0
 NoPPCPCI	dc.b	"PPCPCI environment not set in ENVARC:Mediator",0
-PPCErrMem	dc.b	"PPC CPU ran out of memory",0
+PPCErrMem	dc.b	"PPC memory list corruption detected",0
 PPCErrAsync	dc.b	"Async Run68K function not supported",0
 PPCErrSem	dc.b	"PPC Semaphore in illegal state",0
 PPCErrFifo	dc.b	"PPC received an illegal command packet",0
