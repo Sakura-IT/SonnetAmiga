@@ -4834,7 +4834,7 @@ PPCErrSem	dc.b	"PPC Semaphore in illegal state",0
 PPCErrFifo	dc.b	"PPC received an illegal command packet",0
 PPCCrashNoWin	dc.b	"PPC crashed but could not output crash window",0
 PPCErrorTimeOut	dc.b	"PPC timed out while waiting on 68k",0
-MemWrapError	dc.b	"PPC emory wrapping error detected. Please reboot!",0
+MemWrapError	dc.b	"PPC memory wrapping error detected. Please reboot!",0
 CardStateError	dc.b	"PPC card in unsupported state",0
 KernelPanic	dc.b	"Kernel Panic!",0
 AMPName		dc.b	"AmigaAMP",0
