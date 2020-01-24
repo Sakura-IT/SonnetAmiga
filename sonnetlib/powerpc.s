@@ -975,8 +975,11 @@ NoReset		move.l #$20000000,d0
 		bne.s Is256
 		
 		move.b Options68K+3(pc),d0
-		beq.s Is128
-		
+		bne.s Is2562
+		or.l #XCSR_SDBA_16M8,XCSR_SDBA_SIZE(a3)
+		bra.s Is128
+			
+Is2562		or.l #XCSR_SDBA_32M8,XCSR_SDBA_SIZE(a3)				
 Is256		move.l #$000000f0,d0			;Set 256MB PCI Memory (swapped and negged)
 		moveq.l #2,d1				;Dummy bar 2
 		move.l SonAddr(pc),a0
@@ -1145,6 +1148,7 @@ SkipRamSettings	move.l XCSR_SDBAA(a3),d2
 		or.l d3,d2						;Set MXRR to required Refresh Rate
 		move.l d2,XCSR_SDGC(a3)					;and remap using ENRV from $fff00000 to $0
 		move.w #XCSR_XARB_PRKCPU0|XCSR_XARB_ENA,XCSR_XARB(a3)	;Set external arbiter to park on CPU 0.
+		move.l a3,a4
 
 		move.l SonnetBase(pc),a3
 		lea $10000(a3),a1
@@ -1159,7 +1163,27 @@ loopHarrier	move.l (a2)+,(a5)+					;Copy code to 0x13000
 		dbf d6,loopHarrier
 
 		move.l #$abcdabcd,BASE_CODEWORD(a1)			;Code Word
-		move.l GfxMem(pc),BASE_GFXMEM(a1)
+		
+		move.l XCSR_SDBAA(a4),d6
+		and.l #XCSR_SDBA_SIZE,d6
+		cmp.l #XCSR_SDBA_16M8,d6
+		beq.s NoMemWrap
+
+		move.l a1,a2
+		add.l #$8000000,a2
+		cmp.l #$abcdabcd,BASE_CODEWORD(a2)
+		bne.s NoMemWrap 
+		
+		move.l XCSR_SDBAA(a4),d6
+		and.l #~XCSR_SDBA_SIZE,d6
+		or.l #XCSR_SDBA_16M8,d6
+		move.l d6,XCSR_SDBAA(a4)
+		
+		movem.l (a7)+,d0-a0/a2-a6
+		lea MemWrapError(pc),a2
+		bra PrintError		
+		
+NoMemWrap	move.l GfxMem(pc),BASE_GFXMEM(a1)
 		move.l GfxLen(pc),BASE_GFXLEN(a1)		
 		move.l GfxType(pc),BASE_GFXTYPE(a1)
 		move.l GfxConfig(pc),BASE_GFXCONFIG(a1)
@@ -4774,7 +4798,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.13 (19.01.20)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.13 (24.01.20)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
@@ -4810,6 +4834,7 @@ PPCErrSem	dc.b	"PPC Semaphore in illegal state",0
 PPCErrFifo	dc.b	"PPC received an illegal command packet",0
 PPCCrashNoWin	dc.b	"PPC crashed but could not output crash window",0
 PPCErrorTimeOut	dc.b	"PPC timed out while waiting on 68k",0
+MemWrapError	dc.b	"PPC emory wrapping error detected. Please reboot!",0
 CardStateError	dc.b	"PPC card in unsupported state",0
 KernelPanic	dc.b	"Kernel Panic!",0
 AMPName		dc.b	"AmigaAMP",0
