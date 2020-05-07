@@ -976,10 +976,10 @@ NoReset		move.l #$20000000,d0
 		
 		move.b Options68K+3(pc),d0
 		bne.s Is2562
-		or.l #XCSR_SDBA_16M8,XCSR_SDBA_SIZE(a3)
+		or.l #XCSR_SDBA_16M8,XCSR_SDBAA(a3)
 		bra.s Is128
 			
-Is2562		or.l #XCSR_SDBA_32M8,XCSR_SDBA_SIZE(a3)				
+Is2562		or.l #XCSR_SDBA_32M8,XCSR_SDBAA(a3)				
 Is256		move.l #$000000f0,d0			;Set 256MB PCI Memory (swapped and negged)
 		moveq.l #2,d1				;Dummy bar 2
 		move.l SonAddr(pc),a0
