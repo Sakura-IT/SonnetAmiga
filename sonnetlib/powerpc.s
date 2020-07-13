@@ -633,6 +633,10 @@ GotLibMade
 		move.l d0,a1
 		addq.w #1,LIB_OPENCNT(a1)		;Prevent closure and all kinds of problems
 		jsr _LVOAddLibrary(a6)
+		
+		move.l _PowerPCBase(pc),a0
+		move.l LExecBase(pc),PPC_SYSLIB(a0)
+		move.l DosBase(pc),PPC_DOSLIB(a0)
 
 		lea WARPFUNCTABLE(pc),a0		;Set up a fake warp.library
 		lea WARPDATATABLE(pc),a1		;Some programs do a version
@@ -4798,7 +4802,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.13 (24.01.20)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.13 (14.07.20)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
