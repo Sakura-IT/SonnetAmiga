@@ -176,6 +176,13 @@ GotExp		move.l d0,a6
 		jsr _LVOFindConfigDev(a6)		;Find A3000/A4000 mediator
 		tst.l d0
 		bne.s FoundMed
+		
+		sub.l a0,a0
+		move.l #VENDOR_ELBOX,d0			;ELBOX
+		moveq.l #MEDIATOR_MKIII,d1		;Mediator MKIII
+		jsr _LVOFindConfigDev(a6)		;Find A3000/A4000 mediator
+		tst.l d0
+		bne.s FoundMed
 
 		sub.l a0,a0
 		move.l #VENDOR_ELBOX,d0			;ELBOX
@@ -211,9 +218,16 @@ FoundMed	sub.l a0,a0
 		move.l #MEDIATOR_LOGIC,d1		;Mediator Logic board for A3/4000
 		jsr _LVOFindConfigDev(a6)
 		tst.l d0
+		bne.s GotCorrMed
+		
+		sub.l a0,a0
+		move.l #VENDOR_ELBOX,d0			;ELBOX
+		move.l #MEDIATOR_LOGICIII,d1		;Mediator Logic board MKIII for A3/4000
+		jsr _LVOFindConfigDev(a6)
+		tst.l d0
 		beq.s WeirdMed
 
-		move.l d0,a1
+GotCorrMed	move.l d0,a1
 		move.l cd_BoardSize(a1),d0		;Start address Configspace Mediator
 		cmp.l #$20000000,d0
 		beq TestForMPC107			;WindowSize 512MB?
@@ -4802,7 +4816,7 @@ EndFlag		dc.l	-1
 WarpName	dc.b	"warp.library",0
 WarpIDString	dc.b	"$VER: warp.library 5.1 (22.3.17)",0
 PowerName	dc.b	"powerpc.library",0
-PowerIDString	dc.b	"$VER: powerpc.library 17.13 (14.07.20)",0
+PowerIDString	dc.b	"$VER: powerpc.library 17.13b (19.12.20)",0
 DebugString	dc.b	"Process: %s Function: %s r4,r5,r6,r7 = %08lx,%08lx,%08lx,%08lx",10,0
 DebugString2	dc.b	"Process: %s Function: %s r3 = %08lx",10,0
 		
